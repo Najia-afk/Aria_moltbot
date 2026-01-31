@@ -186,7 +186,7 @@ function renderServiceCard(service, online) {
                 </div>
             </div>
             <div class="service-actions">
-                ${service.url ? `<a href="${service.url}" target="_blank" class="btn btn-primary">Open</a>` : ''}
+                ${service.url ? `<a href="${service.url}" target="_blank" rel="noopener noreferrer" class="btn btn-primary">Open</a>` : ''}
                 <button class="btn btn-secondary" onclick="checkSingle('${service.id}')">Check</button>
             </div>
         </div>
