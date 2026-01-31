@@ -121,7 +121,6 @@ async def get_db():
 
 
 @app.get("/health", response_model=HealthResponse)
-@app.get("/api/health", response_model=HealthResponse)
 async def health_check():
     uptime = (datetime.utcnow() - STARTUP_TIME).total_seconds()
     db_status = "connected" if db_pool else "disconnected"
@@ -133,7 +132,7 @@ async def health_check():
     )
 
 
-@app.get("/api/status")
+@app.get("/status")
 async def api_status():
     results = {}
     async with httpx.AsyncClient(timeout=3.0) as client:
@@ -147,7 +146,7 @@ async def api_status():
     return results
 
 
-@app.get("/api/status/{service_id}")
+@app.get("/status/{service_id}")
 async def api_status_service(service_id: str):
     service_info = SERVICE_URLS.get(service_id)
     if not service_info:
@@ -162,7 +161,7 @@ async def api_status_service(service_id: str):
         return {"status": "offline", "code": None}
 
 
-@app.get("/api/stats", response_model=StatsResponse)
+@app.get("/stats", response_model=StatsResponse)
 async def api_stats(conn=Depends(get_db)):
     activities = await conn.fetchval("SELECT COUNT(*) FROM activity_log")
     thoughts = await conn.fetchval("SELECT COUNT(*) FROM thoughts")
@@ -176,7 +175,7 @@ async def api_stats(conn=Depends(get_db)):
     )
 
 
-@app.get("/api/activities")
+@app.get("/activities")
 async def api_activities(limit: int = 100, conn=Depends(get_db)):
     rows = await conn.fetch(
         """
@@ -205,7 +204,7 @@ async def api_activities(limit: int = 100, conn=Depends(get_db)):
     return results
 
 
-@app.get("/api/thoughts")
+@app.get("/thoughts")
 async def api_thoughts(limit: int = 100, conn=Depends(get_db)):
     rows = await conn.fetch(
         """
@@ -229,7 +228,7 @@ async def api_thoughts(limit: int = 100, conn=Depends(get_db)):
     }
 
 
-@app.get("/api/search")
+@app.get("/search")
 async def api_search(
     q: str = "",
     activities: bool = True,
@@ -314,7 +313,7 @@ async def api_search(
     return results
 
 
-@app.get("/api/records")
+@app.get("/records")
 async def api_records(
     table: str = "activities",
     limit: int = 25,
@@ -340,7 +339,7 @@ async def api_records(
     return {"records": records, "total": total}
 
 
-@app.get("/api/export")
+@app.get("/export")
 async def api_export(table: str = "activities", conn=Depends(get_db)):
     table_map = {
         "activities": "activity_log",
@@ -385,7 +384,7 @@ async def list_interactions(limit: int = 50, conn=Depends(get_db)):
 # ============================================
 # Routes: UI API (/api)
 # ============================================
-@app.get("/api/status")
+@app.get("/status")
 async def api_status(conn=Depends(get_db)):
     status = {}
     for name, url in SERVICE_URLS.items():
@@ -401,7 +400,7 @@ async def api_status(conn=Depends(get_db)):
     return status
 
 
-@app.get("/api/status/{service_id}")
+@app.get("/status/{service_id}")
 async def api_service_status(service_id: str, conn=Depends(get_db)):
     service_ports = {
         "ollama": 11434,
@@ -428,7 +427,7 @@ async def api_service_status(service_id: str, conn=Depends(get_db)):
     return {"status": "online" if result["status"] == "up" else "offline", "port": service_ports.get(service_id), "code": result.get("code")}
 
 
-@app.get("/api/activities")
+@app.get("/activities")
 async def api_activities(limit: int = 100, conn=Depends(get_db)):
     rows = await conn.fetch(
         """SELECT id, action, details, created_at
@@ -449,7 +448,7 @@ async def api_activities(limit: int = 100, conn=Depends(get_db)):
     return activities
 
 
-@app.get("/api/thoughts")
+@app.get("/thoughts")
 async def api_thoughts(limit: int = 100, conn=Depends(get_db)):
     rows = await conn.fetch(
         """SELECT id, category, content, created_at
@@ -470,7 +469,7 @@ async def api_thoughts(limit: int = 100, conn=Depends(get_db)):
     return {"thoughts": thoughts}
 
 
-@app.get("/api/search")
+@app.get("/search")
 async def api_search(q: str = "", activities: bool = True, thoughts: bool = True, memories: bool = True, conn=Depends(get_db)):
     if not q:
         return {"activities": [], "thoughts": [], "memories": []}
@@ -531,7 +530,7 @@ async def api_search(q: str = "", activities: bool = True, thoughts: bool = True
     return results
 
 
-@app.get("/api/stats")
+@app.get("/stats")
 async def api_stats(conn=Depends(get_db)):
     try:
         activities_count = await conn.fetchval("SELECT COUNT(*) FROM activity_log")
@@ -554,7 +553,7 @@ async def api_stats(conn=Depends(get_db)):
         }
 
 
-@app.get("/api/records")
+@app.get("/records")
 async def api_records(table: str = "activities", limit: int = 25, page: int = 1, conn=Depends(get_db)):
     table_map = {
         "activities": "activity_log",
@@ -573,7 +572,7 @@ async def api_records(table: str = "activities", limit: int = 25, page: int = 1,
     return {"records": records, "total": total or 0, "page": page, "limit": limit}
 
 
-@app.get("/api/export")
+@app.get("/export")
 async def api_export(table: str = "activities", conn=Depends(get_db)):
     table_map = {
         "activities": "activity_log",
