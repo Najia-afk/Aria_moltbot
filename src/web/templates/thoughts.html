@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Thoughts - Aria{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>💭 Aria's Thoughts</h1>
+    <p>View and explore Aria's reasoning and internal thoughts</p>
+</div>
+
+<div class="filters">
+    <div class="search-box">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+        <input type="text" class="input" id="searchInput" placeholder="Search thoughts...">
+    </div>
+    <div class="filter-group">
+        <label class="filter-label">Category:</label>
+        <select id="categoryFilter" onchange="filterThoughts()">
+            <option value="">All Categories</option>
+            <option value="reasoning">Reasoning</option>
+            <option value="reflection">Reflection</option>
+            <option value="planning">Planning</option>
+            <option value="observation">Observation</option>
+        </select>
+    </div>
+    <button class="btn btn-primary" onclick="loadThoughts()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12a9 9 0 11-6.22-8.56"/>
+        </svg>
+        Refresh
+    </button>
+</div>
+
+<div class="thoughts-grid grid-2" id="thoughtsContainer">
+    <div class="loading"><div class="spinner"></div></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.thought-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    transition: transform 0.2s;
+}
+.thought-card:hover { transform: translateY(-2px); }
+.thought-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+}
+.thought-category {
+    padding: 0.25rem 0.75rem;
+    background: rgba(124, 58, 237, 0.15);
+    color: var(--accent-purple);
+    border-radius: 20px;
+    font-size: 0.8rem;
+}
+.thought-time {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+.thought-content {
+    color: var(--text-secondary);
+    line-height: 1.7;
+}
+.thought-content strong { color: var(--text-primary); }
+</style>
+
+<script>
+async function loadThoughts() {
+    const container = document.getElementById('thoughtsContainer');
+    container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+    
+    try {
+        const response = await fetch(`${window.ARIA_API_BASE_URL}/thoughts`);
+        const data = await response.json();
+        renderThoughts(data.thoughts || []);
+    } catch (error) {
+        container.innerHTML = '<div class="empty-state"><p>Error loading thoughts</p></div>';
+    }
+}
+
+function renderThoughts(thoughts) {
+    const container = document.getElementById('thoughtsContainer');
+    
+    if (!thoughts.length) {
+        container.innerHTML = `
+            <div class="empty-state" style="grid-column: 1/-1;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                </svg>
+                <p>No thoughts recorded yet</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = thoughts.map(t => `
+        <div class="thought-card" data-category="${t.category || 'general'}">
+            <div class="thought-header">
+                <span class="thought-category">${t.category || 'General'}</span>
+                <span class="thought-time">${formatTime(t.timestamp)}</span>
+            </div>
+            <div class="thought-content">${t.content}</div>
+        </div>
+    `).join('');
+}
+
+function filterThoughts() {
+    const category = document.getElementById('categoryFilter').value;
+    const search = document.getElementById('searchInput').value.toLowerCase();
+    
+    document.querySelectorAll('.thought-card').forEach(card => {
+        const matchCategory = !category || card.dataset.category === category;
+        const matchSearch = !search || card.textContent.toLowerCase().includes(search);
+        card.style.display = matchCategory && matchSearch ? 'block' : 'none';
+    });
+}
+
+function formatTime(ts) {
+    return new Date(ts).toLocaleString();
+}
+
+document.getElementById('searchInput').addEventListener('input', filterThoughts);
+document.addEventListener('DOMContentLoaded', loadThoughts);
+</script>
+{% endblock %}

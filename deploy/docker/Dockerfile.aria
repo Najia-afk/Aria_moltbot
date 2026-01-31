@@ -1,0 +1,59 @@
+# Aria Bot - Alpine-based OpenClaw container
+FROM node:20-alpine
+
+LABEL maintainer="Aria Blue <aria@moltbot.local>"
+LABEL description="Aria AI Assistant - OpenClaw based"
+
+# Install dependencies
+RUN apk add --no-cache \
+    git \
+    python3 \
+    py3-pip \
+    bash \
+    curl \
+    jq \
+    openssh-client
+
+# Create app directory
+WORKDIR /app
+
+# Clone OpenClaw (or use local if mounted)
+ARG OPENCLAW_REPO=https://github.com/Clawdio51/OpenClaw.git
+ARG OPENCLAW_BRANCH=main
+
+RUN git clone --depth 1 -b ${OPENCLAW_BRANCH} ${OPENCLAW_REPO} /app/openclaw || true
+
+# If OpenClaw clone fails, create minimal structure
+RUN mkdir -p /app/openclaw /app/soul /app/sessions /app/memory /app/skills
+
+# Install OpenClaw dependencies
+WORKDIR /app/openclaw
+RUN if [ -f "package.json" ]; then npm install --production; fi
+
+# Copy soul files placeholder
+WORKDIR /app
+COPY soul/ /app/soul/ 2>/dev/null || true
+
+# Create directories for runtime
+RUN mkdir -p /app/logs /app/data
+
+# Environment
+ENV NODE_ENV=production
+ENV ARIA_HOME=/app
+ENV SOUL_PATH=/app/soul
+ENV MEMORY_PATH=/app/memory
+ENV SESSION_PATH=/app/sessions
+
+# Expose port for web interface
+EXPOSE 18789
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:18789/health || exit 1
+
+# Start script
+COPY docker/entrypoint-aria.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["node", "openclaw/index.js"]

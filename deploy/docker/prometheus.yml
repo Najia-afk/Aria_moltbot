@@ -1,0 +1,29 @@
+# Prometheus Configuration for Aria Stack
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    metrics_path: /prometheus/metrics
+
+  - job_name: 'aria-brain'
+    static_configs:
+      - targets: ['aria-brain:8000']
+    metrics_path: /metrics
+
+  - job_name: 'aria-bot'
+    static_configs:
+      - targets: ['aria-bot:18789']
+    metrics_path: /health
+
+  - job_name: 'traefik'
+    static_configs:
+      - targets: ['traefik:8080']
+    metrics_path: /metrics
+
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['aria-db:5432']

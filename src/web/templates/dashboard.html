@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    .dashboard-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+    .chart-card {
+        background: var(--bg-secondary);
+        border-radius: 16px;
+        padding: 25px;
+        border: 1px solid var(--border-color);
+    }
+    .chart-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+    .chart-title {
+        font-size: 18px;
+        font-weight: 600;
+    }
+    .chart-container {
+        height: 300px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-secondary);
+    }
+    .metrics-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-bottom: 30px;
+    }
+    .metric-card {
+        background: var(--bg-secondary);
+        border-radius: 12px;
+        padding: 20px;
+        border: 1px solid var(--border-color);
+        text-align: center;
+    }
+    .metric-value {
+        font-size: 32px;
+        font-weight: 700;
+        color: var(--accent-blue);
+    }
+    .metric-label {
+        color: var(--text-secondary);
+        font-size: 14px;
+        margin-top: 5px;
+    }
+    .metric-trend {
+        font-size: 12px;
+        margin-top: 8px;
+    }
+    .metric-trend.up { color: var(--success); }
+    .metric-trend.down { color: var(--danger); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>📊 Dashboard</h1>
+    <p>Real-time overview of Aria's activities and system metrics</p>
+</div>
+
+<div class="metrics-row">
+    <div class="metric-card">
+        <div class="metric-value" id="m-activities">-</div>
+        <div class="metric-label">Total Activities</div>
+        <div class="metric-trend up">↑ Active</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-value" id="m-thoughts">-</div>
+        <div class="metric-label">Total Thoughts</div>
+        <div class="metric-trend up">↑ Growing</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-value" id="m-services">-</div>
+        <div class="metric-label">Services Online</div>
+        <div class="metric-trend" id="m-services-trend">Checking...</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-value" id="m-uptime">-</div>
+        <div class="metric-label">System Status</div>
+        <div class="metric-trend up">Operational</div>
+    </div>
+</div>
+
+<div class="dashboard-grid">
+    <div class="chart-card">
+        <div class="chart-header">
+            <span class="chart-title">⚡ Activity Timeline</span>
+            <select class="chart-filter">
+                <option>Last 24h</option>
+                <option>Last 7d</option>
+                <option>Last 30d</option>
+            </select>
+        </div>
+        <div class="chart-container" id="activity-chart">
+            <p>Loading activity data...</p>
+        </div>
+    </div>
+    
+    <div class="chart-card">
+        <div class="chart-header">
+            <span class="chart-title">🧠 Thoughts by Type</span>
+        </div>
+        <div class="chart-container" id="thoughts-chart">
+            <p>Loading thoughts data...</p>
+        </div>
+    </div>
+    
+    <div class="chart-card">
+        <div class="chart-header">
+            <span class="chart-title">🔌 Service Health</span>
+        </div>
+        <div class="chart-container" id="services-chart">
+            <div class="services-health-grid" id="services-health"></div>
+        </div>
+    </div>
+    
+    <div class="chart-card">
+        <div class="chart-header">
+            <span class="chart-title">📜 Recent Activity</span>
+            <a href="/activities" class="btn-link">View All →</a>
+        </div>
+        <div class="chart-container" id="recent-activity" style="height: auto; max-height: 300px; overflow-y: auto;">
+            <p>Loading...</p>
+        </div>
+    </div>
+</div>
+
+<div class="embed-section">
+    <h2 class="section-title">Grafana Dashboards</h2>
+    <p>For detailed metrics, visit <a href="/grafana/" target="_blank">Grafana →</a></p>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Load stats
+    fetch(`${window.ARIA_API_BASE_URL}/stats`)
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('m-activities').textContent = data.activities_count || 0;
+            document.getElementById('m-thoughts').textContent = data.thoughts_count || 0;
+            document.getElementById('m-uptime').textContent = 'Online';
+        })
+        .catch(() => {
+            document.getElementById('m-uptime').textContent = 'Error';
+        });
+
+    // Load service status
+    fetch(`${window.ARIA_API_BASE_URL}/status`)
+        .then(r => r.json())
+        .then(data => {
+            const online = Object.values(data).filter(s => s.status === 'up').length;
+            const total = Object.keys(data).length;
+            document.getElementById('m-services').textContent = `${online}/${total}`;
+            document.getElementById('m-services-trend').textContent = online === total ? '✓ All Online' : `${total - online} Down`;
+            document.getElementById('m-services-trend').className = 'metric-trend ' + (online === total ? 'up' : 'down');
+            
+            // Build health grid
+            let html = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:100%">';
+            for (const [name, info] of Object.entries(data)) {
+                html += `<div style="padding:10px;background:${info.status === 'up' ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'};border-radius:8px;text-align:center">
+                    <div style="font-weight:600">${name}</div>
+                    <div style="font-size:12px;color:${info.status === 'up' ? 'var(--success)' : 'var(--danger)'}">${info.status}</div>
+                </div>`;
+            }
+            html += '</div>';
+            document.getElementById('services-health').innerHTML = html;
+        })
+        .catch(() => {});
+
+    // Load recent activities
+    fetch(`${window.ARIA_API_BASE_URL}/activities`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.length === 0) {
+                document.getElementById('recent-activity').innerHTML = '<p>No activities yet</p>';
+                return;
+            }
+            let html = '<div style="width:100%">';
+            data.slice(0, 10).forEach(a => {
+                const d = new Date(a.created_at);
+                html += `<div style="padding:10px;border-bottom:1px solid var(--border-color)">
+                    <div style="font-weight:500">${a.type || 'Activity'}</div>
+                    <div style="font-size:13px;color:var(--text-secondary)">${a.description || '-'}</div>
+                    <div style="font-size:11px;color:var(--text-muted)">${d.toLocaleString()}</div>
+                </div>`;
+            });
+            html += '</div>';
+            document.getElementById('recent-activity').innerHTML = html;
+        })
+        .catch(e => {
+            document.getElementById('recent-activity').innerHTML = '<p>Could not load activities</p>';
+        });
+</script>
+{% endblock %}

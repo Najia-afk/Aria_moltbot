@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}Records - Aria{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>📋 Records</h1>
+    <p>Browse all stored records and data entries</p>
+</div>
+
+<div class="filters">
+    <div class="search-box">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+        <input type="text" class="input" id="searchInput" placeholder="Search records...">
+    </div>
+    <div class="filter-group">
+        <label class="filter-label">Table:</label>
+        <select id="tableFilter" onchange="loadRecords()">
+            <option value="activities">Activities</option>
+            <option value="thoughts">Thoughts</option>
+            <option value="memories">Memories</option>
+        </select>
+    </div>
+    <div class="filter-group">
+        <label class="filter-label">Limit:</label>
+        <select id="limitFilter" onchange="loadRecords()">
+            <option value="25">25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+        </select>
+    </div>
+    <button class="btn btn-secondary" onclick="exportRecords()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+        </svg>
+        Export
+    </button>
+</div>
+
+<div class="table-container">
+    <table id="recordsTable">
+        <thead>
+            <tr id="tableHeader"></tr>
+        </thead>
+        <tbody id="tableBody">
+            <tr><td colspan="5" class="loading"><div class="spinner"></div></td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="pagination" id="pagination" style="margin-top: 1.5rem; display: flex; justify-content: center; gap: 0.5rem;"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentPage = 1;
+let totalRecords = 0;
+
+async function loadRecords() {
+    const table = document.getElementById('tableFilter').value;
+    const limit = document.getElementById('limitFilter').value;
+    const tbody = document.getElementById('tableBody');
+    const thead = document.getElementById('tableHeader');
+    
+    tbody.innerHTML = '<tr><td colspan="5"><div class="loading"><div class="spinner"></div></div></td></tr>';
+    
+    try {
+        const response = await fetch(`${window.ARIA_API_BASE_URL}/records?table=${table}&limit=${limit}&page=${currentPage}`);
+        const data = await response.json();
+        
+        if (data.records && data.records.length > 0) {
+            const columns = Object.keys(data.records[0]);
+            thead.innerHTML = columns.map(col => `<th>${col}</th>`).join('');
+            
+            tbody.innerHTML = data.records.map(record => `
+                <tr>
+                    ${columns.map(col => `<td>${formatCell(record[col])}</td>`).join('')}
+                </tr>
+            `).join('');
+            
+            totalRecords = data.total || data.records.length;
+            renderPagination(limit);
+        } else {
+            thead.innerHTML = '<th>No Data</th>';
+            tbody.innerHTML = '<tr><td class="empty-state">No records found</td></tr>';
+        }
+    } catch (error) {
+        tbody.innerHTML = `<tr><td colspan="5" class="empty-state">Error: ${error.message}</td></tr>`;
+    }
+}
+
+function formatCell(value) {
+    if (value === null || value === undefined) return '<span style="color: var(--text-muted)">null</span>';
+    if (typeof value === 'object') return `<code>${JSON.stringify(value).substring(0, 50)}...</code>`;
+    if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}/)) {
+        return new Date(value).toLocaleString();
+    }
+    const str = String(value);
+    return str.length > 100 ? str.substring(0, 100) + '...' : str;
+}
+
+function renderPagination(limit) {
+    const totalPages = Math.ceil(totalRecords / limit);
+    const pagination = document.getElementById('pagination');
+    
+    if (totalPages <= 1) {
+        pagination.innerHTML = '';
+        return;
+    }
+    
+    let html = '';
+    if (currentPage > 1) {
+        html += `<button class="btn btn-secondary" onclick="goToPage(${currentPage - 1})">← Prev</button>`;
+    }
+    html += `<span style="padding: 0.6rem 1rem; color: var(--text-secondary);">Page ${currentPage} of ${totalPages}</span>`;
+    if (currentPage < totalPages) {
+        html += `<button class="btn btn-secondary" onclick="goToPage(${currentPage + 1})">Next →</button>`;
+    }
+    pagination.innerHTML = html;
+}
+
+function goToPage(page) {
+    currentPage = page;
+    loadRecords();
+}
+
+function exportRecords() {
+    const table = document.getElementById('tableFilter').value;
+    window.open(`${window.ARIA_API_BASE_URL}/export?table=${table}`, '_blank');
+}
+
+document.getElementById('searchInput').addEventListener('input', function() {
+    const search = this.value.toLowerCase();
+    document.querySelectorAll('#tableBody tr').forEach(row => {
+        row.style.display = row.textContent.toLowerCase().includes(search) ? '' : 'none';
+    });
+});
+
+document.addEventListener('DOMContentLoaded', loadRecords);
+</script>
+{% endblock %}

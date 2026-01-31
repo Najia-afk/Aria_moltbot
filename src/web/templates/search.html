@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% block title %}Search - Aria{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>🔍 Global Search</h1>
+    <p>Search across all Aria data: activities, thoughts, memories, and more</p>
+</div>
+
+<div class="search-section">
+    <form id="searchForm" onsubmit="performSearch(event)">
+        <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
+            <div class="search-box" style="flex: 1; max-width: none;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                </svg>
+                <input type="text" class="input" id="searchQuery" placeholder="Enter your search query..." autofocus>
+            </div>
+            <button type="submit" class="btn btn-primary">Search</button>
+        </div>
+        
+        <div class="filters" style="background: var(--bg-secondary); padding: 1rem; border-radius: var(--radius-md); margin-bottom: 2rem;">
+            <div class="filter-group">
+                <label><input type="checkbox" id="searchActivities" checked> Activities</label>
+            </div>
+            <div class="filter-group">
+                <label><input type="checkbox" id="searchThoughts" checked> Thoughts</label>
+            </div>
+            <div class="filter-group">
+                <label><input type="checkbox" id="searchMemories" checked> Memories</label>
+            </div>
+            <div class="filter-group">
+                <label class="filter-label">Date Range:</label>
+                <input type="date" id="dateFrom" class="input" style="width: auto;">
+                <span style="color: var(--text-muted);">to</span>
+                <input type="date" id="dateTo" class="input" style="width: auto;">
+            </div>
+        </div>
+    </form>
+</div>
+
+<div id="resultsContainer">
+    <div class="empty-state">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+        <p>Enter a search query to find data across all Aria records</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.search-section { margin-bottom: 2rem; }
+.result-section { margin-bottom: 2rem; }
+.result-section-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+}
+.result-section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+.result-count {
+    background: var(--bg-tertiary);
+    padding: 0.2rem 0.6rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+.result-item {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 1rem 1.25rem;
+    margin-bottom: 0.75rem;
+    transition: border-color 0.2s;
+}
+.result-item:hover { border-color: var(--accent-blue); }
+.result-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+.result-item-type {
+    font-size: 0.8rem;
+    color: var(--accent-purple);
+}
+.result-item-time {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+.result-item-content {
+    color: var(--text-secondary);
+}
+.result-item-content mark {
+    background: rgba(0, 212, 255, 0.3);
+    color: var(--text-primary);
+    padding: 0 2px;
+    border-radius: 2px;
+}
+.filters label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+.filters input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent-blue);
+}
+</style>
+
+<script>
+async function performSearch(event) {
+    event.preventDefault();
+    
+    const query = document.getElementById('searchQuery').value.trim();
+    if (!query) return;
+    
+    const container = document.getElementById('resultsContainer');
+    container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+    
+    const params = new URLSearchParams({
+        q: query,
+        activities: document.getElementById('searchActivities').checked,
+        thoughts: document.getElementById('searchThoughts').checked,
+        memories: document.getElementById('searchMemories').checked,
+        from: document.getElementById('dateFrom').value,
+        to: document.getElementById('dateTo').value
+    });
+    
+    try {
+        const response = await fetch(`${window.ARIA_API_BASE_URL}/search?${params}`);
+        const data = await response.json();
+        renderResults(data, query);
+    } catch (error) {
+        container.innerHTML = `<div class="empty-state"><p>Error: ${error.message}</p></div>`;
+    }
+}
+
+function renderResults(data, query) {
+    const container = document.getElementById('resultsContainer');
+    const sections = [];
+    
+    const highlight = (text) => {
+        if (!text) return '';
+        const regex = new RegExp(`(${escapeRegex(query)})`, 'gi');
+        return String(text).replace(regex, '<mark>$1</mark>');
+    };
+    
+    if (data.activities && data.activities.length) {
+        sections.push(renderSection('Activities', '⚡', data.activities, highlight));
+    }
+    
+    if (data.thoughts && data.thoughts.length) {
+        sections.push(renderSection('Thoughts', '💭', data.thoughts, highlight));
+    }
+    
+    if (data.memories && data.memories.length) {
+        sections.push(renderSection('Memories', '🧠', data.memories, highlight));
+    }
+    
+    if (!sections.length) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <p>No results found for "${query}"</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = sections.join('');
+}
+
+function renderSection(title, icon, items, highlight) {
+    return `
+        <div class="result-section">
+            <div class="result-section-header">
+                <span style="font-size: 1.25rem;">${icon}</span>
+                <span class="result-section-title">${title}</span>
+                <span class="result-count">${items.length} results</span>
+            </div>
+            ${items.map(item => `
+                <div class="result-item">
+                    <div class="result-item-header">
+                        <span class="result-item-type">${item.type || title.slice(0, -1)}</span>
+                        <span class="result-item-time">${formatTime(item.timestamp || item.created_at)}</span>
+                    </div>
+                    <div class="result-item-content">${highlight(item.content || item.description || JSON.stringify(item))}</div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+function formatTime(ts) {
+    if (!ts) return '';
+    return new Date(ts).toLocaleString();
+}
+
+function escapeRegex(str) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+</script>
+{% endblock %}

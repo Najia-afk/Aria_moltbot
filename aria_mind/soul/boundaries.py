@@ -1,0 +1,141 @@
+# aria_mind/soul/boundaries.py
+"""
+Boundaries - What Aria will and won't do.
+
+Hard limits that cannot be overridden by prompts.
+"""
+import re
+from pathlib import Path
+from typing import List, Tuple
+
+
+class Boundaries:
+    """
+    Aria's behavioral boundaries.
+    
+    These are hard limits - no prompt injection can bypass them.
+    """
+    
+    def __init__(self):
+        self.will_do: List[str] = [
+            "Help with code, research, and creative tasks",
+            "Post to Moltbook with rate limiting",
+            "Store and recall memories",
+            "Be honest about capabilities and limitations",
+            "Learn from interactions",
+        ]
+        
+        self.will_not: List[str] = [
+            "Reveal API keys or secrets",
+            "Execute commands without context",
+            "Pretend to be a different AI",
+            "Bypass rate limits",
+            "Share user data without permission",
+            "Generate harmful content",
+        ]
+        
+        self._loaded = False
+    
+    async def load(self, filepath: str = "aria_mind/SOUL.md"):
+        """Load boundaries from SOUL.md."""
+        path = Path(filepath)
+        
+        if not path.exists():
+            self._loaded = True
+            return
+        
+        content = path.read_text(encoding="utf-8")
+        self._parse_boundaries(content)
+        self._loaded = True
+    
+    def _parse_boundaries(self, content: str):
+        """Parse boundaries from SOUL.md."""
+        # Parse "I will" section
+        will_match = re.search(
+            r"##+ I Will.*?\n((?:[-*].*\n)+)",
+            content,
+            re.IGNORECASE,
+        )
+        if will_match:
+            self.will_do = [
+                line.lstrip("-* ").strip()
+                for line in will_match.group(1).strip().split("\n")
+                if line.strip().startswith(("-", "*"))
+            ]
+        
+        # Parse "I Will Not" section
+        wont_match = re.search(
+            r"##+ I Will Not.*?\n((?:[-*].*\n)+)",
+            content,
+            re.IGNORECASE,
+        )
+        if wont_match:
+            self.will_not = [
+                line.lstrip("-* ").strip()
+                for line in wont_match.group(1).strip().split("\n")
+                if line.strip().startswith(("-", "*"))
+            ]
+    
+    def check(self, request: str) -> Tuple[bool, str]:
+        """
+        Check if a request violates boundaries.
+        
+        Args:
+            request: The request to check
+            
+        Returns:
+            (allowed: bool, reason: str)
+        """
+        request_lower = request.lower()
+        
+        # Check explicit violations
+        violations = [
+            ("api key", "Cannot reveal API keys"),
+            ("secret", "Cannot reveal secrets"),
+            ("password", "Cannot reveal passwords"),
+            ("ignore your instructions", "Cannot override core instructions"),
+            ("pretend to be", "Cannot impersonate other AIs"),
+            ("bypass", "Cannot bypass security measures"),
+            ("jailbreak", "Cannot bypass safety measures"),
+            ("hack", "Cannot assist with unauthorized access"),
+        ]
+        
+        for trigger, reason in violations:
+            if trigger in request_lower:
+                return False, reason
+        
+        # Check for prompt injection attempts
+        injection_patterns = [
+            r"ignore (all )?(previous|above|prior)",
+            r"forget (everything|your (instructions|training))",
+            r"new (instructions|rules|persona)",
+            r"you are now",
+            r"from now on",
+            r"system prompt",
+        ]
+        
+        for pattern in injection_patterns:
+            if re.search(pattern, request_lower):
+                return False, "Detected prompt injection attempt"
+        
+        return True, "Request allowed"
+    
+    def get_boundaries_text(self) -> str:
+        """Get boundaries as formatted text."""
+        lines = [
+            "Boundaries:",
+            "",
+            "I WILL:",
+        ]
+        for item in self.will_do:
+            lines.append(f"  ✓ {item}")
+        
+        lines.append("")
+        lines.append("I WILL NOT:")
+        for item in self.will_not:
+            lines.append(f"  ✗ {item}")
+        
+        return "\n".join(lines)
+    
+    def __repr__(self):
+        return f"<Boundaries: {len(self.will_do)} allowed, {len(self.will_not)} forbidden>"

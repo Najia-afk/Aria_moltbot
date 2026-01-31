@@ -1,0 +1,179 @@
+[project]
+name = "aria-blue"
+version = "1.0.0"
+description = "Aria Blue - A silicon familiar with sharp, efficient, and secure vibes"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Najia", email = "najia@aria.blue"}
+]
+keywords = ["ai", "assistant", "moltbook", "social", "agent"]
+
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "httpx>=0.25.0",
+    "asyncpg>=0.29.0",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "black>=24.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.8.0",
+]
+
+docker = [
+    "docker>=7.0.0",
+]
+
+all = [
+    "aria-blue[dev]",
+    "aria-blue[docker]",
+]
+
+[project.urls]
+Homepage = "https://github.com/aria-blue/aria"
+Documentation = "https://aria.blue/docs"
+Repository = "https://github.com/aria-blue/aria"
+
+[project.scripts]
+aria = "aria_mind.cli:main"
+aria-health = "aria_mind.cli:health_check"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["aria_mind", "aria_skills", "aria_agents"]
+
+# ============================================================================
+# pytest
+# ============================================================================
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = [
+    "-ra",
+    "-q",
+    "--strict-markers",
+    "--asyncio-mode=auto",
+]
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+# ============================================================================
+# coverage
+# ============================================================================
+
+[tool.coverage.run]
+source = ["aria_mind", "aria_skills", "aria_agents"]
+branch = true
+omit = ["*/tests/*", "*/__pycache__/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+]
+show_missing = true
+
+# ============================================================================
+# black
+# ============================================================================
+
+[tool.black]
+line-length = 100
+target-version = ["py310", "py311", "py312"]
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hatch
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
+
+# ============================================================================
+# ruff
+# ============================================================================
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # Pyflakes
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "UP",     # pyupgrade
+    "ARG",    # flake8-unused-arguments
+    "SIM",    # flake8-simplify
+]
+ignore = [
+    "E501",   # line too long (handled by black)
+    "B008",   # do not perform function calls in argument defaults
+    "C901",   # too complex
+    "ARG001", # unused function argument
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["aria_mind", "aria_skills", "aria_agents"]
+
+# ============================================================================
+# mypy
+# ============================================================================
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+exclude = [
+    "tests/",
+    "build/",
+    "dist/",
+]
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+ignore_errors = true

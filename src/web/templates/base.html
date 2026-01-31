@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Aria Blue{% endblock %}</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="/static/css/variables.css">
+    <link rel="stylesheet" href="/static/css/base.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <header>
+        <div class="container">
+            <nav>
+                <a href="/" class="logo">
+                    <div class="logo-icon">🌟</div>
+                    <div class="logo-text"><span>Aria Blue</span></div>
+                </a>
+
+                <div class="nav-links" id="nav-links">
+                    <a href="/" class="{% if request.path == '/' %}active{% endif %}">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M8.354 1.146a.5.5 0 0 0-.708 0l-6 6A.5.5 0 0 0 1.5 7.5v7a.5.5 0 0 0 .5.5h4.5a.5.5 0 0 0 .5-.5v-4h2v4a.5.5 0 0 0 .5.5H14a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.146-.354L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293L8.354 1.146z"/>
+                        </svg>
+                        Home
+                    </a>
+                    <a href="/dashboard" class="{% if '/dashboard' in request.path %}active{% endif %}">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M4 11a1 1 0 1 1 2 0v1a1 1 0 1 1-2 0v-1zm6-4a1 1 0 1 1 2 0v5a1 1 0 1 1-2 0V7zM7 9a1 1 0 0 1 2 0v3a1 1 0 1 1-2 0V9z"/>
+                            <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/>
+                        </svg>
+                        Dashboard
+                    </a>
+                    <a href="/activities" class="{% if '/activities' in request.path %}active{% endif %}">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2zm.995-14.901a1 1 0 1 0-1.99 0A5.002 5.002 0 0 0 3 6c0 1.098-.5 6-2 7h14c-1.5-1-2-5.902-2-7 0-2.42-1.72-4.44-4.005-4.901z"/>
+                        </svg>
+                        Activities
+                    </a>
+                    <a href="/thoughts" class="{% if '/thoughts' in request.path %}active{% endif %}">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M9.5 2.672a.5.5 0 1 0 1 0V.843a.5.5 0 0 0-1 0v1.829Zm4.5.035A.5.5 0 0 0 13.293 2L12 3.293a.5.5 0 1 0 .707.707L14 2.707ZM7.293 4A.5.5 0 1 0 8 3.293L6.707 2A.5.5 0 0 0 6 2.707L7.293 4Zm-.621 2.5a.5.5 0 1 0 0-1H4.843a.5.5 0 1 0 0 1h1.829Zm8.485 0a.5.5 0 1 0 0-1h-1.829a.5.5 0 0 0 0 1h1.829ZM13.293 10A.5.5 0 1 0 14 9.293L12.707 8a.5.5 0 1 0-.707.707L13.293 10ZM9.5 11.157a.5.5 0 0 0 1 0V9.328a.5.5 0 0 0-1 0v1.829Zm1.854-5.097a.5.5 0 0 0 0-.706l-.708-.708a.5.5 0 0 0-.707 0L8.646 5.94a.5.5 0 0 0 0 .707l.708.708a.5.5 0 0 0 .707 0l1.293-1.293Zm-3 3a.5.5 0 0 0 0-.706l-.708-.708a.5.5 0 0 0-.707 0L.646 13.94a.5.5 0 0 0 0 .707l.708.708a.5.5 0 0 0 .707 0L8.354 9.06Z"/>
+                        </svg>
+                        Thoughts
+                    </a>
+                    <a href="/records" class="{% if '/records' in request.path %}active{% endif %}">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M5 4a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1H5zm-.5 2.5A.5.5 0 0 1 5 6h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zM5 8a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1H5zm0 2a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1H5z"/>
+                            <path d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2zm10-1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1z"/>
+                        </svg>
+                        Records
+                    </a>
+                    <a href="/search" class="{% if '/search' in request.path %}active{% endif %}">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
+                        </svg>
+                        Search
+                    </a>
+
+                    <div class="nav-divider"></div>
+
+                    <a href="/services" class="{% if '/services' in request.path %}active{% endif %}">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M6 3a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM1 3a2 2 0 1 0 4 0 2 2 0 0 0-4 0z"/>
+                            <path d="M9 6a3 3 0 1 1 6 0 3 3 0 0 1-6 0zm3-2a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/>
+                            <path d="M3 13a3 3 0 1 1 6 0 3 3 0 0 1-6 0zm3-2a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/>
+                        </svg>
+                        Services
+                    </a>
+                    <a href="{{ clawdbot_public_url }}" target="_blank">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v13.5a.5.5 0 0 1-.777.416L8 13.101l-5.223 2.815A.5.5 0 0 1 2 15.5V2z"/>
+                        </svg>
+                        🦞 Clawdbot
+                    </a>
+                    <a href="/grafana/" target="_blank">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M0 0h1v15h15v1H0V0Zm14.817 3.113a.5.5 0 0 1 .07.704l-4.5 5.5a.5.5 0 0 1-.74.037L7.06 6.767l-3.656 5.027a.5.5 0 0 1-.808-.588l4-5.5a.5.5 0 0 1 .758-.06l2.609 2.61 4.15-5.073a.5.5 0 0 1 .704-.07Z"/>
+                        </svg>
+                        📊 Grafana
+                    </a>
+                    <a href="/prometheus/" target="_blank">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16Zm.25-14.75v1.5a.25.25 0 0 1-.5 0v-1.5a.25.25 0 0 1 .5 0Zm0 12v1.5a.25.25 0 0 1-.5 0v-1.5a.25.25 0 0 1 .5 0ZM4.5 8a.25.25 0 0 1-.25.25h-1.5a.25.25 0 0 1 0-.5h1.5A.25.25 0 0 1 4.5 8Zm9.5 0a.25.25 0 0 1-.25.25h-1.5a.25.25 0 0 1 0-.5h1.5a.25.25 0 0 1 .25.25Z"/>
+                        </svg>
+                        📈 Prometheus
+                    </a>
+
+                    <div class="api-status" id="api-status">
+                        <span class="status-dot"></span>
+                        <span>Loading...</span>
+                    </div>
+                </div>
+
+                <button class="menu-toggle" onclick="toggleMenu()" aria-label="Toggle menu">
+                    <svg width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
+                        <path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/>
+                    </svg>
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <main id="main-content">
+        <div class="container">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <div class="footer-logo">🌟</div>
+                    <div class="footer-text">
+                        <strong>Aria Blue</strong> - Autonomous AI Agent
+                    </div>
+                </div>
+                <div class="footer-links">
+                    <a href="{{ api_base_url }}/status">API Status</a>
+                    <a href="/services">Services</a>
+                </div>
+            </div>
+            <div class="footer-divider"></div>
+            <div class="footer-bottom">
+                <span>&copy; 2025-2026 Aria Blue. All rights reserved.</span>
+                <div class="footer-tech">
+                    <span class="footer-tech-badge">Flask</span>
+                    <span class="footer-tech-badge">PostgreSQL</span>
+                    <span class="footer-tech-badge">Ollama</span>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <div id="notification-container"></div>
+
+    <script>
+        function toggleMenu() {
+            document.getElementById('nav-links').classList.toggle('active');
+        }
+
+        function showNotification(message, type = 'info') {
+            const container = document.getElementById('notification-container');
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.innerHTML = `<span>${message}</span><button onclick="this.parentElement.remove()">&times;</button>`;
+            container.appendChild(notification);
+            setTimeout(() => notification.remove(), 5000);
+        }
+
+        // Check API status on load
+        const API_BASE_URL = "{{ api_base_url }}";
+        window.ARIA_API_BASE_URL = API_BASE_URL;
+        window.ARIA_CLAWDBOT_PUBLIC_URL = "{{ clawdbot_public_url }}";
+        fetch(`${API_BASE_URL}/status`)
+            .then(r => r.json())
+            .then(data => {
+                const el = document.getElementById('api-status');
+                const allUp = Object.values(data).every(s => s.status === 'up');
+                el.innerHTML = `<span class="status-dot ${allUp ? 'up' : 'partial'}"></span><span>${allUp ? 'All Systems Online' : 'Partial'}</span>`;
+            })
+            .catch(() => {
+                document.getElementById('api-status').innerHTML = '<span class="status-dot down"></span><span>Offline</span>';
+            });
+    </script>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

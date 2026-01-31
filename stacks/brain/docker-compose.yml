@@ -1,0 +1,325 @@
+services:
+  # PostgreSQL Database
+  aria-db:
+    image: postgres:16-alpine
+    container_name: aria-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER?DB_USER is required}
+      POSTGRES_PASSWORD: ${DB_PASSWORD?DB_PASSWORD is required}
+      POSTGRES_DB: ${DB_NAME?DB_NAME is required}
+    volumes:
+      - aria_pg_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aria-net
+    mem_limit: ${POSTGRES_MEM_LIMIT?POSTGRES_MEM_LIMIT is required}
+    cpus: ${POSTGRES_CPU_LIMIT?POSTGRES_CPU_LIMIT is required}
+
+  # Headless Chrome for browser automation
+  aria-browser:
+    image: browserless/chrome:latest
+    container_name: aria-browser
+    restart: unless-stopped
+    environment:
+      MAX_CONCURRENT_SESSIONS: 5
+      CONNECTION_TIMEOUT: 60000
+      TOKEN: ${BROWSERLESS_TOKEN}
+    ports:
+      - "3000:3000"
+    networks:
+      - aria-net
+
+  # Clawdbot Gateway - AI Assistant Control UI
+  clawdbot:
+    image: node:22-bookworm
+    container_name: clawdbot
+    restart: unless-stopped
+    working_dir: /root
+    environment:
+      NODE_OPTIONS: "--max-old-space-size=1024"
+      OPENCLAW_CONFIG_PATH: "/root/.openclaw/openclaw.json"
+      OPENCLAW_WORKSPACE: "/root/.openclaw/workspace"
+      CLAWDBOT_GATEWAY_PORT: "18789"
+      CLAWDBOT_GATEWAY_TOKEN: ${CLAWDBOT_TOKEN?CLAWDBOT_TOKEN is required}
+      OPENCLAW_GATEWAY_PORT: "18789"
+      OPENCLAW_GATEWAY_TOKEN: ${CLAWDBOT_TOKEN?CLAWDBOT_TOKEN is required}
+      OPENCLAW_NO_ONBOARD: "1"
+      OPENCLAW_NO_PROMPT: "1"
+      GOOGLE_GEMINI_KEY: ${GOOGLE_GEMINI_KEY}
+      MOONSHOT_KIMI_KEY: ${MOONSHOT_KIMI_KEY}
+    volumes:
+      - openclaw_data:/root/.openclaw
+      - ../../aria_mind:/root/.openclaw/workspace:ro
+    ports:
+      - "18789:18789"
+    command: >
+      bash -c "if [ ! -e /usr/local/bin/openclaw ]; then apt-get update && apt-get install -y curl; curl -fsSL https://openclaw.ai/install.sh | bash -s -- --no-onboard --no-prompt; fi; if [ ! -f /root/.openclaw/openclaw.json ] || grep -q '\"workspace\"' /root/.openclaw/openclaw.json; then mkdir -p /root/.openclaw; printf '{\"gateway\":{\"mode\":\"local\",\"bind\":\"lan\",\"port\":18789,\"auth\":{\"mode\":\"token\",\"token\":\"'"$$OPENCLAW_GATEWAY_TOKEN"'\"}}}' > /root/.openclaw/openclaw.json; fi; /usr/local/bin/openclaw gateway run --port 18789 --bind lan --token \"$$OPENCLAW_GATEWAY_TOKEN\" --allow-unconfigured --verbose"
+    networks:
+      - aria-net
+    mem_limit: ${CLAWDBOT_MEM_LIMIT?CLAWDBOT_MEM_LIMIT is required}
+    cpus: ${CLAWDBOT_CPU_LIMIT?CLAWDBOT_CPU_LIMIT is required}
+
+  # Tor Proxy for privacy
+  tor-proxy:
+    image: dperson/torproxy:latest
+    container_name: tor-proxy
+    restart: unless-stopped
+    ports:
+      - "9050:9050"
+      - "9051:9051"
+    networks:
+      - aria-net
+
+  # Self-signed TLS cert generator (runs once if missing)
+  certs-init:
+    image: alpine:3.20
+    container_name: aria-certs-init
+    restart: "no"
+    volumes:
+      - ./certs:/certs
+    command: >
+      sh -c "apk add --no-cache openssl; if [ ! -f /certs/cert.pem ] || [ ! -f /certs/key.pem ]; then \
+      openssl req -x509 -newkey rsa:4096 -nodes -keyout /certs/key.pem -out /certs/cert.pem -days 3650 \
+      -subj \"/C=US/ST=Local/L=LAN/O=Aria/CN=aria.local\"; fi"
+    networks:
+      - aria-net
+
+  # Traefik reverse proxy (HTTPS)
+  traefik:
+    image: traefik:v3.1
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      - "--api=true"
+      - "--api.dashboard=true"
+      - "--providers.file.filename=/etc/traefik/dynamic.yaml"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--metrics.prometheus=true"
+      - "--metrics.prometheus.entryPoint=web"
+    ports:
+      - "0.0.0.0:80:80"
+      - "0.0.0.0:443:443"
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./traefik-dynamic.yaml:/etc/traefik/dynamic.yaml:ro
+      - ./certs:/certs:ro
+    depends_on:
+      certs-init:
+        condition: service_completed_successfully
+      aria-web:
+        condition: service_started
+      aria-api:
+        condition: service_started
+      grafana:
+        condition: service_started
+      prometheus:
+        condition: service_started
+      clawdbot:
+        condition: service_started
+      litellm:
+        condition: service_started
+    networks:
+      - aria-net
+
+  # LiteLLM Router for model management
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: litellm
+    restart: unless-stopped
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY?LITELLM_MASTER_KEY is required}
+      GOOGLE_GEMINI_KEY: ${GOOGLE_GEMINI_KEY}
+      MOONSHOT_KIMI_KEY: ${MOONSHOT_KIMI_KEY}
+      LITELLM_DATABASE_URL: postgresql://${DB_USER?DB_USER is required}:${DB_PASSWORD?DB_PASSWORD is required}@aria-db:5432/${DB_NAME?DB_NAME is required}
+      STORE_MODEL_IN_DB: "False"
+      OLLAMA_API_BASE: http://host.docker.internal:11434
+    volumes:
+      - ./litellm-config.yaml:/app/config.yaml:ro
+    ports:
+      - "18793:4000"
+    command: ["--config", "/app/config.yaml", "--detailed_debug"]
+    networks:
+      - aria-net
+
+  # NOTE: Ollama runs NATIVELY on macOS for Metal GPU acceleration (~20 tok/s)
+  # Start with: OLLAMA_HOST=0.0.0.0:11434 ollama serve
+  # Docker containers access via host.docker.internal:11434
+
+  # Prometheus for metrics
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+      - '--web.external-url=/prometheus/'
+      - '--web.route-prefix=/prometheus/'
+    ports:
+      - "9090:9090"
+    networks:
+      - aria-net
+
+  # Grafana for dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD?GRAFANA_PASSWORD is required}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: "%(protocol)s://%(domain)s/grafana/"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - aria-net
+
+  # Aria Brain - Main AI Agent
+  aria-brain:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    container_name: aria-brain
+    restart: unless-stopped
+    environment:
+      # Database
+      DATABASE_URL: postgresql://${DB_USER?DB_USER is required}:${DB_PASSWORD?DB_PASSWORD is required}@aria-db:5432/${DB_NAME?DB_NAME is required}
+      # Local LLM (Ollama)
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODEL: qwen3-vl:8b
+      # LLM APIs (fallback)
+      GEMINI_API_KEY: ${GOOGLE_GEMINI_KEY}
+      MOONSHOT_API_KEY: ${MOONSHOT_KIMI_KEY}
+      # Moltbook
+      MOLTBOOK_TOKEN: ${MOLTBOOK_TOKEN}
+      MOLTBOOK_API_URL: ${MOLTBOOK_API_URL?MOLTBOOK_API_URL is required}
+      # LiteLLM (internal)
+      LITELLM_URL: http://litellm:4000
+      # Aria Email
+      ARIA_EMAIL: ${ARIA_EMAIL}
+      ARIA_EMAIL_PASSWORD: ${ARIA_EMAIL_PASSWORD}
+    volumes:
+      - aria_data:/app/data
+      - aria_logs:/app/logs
+    depends_on:
+      aria-db:
+        condition: service_healthy
+      aria-api:
+        condition: service_healthy
+      litellm:
+        condition: service_started
+      ollama:
+        condition: service_started
+    networks:
+      - aria-net
+    # Keep running for interactive mode
+    tty: true
+    stdin_open: true
+    mem_limit: ${ARIA_BRAIN_MEM_LIMIT?ARIA_BRAIN_MEM_LIMIT is required}
+    cpus: ${ARIA_BRAIN_CPU_LIMIT?ARIA_BRAIN_CPU_LIMIT is required}
+
+  # PgAdmin for database management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: aria-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL?PGADMIN_EMAIL is required}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD?PGADMIN_PASSWORD is required}
+      SCRIPT_NAME: /pgadmin
+    ports:
+      - "5050:80"
+    depends_on:
+      - aria-db
+    networks:
+      - aria-net
+
+  # Aria Web Portal - Flask Dashboard
+  aria-web:
+    build:
+      context: ../../src/web
+      dockerfile: Dockerfile
+    container_name: aria-web
+    restart: unless-stopped
+    environment:
+      SECRET_KEY: ${WEB_SECRET_KEY?WEB_SECRET_KEY is required}
+      SERVICE_HOST: ${SERVICE_HOST?SERVICE_HOST is required}
+      API_BASE_URL: ${API_BASE_URL?API_BASE_URL is required}
+      CLAWDBOT_PUBLIC_URL: ${CLAWDBOT_PUBLIC_URL?CLAWDBOT_PUBLIC_URL is required}
+      GRAFANA_URL: http://grafana:3000
+      PROMETHEUS_URL: http://prometheus:9090
+      OLLAMA_URL: http://ollama:11434
+      LITELLM_URL: http://litellm:4000
+      CLAWDBOT_URL: http://clawdbot:18789
+      CLAWDBOT_TOKEN: ${CLAWDBOT_TOKEN?CLAWDBOT_TOKEN is required}
+    ports:
+      - "5000:5000"
+    depends_on:
+      aria-db:
+        condition: service_healthy
+    networks:
+      - aria-net
+    mem_limit: ${ARIA_WEB_MEM_LIMIT?ARIA_WEB_MEM_LIMIT is required}
+    cpus: ${ARIA_WEB_CPU_LIMIT?ARIA_WEB_CPU_LIMIT is required}
+
+  # Aria API - FastAPI backend (data routes)
+  aria-api:
+    build:
+      context: ../../src/api
+      dockerfile: Dockerfile
+    container_name: aria-api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${DB_USER?DB_USER is required}:${DB_PASSWORD?DB_PASSWORD is required}@aria-db:5432/${DB_NAME?DB_NAME is required}
+      GRAFANA_URL: http://grafana:3000
+      PROMETHEUS_URL: http://prometheus:9090
+      OLLAMA_URL: http://ollama:11434
+      LITELLM_URL: http://litellm:4000
+      CLAWDBOT_URL: http://clawdbot:18789
+      PGADMIN_URL: http://aria-pgadmin:80
+      API_BASE_URL: ${API_BASE_URL?API_BASE_URL is required}
+    ports:
+      - "8000:8000"
+    depends_on:
+      aria-db:
+        condition: service_healthy
+    networks:
+      - aria-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    mem_limit: ${ARIA_API_MEM_LIMIT?ARIA_API_MEM_LIMIT is required}
+    cpus: ${ARIA_API_CPU_LIMIT?ARIA_API_CPU_LIMIT is required}
+
+volumes:
+  aria_pg_data:
+  prometheus_data:
+  grafana_data:
+  aria_data:
+  aria_logs:
+  openclaw_data:
+  
+
+networks:
+  aria-net:
+    driver: bridge

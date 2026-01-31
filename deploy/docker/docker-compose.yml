@@ -1,0 +1,139 @@
+# Aria Blue - Docker Compose (Direct Port Mapping)
+# Simpler architecture without Traefik for macOS Docker Desktop
+# NOTE: Use stacks/brain/docker-compose.yml instead - this is deprecated
+
+services:
+  # ============================================
+  # DATABASE - PostgreSQL
+  # ============================================
+  aria-db:
+    image: postgres:16-alpine
+    container_name: aria-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: aria_admin
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: aria_warehouse
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aria_admin -d aria_warehouse"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aria-net
+
+  # ============================================
+  # DATABASE UI - PGAdmin
+  # ============================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: aria-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    ports:
+      - "5050:80"
+    depends_on:
+      - aria-db
+    networks:
+      - aria-net
+
+  # ============================================
+  # ARIA BRAIN - Python API
+  # ============================================
+  aria-brain:
+    image: aria-brain:latest
+    container_name: aria-brain
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://aria_admin:${DB_PASSWORD}@aria-db:5432/aria_warehouse
+      GOOGLE_GEMINI_KEY: ${GOOGLE_GEMINI_KEY}
+      MOONSHOT_KIMI_KEY: ${MOONSHOT_KIMI_KEY}
+    volumes:
+      - /Users/najia/aria-blue/skills:/app/skills:ro
+      - /Users/najia/aria-blue/aria_memory:/app/memory:ro
+    ports:
+      - "8000:8000"
+    depends_on:
+      aria-db:
+        condition: service_healthy
+    networks:
+      - aria-net
+
+  # ============================================
+  # MONITORING - Prometheus
+  # ============================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: aria-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    volumes:
+      - /Users/najia/aria-blue/deploy/docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - aria-net
+
+  # ============================================
+  # MONITORING - Grafana
+  # ============================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: aria-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - aria-net
+
+  # ============================================
+  # WEB SERVER - Nginx (Dashboard)
+  # ============================================
+  nginx:
+    image: nginx:alpine
+    container_name: aria-nginx
+    restart: unless-stopped
+    volumes:
+      - /Users/najia/aria-blue/deploy/docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - /Users/najia/aria-blue/src/web:/usr/share/nginx/html:ro
+    ports:
+      - "80:80"
+    depends_on:
+      - aria-brain
+    networks:
+      - aria-net
+
+# ============================================
+# NETWORKS
+# ============================================
+networks:
+  aria-net:
+    driver: bridge
+
+# ============================================
+# VOLUMES
+# ============================================
+volumes:
+  postgres_data:
+  pgadmin_data:
+  prometheus_data:
+  grafana_data:

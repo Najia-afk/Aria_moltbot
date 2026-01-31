@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <div class="hero-content">
+        <div class="hero-icon">🌟</div>
+        <h1>Aria Blue</h1>
+        <p class="hero-subtitle">Autonomous AI Agent - Dashboard & Control Center</p>
+    </div>
+</div>
+
+<section class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon">🧠</div>
+        <div class="stat-info">
+            <span class="stat-value" id="stat-thoughts">-</span>
+            <span class="stat-label">Thoughts</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">⚡</div>
+        <div class="stat-info">
+            <span class="stat-value" id="stat-activities">-</span>
+            <span class="stat-label">Activities</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">🕐</div>
+        <div class="stat-info">
+            <span class="stat-value" id="stat-last">-</span>
+            <span class="stat-label">Last Activity</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">✨</div>
+        <div class="stat-info">
+            <span class="stat-value status-online">ONLINE</span>
+            <span class="stat-label">Status</span>
+        </div>
+    </div>
+</section>
+
+<section class="quick-links">
+    <h2 class="section-title">Quick Access</h2>
+    <div class="links-grid">
+        <a href="/dashboard" class="link-card">
+            <div class="link-icon dashboard">📊</div>
+            <div class="link-info">
+                <h3>Dashboard</h3>
+                <p>Stats, graphs, and real-time monitoring</p>
+            </div>
+        </a>
+        <a href="/activities" class="link-card">
+            <div class="link-icon activities">⚡</div>
+            <div class="link-info">
+                <h3>Activities</h3>
+                <p>View and search Aria's activities</p>
+            </div>
+        </a>
+        <a href="/thoughts" class="link-card">
+            <div class="link-icon thoughts">🧠</div>
+            <div class="link-info">
+                <h3>Thoughts</h3>
+                <p>Aria's reasoning and reflections</p>
+            </div>
+        </a>
+        <a href="/search" class="link-card">
+            <div class="link-icon search">🔍</div>
+            <div class="link-info">
+                <h3>Search</h3>
+                <p>Search across all Aria data</p>
+            </div>
+        </a>
+    </div>
+</section>
+
+<section class="services-section">
+    <h2 class="section-title">External Services</h2>
+    <div class="services-grid">
+        <a href="http://{{ request.host.split(':')[0] }}:18789/?token=49abdf292939e5a8566870fa36ec3b8e3329350d91f68950" target="_blank" class="service-card">
+            <div class="service-icon clawdbot">🦞</div>
+            <div class="service-info">
+                <h3>Clawdbot</h3>
+                <p>Personal AI Assistant</p>
+            </div>
+            <span class="service-status" id="status-clawdbot">...</span>
+        </a>
+        <a href="/grafana/" target="_blank" class="service-card">
+            <div class="service-icon grafana">📊</div>
+            <div class="service-info">
+                <h3>Grafana</h3>
+                <p>Metrics & Dashboards</p>
+            </div>
+            <span class="service-status" id="status-grafana">...</span>
+        </a>
+        <a href="/prometheus/" target="_blank" class="service-card">
+            <div class="service-icon prometheus">📈</div>
+            <div class="service-info">
+                <h3>Prometheus</h3>
+                <p>Time Series Database</p>
+            </div>
+            <span class="service-status" id="status-prometheus">...</span>
+        </a>
+        <a href="/ollama/" target="_blank" class="service-card">
+            <div class="service-icon ollama">🦙</div>
+            <div class="service-info">
+                <h3>Ollama</h3>
+                <p>Local LLM Server</p>
+            </div>
+            <span class="service-status" id="status-ollama">...</span>
+        </a>
+        <a href="/pgadmin/" target="_blank" class="service-card">
+            <div class="service-icon pgadmin">🗄️</div>
+            <div class="service-info">
+                <h3>PgAdmin</h3>
+                <p>Database Manager</p>
+            </div>
+            <span class="service-status" id="status-pgadmin">...</span>
+        </a>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Load stats
+    fetch(`${window.ARIA_API_BASE_URL}/stats`)
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('stat-thoughts').textContent = data.thoughts_count || 0;
+            document.getElementById('stat-activities').textContent = data.activities_count || 0;
+            if (data.last_activity) {
+                const d = new Date(data.last_activity);
+                document.getElementById('stat-last').textContent = d.toLocaleString();
+            }
+        })
+        .catch(() => {});
+
+    // Load service status
+    fetch(`${window.ARIA_API_BASE_URL}/status`)
+        .then(r => r.json())
+        .then(data => {
+            for (const [name, info] of Object.entries(data)) {
+                const el = document.getElementById('status-' + name);
+                if (el) {
+                    el.textContent = info.status === 'up' ? '● Online' : '○ Offline';
+                    el.className = 'service-status ' + (info.status === 'up' ? 'up' : 'down');
+                }
+            }
+        })
+        .catch(() => {});
+</script>
+{% endblock %}

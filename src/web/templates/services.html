@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% block title %}Services - Aria{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>🖥️ Services</h1>
+    <p>Monitor and manage all Aria stack services</p>
+</div>
+
+<div class="filters">
+    <button class="btn btn-primary" onclick="refreshAllStatus()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12a9 9 0 11-6.22-8.56"/>
+        </svg>
+        Refresh All
+    </button>
+    <div class="filter-group">
+        <label class="filter-label">Filter:</label>
+        <select id="statusFilter" onchange="filterServices()">
+            <option value="">All Services</option>
+            <option value="online">Online</option>
+            <option value="offline">Offline</option>
+        </select>
+    </div>
+</div>
+
+<div class="grid-3" id="servicesGrid">
+    <!-- Services will be loaded here -->
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.service-card-large {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    transition: all 0.2s;
+}
+.service-card-large:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
+}
+.service-card-large.online { border-left: 3px solid var(--success); }
+.service-card-large.offline { border-left: 3px solid var(--danger); }
+
+.service-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+}
+.service-title {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+.service-icon-large {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+    font-size: 1.5rem;
+}
+.service-name-large {
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+.service-desc {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+.service-details {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+    margin: 1rem 0;
+    padding: 1rem;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+}
+.detail-item {
+    font-size: 0.9rem;
+}
+.detail-label {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+.service-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+</style>
+
+<script>
+const serviceHost = "{{ service_host }}";
+const baseUrl = `https://${serviceHost}`;
+const hostName = serviceHost;
+const clawdbotUrl = "{{ clawdbot_public_url }}";
+
+const services = [
+    { id: 'ollama', name: 'Ollama', icon: '🦙', desc: 'Local LLM Server', port: 11434, url: `${baseUrl}/ollama/` },
+    { id: 'litellm', name: 'LiteLLM', icon: '⚡', desc: 'LLM Proxy', port: 18793, url: `${baseUrl}/litellm/` },
+    { id: 'clawdbot', name: 'Clawdbot', icon: '🤖', desc: 'AI Gateway', port: 18789, url: clawdbotUrl },
+    { id: 'postgres', name: 'PostgreSQL', icon: '🐘', desc: 'Database Server', port: 5432, url: null },
+    { id: 'grafana', name: 'Grafana', icon: '📊', desc: 'Metrics Dashboard', port: 3001, url: `${baseUrl}/grafana/` },
+    { id: 'prometheus', name: 'Prometheus', icon: '🔥', desc: 'Metrics Collection', port: 9090, url: `${baseUrl}/prometheus/` },
+    { id: 'pgadmin', name: 'PgAdmin', icon: '🔧', desc: 'Database Admin', port: 5050, url: `${baseUrl}/pgadmin/` },
+    { id: 'traefik', name: 'Traefik', icon: '🚦', desc: 'Reverse Proxy', port: 8080, url: `${baseUrl}/dashboard/` },
+];
+
+const statusCache = {};
+
+async function checkServiceStatus(service) {
+    try {
+        const response = await fetch(`${window.ARIA_API_BASE_URL}/status/${service.id}`);
+        const data = await response.json();
+        return data.status === 'online';
+    } catch {
+        return false;
+    }
+}
+
+async function refreshAllStatus() {
+    const grid = document.getElementById('servicesGrid');
+    grid.innerHTML = services.map(s => renderServiceCard(s, null)).join('');
+    
+    for (const service of services) {
+        const online = await checkServiceStatus(service);
+        statusCache[service.id] = online;
+        updateServiceCard(service.id, online);
+    }
+}
+
+function renderServiceCard(service, online) {
+    const statusClass = online === null ? '' : (online ? 'online' : 'offline');
+    const statusBadge = online === null 
+        ? '<span class="status"><span class="spinner" style="width:14px;height:14px;border-width:2px;"></span></span>'
+        : (online 
+            ? '<span class="status status-online"><span class="status-dot"></span>Online</span>'
+            : '<span class="status status-offline"><span class="status-dot"></span>Offline</span>');
+    
+    return `
+        <div class="service-card-large ${statusClass}" id="service-${service.id}">
+            <div class="service-header">
+                <div class="service-title">
+                    <div class="service-icon-large">${service.icon}</div>
+                    <div>
+                        <div class="service-name-large">${service.name}</div>
+                        <div class="service-desc">${service.desc}</div>
+                    </div>
+                </div>
+                ${statusBadge}
+            </div>
+            <div class="service-details">
+                <div class="detail-item">
+                    <div class="detail-label">Port</div>
+                    <div>${service.port}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Host</div>
+                    <div>${hostName}</div>
+                </div>
+            </div>
+            <div class="service-actions">
+                ${service.url ? `<a href="${service.url}" target="_blank" class="btn btn-primary">Open</a>` : ''}
+                <button class="btn btn-secondary" onclick="checkSingle('${service.id}')">Check</button>
+            </div>
+        </div>
+    `;
+}
+
+function updateServiceCard(id, online) {
+    const card = document.getElementById(`service-${id}`);
+    if (!card) return;
+    
+    card.classList.remove('online', 'offline');
+    card.classList.add(online ? 'online' : 'offline');
+    
+    const statusSpan = card.querySelector('.status');
+    if (statusSpan) {
+        statusSpan.className = `status ${online ? 'status-online' : 'status-offline'}`;
+        statusSpan.innerHTML = `<span class="status-dot"></span>${online ? 'Online' : 'Offline'}`;
+    }
+}
+
+async function checkSingle(id) {
+    const service = services.find(s => s.id === id);
+    if (!service) return;
+    
+    const card = document.getElementById(`service-${id}`);
+    const statusSpan = card.querySelector('.status');
+    statusSpan.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;"></span>';
+    
+    const online = await checkServiceStatus(service);
+    statusCache[id] = online;
+    updateServiceCard(id, online);
+}
+
+function filterServices() {
+    const filter = document.getElementById('statusFilter').value;
+    document.querySelectorAll('.service-card-large').forEach(card => {
+        if (!filter) {
+            card.style.display = 'block';
+        } else {
+            card.style.display = card.classList.contains(filter) ? 'block' : 'none';
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', refreshAllStatus);
+</script>
+{% endblock %}

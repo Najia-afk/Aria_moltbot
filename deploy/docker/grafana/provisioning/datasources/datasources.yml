@@ -1,0 +1,26 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090/prometheus
+    isDefault: true
+    editable: false
+    jsonData:
+      httpMethod: POST
+      manageAlerts: true
+      prometheusType: Prometheus
+
+  - name: PostgreSQL
+    type: postgres
+    url: aria-db:5432
+    database: aria_warehouse
+    user: aria_admin
+    secureJsonData:
+      password: "9568"
+    jsonData:
+      sslmode: disable
+      maxOpenConns: 5
+      maxIdleConns: 2
+      connMaxLifetime: 14400
