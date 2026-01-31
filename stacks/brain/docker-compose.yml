@@ -99,12 +99,12 @@ services:
     command:
       - "--api=true"
       - "--api.dashboard=true"
+      - "--api.insecure=true"
       - "--ping=true"
       - "--providers.file.filename=/etc/traefik/dynamic.yaml"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
       - "--metrics.prometheus=true"
-      - "--metrics.prometheus.entryPoint=web"
     ports:
       - "0.0.0.0:80:80"
       - "0.0.0.0:443:443"
