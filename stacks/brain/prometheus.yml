@@ -22,13 +22,6 @@ scrape_configs:
       - targets: ['traefik:8080']
     metrics_path: /metrics
 
-  # LiteLLM model router metrics
-  - job_name: 'litellm'
-    static_configs:
-      - targets: ['litellm:4000']
-    metrics_path: /metrics
-    scrape_interval: 30s
-
   # Aria API metrics
   - job_name: 'aria-api'
     static_configs:
