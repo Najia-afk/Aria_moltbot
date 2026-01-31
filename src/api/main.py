@@ -64,9 +64,27 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Aria Brain API",
-    description="Canonical data API for Aria Blue",
+    description="""
+## Aria Blue Data API
+
+Canonical data API for the Aria AI assistant ecosystem.
+
+### Features
+- **Activities**: Track and query AI agent activities
+- **Thoughts**: Store and retrieve reasoning logs
+- **Memories**: Long-term memory storage
+- **Records**: Generic data table access
+- **Services**: Health monitoring for all stack services
+
+### Authentication
+Currently open for internal network access.
+    """,
     version="2.1.0",
     lifespan=lifespan,
+    root_path="/api",  # Mounted behind reverse proxy at /api
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
 )
 
 # Prometheus metrics instrumentation - exposes /metrics endpoint

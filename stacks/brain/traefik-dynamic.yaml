@@ -25,6 +25,8 @@ http:
       entryPoints:
         - web
       service: aria-api
+      middlewares:
+        - api-strip
 
     clawdbot-http:
       rule: "PathPrefix(`/clawdbot`)"
@@ -98,6 +100,8 @@ http:
       entryPoints:
         - websecure
       service: aria-api
+      middlewares:
+        - api-strip
       tls: {}
 
     clawdbot:
@@ -165,6 +169,10 @@ http:
       tls: {}
 
   middlewares:
+    api-strip:
+      stripPrefix:
+        prefixes:
+          - /api
     clawdbot-strip:
       stripPrefix:
         prefixes:
