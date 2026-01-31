@@ -30,12 +30,11 @@ if not DATABASE_URL:
 # Service URLs with specific health check paths
 SERVICE_URLS = {
     "grafana": (os.getenv("GRAFANA_URL", "http://grafana:3000"), "/api/health"),
-    "prometheus": (os.getenv("PROMETHEUS_URL", "http://prometheus:9090"), "/-/healthy"),
+    "prometheus": (os.getenv("PROMETHEUS_URL", "http://prometheus:9090"), "/prometheus/-/healthy"),
     "ollama": (os.getenv("OLLAMA_URL", "http://host.docker.internal:11434"), "/api/tags"),
-    "litellm": (os.getenv("LITELLM_URL", "http://litellm:4000"), "/health"),
-    "clawdbot": (os.getenv("CLAWDBOT_URL", "http://clawdbot:18789"), "/health"),
-    "pgadmin": (os.getenv("PGADMIN_URL", "http://aria-pgadmin:80"), "/misc/ping"),
-    "traefik": ("http://traefik:8080", "/ping"),
+    "litellm": (os.getenv("LITELLM_URL", "http://litellm:4000"), "/health/liveliness"),
+    "clawdbot": (os.getenv("CLAWDBOT_URL", "http://clawdbot:18789"), "/"),
+    "pgadmin": (os.getenv("PGADMIN_URL", "http://aria-pgadmin:80"), "/"),
     "browser": ("http://aria-browser:3000", "/"),
 }
 
