@@ -202,8 +202,8 @@ services:
     environment:
       # Database
       DATABASE_URL: postgresql://${DB_USER?DB_USER is required}:${DB_PASSWORD?DB_PASSWORD is required}@aria-db:5432/${DB_NAME?DB_NAME is required}
-      # Local LLM (Ollama)
-      OLLAMA_URL: http://ollama:11434
+      # Local LLM (Ollama - native on host)
+      OLLAMA_URL: http://host.docker.internal:11434
       OLLAMA_MODEL: qwen3-vl:8b
       # LLM APIs (fallback)
       GEMINI_API_KEY: ${GOOGLE_GEMINI_KEY}
@@ -225,8 +225,6 @@ services:
       aria-api:
         condition: service_healthy
       litellm:
-        condition: service_started
-      ollama:
         condition: service_started
     networks:
       - aria-net
@@ -266,7 +264,7 @@ services:
       CLAWDBOT_PUBLIC_URL: ${CLAWDBOT_PUBLIC_URL?CLAWDBOT_PUBLIC_URL is required}
       GRAFANA_URL: http://grafana:3000
       PROMETHEUS_URL: http://prometheus:9090
-      OLLAMA_URL: http://ollama:11434
+      OLLAMA_URL: http://host.docker.internal:11434
       LITELLM_URL: http://litellm:4000
       CLAWDBOT_URL: http://clawdbot:18789
       CLAWDBOT_TOKEN: ${CLAWDBOT_TOKEN?CLAWDBOT_TOKEN is required}
@@ -291,7 +289,7 @@ services:
       DATABASE_URL: postgresql://${DB_USER?DB_USER is required}:${DB_PASSWORD?DB_PASSWORD is required}@aria-db:5432/${DB_NAME?DB_NAME is required}
       GRAFANA_URL: http://grafana:3000
       PROMETHEUS_URL: http://prometheus:9090
-      OLLAMA_URL: http://ollama:11434
+      OLLAMA_URL: http://host.docker.internal:11434
       LITELLM_URL: http://litellm:4000
       CLAWDBOT_URL: http://clawdbot:18789
       PGADMIN_URL: http://aria-pgadmin:80
