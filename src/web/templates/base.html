@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="x-dns-prefetch-control" content="off">
+    <!-- Disable Chrome's speculative preloading/prefetching -->
+    <meta http-equiv="Speculation-Rules" content="{}">
+    <link rel="prefetch" href="">
+    <script type="speculationrules">{"prefetch":[],"prerender":[]}</script>
     <title>{% block title %}Aria Blue{% endblock %}</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
