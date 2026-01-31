@@ -78,45 +78,69 @@
 <section class="services-section">
     <h2 class="section-title">External Services</h2>
     <div class="services-grid">
-        <a href="http://{{ request.host.split(':')[0] }}:18789/?token=49abdf292939e5a8566870fa36ec3b8e3329350d91f68950" target="_blank" class="service-card">
+        <a href="{{ clawdbot_public_url }}" target="_blank" class="service-card">
             <div class="service-icon clawdbot">🦞</div>
             <div class="service-info">
                 <h3>Clawdbot</h3>
-                <p>Personal AI Assistant</p>
+                <p>AI Agent Gateway</p>
             </div>
-            <span class="service-status" id="status-clawdbot">...</span>
+            <span class="service-status loading" id="status-clawdbot">...</span>
         </a>
         <a href="/grafana/" target="_blank" class="service-card">
             <div class="service-icon grafana">📊</div>
             <div class="service-info">
                 <h3>Grafana</h3>
-                <p>Metrics & Dashboards</p>
+                <p>Monitoring Dashboard</p>
             </div>
-            <span class="service-status" id="status-grafana">...</span>
+            <span class="service-status loading" id="status-grafana">...</span>
         </a>
         <a href="/prometheus/" target="_blank" class="service-card">
             <div class="service-icon prometheus">📈</div>
             <div class="service-info">
                 <h3>Prometheus</h3>
-                <p>Time Series Database</p>
+                <p>Metrics Engine</p>
             </div>
-            <span class="service-status" id="status-prometheus">...</span>
+            <span class="service-status loading" id="status-prometheus">...</span>
         </a>
-        <a href="/ollama/" target="_blank" class="service-card">
+        <a href="http://{{ request.host.split(':')[0] }}:11434" target="_blank" class="service-card">
             <div class="service-icon ollama">🦙</div>
             <div class="service-info">
                 <h3>Ollama</h3>
-                <p>Local LLM Server</p>
+                <p>Local LLM (Metal GPU)</p>
             </div>
-            <span class="service-status" id="status-ollama">...</span>
+            <span class="service-status loading" id="status-ollama">...</span>
         </a>
         <a href="/pgadmin/" target="_blank" class="service-card">
             <div class="service-icon pgadmin">🗄️</div>
             <div class="service-info">
                 <h3>PgAdmin</h3>
-                <p>Database Manager</p>
+                <p>Database Admin</p>
             </div>
-            <span class="service-status" id="status-pgadmin">...</span>
+            <span class="service-status loading" id="status-pgadmin">...</span>
+        </a>
+        <a href="http://{{ request.host.split(':')[0] }}:18793" target="_blank" class="service-card">
+            <div class="service-icon litellm">🔀</div>
+            <div class="service-info">
+                <h3>LiteLLM</h3>
+                <p>Model Router</p>
+            </div>
+            <span class="service-status loading" id="status-litellm">...</span>
+        </a>
+        <a href="/traefik/dashboard/" target="_blank" class="service-card">
+            <div class="service-icon traefik">🔷</div>
+            <div class="service-info">
+                <h3>Traefik</h3>
+                <p>Reverse Proxy</p>
+            </div>
+            <span class="service-status loading" id="status-traefik">...</span>
+        </a>
+        <a href="http://{{ request.host.split(':')[0] }}:3000" target="_blank" class="service-card">
+            <div class="service-icon tor">🌐</div>
+            <div class="service-info">
+                <h3>Browser</h3>
+                <p>Headless Chrome</p>
+            </div>
+            <span class="service-status loading" id="status-browser">...</span>
         </a>
     </div>
 </section>
@@ -132,7 +156,7 @@
             document.getElementById('stat-activities').textContent = data.activities_count || 0;
             if (data.last_activity) {
                 const d = new Date(data.last_activity);
-                document.getElementById('stat-last').textContent = d.toLocaleString();
+                document.getElementById('stat-last').textContent = d.toLocaleTimeString();
             }
         })
         .catch(() => {});
@@ -144,11 +168,17 @@
             for (const [name, info] of Object.entries(data)) {
                 const el = document.getElementById('status-' + name);
                 if (el) {
-                    el.textContent = info.status === 'up' ? '● Online' : '○ Offline';
-                    el.className = 'service-status ' + (info.status === 'up' ? 'up' : 'down');
+                    el.textContent = info.status === 'up' ? 'ONLINE' : 'OFFLINE';
+                    el.className = 'service-status ' + (info.status === 'up' ? 'online' : 'offline');
                 }
             }
         })
-        .catch(() => {});
+        .catch(() => {
+            // Set all to loading if API fails
+            document.querySelectorAll('.service-status').forEach(el => {
+                el.textContent = '...';
+                el.className = 'service-status loading';
+            });
+        });
 </script>
 {% endblock %}
