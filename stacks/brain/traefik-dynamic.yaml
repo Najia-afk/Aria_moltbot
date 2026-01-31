@@ -1,5 +1,10 @@
 # Traefik Dynamic Configuration - HTTP & HTTPS routes
 tls:
+  stores:
+    default:
+      defaultCertificate:
+        certFile: /certs/cert.pem
+        keyFile: /certs/key.pem
   certificates:
     - certFile: /certs/cert.pem
       keyFile: /certs/key.pem
