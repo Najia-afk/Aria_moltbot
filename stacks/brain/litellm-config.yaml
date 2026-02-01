@@ -1,7 +1,17 @@
 model_list:
   # Local Ollama model (native Metal GPU on host)
-  # Primary model - can be called as "local-default" or "gpt-4o" (for OpenClaw compatibility)
+  # Primary model - can be called as "local-default", "gpt-4o", or "qwen3-local"
   - model_name: local-default
+    litellm_params:
+      model: ollama/qwen3-vl:8b
+      api_base: http://host.docker.internal:11434
+    model_info:
+      max_tokens: 8192
+      input_cost_per_token: 0
+      output_cost_per_token: 0
+
+  # Alias for OpenClaw LiteLLM provider - routes qwen3-local to Ollama
+  - model_name: qwen3-local
     litellm_params:
       model: ollama/qwen3-vl:8b
       api_base: http://host.docker.internal:11434

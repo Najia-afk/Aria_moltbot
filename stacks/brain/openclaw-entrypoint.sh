@@ -32,11 +32,12 @@ cat > /root/.openclaw/openclaw.json << EOF
       "maxConcurrent": 4,
       "model": {
         "primary": "litellm/qwen3-local",
-        "fallbacks": ["google/gemini-2.0-flash"]
+        "fallbacks": ["google/gemini-2.0-flash", "google/gemini-2.5-flash"]
       },
       "models": {
         "litellm/qwen3-local": { "alias": "Qwen3 Local" },
-        "google/gemini-2.0-flash": { "alias": "Gemini Flash" }
+        "google/gemini-2.0-flash": { "alias": "Gemini 2.0 Flash" },
+        "google/gemini-2.5-flash": { "alias": "Gemini 2.5 Flash" }
       },
       "subagents": {
         "maxConcurrent": 8
