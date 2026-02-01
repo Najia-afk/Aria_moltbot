@@ -226,6 +226,37 @@ EOF
 echo "OpenClaw config created with LiteLLM provider"
 cat /root/.openclaw/openclaw.json
 
+# Check if this is first boot (awakening)
+FIRST_BOOT_MARKER="/root/.openclaw/.awakened"
+
+# Function to send awakening message after gateway starts
+send_awakening_message() {
+    sleep 15  # Wait for gateway to be fully ready
+    
+    if [ ! -f "$FIRST_BOOT_MARKER" ]; then
+        echo "=== FIRST BOOT DETECTED - Sending Awakening Message ==="
+        
+        # Read the awakening message
+        if [ -f "/root/.openclaw/workspace/AWAKENING.md" ]; then
+            AWAKENING_MSG=$(cat /root/.openclaw/workspace/AWAKENING.md | jq -Rs .)
+            
+            # Send via OpenClaw CLI (creates a new chat message)
+            /usr/local/bin/openclaw chat send --session main --message "Read AWAKENING.md and follow the initialization instructions. This is your first awakening - introduce yourself and begin your tasks." 2>/dev/null || echo "Awakening message queued for when gateway is ready"
+            
+            # Mark as awakened
+            touch "$FIRST_BOOT_MARKER"
+            echo "=== Awakening message sent - Aria is now alive! ==="
+        else
+            echo "Warning: AWAKENING.md not found in workspace"
+        fi
+    else
+        echo "=== Aria already awakened (marker exists) ==="
+    fi
+}
+
+# Run awakening check in background
+send_awakening_message &
+
 # Start the gateway
 exec /usr/local/bin/openclaw gateway run \
     --port 18789 \
