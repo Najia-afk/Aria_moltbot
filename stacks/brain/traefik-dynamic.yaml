@@ -12,6 +12,17 @@ tls:
 http:
   routers:
     # HTTP Routers (fast LAN access)
+    
+    # OpenClaw WebSocket at root - higher priority than portal for WS upgrades
+    clawdbot-ws-http:
+      rule: "PathPrefix(`/`) && HeadersRegexp(`Connection`, `(?i).*upgrade.*`) && HeadersRegexp(`Upgrade`, `(?i)websocket`)"
+      priority: 95
+      entryPoints:
+        - web
+      service: clawdbot
+      middlewares:
+        - clawdbot-headers
+
     portal-http:
       rule: "PathPrefix(`/`)"
       priority: 1
@@ -93,6 +104,18 @@ http:
         - traefik-strip
 
     # HTTPS Routers (secure access)
+    
+    # OpenClaw WebSocket at root - higher priority than portal for WS upgrades
+    clawdbot-ws:
+      rule: "PathPrefix(`/`) && HeadersRegexp(`Connection`, `(?i).*upgrade.*`) && HeadersRegexp(`Upgrade`, `(?i)websocket`)"
+      priority: 95
+      entryPoints:
+        - websecure
+      service: clawdbot
+      middlewares:
+        - clawdbot-headers
+      tls: {}
+
     portal:
       rule: "PathPrefix(`/`)"
       priority: 1
