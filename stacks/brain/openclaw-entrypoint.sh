@@ -173,6 +173,7 @@ cat > /root/.openclaw/openclaw.json << EOF
         "google/gemini-2.0-flash": { "alias": "Gemini 2.0 Flash" },
         "google/gemini-2.5-flash": { "alias": "Gemini 2.5 Flash" }
       },
+      "reasoningDefault": "on",
       "subagents": {
         "maxConcurrent": 8
       },
@@ -207,7 +208,7 @@ cat > /root/.openclaw/openclaw.json << EOF
           {
             "id": "qwen3-local",
             "name": "Qwen3-VL 8B via LiteLLM",
-            "reasoning": false,
+            "reasoning": true,
             "input": ["text", "image"],
             "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
             "contextWindow": 32768,
