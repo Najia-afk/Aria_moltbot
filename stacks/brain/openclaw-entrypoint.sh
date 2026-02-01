@@ -122,6 +122,14 @@ async def run_skill(skill_name: str, function_name: str, args: dict):
           })
           skill = PytestSkill(config)
           await skill.initialize()
+        elif skill_name == 'model_switcher':
+          from aria_skills.model_switcher import ModelSwitcherSkill
+          from aria_skills.base import SkillConfig
+          config = SkillConfig(name='model_switcher', config={
+            'url': os.environ.get('OLLAMA_URL', 'http://host.docker.internal:11434')
+          })
+          skill = ModelSwitcherSkill(config)
+          await skill.initialize()
         else:
             return {'error': f'Unknown skill: {skill_name}'}
         
@@ -174,7 +182,8 @@ cat > /root/.openclaw/openclaw.json << EOF
       "aria-moltbook": { "enabled": true },
       "aria-goals": { "enabled": true },
       "aria-health": { "enabled": true },
-      "aria-pytest": { "enabled": true }
+      "aria-pytest": { "enabled": true },
+      "aria-model-switcher": { "enabled": true }
     }
   },
   "gateway": {

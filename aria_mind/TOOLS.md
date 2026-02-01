@@ -132,6 +132,41 @@ config:
 - `list_goals(status?)` - List goals
 - `schedule_task(task, cron?)` - Schedule recurring task
 
+### model_switcher
+Switch between Ollama models at runtime - GLM for text, Qwen3-VL for vision.
+
+```yaml
+skill: model_switcher
+enabled: true
+config:
+  url: env:OLLAMA_URL
+```
+
+**Model Aliases:**
+| Alias | Model | Use Case |
+|-------|-------|----------|
+| `glm` | GLM-4.7-Flash-REAP | Default. Smart text reasoning |
+| `qwen3-vl` | qwen3-vl:8b | Vision/image tasks |
+| `qwen2.5` | qwen2.5:7b | Backup text model |
+
+**Functions:**
+- `list_models()` - List available Ollama models
+- `switch_model(model)` - Switch to model by alias or full name
+- `get_current_model()` - Get active model
+- `pull_model(model)` - Download model if not available
+
+**Usage:**
+```bash
+# Switch to GLM for text tasks (default)
+exec python3 /root/.openclaw/workspace/skills/run_skill.py model_switcher switch_model '{"model": "glm"}'
+
+# Switch to Qwen3-VL for vision/image analysis
+exec python3 /root/.openclaw/workspace/skills/run_skill.py model_switcher switch_model '{"model": "qwen3-vl"}'
+
+# Check what model is active
+exec python3 /root/.openclaw/workspace/skills/run_skill.py model_switcher get_current_model '{}'
+```
+
 ## LLM Skills (Aria's Brain)
 
 Per SOUL.md, I prefer local models first, then cloud fallback.
@@ -140,16 +175,19 @@ Per SOUL.md, I prefer local models first, then cloud fallback.
 Local LLM via Ollama - my primary thinking engine.
 Private, free, fast. This is how I prefer to think.
 
+Model is determined by `model_switcher` skill at runtime.
+
 ```yaml
 skill: ollama
 enabled: true
 priority: 1  # Try first (as per SOUL.md)
 config:
   url: env:OLLAMA_URL
-  model: env:OLLAMA_MODEL  # Default: GLM-4.7-Flash-REAP-23B-A3B Q3_K_S (SOUL.md)
+  # Model read from shared state (set by model_switcher) or OLLAMA_MODEL env
 ```
 
-Available local models (examples): qwen3-vl:8b, qwen2.5:14b, llama3.2:8b.
+**Default Model:** GLM-4.7-Flash-REAP (smart text reasoning)
+**Vision Model:** qwen3-vl:8b (use model_switcher to switch when needed)
 
 **Functions:**
 - `generate(prompt, system_prompt?)` - Generate text

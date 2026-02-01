@@ -1,29 +1,49 @@
 model_list:
   # Local Ollama model (native Metal GPU on host)
-  # Primary model - Qwen2.5:7b - excellent for tool calling, no thinking overhead
+  # Primary model - GLM-4.7-Flash-REAP - smart text reasoning (per SOUL.md)
   - model_name: local-default
     litellm_params:
-      model: ollama/qwen2.5:7b
+      model: ollama/hf.co/unsloth/GLM-4.7-Flash-REAP-23B-A3B-GGUF:Q3_K_S
       api_base: http://host.docker.internal:11434
     model_info:
       max_tokens: 32768
       input_cost_per_token: 0
       output_cost_per_token: 0
 
-  # Alias for OpenClaw LiteLLM provider - routes qwen-local to Ollama
+  # GLM-4.7 - Primary brain for Aria (smart text reasoning)
+  - model_name: glm-local
+    litellm_params:
+      model: ollama/hf.co/unsloth/GLM-4.7-Flash-REAP-23B-A3B-GGUF:Q3_K_S
+      api_base: http://host.docker.internal:11434
+    model_info:
+      max_tokens: 32768
+      input_cost_per_token: 0
+      output_cost_per_token: 0
+
+  # Qwen3-VL - Vision model for image tasks
+  - model_name: qwen3-vl
+    litellm_params:
+      model: ollama/qwen3-vl:8b
+      api_base: http://host.docker.internal:11434
+    model_info:
+      max_tokens: 32768
+      input_cost_per_token: 0
+      output_cost_per_token: 0
+
+  # Alias for backwards compatibility - routes qwen-local to GLM
   - model_name: qwen-local
     litellm_params:
-      model: ollama/qwen2.5:7b
+      model: ollama/hf.co/unsloth/GLM-4.7-Flash-REAP-23B-A3B-GGUF:Q3_K_S
       api_base: http://host.docker.internal:11434
     model_info:
       max_tokens: 32768
       input_cost_per_token: 0
       output_cost_per_token: 0
 
-  # Alias for OpenClaw - routes gpt-4o requests to local Ollama
+  # Alias for OpenClaw - routes gpt-4o requests to local GLM
   - model_name: gpt-4o
     litellm_params:
-      model: ollama/qwen2.5:7b
+      model: ollama/hf.co/unsloth/GLM-4.7-Flash-REAP-23B-A3B-GGUF:Q3_K_S
       api_base: http://host.docker.internal:11434
     model_info:
       max_tokens: 32768

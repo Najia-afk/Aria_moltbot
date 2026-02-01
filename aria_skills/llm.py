@@ -3,14 +3,35 @@
 
 Handles model selection, prompting, and response parsing.
 """
+import json
 import os
 from abc import abstractmethod
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import httpx
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
 from aria_skills.registry import SkillRegistry
+
+# Shared state file for model preference (used by model_switcher skill)
+MODEL_STATE_FILE = Path("/root/.openclaw/workspace/memory/model_preference.json")
+
+
+def _get_active_model() -> Optional[str]:
+    """
+    Get active model from shared state file.
+    
+    This allows the model_switcher skill to change models at runtime
+    without requiring container restarts.
+    """
+    if MODEL_STATE_FILE.exists():
+        try:
+            data = json.loads(MODEL_STATE_FILE.read_text())
+            return data.get("current_model")
+        except Exception:
+            pass
+    return None
 
 
 class BaseLLMSkill(BaseSkill):
@@ -218,34 +239,54 @@ class OllamaSkill(BaseLLMSkill):
     Ollama local LLM skill - Aria's DEFAULT brain.
     
     Per SOUL.md, local models are preferred:
-    - qwen3-vl:8b (default) - Vision capable, local, free (as per SOUL.md)
+    - GLM-4.7-Flash-REAP (default) - Smart text model
+    - qwen3-vl:8b - Vision capable, for image tasks
     - Falls back to cloud APIs only when local unavailable
+    
+    Model can be switched at runtime via model_switcher skill.
     
     Config:
         url: Ollama server URL (default: http://ollama:11434)
-        model: Model name (default from env:OLLAMA_MODEL or GLM-4.7 Q3_K_S)
+        model: Model name (reads from shared state, then env:OLLAMA_MODEL, then GLM default)
         
     This is Aria's primary thinking engine - local, private, fast.
     """
     
     MODELS = {
-        "qwen3-vl:8b": "Default - vision capable, local/free (SOUL.md)",
-        "qwen2.5:14b": "Higher quality text, slower",
-        "llama3.2:8b": "Alternative general model",
-        "codellama:7b": "Code-focused tasks",
+        "glm": "hf.co/unsloth/GLM-4.7-Flash-REAP-23B-A3B-GGUF:Q3_K_S",
+        "qwen3-vl": "qwen3-vl:8b",
+        "qwen2.5": "qwen2.5:7b",
     }
     
     def __init__(self, config: SkillConfig):
         super().__init__(config)
-        # Respect environment config first, then SOUL.md defaults
-        self._model = os.getenv(
-            "OLLAMA_MODEL",
-            config.config.get(
-                "model",
-                "hf.co/unsloth/GLM-4.7-Flash-REAP-23B-A3B-GGUF:Q3_K_S",
-            ),
+        self._base_url = os.getenv("OLLAMA_URL", config.config.get("url", "http://host.docker.internal:11434"))
+        # Model is determined dynamically - see _get_model()
+        self._config_model = config.config.get(
+            "model",
+            "hf.co/unsloth/GLM-4.7-Flash-REAP-23B-A3B-GGUF:Q3_K_S",
         )
-        self._base_url = os.getenv("OLLAMA_URL", config.config.get("url", "http://ollama:11434"))
+    
+    @property
+    def _model(self) -> str:
+        """
+        Get current model - checks shared state first for runtime switching.
+        
+        Priority:
+        1. Shared state file (set by model_switcher skill)
+        2. OLLAMA_MODEL environment variable
+        3. Config default (GLM-4.7)
+        """
+        # Check shared state file first (allows runtime switching)
+        state_model = _get_active_model()
+        if state_model:
+            return state_model
+        # Fall back to env var
+        env_model = os.getenv("OLLAMA_MODEL")
+        if env_model:
+            return env_model
+        # Finally use config default
+        return self._config_model
     
     @property
     def name(self) -> str:

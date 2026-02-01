@@ -1,0 +1,56 @@
+{
+  "name": "aria-model-switcher",
+  "version": "1.0.0",
+  "description": "Switch between Ollama models at runtime. GLM for smart text, Qwen3-VL for vision tasks.",
+  "author": "Aria Team",
+  "tools": [
+    {
+      "name": "list_models",
+      "description": "List all available Ollama models and show current active model. Returns installed models with aliases.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "switch_model",
+      "description": "Switch to a different Ollama model. Use 'glm' for smart text tasks, 'qwen3-vl' for vision/image tasks.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "Model alias (glm, qwen3-vl, qwen2.5) or full model name"
+          }
+        },
+        "required": ["model"]
+      }
+    },
+    {
+      "name": "pull_model",
+      "description": "Download/pull a model to Ollama. Use this if a model is not available.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "Model alias or full name to pull"
+          }
+        },
+        "required": ["model"]
+      }
+    },
+    {
+      "name": "get_current_model",
+      "description": "Get the currently active model name and alias.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  ],
+  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py model_switcher {{tool}} '{{args_json}}'",
+  "env": {
+    "OLLAMA_URL": "Ollama server URL (default: http://host.docker.internal:11434)"
+  }
+}
