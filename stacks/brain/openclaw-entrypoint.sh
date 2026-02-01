@@ -173,7 +173,6 @@ cat > /root/.openclaw/openclaw.json << EOF
         "google/gemini-2.0-flash": { "alias": "Gemini 2.0 Flash" },
         "google/gemini-2.5-flash": { "alias": "Gemini 2.5 Flash" }
       },
-      "reasoningDefault": "on",
       "subagents": {
         "maxConcurrent": 8
       },
