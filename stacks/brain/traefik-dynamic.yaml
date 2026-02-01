@@ -40,6 +40,7 @@ http:
       service: clawdbot
       middlewares:
         - clawdbot-strip
+        - clawdbot-headers
 
     grafana-http:
       rule: "PathPrefix(`/grafana`)"
@@ -123,6 +124,7 @@ http:
       service: clawdbot
       middlewares:
         - clawdbot-strip
+        - clawdbot-headers
       tls: {}
 
     grafana:
@@ -190,6 +192,24 @@ http:
       stripPrefix:
         prefixes:
           - /clawdbot
+    # WebSocket-friendly headers for OpenClaw (no Keep-Alive, allow upgrade)
+    clawdbot-headers:
+      headers:
+        accessControlAllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+        accessControlAllowHeaders:
+          - "*"
+        accessControlAllowOriginList: 
+          - "*"
+        accessControlMaxAge: 100
+        addVaryHeader: true
+        # Don't add Connection headers - let WebSocket upgrade work
+        customRequestHeaders:
+          X-Forwarded-Proto: "https"
     grafana-strip:
       stripPrefix:
         prefixes:
