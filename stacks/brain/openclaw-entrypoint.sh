@@ -209,12 +209,13 @@ cat > /root/.openclaw/openclaw.json << EOF
       "maxConcurrent": 4,
       "workspace": "/root/.openclaw/workspace",
       "model": {
-        "primary": "litellm/qwen-local",
-        "fallbacks": ["litellm/kimi-local"]
+        "primary": "ollama/qwen2.5:7b",
+        "fallbacks": ["ollama/hf.co/unsloth/GLM-4.7-Flash-REAP-23B-A3B-GGUF:Q3_K_S"]
       },
       "models": {
-        "litellm/qwen-local": { "alias": "Qwen2.5 7B Local" },
-        "litellm/kimi-local": { "alias": "Kimi K2.5 Fallback" }
+        "ollama/qwen2.5:7b": { "alias": "Qwen2.5 7B" },
+        "ollama/hf.co/unsloth/GLM-4.7-Flash-REAP-23B-A3B-GGUF:Q3_K_S": { "alias": "GLM-4.7 Flash" },
+        "ollama/qwen3-vl:8b": { "alias": "Qwen3-VL Vision" }
       },
       "subagents": {
         "maxConcurrent": 8
@@ -254,16 +255,34 @@ cat > /root/.openclaw/openclaw.json << EOF
   "models": {
     "mode": "merge",
     "providers": {
-      "litellm": {
-        "baseUrl": "http://litellm:4000/v1",
-        "apiKey": "${LITELLM_MASTER_KEY}",
+      "ollama": {
+        "baseUrl": "http://host.docker.internal:11434/v1",
+        "apiKey": "ollama",
         "api": "openai-responses",
         "models": [
           {
-            "id": "qwen-local",
-            "name": "Qwen2.5 7B via LiteLLM",
+            "id": "qwen2.5:7b",
+            "name": "Qwen2.5 7B Local",
             "reasoning": false,
             "input": ["text"],
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+            "contextWindow": 32768,
+            "maxTokens": 8192
+          },
+          {
+            "id": "hf.co/unsloth/GLM-4.7-Flash-REAP-23B-A3B-GGUF:Q3_K_S",
+            "name": "GLM-4.7 Flash REAP",
+            "reasoning": false,
+            "input": ["text"],
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+            "contextWindow": 32768,
+            "maxTokens": 8192
+          },
+          {
+            "id": "qwen3-vl:8b",
+            "name": "Qwen3-VL Vision",
+            "reasoning": false,
+            "input": ["text", "image"],
             "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
             "contextWindow": 32768,
             "maxTokens": 8192
@@ -280,7 +299,7 @@ cat > /root/.openclaw/openclaw.json << EOF
 }
 EOF
 
-echo "OpenClaw config created with LiteLLM provider"
+echo "OpenClaw config created with DIRECT Ollama provider (no LiteLLM)"
 cat /root/.openclaw/openclaw.json
 
 # Check if this is first boot (awakening)
