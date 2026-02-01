@@ -146,7 +146,10 @@ cat > /root/.openclaw/openclaw.json << EOF
       "mode": "token",
       "token": "${OPENCLAW_GATEWAY_TOKEN}"
     },
-    "trustedProxies": ["0.0.0.0/0", "::0/0"]
+    "trustedProxies": ["0.0.0.0/0", "::0/0"],
+    "controlUi": {
+      "basePath": "/clawdbot"
+    }
   },
   "agents": {
     "defaults": {

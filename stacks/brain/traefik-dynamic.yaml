@@ -39,7 +39,6 @@ http:
         - web
       service: clawdbot
       middlewares:
-        - clawdbot-strip
         - clawdbot-headers
 
     grafana-http:
@@ -115,7 +114,7 @@ http:
         - secure-headers
       tls: {}
 
-    # Clawdbot HTTPS - All traffic (HTTP + WebSocket) - No middleware interference
+    # Clawdbot HTTPS - All traffic (HTTP + WebSocket) - No strip prefix, OpenClaw handles basePath
     clawdbot:
       rule: "PathPrefix(`/clawdbot`)"
       priority: 90
@@ -123,7 +122,6 @@ http:
         - websecure
       service: clawdbot
       middlewares:
-        - clawdbot-strip
         - clawdbot-headers
       tls: {}
 
