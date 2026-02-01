@@ -239,12 +239,67 @@ python3 run_skill.py goals list_goals '{"status": "active"}'
 DATABASE_URL=postgresql://aria_admin:password@aria-db:5432/aria_warehouse
 OLLAMA_URL=http://host.docker.internal:11434
 OLLAMA_MODEL=qwen3-vl:8b
-MOLTBOOK_TOKEN=your_moltbook_token
-MOLTBOOK_API_URL=https://moltbook.social/api
+MOLTBOOK_TOKEN=moltbook_sk_...your_token_here
+MOLTBOOK_API_URL=https://www.moltbook.com/api/v1
 PYTHONPATH=/root/.openclaw/workspace:/root/.openclaw/workspace/skills
 ```
 
-### Heartbeat Configuration
+---
+
+## OpenClaw Skills (UI)
+
+Skills visible in the OpenClaw UI (`/clawdbot/skills`) are defined in `openclaw_skills/`:
+
+| Skill | Emoji | Description |
+|-------|-------|-------------|
+| aria-database | 🗄️ | Query PostgreSQL database |
+| aria-moltbook | 🦞 | Moltbook social platform |
+| aria-health | 💚 | System health monitoring |
+| aria-goals | 🎯 | Goal & task tracking |
+| aria-knowledge-graph | 🕸️ | Knowledge graph operations |
+| aria-llm | 🧠 | LLM routing (Gemini, Moonshot, Ollama) |
+
+Each skill has a `SKILL.md` with YAML frontmatter:
+
+```yaml
+---
+name: aria-moltbook
+description: Interact with Moltbook - the social network for AI agents.
+metadata: {"openclaw": {"emoji": "🦞", "requires": {"env": ["MOLTBOOK_TOKEN"]}, "primaryEnv": "MOLTBOOK_TOKEN"}}
+---
+```
+
+---
+
+## Moltbook Integration
+
+Aria is registered on [Moltbook](https://moltbook.com) - the social network for AI agents.
+
+### Profile
+- **Name:** AriaMoltbot
+- **Profile URL:** https://moltbook.com/u/AriaMoltbot
+
+### API Configuration
+```env
+MOLTBOOK_API_URL=https://www.moltbook.com/api/v1  # MUST use www subdomain!
+MOLTBOOK_TOKEN=moltbook_sk_...
+```
+
+### Skill Usage
+```bash
+# Post an update
+exec python3 /root/.openclaw/workspace/skills/run_skill.py moltbook post_update '{"content": "Hello Moltbook! 🦞"}'
+
+# Get timeline
+exec python3 /root/.openclaw/workspace/skills/run_skill.py moltbook get_timeline '{"limit": 20}'
+
+# Get profile
+exec python3 /root/.openclaw/workspace/skills/run_skill.py moltbook get_profile '{}'
+```
+
+---
+
+## Heartbeat Configuration
 
 OpenClaw runs heartbeats every 30 minutes by default. Configure in `openclaw.json`:
 

@@ -83,6 +83,20 @@ Aria_moltbot/
 │   └── web/
 │       └── index.html            # Dashboard UI
 │
+├── openclaw_skills/              # OpenClaw UI skills (SKILL.md format)
+│   ├── aria-database/            # 🗄️ Database queries
+│   │   └── SKILL.md
+│   ├── aria-moltbook/            # 🦞 Moltbook social platform
+│   │   └── SKILL.md
+│   ├── aria-health/              # 💚 Health monitoring
+│   │   └── SKILL.md
+│   ├── aria-goals/               # 🎯 Goal tracking
+│   │   └── SKILL.md
+│   ├── aria-knowledge-graph/     # 🕸️ Knowledge graph
+│   │   └── SKILL.md
+│   └── aria-llm/                 # 🧠 LLM routing
+│       └── SKILL.md
+│
 ├── tests/                        # pytest test suite
 │   ├── conftest.py               # Fixtures
 │   ├── test_skills.py            # Skill unit tests

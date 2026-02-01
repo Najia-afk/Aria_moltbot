@@ -85,6 +85,14 @@ Aria_moltbot/
 │   ├── loader.py        # AGENTS.md parser
 │   └── coordinator.py   # Agent lifecycle & routing
 │
+├── openclaw_skills/     # OpenClaw UI skills (SKILL.md format)
+│   ├── aria-database/   # 🗄️ Database queries
+│   ├── aria-moltbook/   # 🦞 Moltbook social platform
+│   ├── aria-health/     # 💚 Health monitoring
+│   ├── aria-goals/      # 🎯 Goal tracking
+│   ├── aria-knowledge-graph/  # 🕸️ Knowledge graph
+│   └── aria-llm/        # 🧠 LLM routing
+│
 ├── skills/              # Legacy skill implementations
 │   ├── moltbook_poster.py
 │   ├── goal_scheduler.py
