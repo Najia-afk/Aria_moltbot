@@ -18,6 +18,8 @@ http:
       entryPoints:
         - web
       service: portal
+      middlewares:
+        - secure-headers
 
     api-http:
       rule: "PathPrefix(`/api`)"
@@ -27,7 +29,9 @@ http:
       service: aria-api
       middlewares:
         - api-strip
+        - secure-headers
 
+    # Clawdbot - All traffic (HTTP + WebSocket) - No middleware interference
     clawdbot-http:
       rule: "PathPrefix(`/clawdbot`)"
       priority: 90
@@ -43,6 +47,9 @@ http:
       entryPoints:
         - web
       service: grafana
+      middlewares:
+        - secure-headers
+
 
     prometheus-http:
       rule: "PathPrefix(`/prometheus`)"
@@ -92,6 +99,8 @@ http:
       entryPoints:
         - websecure
       service: portal
+      middlewares:
+        - secure-headers
       tls: {}
 
     api:
@@ -102,8 +111,10 @@ http:
       service: aria-api
       middlewares:
         - api-strip
+        - secure-headers
       tls: {}
 
+    # Clawdbot HTTPS - All traffic (HTTP + WebSocket) - No middleware interference
     clawdbot:
       rule: "PathPrefix(`/clawdbot`)"
       priority: 90
@@ -120,6 +131,8 @@ http:
       entryPoints:
         - websecure
       service: grafana
+      middlewares:
+        - secure-headers
       tls: {}
 
     prometheus:
@@ -201,6 +214,66 @@ http:
       stripPrefix:
         prefixes:
           - /traefik
+    socketio-strip:
+      stripPrefix:
+        prefixes:
+          - /socket.io
+
+    # CORS Only (Safe for WebSockets)
+    cors-only:
+      headers:
+        accessControlAllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+        accessControlAllowHeaders:
+          - "*"
+        accessControlAllowOriginList: 
+          - "*"
+        accessControlMaxAge: 100
+        addVaryHeader: true
+
+    # Security Headers for Websockets (No Keep-Alive)
+    secure-headers-ws:
+      headers:
+        accessControlAllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+        accessControlAllowHeaders:
+          - "*"
+        accessControlAllowOriginList: 
+          - "*"
+        accessControlMaxAge: 100
+        addVaryHeader: true
+        contentTypeNosniff: true
+        browserXssFilter: true
+
+    # Security Headers for Standard HTTP (With Keep-Alive for stability)
+    secure-headers:
+      headers:
+        accessControlAllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+        accessControlAllowHeaders:
+          - "*"
+        accessControlAllowOriginList: 
+          - "*"
+        accessControlMaxAge: 100
+        addVaryHeader: true
+        contentTypeNosniff: true
+        browserXssFilter: true
+        # Helps with "Network Changed" / stalled connection issues
+        customResponseHeaders:
+          Connection: "keep-alive"
+          Keep-Alive: "timeout=5, max=1000"
 
   services:
     portal:

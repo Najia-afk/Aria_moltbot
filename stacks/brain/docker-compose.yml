@@ -37,6 +37,7 @@ services:
       - aria-net
 
   # Clawdbot Gateway - AI Assistant Control UI
+  # Uses LiteLLM as backend to route to local Ollama (qwen3-vl) or cloud models
   clawdbot:
     image: node:22-bookworm
     container_name: clawdbot
@@ -52,6 +53,10 @@ services:
       OPENCLAW_GATEWAY_TOKEN: ${CLAWDBOT_TOKEN?CLAWDBOT_TOKEN is required}
       OPENCLAW_NO_ONBOARD: "1"
       OPENCLAW_NO_PROMPT: "1"
+      # LiteLLM as OpenAI-compatible backend (routes to local Ollama/qwen3-vl)
+      OPENAI_API_KEY: ${LITELLM_MASTER_KEY}
+      OPENAI_API_BASE: http://litellm:4000
+      # Cloud fallbacks (passed to LiteLLM)
       GOOGLE_GEMINI_KEY: ${GOOGLE_GEMINI_KEY}
       MOONSHOT_KIMI_KEY: ${MOONSHOT_KIMI_KEY}
     volumes:
@@ -59,8 +64,10 @@ services:
       - ../../aria_mind:/root/.openclaw/workspace:ro
     ports:
       - "18789:18789"
+    depends_on:
+      - litellm
     command: >
-      bash -c "if [ ! -e /usr/local/bin/openclaw ]; then apt-get update && apt-get install -y curl; curl -fsSL https://openclaw.ai/install.sh | bash -s -- --no-onboard --no-prompt; fi; if [ ! -f /root/.openclaw/openclaw.json ] || grep -q '\"workspace\"' /root/.openclaw/openclaw.json; then mkdir -p /root/.openclaw; printf '{\"gateway\":{\"mode\":\"local\",\"bind\":\"lan\",\"port\":18789,\"auth\":{\"mode\":\"token\",\"token\":\"'"$$OPENCLAW_GATEWAY_TOKEN"'\"}}}' > /root/.openclaw/openclaw.json; fi; /usr/local/bin/openclaw gateway run --port 18789 --bind lan --token \"$$OPENCLAW_GATEWAY_TOKEN\" --allow-unconfigured --verbose"
+      bash -c "if [ ! -e /usr/local/bin/openclaw ]; then apt-get update && apt-get install -y curl; curl -fsSL https://openclaw.ai/install.sh | bash -s -- --no-onboard --no-prompt; fi; mkdir -p /root/.openclaw; printf '{\"gateway\":{\"mode\":\"local\",\"bind\":\"lan\",\"port\":18789,\"auth\":{\"mode\":\"token\",\"token\":\"'\"$$OPENCLAW_GATEWAY_TOKEN\"'\"},\"trustedProxies\":[\"0.0.0.0/0\",\"::0/0\"]},\"agent\":{\"provider\":\"openai\",\"model\":\"local-default\",\"apiBase\":\"http://litellm:4000\",\"apiKey\":\"'\"$$OPENAI_API_KEY\"'\"}}' > /root/.openclaw/openclaw.json; /usr/local/bin/openclaw gateway run --port 18789 --bind lan --token \"$$OPENCLAW_GATEWAY_TOKEN\" --allow-unconfigured --verbose"
     networks:
       - aria-net
     mem_limit: ${CLAWDBOT_MEM_LIMIT?CLAWDBOT_MEM_LIMIT is required}
