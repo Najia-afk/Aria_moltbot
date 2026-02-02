@@ -2,7 +2,7 @@ model_list:
   # GLM-4.7 - Primary model for Aria
   - model_name: glm-local
     litellm_params:
-      model: ollama/hf.co/unsloth/GLM-4.7-Flash-REAP-23B-A3B-GGUF:Q3_K_S
+      model: ollama_chat/hf.co/unsloth/GLM-4.7-Flash-REAP-23B-A3B-GGUF:Q3_K_S
       api_base: http://host.docker.internal:11434
       stop: ["<|user|>", "<|observation|>", "[GORILLA]", "[system_message]"]
     model_info:
@@ -13,7 +13,7 @@ model_list:
   # Qwen3-VL - Fallback and vision model
   - model_name: qwen3-vl
     litellm_params:
-      model: ollama/qwen3-vl:8b
+      model: ollama_chat/qwen3-vl:8b
       api_base: http://host.docker.internal:11434
       stop: ["<|user|>", "<|observation|>", "[GORILLA]", "[system_message]"]
     model_info:
@@ -85,7 +85,7 @@ model_list:
 router_settings:
   routing_strategy: simple-shuffle
   num_retries: 3
-  timeout: 120
+  timeout: 600
   allowed_fails: 3
   cooldown_time: 60
 

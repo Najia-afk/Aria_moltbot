@@ -231,13 +231,13 @@ cat > /root/.openclaw/openclaw.json << EOF
       "maxConcurrent": 4,
       "workspace": "/root/.openclaw/workspace",
       "model": {
-        "primary": "litellm/glm-local",
-        "fallbacks": ["litellm/qwen3-vl", "litellm/kimi"]
+        "primary": "litellm/qwen3-vl",
+        "fallbacks": ["litellm/kimi", "litellm/glm-local"]
       },
       "models": {
+        "litellm/qwen3-vl": { "alias": "Qwen3-VL" },
         "litellm/kimi": { "alias": "Kimi (Moonshot)" },
-        "litellm/glm-local": { "alias": "GLM-4.7 Flash" },
-        "litellm/qwen3-vl": { "alias": "Qwen3-VL" }
+        "litellm/glm-local": { "alias": "GLM-4.7 Flash" }
       },
       "subagents": {
         "maxConcurrent": 8
