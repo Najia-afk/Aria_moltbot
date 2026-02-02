@@ -181,6 +181,8 @@ services:
     command: ["--config", "/app/config.yaml", "--detailed_debug"]
     networks:
       - aria-net
+    mem_limit: ${LITELLM_MEM_LIMIT?LITELLM_MEM_LIMIT is required}
+    cpus: ${LITELLM_CPU_LIMIT?LITELLM_CPU_LIMIT is required}
 
   # NOTE: Ollama runs NATIVELY on macOS for Metal GPU acceleration (~20 tok/s)
   # Start with: OLLAMA_HOST=0.0.0.0:11434 ollama serve

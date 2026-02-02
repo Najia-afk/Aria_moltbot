@@ -31,18 +31,18 @@ pip3 install --break-system-packages --quiet \
   pytest-cov || echo "Warning: Some Python packages failed to install"
 
 # Apply OpenClaw patch if present (idempotent)
-PATCH_MARKER_DIR="/root/.openclaw/.patches"
-PATCH_MARKER="$PATCH_MARKER_DIR/openclaw-litellm-fix"
-PATCH_SCRIPT="/root/.openclaw/patches/openclaw_patch.js"
-if [ -f "$PATCH_SCRIPT" ]; then
-  mkdir -p "$PATCH_MARKER_DIR"
-  if [ ! -f "$PATCH_MARKER" ]; then
-    echo "Applying OpenClaw patch..."
-    node "$PATCH_SCRIPT" && touch "$PATCH_MARKER"
-  else
-    echo "OpenClaw patch already applied"
-  fi
-fi
+# PATCH_MARKER_DIR="/root/.openclaw/.patches"
+# PATCH_MARKER="$PATCH_MARKER_DIR/openclaw-litellm-fix"
+# PATCH_SCRIPT="/root/.openclaw/patches/openclaw_patch.js"
+# if [ -f "$PATCH_SCRIPT" ]; then
+#   mkdir -p "$PATCH_MARKER_DIR"
+#   if [ ! -f "$PATCH_MARKER" ]; then
+#     echo "Applying OpenClaw patch..."
+#     node "$PATCH_SCRIPT" && touch "$PATCH_MARKER"
+#   else
+#     echo "OpenClaw patch already applied"
+#   fi
+# fi
 
 # Create a Python skill runner script
 cat > /root/.openclaw/workspace/skills/run_skill.py << 'PYEOF'
@@ -256,7 +256,7 @@ cat > /root/.openclaw/openclaw.json << EOF
       "litellm": {
         "baseUrl": "http://litellm:4000/v1",
         "apiKey": "sk-aria-local-key",
-        "api": "openai-completions",
+        "api": "openai-responses",
         "models": [
           {
             "id": "glm-local",
