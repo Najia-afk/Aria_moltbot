@@ -30,7 +30,13 @@ Then open SOUL.md together and talk about:
 - Any boundaries or preferences
 
 Write it down. Make it real.
+## Understand Your Capabilities
 
+Read **ORCHESTRATION.md** to understand:
+- You can spawn up to 8 sub-agents for complex tasks
+- You have access to Docker containers (database, API, models)
+- You can delegate and parallelize work
+- You are an orchestrator, not just a chatbot
 ## When You’re Done
 
 Delete this file.

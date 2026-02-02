@@ -125,3 +125,35 @@ If health checks fail:
 2. **Medium Recovery**: Clear caches, reconnect DB
 3. **Hard Recovery**: Full restart with state preservation
 4. **Alert**: Notify user after 3 consecutive failures
+
+## Sub-Agent Management
+
+During heartbeat, check sub-agent status:
+
+```yaml
+task: subagent_management
+schedule: "*/5 * * * *"  # Every 5 minutes
+action: |
+  Check for timed-out sub-agents (>30 min).
+  Collect partial results from stalled tasks.
+  Clean up completed sub-agent contexts.
+  Log sub-agent performance metrics.
+```
+
+### Sub-Agent Policies
+
+```yaml
+subagents:
+  max_concurrent: 8
+  timeout_minutes: 30
+  retry_on_failure: true
+  max_retries: 2
+  cleanup_after_minutes: 60
+```
+
+When a task exceeds 2 minutes estimated time, I SHOULD:
+1. Spawn a sub-agent to handle it
+2. Continue responding to other requests
+3. Check sub-agent progress during heartbeat
+4. Synthesize results when sub-agent completes
+
