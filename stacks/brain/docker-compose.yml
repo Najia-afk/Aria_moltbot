@@ -170,6 +170,7 @@ services:
     environment:
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY?LITELLM_MASTER_KEY is required}
       MOONSHOT_KIMI_KEY: ${MOONSHOT_KIMI_KEY}
+      OPEN_ROUTER_KEY: ${OPEN_ROUTER_KEY}
       # Use separate database for LiteLLM to prevent schema conflicts with Aria tables
       LITELLM_DATABASE_URL: postgresql://${DB_USER?DB_USER is required}:${DB_PASSWORD?DB_PASSWORD is required}@aria-db:5432/litellm
       STORE_MODEL_IN_DB: "False"
