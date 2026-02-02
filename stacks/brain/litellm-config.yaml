@@ -5,7 +5,6 @@ model_list:
       model: openai/nightmedia/Qwen3-VLTO-8B-Instruct-qx86x-hi-mlx
       api_base: http://host.docker.internal:8080/v1
       api_key: not-needed
-      stop: ["<|im_end|>", "<|endoftext|>", "<|im_start|>"]
     model_info:
       max_tokens: 32768
       input_cost_per_token: 0
