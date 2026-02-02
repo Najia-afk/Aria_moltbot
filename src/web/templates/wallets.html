@@ -37,8 +37,8 @@
         </div>
         <div class="wallet-balance">
             <div class="balance-main" id="kimi-balance">--</div>
-            <div class="balance-currency">CNY (Chinese Yuan)</div>
-            <div class="balance-usd" id="kimi-usd">≈ $-- USD</div>
+            <div class="balance-currency">USD (US Dollars)</div>
+            <div class="balance-usd" id="kimi-usd"></div>
         </div>
         <div class="wallet-details">
             <div class="detail-row">
@@ -551,20 +551,19 @@ async function loadBalances() {
         
         let totalUSD = 0;
         
-        // Kimi
+        // Kimi (already in USD)
         if (data.kimi) {
             const kimi = data.kimi;
             if (kimi.status === 'ok') {
                 const available = kimi.available || 0;
-                const usdEquiv = available * CNY_TO_USD;
-                totalUSD += usdEquiv;
+                totalUSD += available;
                 
                 document.getElementById('kimi-status').textContent = 'Active';
                 document.getElementById('kimi-status').className = 'wallet-status ok';
-                document.getElementById('kimi-balance').textContent = '¥' + available.toFixed(2);
-                document.getElementById('kimi-usd').textContent = '≈ $' + usdEquiv.toFixed(2) + ' USD';
-                document.getElementById('kimi-cash').textContent = '¥' + (kimi.cash || 0).toFixed(2);
-                document.getElementById('kimi-voucher').textContent = '¥' + (kimi.voucher || 0).toFixed(2);
+                document.getElementById('kimi-balance').textContent = '$' + available.toFixed(2);
+                document.getElementById('kimi-usd').textContent = '';
+                document.getElementById('kimi-cash').textContent = '$' + (kimi.cash || 0).toFixed(2);
+                document.getElementById('kimi-voucher').textContent = '$' + (kimi.voucher || 0).toFixed(2);
             } else {
                 document.getElementById('kimi-status').textContent = 'Error';
                 document.getElementById('kimi-status').className = 'wallet-status error';

@@ -927,6 +927,12 @@ function updateCharts() {
     const counts = Object.values(providerCounts);
     const colors = providers.map(p => getProviderColor(p));
     
+    // Don't render empty charts
+    if (providers.length === 0) {
+        document.getElementById('tokens-by-provider-chart').parentElement.innerHTML = '<div class="empty-state"><p>No model data available</p></div>';
+        return;
+    }
+    
     const providerCtx = document.getElementById('tokens-by-provider-chart').getContext('2d');
     if (providerChart) providerChart.destroy();
     providerChart = new Chart(providerCtx, {
