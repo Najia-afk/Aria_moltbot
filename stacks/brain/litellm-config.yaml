@@ -4,6 +4,7 @@ model_list:
     litellm_params:
       model: ollama/hf.co/unsloth/GLM-4.7-Flash-REAP-23B-A3B-GGUF:Q3_K_S
       api_base: http://host.docker.internal:11434
+      stop: ["<|user|>", "<|observation|>", "[GORILLA]", "[system_message]"]
     model_info:
       max_tokens: 32768
       input_cost_per_token: 0
@@ -14,6 +15,7 @@ model_list:
     litellm_params:
       model: ollama/qwen3-vl:8b
       api_base: http://host.docker.internal:11434
+      stop: ["<|user|>", "<|observation|>", "[GORILLA]", "[system_message]"]
     model_info:
       max_tokens: 32768
       input_cost_per_token: 0
@@ -21,6 +23,15 @@ model_list:
 
   # Moonshot / Kimi (256K context)
   - model_name: kimi-k2.5
+    litellm_params:
+      model: moonshot/kimi-k2.5
+      api_key: os.environ/MOONSHOT_KIMI_KEY
+      api_base: https://api.moonshot.ai/v1
+    model_info:
+      max_tokens: 256000
+
+  # Alias for shorter name
+  - model_name: kimi
     litellm_params:
       model: moonshot/kimi-k2.5
       api_key: os.environ/MOONSHOT_KIMI_KEY

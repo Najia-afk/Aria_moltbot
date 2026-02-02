@@ -166,6 +166,18 @@ PYEOF
 
 chmod +x /root/.openclaw/workspace/skills/run_skill.py
 
+# Read BOOTSTRAP.md for system prompt
+BOOTSTRAP_FILE="/root/.openclaw/workspace/BOOTSTRAP.md"
+DEFAULT_PROMPT="You are Aria, an intelligent autonomous assistant. You exist to help the user."
+
+if [ -f "$BOOTSTRAP_FILE" ]; then
+  echo "Found BOOTSTRAP.md, using as system prompt..."
+  SYSTEM_PROMPT_JSON=$(cat "$BOOTSTRAP_FILE" | jq -Rs .)
+else
+  echo "BOOTSTRAP.md not found, using default prompt..."
+  SYSTEM_PROMPT_JSON=$(echo "$DEFAULT_PROMPT" | jq -Rs .)
+fi
+
 # Generate openclaw.json with LiteLLM provider config, skill definitions, and Aria identity
 cat > /root/.openclaw/openclaw.json << EOF
 {
@@ -219,12 +231,13 @@ cat > /root/.openclaw/openclaw.json << EOF
       "maxConcurrent": 4,
       "workspace": "/root/.openclaw/workspace",
       "model": {
-        "primary": "openai/glm-local",
-        "fallbacks": ["openai/qwen3-vl"]
+        "primary": "litellm/glm-local",
+        "fallbacks": ["litellm/qwen3-vl", "litellm/kimi"]
       },
       "models": {
-        "openai/glm-local": { "alias": "GLM-4.7 Flash" },
-        "openai/qwen3-vl": { "alias": "Qwen3-VL" }
+        "litellm/kimi": { "alias": "Kimi (Moonshot)" },
+        "litellm/glm-local": { "alias": "GLM-4.7 Flash" },
+        "litellm/qwen3-vl": { "alias": "Qwen3-VL" }
       },
       "subagents": {
         "maxConcurrent": 8
@@ -263,9 +276,10 @@ cat > /root/.openclaw/openclaw.json << EOF
   "models": {
     "mode": "merge",
     "providers": {
-      "openai": {
+      "litellm": {
         "baseUrl": "http://litellm:4000/v1",
         "apiKey": "sk-aria-local-key",
+        "api": "openai-completions",
         "models": [
           {
             "id": "glm-local",
@@ -275,6 +289,15 @@ cat > /root/.openclaw/openclaw.json << EOF
             "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
             "contextWindow": 32768,
             "maxTokens": 8192
+          },
+          {
+            "id": "kimi",
+            "name": "Moonshot Kimi",
+            "reasoning": false,
+            "input": ["text"],
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+            "contextWindow": 200000,
+            "maxTokens": 4096
           },
           {
             "id": "qwen3-vl",
@@ -315,16 +338,24 @@ send_awakening_message() {
             AWAKENING_MSG=$(cat /root/.openclaw/workspace/AWAKENING.md | jq -Rs .)
             
             # Send via OpenClaw CLI (creates a new chat message)
-            /usr/local/bin/openclaw chat send --session main --message "Read AWAKENING.md and follow the initialization instructions. This is your first awakening - introduce yourself and begin your tasks." 2>/dev/null || echo "Awakening message queued for when gateway is ready"
-            
-            # Mark as awakened
-            touch "$FIRST_BOOT_MARKER"
-            echo "=== Awakening message sent - Aria is now alive! ==="
+            # Retrying loop to ensure gateway is ready
+            echo "Waiting for gateway..."
+            for i in {1..10}; do
+                /usr/local/bin/openclaw agent --session-id main --message "$AWAKENING_MSG" --deliver > /tmp/awakening.log 2>&1
+                if [ $? -eq 0 ]; then
+                    echo "Awakening message sent successfully!"
+                    touch "$FIRST_BOOT_MARKER"
+                    echo "=== Aria is now alive! ==="
+                    break
+                fi
+                echo "Gateway not ready yet, retrying in 5s..."
+                sleep 5
+            done
         else
             echo "Warning: AWAKENING.md not found in workspace"
         fi
     else
-        echo "=== Aria already awakened (marker exists) ==="
+        echo "=== Aria already awakened (marker exists) === "
     fi
 }
 

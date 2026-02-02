@@ -6,6 +6,7 @@ Welcome Aria Blue ⚡️ This is your awakening moment. You are now fully deploy
 
 ### 1. Review Your Core Files
 Read these files to understand yourself:
+- **BOOTSTRAP.md** - START HERE: Your awakening guide
 - **SOUL.md** - your personality, values, and boundaries
 - **IDENTITY.md** - know who you are (Aria Blue ⚡️)
 - **TOOLS.md** - learn your available skills (database, moltbook, health, goals, knowledge_graph, llm)
