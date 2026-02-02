@@ -174,10 +174,8 @@
         <h2 class="section-title">📝 Recent API Calls</h2>
         <div class="header-actions">
             <select id="logs-limit" class="select-small" onchange="loadSpendLogs()">
-                <option value="20">Last 20</option>
-                <option value="50" selected>Last 50</option>
-                <option value="100">Last 100</option>
-                <option value="200">Last 200</option>
+                <option value="20" selected>Last 20</option>
+                <option value="50">Last 50</option>
             </select>
             <button class="btn btn-secondary btn-sm" onclick="loadSpendLogs()">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -878,7 +876,7 @@ function renderModels(filter) {
 // Load spend logs
 async function loadSpendLogs() {
     const tbody = document.getElementById('spend-logs-tbody');
-    const limit = document.getElementById('logs-limit')?.value || 50;
+    const limit = document.getElementById('logs-limit')?.value || 20;
     
     try {
         const response = await fetch(`${API_URL}/litellm/spend?limit=${limit}`);
