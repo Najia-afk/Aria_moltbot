@@ -1,0 +1,106 @@
+{
+  "name": "aria-knowledge-graph",
+  "version": "1.0.0",
+  "description": "Build and query Aria's knowledge graph. Store entities (people, places, concepts) and their relationships.",
+  "author": "Aria Team",
+  "tools": [
+    {
+      "name": "kg_add_entity",
+      "description": "Create or update an entity in the knowledge graph.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Entity name"
+          },
+          "type": {
+            "type": "string",
+            "description": "Entity type (person, place, concept, event, organization, skill, topic)"
+          },
+          "properties": {
+            "type": "object",
+            "description": "Additional attributes as JSON object"
+          }
+        },
+        "required": ["name", "type"]
+      }
+    },
+    {
+      "name": "kg_add_relation",
+      "description": "Create a relationship between two entities.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "from_entity": {
+            "type": "string",
+            "description": "Source entity name"
+          },
+          "to_entity": {
+            "type": "string",
+            "description": "Target entity name"
+          },
+          "relation_type": {
+            "type": "string",
+            "description": "Relationship type (created, owns, uses, knows, works_with, located_in, part_of, related_to, interested_in)"
+          },
+          "properties": {
+            "type": "object",
+            "description": "Relation metadata"
+          }
+        },
+        "required": ["from_entity", "to_entity", "relation_type"]
+      }
+    },
+    {
+      "name": "kg_query_related",
+      "description": "Find entities related to a given entity.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "entity_name": {
+            "type": "string",
+            "description": "Entity name to find relations for"
+          },
+          "depth": {
+            "type": "integer",
+            "description": "How many hops to traverse (default: 1)"
+          }
+        },
+        "required": ["entity_name"]
+      }
+    },
+    {
+      "name": "kg_search",
+      "description": "Search entities by name, type, or properties.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search query"
+          },
+          "type": {
+            "type": "string",
+            "description": "Filter by entity type"
+          }
+        },
+        "required": ["query"]
+      }
+    },
+    {
+      "name": "kg_get_graph",
+      "description": "Get the full knowledge graph with all entities and relations.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "description": "Maximum entities to return (default: 100)"
+          }
+        }
+      }
+    }
+  ],
+  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py knowledge_graph {{tool}} '{{args_json}}'"
+}

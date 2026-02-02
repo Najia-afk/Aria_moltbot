@@ -1,0 +1,116 @@
+{
+  "name": "aria-schedule",
+  "version": "1.0.0",
+  "description": "Manage Aria's scheduled jobs, tasks, and background operations.",
+  "author": "Aria Team",
+  "tools": [
+    {
+      "name": "schedule_list",
+      "description": "List all scheduled jobs.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["active", "paused", "all"],
+            "description": "Filter by job status"
+          }
+        }
+      }
+    },
+    {
+      "name": "schedule_tick",
+      "description": "Get current schedule tick status.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "schedule_trigger",
+      "description": "Manually trigger a schedule tick.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "force": {
+            "type": "boolean",
+            "description": "Force execution even if not due"
+          }
+        }
+      }
+    },
+    {
+      "name": "schedule_sync",
+      "description": "Sync jobs from OpenClaw configuration.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "task_create",
+      "description": "Create a pending complex task for later execution.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Task type (research, code, analysis, etc.)"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "Task description/prompt"
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["low", "medium", "high", "critical"],
+            "description": "Task priority"
+          },
+          "context": {
+            "type": "object",
+            "description": "Additional context for the task"
+          }
+        },
+        "required": ["type", "prompt"]
+      }
+    },
+    {
+      "name": "task_list",
+      "description": "List pending tasks.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["pending", "in_progress", "completed", "failed", "all"],
+            "description": "Filter by status"
+          }
+        }
+      }
+    },
+    {
+      "name": "task_update",
+      "description": "Update a pending task.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "integer",
+            "description": "Task ID"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "in_progress", "completed", "failed"],
+            "description": "New status"
+          },
+          "result": {
+            "type": "string",
+            "description": "Task result/output"
+          }
+        },
+        "required": ["task_id"]
+      }
+    }
+  ],
+  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py schedule {{tool}} '{{args_json}}'"
+}

@@ -232,6 +232,90 @@ config:
 
 Available Kimi models: kimi-k2.5, kimi-k2-0905-preview, kimi-k2-turbo-preview, kimi-k2-thinking, kimi-k2-thinking-turbo.
 
+## New Skills (v1.1.0)
+
+### performance
+Track and analyze Aria's cognitive performance.
+
+```yaml
+skill: performance
+enabled: true
+config:
+  api_url: http://aria-api:8000
+```
+
+**Functions:**
+- `log(event, details?, latency?)` - Log performance event
+- `list(event?, since?)` - List performance metrics
+- `stats(period?)` - Get aggregated statistics
+
+### social
+Social media posting and scheduling.
+
+```yaml
+skill: social
+enabled: true
+config:
+  api_url: http://aria-api:8000
+```
+
+**Functions:**
+- `post(platform, content, metadata?)` - Post to social platform
+- `list(platform?, status?)` - List social posts
+- `schedule(platform, content, scheduled_at, metadata?)` - Schedule a future post
+
+### hourly_goals
+Manage hourly goal tracking and progress.
+
+```yaml
+skill: hourly_goals
+enabled: true
+config:
+  api_url: http://aria-api:8000
+```
+
+**Functions:**
+- `create(goal, hour?, status?)` - Create hourly goal
+- `list(date?, status?)` - List hourly goals
+- `update(goal_id, status?, notes?)` - Update goal progress
+- `stats(period?)` - Get goal statistics
+
+### litellm
+Manage LiteLLM proxy, spend tracking, and provider balances.
+
+```yaml
+skill: litellm
+enabled: true
+config:
+  api_url: http://litellm:4000
+```
+
+**Functions:**
+- `models()` - List available LLM models
+- `health()` - Check LiteLLM proxy health
+- `spend(start?, end?)` - Get spend analytics by day
+- `global_spend(start?, end?)` - Get total spend
+- `provider_balances()` - Get wallet balances from all providers (Kimi, OpenRouter)
+
+### schedule
+Manage scheduled jobs and pending tasks.
+
+```yaml
+skill: schedule
+enabled: true
+config:
+  api_url: http://aria-api:8000
+```
+
+**Functions:**
+- `list_jobs(status?)` - List scheduled jobs
+- `tick()` - Get current schedule tick status
+- `trigger(force?)` - Manually trigger schedule tick
+- `sync()` - Sync jobs from OpenClaw config
+- `create_task(task_type, prompt, priority?, context?)` - Create pending task
+- `list_tasks(status?)` - List pending tasks
+- `update_task(task_id, status?, result?)` - Update task status
+
 ## External APIs
 
 ### browser

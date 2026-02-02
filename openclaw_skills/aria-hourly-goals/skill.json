@@ -1,0 +1,94 @@
+{
+  "name": "aria-hourly-goals",
+  "version": "1.0.0",
+  "description": "Manage Aria's hourly goals and micro-tasks for short-term focus.",
+  "author": "Aria Team",
+  "tools": [
+    {
+      "name": "hourly_create",
+      "description": "Create an hourly goal for focused short-term work.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Goal title"
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed description"
+          },
+          "target_hour": {
+            "type": "string",
+            "description": "Target hour (ISO timestamp)"
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["low", "medium", "high", "critical"],
+            "description": "Priority level"
+          },
+          "parent_goal_id": {
+            "type": "integer",
+            "description": "Link to parent main goal"
+          }
+        },
+        "required": ["title"]
+      }
+    },
+    {
+      "name": "hourly_list",
+      "description": "List hourly goals with optional status filter.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["pending", "in_progress", "completed", "failed", "all"],
+            "description": "Filter by status"
+          },
+          "date": {
+            "type": "string",
+            "description": "Filter by date (YYYY-MM-DD)"
+          }
+        }
+      }
+    },
+    {
+      "name": "hourly_update",
+      "description": "Update an hourly goal's status or progress.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "goal_id": {
+            "type": "integer",
+            "description": "Goal ID to update"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "in_progress", "completed", "failed"],
+            "description": "New status"
+          },
+          "notes": {
+            "type": "string",
+            "description": "Progress notes"
+          }
+        },
+        "required": ["goal_id"]
+      }
+    },
+    {
+      "name": "hourly_stats",
+      "description": "Get hourly goal completion statistics.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "integer",
+            "description": "Days to analyze (default: 7)"
+          }
+        }
+      }
+    }
+  ],
+  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py hourly_goals {{tool}} '{{args_json}}'"
+}

@@ -44,10 +44,18 @@ exec python3 /root/.openclaw/workspace/skills/run_skill.py health check_service 
 ```
 
 **Available services:**
-- `database` - PostgreSQL connection
+- `database` (aria-db) - PostgreSQL connection
 - `ollama` - Local LLM (Qwen3-VL)
 - `litellm` - LLM proxy/router
-- `moltbook` - Moltbook API
+- `grafana` - Metrics dashboard
+- `prometheus` - Metrics collection
+- `traefik` - Reverse proxy
+- `aria-api` - FastAPI backend
+- `aria-web` - Flask frontend
+- `aria-brain` - Core brain service
+- `aria-browser` - Browserless Chrome
+- `pgadmin` - Database admin
+- `tor-proxy` - Tor anonymization
 
 ### get_metrics
 Get system resource usage.
@@ -55,6 +63,12 @@ Get system resource usage.
 ```bash
 exec python3 /root/.openclaw/workspace/skills/run_skill.py health get_metrics '{}'
 ```
+
+## API Endpoints
+
+- `GET /health` - Overall health with uptime
+- `GET /services` - All service statuses
+- `GET /services/{name}` - Specific service status
 
 ## Service Endpoints
 

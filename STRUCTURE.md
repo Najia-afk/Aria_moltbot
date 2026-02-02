@@ -39,7 +39,14 @@ Aria_moltbot/
 │   ├── llm.py                    # LLM routing (Ollama + cloud fallback)
 │   ├── health.py                 # Health monitoring
 │   ├── knowledge_graph.py        # Knowledge graph operations
-│   └── goals.py                  # Goal & task scheduling
+│   ├── goals.py                  # Goal & task scheduling
+│   ├── performance.py            # Performance tracking (v1.1.0)
+│   ├── social.py                 # Social media posting (v1.1.0)
+│   ├── hourly_goals.py           # Hourly goal tracking (v1.1.0)
+│   ├── litellm_skill.py          # LiteLLM proxy management (v1.1.0)
+│   ├── schedule.py               # Schedule & task management (v1.1.0)
+│   ├── model_switcher.py         # Ollama model switching
+│   └── pytest_runner.py          # Pytest test runner
 │
 ├── aria_agents/                  # Multi-agent orchestration (mounted to clawdbot)
 │   ├── __init__.py
@@ -98,7 +105,19 @@ Aria_moltbot/
 │   │   └── SKILL.md
 │   ├── aria-llm/                 # 🧠 LLM routing
 │   │   └── SKILL.md
-│   └── aria-pytest/              # 🧪 Pytest runner
+│   ├── aria-pytest/              # 🧪 Pytest runner
+│   │   └── SKILL.md
+│   ├── aria-model-switcher/      # 🔄 Model switching
+│   │   └── SKILL.md
+│   ├── aria-performance/         # 📊 Performance tracking (v1.1.0)
+│   │   └── SKILL.md
+│   ├── aria-social/              # 📱 Social media posting (v1.1.0)
+│   │   └── SKILL.md
+│   ├── aria-hourly-goals/        # ⏰ Hourly goals (v1.1.0)
+│   │   └── SKILL.md
+│   ├── aria-litellm/             # 💰 LiteLLM proxy (v1.1.0)
+│   │   └── SKILL.md
+│   └── aria-schedule/            # 📅 Scheduling (v1.1.0)
 │       └── SKILL.md
 │
 ├── tests/                        # pytest test suite
@@ -159,7 +178,14 @@ Aria's Python skills are mounted into the OpenClaw container at runtime:
     │   ├── health.py
     │   ├── goals.py
     │   ├── llm.py
-    │   └── knowledge_graph.py
+    │   ├── knowledge_graph.py
+    │   ├── model_switcher.py
+    │   ├── pytest_runner.py
+    │   ├── performance.py          # v1.1.0
+    │   ├── social.py               # v1.1.0
+    │   ├── hourly_goals.py         # v1.1.0
+    │   ├── litellm_skill.py        # v1.1.0
+    │   └── schedule.py             # v1.1.0
     ├── aria_agents/                # ← mounted from ../../aria_agents
     │   ├── base.py
     │   ├── loader.py

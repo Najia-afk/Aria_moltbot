@@ -1,0 +1,81 @@
+{
+  "name": "aria-social",
+  "version": "1.0.0",
+  "description": "Manage Aria's social presence and posts on Moltbook and other platforms.",
+  "author": "Aria Team",
+  "tools": [
+    {
+      "name": "social_post",
+      "description": "Create a social media post.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "Post content text"
+          },
+          "platform": {
+            "type": "string",
+            "enum": ["moltbook", "twitter", "mastodon"],
+            "description": "Target platform"
+          },
+          "mood": {
+            "type": "string",
+            "description": "Mood/emotion tag"
+          },
+          "tags": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Hashtags or topics"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": ["public", "private", "followers"],
+            "description": "Post visibility"
+          }
+        },
+        "required": ["content", "platform"]
+      }
+    },
+    {
+      "name": "social_list",
+      "description": "Get recent social posts.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "description": "Filter by platform"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Maximum posts (default: 20)"
+          }
+        }
+      }
+    },
+    {
+      "name": "social_schedule",
+      "description": "Schedule a post for later.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "Post content"
+          },
+          "platform": {
+            "type": "string",
+            "description": "Target platform"
+          },
+          "scheduled_for": {
+            "type": "string",
+            "description": "ISO timestamp for posting"
+          }
+        },
+        "required": ["content", "platform", "scheduled_for"]
+      }
+    }
+  ],
+  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py social {{tool}} '{{args_json}}'"
+}

@@ -1,0 +1,95 @@
+{
+  "name": "aria-llm",
+  "version": "1.0.0",
+  "description": "Access multiple LLM providers (Moonshot/Kimi, Ollama, OpenRouter) for text generation and chat.",
+  "author": "Aria Team",
+  "tools": [
+    {
+      "name": "llm_generate",
+      "description": "Generate text from a prompt using specified model.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "The prompt to generate from"
+          },
+          "model": {
+            "type": "string",
+            "description": "Model to use (moonshot, ollama, openrouter)"
+          },
+          "temperature": {
+            "type": "number",
+            "description": "Temperature for generation (0-1, default: 0.7)"
+          },
+          "max_tokens": {
+            "type": "integer",
+            "description": "Maximum tokens to generate"
+          }
+        },
+        "required": ["prompt"]
+      }
+    },
+    {
+      "name": "llm_chat",
+      "description": "Multi-turn conversation with message history.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": { "type": "string" },
+                "content": { "type": "string" }
+              }
+            },
+            "description": "Array of chat messages with role and content"
+          },
+          "model": {
+            "type": "string",
+            "description": "Model to use"
+          },
+          "system_prompt": {
+            "type": "string",
+            "description": "Optional system prompt"
+          }
+        },
+        "required": ["messages"]
+      }
+    },
+    {
+      "name": "llm_analyze",
+      "description": "Analyze text for sentiment, topics, or custom analysis.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "Text to analyze"
+          },
+          "analysis_type": {
+            "type": "string",
+            "enum": ["sentiment", "topics", "summary", "entities", "custom"],
+            "description": "Type of analysis"
+          },
+          "custom_prompt": {
+            "type": "string",
+            "description": "Custom analysis prompt (for analysis_type=custom)"
+          }
+        },
+        "required": ["text", "analysis_type"]
+      }
+    },
+    {
+      "name": "llm_list_models",
+      "description": "List available models from all providers.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  ],
+  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py llm {{tool}} '{{args_json}}'"
+}

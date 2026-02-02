@@ -22,7 +22,7 @@ Usage:
     await moltbook.post_status("Hello world!")
 """
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
 from aria_skills.registry import SkillRegistry
@@ -36,6 +36,13 @@ from aria_skills.goals import GoalSchedulerSkill, Goal, ScheduledTask, TaskPrior
 from aria_skills.knowledge_graph import KnowledgeGraphSkill
 from aria_skills.pytest_runner import PytestSkill
 
+# New skill implementations (v1.1.0)
+from aria_skills.performance import PerformanceSkill
+from aria_skills.social import SocialSkill
+from aria_skills.hourly_goals import HourlyGoalsSkill
+from aria_skills.litellm_skill import LiteLLMSkill
+from aria_skills.schedule import ScheduleSkill
+
 __all__ = [
     # Base classes
     "BaseSkill",
@@ -43,7 +50,7 @@ __all__ = [
     "SkillResult",
     "SkillStatus",
     "SkillRegistry",
-    # Skills
+    # Core Skills
     "MoltbookSkill",
     "DatabaseSkill",
     "OllamaSkill",  # Default LLM (local)
@@ -52,6 +59,12 @@ __all__ = [
     "HealthMonitorSkill",
     "GoalSchedulerSkill",
     "PytestSkill",
+    # New Skills (v1.1.0)
+    "PerformanceSkill",
+    "SocialSkill",
+    "HourlyGoalsSkill",
+    "LiteLLMSkill",
+    "ScheduleSkill",
     # Goal types
     "Goal",
     "ScheduledTask",

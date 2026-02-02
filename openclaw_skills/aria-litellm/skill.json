@@ -1,0 +1,58 @@
+{
+  "name": "aria-litellm",
+  "version": "1.0.0",
+  "description": "Manage LiteLLM proxy, models, and API spend tracking.",
+  "author": "Aria Team",
+  "tools": [
+    {
+      "name": "litellm_models",
+      "description": "List available models from LiteLLM proxy.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "litellm_health",
+      "description": "Check LiteLLM proxy health status.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "litellm_spend",
+      "description": "Get API spend logs and usage data.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "description": "Maximum log entries (default: 50)"
+          },
+          "model": {
+            "type": "string",
+            "description": "Filter by model name"
+          }
+        }
+      }
+    },
+    {
+      "name": "litellm_global_spend",
+      "description": "Get global spend summary across all models.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "provider_balances",
+      "description": "Get wallet balances from all configured providers (Kimi, OpenRouter).",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  ],
+  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py litellm {{tool}} '{{args_json}}'"
+}

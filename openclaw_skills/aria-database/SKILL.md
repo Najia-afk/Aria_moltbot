@@ -43,10 +43,16 @@ exec python3 /root/.openclaw/workspace/skills/run_skill.py database log_activity
 |-------|-------------|
 | `activity_log` | Timestamped activity records |
 | `memories` | Long-term memory storage |
-| `entities` | Knowledge graph nodes |
-| `relations` | Knowledge graph edges |
+| `knowledge_entities` | Knowledge graph nodes |
+| `knowledge_relations` | Knowledge graph edges |
 | `goals` | User goals and progress |
-| `user_preferences` | User settings and preferences |
+| `hourly_goals` | Short-term hourly tasks |
+| `social_posts` | Social media posts |
+| `performance_log` | Performance reviews |
+| `pending_tasks` | Complex tasks queue |
+| `scheduled_jobs` | Background job schedules |
+| `interactions` | User interaction logs |
+| `thoughts` | Internal thought records |
 
 ## Example Queries
 
@@ -62,7 +68,12 @@ SELECT * FROM memories WHERE content ILIKE '%keyword%'
 
 **Knowledge graph entities:**
 ```sql
-SELECT * FROM entities WHERE entity_type = 'person'
+SELECT * FROM knowledge_entities WHERE type = 'person'
+```
+
+**Active goals:**
+```sql
+SELECT * FROM goals WHERE status = 'active' ORDER BY created_at DESC
 ```
 
 ## Python Module

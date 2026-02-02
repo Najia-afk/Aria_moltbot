@@ -1,0 +1,75 @@
+{
+  "name": "aria-performance",
+  "version": "1.0.0",
+  "description": "Log and query Aria's performance reviews and self-assessments.",
+  "author": "Aria Team",
+  "tools": [
+    {
+      "name": "perf_log",
+      "description": "Log a performance review or self-assessment entry.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "string",
+            "description": "Review period (daily, weekly, monthly)"
+          },
+          "score": {
+            "type": "number",
+            "description": "Performance score (0-100)"
+          },
+          "summary": {
+            "type": "string",
+            "description": "Summary of performance"
+          },
+          "strengths": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "List of strengths identified"
+          },
+          "improvements": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Areas for improvement"
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Additional metadata"
+          }
+        },
+        "required": ["period", "summary"]
+      }
+    },
+    {
+      "name": "perf_list",
+      "description": "Get performance review history.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "string",
+            "description": "Filter by period type"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Maximum entries to return (default: 20)"
+          }
+        }
+      }
+    },
+    {
+      "name": "perf_stats",
+      "description": "Get performance statistics and trends.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "integer",
+            "description": "Number of days to analyze (default: 30)"
+          }
+        }
+      }
+    }
+  ],
+  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py performance {{tool}} '{{args_json}}'"
+}
