@@ -1,0 +1,501 @@
+{% extends "base.html" %}
+{% block title %}Performance{% endblock %}
+
+{% block extra_css %}
+<style>
+    .performance-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+    .performance-header h1 {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+    .stat-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        padding: 1.25rem;
+        text-align: center;
+    }
+    .stat-card .icon {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+    }
+    .stat-card .value {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--accent-primary);
+    }
+    .stat-card .label {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+    }
+    .tabs {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1.5rem;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 0.5rem;
+    }
+    .tab-btn {
+        padding: 0.5rem 1rem;
+        background: none;
+        border: none;
+        color: var(--text-secondary);
+        cursor: pointer;
+        border-radius: var(--radius-md);
+        transition: all 0.2s;
+    }
+    .tab-btn:hover {
+        background: var(--bg-tertiary);
+    }
+    .tab-btn.active {
+        background: var(--accent-primary);
+        color: white;
+    }
+    .tab-content {
+        display: none;
+    }
+    .tab-content.active {
+        display: block;
+    }
+    .performance-list {
+        display: grid;
+        gap: 1rem;
+    }
+    .performance-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+    }
+    .performance-card-header {
+        padding: 1rem 1.25rem;
+        background: var(--bg-tertiary);
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .performance-period {
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .performance-date {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+    .performance-card-body {
+        padding: 1.25rem;
+    }
+    .performance-section {
+        margin-bottom: 1rem;
+    }
+    .performance-section:last-child {
+        margin-bottom: 0;
+    }
+    .performance-section h4 {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        margin-bottom: 0.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .performance-section-content {
+        padding: 0.75rem;
+        background: var(--bg-primary);
+        border-radius: var(--radius-md);
+        font-size: 0.9rem;
+        line-height: 1.6;
+        white-space: pre-wrap;
+    }
+    .performance-section-content.success {
+        border-left: 3px solid #10b981;
+    }
+    .performance-section-content.failure {
+        border-left: 3px solid #ef4444;
+    }
+    .performance-section-content.improvement {
+        border-left: 3px solid #f59e0b;
+    }
+    .empty-state {
+        text-align: center;
+        padding: 3rem;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        color: var(--text-muted);
+    }
+    .btn-add {
+        padding: 0.5rem 1rem;
+        background: var(--accent-primary);
+        color: white;
+        border: none;
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.6);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+    }
+    .modal.active {
+        display: flex;
+    }
+    .modal-content {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        padding: 1.5rem;
+        width: 100%;
+        max-width: 600px;
+        margin: 1rem;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        color: var(--text-muted);
+    }
+    .form-group {
+        margin-bottom: 1rem;
+    }
+    .form-group label {
+        display: block;
+        margin-bottom: 0.25rem;
+        font-weight: 500;
+        font-size: 0.9rem;
+    }
+    .form-group input, .form-group select, .form-group textarea {
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        background: var(--bg-primary);
+        color: var(--text-primary);
+    }
+    .form-group textarea {
+        min-height: 80px;
+        resize: vertical;
+    }
+    .btn-primary {
+        width: 100%;
+        padding: 0.75rem;
+        background: var(--accent-primary);
+        color: white;
+        border: none;
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        font-weight: 500;
+    }
+    /* Tasks Section */
+    .task-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        padding: 1rem;
+        margin-bottom: 0.75rem;
+    }
+    .task-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 0.5rem;
+    }
+    .task-title {
+        font-weight: 600;
+    }
+    .task-status {
+        font-size: 0.75rem;
+        padding: 0.2rem 0.5rem;
+        border-radius: var(--radius-sm);
+    }
+    .task-status.pending {
+        background: rgba(245, 158, 11, 0.2);
+        color: #f59e0b;
+    }
+    .task-status.in_progress {
+        background: rgba(59, 130, 246, 0.2);
+        color: #3b82f6;
+    }
+    .task-status.completed {
+        background: rgba(16, 185, 129, 0.2);
+        color: #10b981;
+    }
+    .task-meta {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="performance-header">
+    <h1>📊 Performance & Tasks</h1>
+    <button class="btn-add" onclick="showAddReviewModal()">
+        ➕ Add Review
+    </button>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="icon">📋</div>
+        <div class="value" id="review-count">-</div>
+        <div class="label">Performance Reviews</div>
+    </div>
+    <div class="stat-card">
+        <div class="icon">⏳</div>
+        <div class="value" id="pending-tasks">-</div>
+        <div class="label">Pending Tasks</div>
+    </div>
+    <div class="stat-card">
+        <div class="icon">✅</div>
+        <div class="value" id="completed-tasks">-</div>
+        <div class="label">Completed Tasks</div>
+    </div>
+</div>
+
+<div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('reviews', this)">📊 Performance Reviews</button>
+    <button class="tab-btn" onclick="switchTab('tasks', this)">📋 Complex Tasks</button>
+</div>
+
+<div class="tab-content active" id="reviews-tab">
+    <div class="performance-list" id="reviews-list">
+        <div class="empty-state">Loading performance reviews...</div>
+    </div>
+</div>
+
+<div class="tab-content" id="tasks-tab">
+    <div class="performance-list" id="tasks-list">
+        <div class="empty-state">Loading tasks...</div>
+    </div>
+</div>
+
+<!-- Add Review Modal -->
+<div class="modal" id="add-review-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>➕ Add Performance Review</h3>
+            <button class="modal-close" onclick="closeModal('add-review-modal')">&times;</button>
+        </div>
+        <form onsubmit="addReview(event)">
+            <div class="form-group">
+                <label>Review Period</label>
+                <select id="review-period">
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="quarterly">Quarterly</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>✅ Successes</label>
+                <textarea id="review-successes" placeholder="What went well? List accomplishments..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>❌ Failures / Challenges</label>
+                <textarea id="review-failures" placeholder="What didn't work? What obstacles were encountered?"></textarea>
+            </div>
+            <div class="form-group">
+                <label>💡 Improvements / Learnings</label>
+                <textarea id="review-improvements" placeholder="What can be improved? Key learnings?"></textarea>
+            </div>
+            <button type="submit" class="btn-primary">Save Review</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const API_BASE = '{{ api_base_url }}';
+
+async function loadPerformance() {
+    try {
+        const [reviewsRes, tasksRes] = await Promise.all([
+            fetch(`${API_BASE}/performance`),
+            fetch(`${API_BASE}/tasks`)
+        ]);
+        
+        const reviewsData = await reviewsRes.json();
+        const tasksData = await tasksRes.json();
+        
+        const reviews = reviewsData.logs || [];
+        const tasks = tasksData.tasks || [];
+        
+        document.getElementById('review-count').textContent = reviews.length;
+        document.getElementById('pending-tasks').textContent = tasks.filter(t => t.status === 'pending').length;
+        document.getElementById('completed-tasks').textContent = tasks.filter(t => t.status === 'completed').length;
+        
+        renderReviews(reviews);
+        renderTasks(tasks);
+    } catch (error) {
+        console.error('Failed to load performance data:', error);
+    }
+}
+
+function renderReviews(reviews) {
+    const container = document.getElementById('reviews-list');
+    
+    if (reviews.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <h3>No performance reviews yet</h3>
+                <p>Start tracking Aria's performance by adding the first review!</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = reviews.map(review => `
+        <div class="performance-card">
+            <div class="performance-card-header">
+                <span class="performance-period">📅 ${review.review_period} Review</span>
+                <span class="performance-date">${new Date(review.created_at).toLocaleString()}</span>
+            </div>
+            <div class="performance-card-body">
+                ${review.successes ? `
+                    <div class="performance-section">
+                        <h4>✅ Successes</h4>
+                        <div class="performance-section-content success">${escapeHtml(review.successes)}</div>
+                    </div>
+                ` : ''}
+                ${review.failures ? `
+                    <div class="performance-section">
+                        <h4>❌ Failures / Challenges</h4>
+                        <div class="performance-section-content failure">${escapeHtml(review.failures)}</div>
+                    </div>
+                ` : ''}
+                ${review.improvements ? `
+                    <div class="performance-section">
+                        <h4>💡 Improvements</h4>
+                        <div class="performance-section-content improvement">${escapeHtml(review.improvements)}</div>
+                    </div>
+                ` : ''}
+            </div>
+        </div>
+    `).join('');
+}
+
+function renderTasks(tasks) {
+    const container = document.getElementById('tasks-list');
+    
+    if (tasks.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <h3>No complex tasks</h3>
+                <p>Complex tasks assigned to Aria will appear here.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = tasks.map(task => `
+        <div class="task-card">
+            <div class="task-header">
+                <span class="task-title">${escapeHtml(task.description)}</span>
+                <span class="task-status ${task.status}">${task.status}</span>
+            </div>
+            <div class="task-meta">
+                <span>🏷️ ${task.task_type}</span>
+                <span>🤖 ${task.agent_type}</span>
+                <span>⚡ ${task.priority}</span>
+                <span>📅 ${new Date(task.created_at).toLocaleString()}</span>
+            </div>
+            ${task.result ? `<div style="margin-top: 0.5rem; padding: 0.5rem; background: var(--bg-tertiary); border-radius: var(--radius-sm); font-size: 0.85rem;">📝 ${escapeHtml(task.result)}</div>` : ''}
+        </div>
+    `).join('');
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function switchTab(tab, btn) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    
+    btn.classList.add('active');
+    document.getElementById(`${tab}-tab`).classList.add('active');
+}
+
+function showAddReviewModal() {
+    document.getElementById('add-review-modal').classList.add('active');
+}
+
+function closeModal(id) {
+    document.getElementById(id).classList.remove('active');
+}
+
+async function addReview(event) {
+    event.preventDefault();
+    
+    const review_period = document.getElementById('review-period').value;
+    const successes = document.getElementById('review-successes').value;
+    const failures = document.getElementById('review-failures').value;
+    const improvements = document.getElementById('review-improvements').value;
+    
+    try {
+        const response = await fetch(`${API_BASE}/performance`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ review_period, successes, failures, improvements })
+        });
+        
+        if (response.ok) {
+            closeModal('add-review-modal');
+            document.getElementById('review-successes').value = '';
+            document.getElementById('review-failures').value = '';
+            document.getElementById('review-improvements').value = '';
+            loadPerformance();
+        }
+    } catch (error) {
+        console.error('Failed to add review:', error);
+    }
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', loadPerformance);
+</script>
+{% endblock %}

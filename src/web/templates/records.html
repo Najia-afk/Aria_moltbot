@@ -17,9 +17,25 @@
     <div class="filter-group">
         <label class="filter-label">Table:</label>
         <select id="tableFilter" onchange="loadRecords()">
-            <option value="activities">Activities</option>
-            <option value="thoughts">Thoughts</option>
-            <option value="memories">Memories</option>
+            <optgroup label="Core Data">
+                <option value="activities">Activities</option>
+                <option value="thoughts">Thoughts</option>
+                <option value="memories">Memories</option>
+            </optgroup>
+            <optgroup label="Goals & Tasks">
+                <option value="goals">Goals</option>
+                <option value="hourly_goals">Hourly Goals</option>
+                <option value="pending_complex_tasks">Complex Tasks</option>
+            </optgroup>
+            <optgroup label="Knowledge & Social">
+                <option value="knowledge_entities">Knowledge Entities</option>
+                <option value="knowledge_relations">Knowledge Relations</option>
+                <option value="social_posts">Social Posts</option>
+            </optgroup>
+            <optgroup label="System">
+                <option value="heartbeat_log">Heartbeat Log</option>
+                <option value="performance_log">Performance Log</option>
+            </optgroup>
         </select>
     </div>
     <div class="filter-group">

@@ -75,6 +75,18 @@ def create_app():
     def heartbeat():
         return render_template('heartbeat.html')
 
+    @app.route('/knowledge')
+    def knowledge():
+        return render_template('knowledge.html')
+
+    @app.route('/social')
+    def social():
+        return render_template('social.html')
+
+    @app.route('/performance')
+    def performance():
+        return render_template('performance.html')
+
     # Flask remains UI-only. All data access goes through the FastAPI service.
 
     return app

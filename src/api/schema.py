@@ -101,6 +101,73 @@ Index("idx_posts_platform", SocialPost.platform)
 Index("idx_posts_posted", SocialPost.posted_at.desc())
 
 
+class HourlyGoal(Base):
+    __tablename__ = "hourly_goals"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    hour_slot: Mapped[int] = mapped_column(Integer, nullable=False)
+    goal_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), server_default=text("'pending'"))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
+
+
+class KnowledgeEntity(Base):
+    __tablename__ = "knowledge_entities"
+
+    id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    type: Mapped[str] = mapped_column(Text, nullable=False)
+    properties: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
+
+
+Index("idx_kg_entity_name", KnowledgeEntity.name)
+
+
+class KnowledgeRelation(Base):
+    __tablename__ = "knowledge_relations"
+
+    id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
+    from_entity: Mapped[Any] = mapped_column(UUID(as_uuid=True), nullable=False)
+    to_entity: Mapped[Any] = mapped_column(UUID(as_uuid=True), nullable=False)
+    relation_type: Mapped[str] = mapped_column(Text, nullable=False)
+    properties: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
+
+
+Index("idx_kg_relation_from", KnowledgeRelation.from_entity)
+Index("idx_kg_relation_to", KnowledgeRelation.to_entity)
+
+
+class PerformanceLog(Base):
+    __tablename__ = "performance_log"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    review_period: Mapped[str] = mapped_column(String(20), nullable=False)
+    successes: Mapped[str | None] = mapped_column(Text)
+    failures: Mapped[str | None] = mapped_column(Text)
+    improvements: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
+
+
+class PendingComplexTask(Base):
+    __tablename__ = "pending_complex_tasks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    task_id: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    task_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    agent_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    priority: Mapped[str] = mapped_column(String(20), server_default=text("'medium'"))
+    status: Mapped[str] = mapped_column(String(20), server_default=text("'pending'"))
+    result: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class HeartbeatLog(Base):
     __tablename__ = "heartbeat_log"
 

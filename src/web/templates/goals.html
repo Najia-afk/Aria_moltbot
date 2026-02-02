@@ -14,6 +14,14 @@
 {% endblock %}
 
 {% block content %}
+<!-- Tabs -->
+<div class="goals-tabs">
+    <button class="goals-tab active" onclick="switchGoalsTab('main', this)">🎯 Main Goals</button>
+    <button class="goals-tab" onclick="switchGoalsTab('hourly', this)">⏰ Hourly Goals</button>
+</div>
+
+<!-- Main Goals Tab -->
+<div class="goals-tab-content active" id="main-goals-tab">
 <!-- Stats Overview -->
 <div class="stats-grid" id="goalStats">
     <div class="stat-card">
@@ -184,6 +192,56 @@
         </form>
     </div>
 </div>
+</div><!-- End main-goals-tab -->
+
+<!-- Hourly Goals Tab -->
+<div class="goals-tab-content" id="hourly-goals-tab">
+    <div class="hourly-header">
+        <h2>⏰ Hourly Goals</h2>
+        <button class="btn btn-primary" onclick="showAddHourlyGoalModal()">+ Add Hourly Goal</button>
+    </div>
+    <div class="hourly-grid" id="hourly-goals-list">
+        <div class="goals-loading">
+            <div class="spinner"></div>
+            <p>Loading hourly goals...</p>
+        </div>
+    </div>
+</div>
+
+<!-- Add Hourly Goal Modal -->
+<div class="modal-overlay" id="addHourlyGoalModal" onclick="closeModalOnOverlay(event)">
+    <div class="modal">
+        <div class="modal-header">
+            <h2>⏰ Add Hourly Goal</h2>
+            <button class="modal-close" onclick="closeAddHourlyGoalModal()">&times;</button>
+        </div>
+        <form id="addHourlyGoalForm" onsubmit="addHourlyGoal(event)">
+            <div class="form-group">
+                <label class="form-label">Hour Slot (0-23)</label>
+                <input type="number" class="form-input" name="hour_slot" min="0" max="23" required placeholder="e.g., 14 for 2pm">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Goal Type</label>
+                <select class="form-input" name="goal_type">
+                    <option value="task">📋 Task</option>
+                    <option value="check-in">👋 Check-in</option>
+                    <option value="reflection">🪞 Reflection</option>
+                    <option value="learning">📚 Learning</option>
+                    <option value="social">💬 Social</option>
+                    <option value="maintenance">🔧 Maintenance</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Description *</label>
+                <textarea class="form-input" name="description" rows="3" required placeholder="What should Aria do at this hour?"></textarea>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeAddHourlyGoalModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Add Goal</button>
+            </div>
+        </form>
+    </div>
+</div>
 
 <!-- Toast Notification -->
 <div class="toast" id="toast"></div>
@@ -191,6 +249,114 @@
 
 {% block extra_css %}
 <style>
+/* Tab styles */
+.goals-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.5rem;
+}
+.goals-tab {
+    padding: 0.6rem 1.25rem;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: var(--radius-md);
+    transition: all 0.2s;
+    font-size: 0.95rem;
+}
+.goals-tab:hover {
+    background: var(--bg-tertiary);
+}
+.goals-tab.active {
+    background: var(--accent-primary);
+    color: white;
+}
+.goals-tab-content {
+    display: none;
+}
+.goals-tab-content.active {
+    display: block;
+}
+/* Hourly Goals Styles */
+.hourly-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+.hourly-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+}
+.hourly-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 1rem;
+}
+.hourly-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+.hourly-slot {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--accent-primary);
+}
+.hourly-type {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: var(--radius-sm);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+}
+.hourly-description {
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+.hourly-status {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border-color);
+}
+.hourly-status-badge {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: var(--radius-sm);
+}
+.hourly-status-badge.pending {
+    background: rgba(245, 158, 11, 0.2);
+    color: #f59e0b;
+}
+.hourly-status-badge.completed {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+}
+.hourly-btn {
+    padding: 0.3rem 0.6rem;
+    background: var(--accent-primary);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 0.75rem;
+}
+.hourly-empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+}
+
 /* Goals Page Specific Styles */
 .goals-grid {
     display: grid;
@@ -1022,12 +1188,136 @@ document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         closeNewGoalModal();
         closeEditGoalModal();
+        closeAddHourlyGoalModal();
     }
     if (e.key === 'n' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
         openNewGoalModal();
     }
 });
+
+// =============================================
+// Hourly Goals Functions
+// =============================================
+function switchGoalsTab(tab, btn) {
+    document.querySelectorAll('.goals-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.goals-tab-content').forEach(c => c.classList.remove('active'));
+    
+    btn.classList.add('active');
+    document.getElementById(`${tab}-goals-tab`).classList.add('active');
+    
+    if (tab === 'hourly') {
+        loadHourlyGoals();
+    }
+}
+
+async function loadHourlyGoals() {
+    const container = document.getElementById('hourly-goals-list');
+    try {
+        const response = await fetch(`${window.ARIA_API_BASE_URL}/hourly-goals`);
+        const data = await response.json();
+        
+        const goals = data.goals || [];
+        
+        if (goals.length === 0) {
+            container.innerHTML = `
+                <div class="hourly-empty">
+                    <h3>No hourly goals set</h3>
+                    <p>Add hourly goals to schedule Aria's daily activities!</p>
+                </div>
+            `;
+            return;
+        }
+        
+        // Sort by hour slot
+        goals.sort((a, b) => a.hour_slot - b.hour_slot);
+        
+        container.innerHTML = goals.map(goal => `
+            <div class="hourly-card">
+                <div class="hourly-card-header">
+                    <span class="hourly-slot">${formatHour(goal.hour_slot)}</span>
+                    <span class="hourly-type">${goal.goal_type}</span>
+                </div>
+                <div class="hourly-description">${escapeHtml(goal.description)}</div>
+                <div class="hourly-status">
+                    <span class="hourly-status-badge ${goal.status}">${goal.status}</span>
+                    ${goal.status !== 'completed' ? `
+                        <button class="hourly-btn" onclick="completeHourlyGoal(${goal.id})">✓ Complete</button>
+                    ` : `<span style="font-size: 0.75rem; color: var(--text-muted);">${goal.completed_at ? new Date(goal.completed_at).toLocaleString() : ''}</span>`}
+                </div>
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error('Failed to load hourly goals:', error);
+        container.innerHTML = `<div class="hourly-empty">Failed to load hourly goals</div>`;
+    }
+}
+
+function formatHour(hour) {
+    if (hour === 0) return '12:00 AM';
+    if (hour === 12) return '12:00 PM';
+    if (hour < 12) return `${hour}:00 AM`;
+    return `${hour - 12}:00 PM`;
+}
+
+function showAddHourlyGoalModal() {
+    document.getElementById('addHourlyGoalModal').classList.add('active');
+    document.getElementById('addHourlyGoalForm').reset();
+}
+
+function closeAddHourlyGoalModal() {
+    document.getElementById('addHourlyGoalModal').classList.remove('active');
+}
+
+async function addHourlyGoal(event) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const formData = new FormData(form);
+    const data = {
+        hour_slot: parseInt(formData.get('hour_slot')),
+        goal_type: formData.get('goal_type'),
+        description: formData.get('description'),
+        status: 'pending'
+    };
+    
+    try {
+        const response = await fetch(`${window.ARIA_API_BASE_URL}/hourly-goals`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+            showToast('✓ Hourly goal added!', 'success');
+            closeAddHourlyGoalModal();
+            loadHourlyGoals();
+        } else {
+            throw new Error('Failed to add hourly goal');
+        }
+    } catch (error) {
+        showToast(`Error: ${error.message}`, 'error');
+    }
+}
+
+async function completeHourlyGoal(goalId) {
+    try {
+        const response = await fetch(`${window.ARIA_API_BASE_URL}/hourly-goals/${goalId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'completed' })
+        });
+        
+        if (response.ok) {
+            showToast('✓ Hourly goal completed!', 'success');
+            loadHourlyGoals();
+        } else {
+            throw new Error('Failed to complete hourly goal');
+        }
+    } catch (error) {
+        showToast(`Error: ${error.message}`, 'error');
+    }
+}
 
 // Initialize
 document.addEventListener('DOMContentLoaded', loadGoals);

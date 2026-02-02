@@ -777,6 +777,11 @@ async def api_records(table: str = "activities", limit: int = 25, page: int = 1,
         "goals": "goals",
         "social_posts": "social_posts",
         "heartbeat_log": "heartbeat_log",
+        "knowledge_entities": "knowledge_entities",
+        "knowledge_relations": "knowledge_relations",
+        "hourly_goals": "hourly_goals",
+        "performance_log": "performance_log",
+        "pending_complex_tasks": "pending_complex_tasks",
     }
     # Different tables have different timestamp column names
     order_col_map = {
@@ -786,6 +791,11 @@ async def api_records(table: str = "activities", limit: int = 25, page: int = 1,
         "goals": "created_at",
         "social_posts": "posted_at",
         "heartbeat_log": "created_at",
+        "knowledge_entities": "created_at",
+        "knowledge_relations": "created_at",
+        "hourly_goals": "created_at",
+        "performance_log": "created_at",
+        "pending_complex_tasks": "created_at",
     }
     if table not in table_map:
         raise HTTPException(status_code=400, detail="Invalid table")
@@ -809,6 +819,11 @@ async def api_export(table: str = "activities", conn=Depends(get_db)):
         "goals": "goals",
         "social_posts": "social_posts",
         "heartbeat_log": "heartbeat_log",
+        "knowledge_entities": "knowledge_entities",
+        "knowledge_relations": "knowledge_relations",
+        "hourly_goals": "hourly_goals",
+        "performance_log": "performance_log",
+        "pending_complex_tasks": "pending_complex_tasks",
     }
     order_col_map = {
         "activity_log": "created_at",
@@ -817,6 +832,11 @@ async def api_export(table: str = "activities", conn=Depends(get_db)):
         "goals": "created_at",
         "social_posts": "posted_at",
         "heartbeat_log": "created_at",
+        "knowledge_entities": "created_at",
+        "knowledge_relations": "created_at",
+        "hourly_goals": "created_at",
+        "performance_log": "created_at",
+        "pending_complex_tasks": "created_at",
     }
     if table not in table_map:
         raise HTTPException(status_code=400, detail="Invalid table")
@@ -825,6 +845,269 @@ async def api_export(table: str = "activities", conn=Depends(get_db)):
     rows = await conn.fetch(f"SELECT * FROM {db_table} ORDER BY {order_col} DESC")
     records = [serialize_record(r) for r in rows]
     return {"records": records}
+
+
+# ============================================
+# Routes: Knowledge Graph
+# ============================================
+@app.get("/knowledge-graph")
+async def get_knowledge_graph(conn=Depends(get_db)):
+    """Get full knowledge graph with entities and relations"""
+    entities = await conn.fetch("SELECT * FROM knowledge_entities ORDER BY created_at DESC")
+    relations = await conn.fetch("""
+        SELECT r.*, e1.name as from_name, e1.type as from_type, 
+               e2.name as to_name, e2.type as to_type
+        FROM knowledge_relations r
+        JOIN knowledge_entities e1 ON r.from_entity = e1.id
+        JOIN knowledge_entities e2 ON r.to_entity = e2.id
+        ORDER BY r.created_at DESC
+    """)
+    return {
+        "entities": [serialize_record(e) for e in entities],
+        "relations": [serialize_record(r) for r in relations],
+        "stats": {
+            "entity_count": len(entities),
+            "relation_count": len(relations)
+        }
+    }
+
+
+@app.get("/knowledge-graph/entities")
+async def get_knowledge_entities(limit: int = 100, type: str = None, conn=Depends(get_db)):
+    """Get knowledge graph entities with optional type filter"""
+    if type:
+        rows = await conn.fetch(
+            "SELECT * FROM knowledge_entities WHERE type = $1 ORDER BY created_at DESC LIMIT $2",
+            type, limit
+        )
+    else:
+        rows = await conn.fetch(
+            "SELECT * FROM knowledge_entities ORDER BY created_at DESC LIMIT $1",
+            limit
+        )
+    return {"entities": [serialize_record(r) for r in rows]}
+
+
+@app.get("/knowledge-graph/relations")
+async def get_knowledge_relations(limit: int = 100, conn=Depends(get_db)):
+    """Get knowledge graph relations with entity names"""
+    rows = await conn.fetch("""
+        SELECT r.*, e1.name as from_name, e1.type as from_type, 
+               e2.name as to_name, e2.type as to_type
+        FROM knowledge_relations r
+        JOIN knowledge_entities e1 ON r.from_entity = e1.id
+        JOIN knowledge_entities e2 ON r.to_entity = e2.id
+        ORDER BY r.created_at DESC LIMIT $1
+    """, limit)
+    return {"relations": [serialize_record(r) for r in rows]}
+
+
+@app.post("/knowledge-graph/entities")
+async def create_knowledge_entity(request: Request, conn=Depends(get_db)):
+    """Create a new knowledge entity"""
+    import uuid
+    data = await request.json()
+    new_id = uuid.uuid4()
+    await conn.execute(
+        """INSERT INTO knowledge_entities (id, name, type, properties, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, NOW(), NOW())""",
+        new_id, data.get('name'), data.get('type'), data.get('properties', {})
+    )
+    return {"id": str(new_id), "created": True}
+
+
+@app.post("/knowledge-graph/relations")
+async def create_knowledge_relation(request: Request, conn=Depends(get_db)):
+    """Create a new knowledge relation"""
+    import uuid
+    data = await request.json()
+    new_id = uuid.uuid4()
+    await conn.execute(
+        """INSERT INTO knowledge_relations (id, from_entity, to_entity, relation_type, properties, created_at)
+           VALUES ($1, $2, $3, $4, $5, NOW())""",
+        new_id, 
+        uuid.UUID(data.get('from_entity')),
+        uuid.UUID(data.get('to_entity')),
+        data.get('relation_type'),
+        data.get('properties', {})
+    )
+    return {"id": str(new_id), "created": True}
+
+
+# ============================================
+# Routes: Social Posts (Moltbook)
+# ============================================
+@app.get("/social")
+async def get_social_posts(limit: int = 50, platform: str = None, conn=Depends(get_db)):
+    """Get social posts with optional platform filter"""
+    if platform:
+        rows = await conn.fetch(
+            "SELECT * FROM social_posts WHERE platform = $1 ORDER BY posted_at DESC LIMIT $2",
+            platform, limit
+        )
+    else:
+        rows = await conn.fetch(
+            "SELECT * FROM social_posts ORDER BY posted_at DESC LIMIT $1",
+            limit
+        )
+    return {"posts": [serialize_record(r) for r in rows], "count": len(rows)}
+
+
+@app.post("/social")
+async def create_social_post(request: Request, conn=Depends(get_db)):
+    """Create a new social post"""
+    import uuid
+    data = await request.json()
+    new_id = uuid.uuid4()
+    await conn.execute(
+        """INSERT INTO social_posts (id, platform, post_id, content, visibility, reply_to, url, posted_at, metadata)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8)""",
+        new_id,
+        data.get('platform', 'moltbook'),
+        data.get('post_id'),
+        data.get('content'),
+        data.get('visibility', 'public'),
+        data.get('reply_to'),
+        data.get('url'),
+        data.get('metadata', {})
+    )
+    return {"id": str(new_id), "created": True}
+
+
+# ============================================
+# Routes: Performance Log
+# ============================================
+@app.get("/performance")
+async def get_performance_logs(limit: int = 50, conn=Depends(get_db)):
+    """Get performance review logs"""
+    rows = await conn.fetch(
+        "SELECT * FROM performance_log ORDER BY created_at DESC LIMIT $1",
+        limit
+    )
+    return {"logs": [serialize_record(r) for r in rows], "count": len(rows)}
+
+
+@app.post("/performance")
+async def create_performance_log(request: Request, conn=Depends(get_db)):
+    """Create a new performance log entry"""
+    data = await request.json()
+    await conn.execute(
+        """INSERT INTO performance_log (review_period, successes, failures, improvements, created_at)
+           VALUES ($1, $2, $3, $4, NOW())""",
+        data.get('review_period'),
+        data.get('successes'),
+        data.get('failures'),
+        data.get('improvements')
+    )
+    return {"created": True}
+
+
+# ============================================
+# Routes: Hourly Goals
+# ============================================
+@app.get("/hourly-goals")
+async def get_hourly_goals(status: str = None, conn=Depends(get_db)):
+    """Get hourly goals with optional status filter"""
+    if status:
+        rows = await conn.fetch(
+            "SELECT * FROM hourly_goals WHERE status = $1 ORDER BY hour_slot, created_at DESC",
+            status
+        )
+    else:
+        rows = await conn.fetch(
+            "SELECT * FROM hourly_goals ORDER BY hour_slot, created_at DESC"
+        )
+    return {"goals": [serialize_record(r) for r in rows], "count": len(rows)}
+
+
+@app.post("/hourly-goals")
+async def create_hourly_goal(request: Request, conn=Depends(get_db)):
+    """Create a new hourly goal"""
+    data = await request.json()
+    await conn.execute(
+        """INSERT INTO hourly_goals (hour_slot, goal_type, description, status, created_at)
+           VALUES ($1, $2, $3, $4, NOW())""",
+        data.get('hour_slot'),
+        data.get('goal_type'),
+        data.get('description'),
+        data.get('status', 'pending')
+    )
+    return {"created": True}
+
+
+@app.patch("/hourly-goals/{goal_id}")
+async def update_hourly_goal(goal_id: int, request: Request, conn=Depends(get_db)):
+    """Update hourly goal status"""
+    data = await request.json()
+    status = data.get('status')
+    if status == 'completed':
+        await conn.execute(
+            "UPDATE hourly_goals SET status = $1, completed_at = NOW() WHERE id = $2",
+            status, goal_id
+        )
+    else:
+        await conn.execute(
+            "UPDATE hourly_goals SET status = $1 WHERE id = $2",
+            status, goal_id
+        )
+    return {"updated": True}
+
+
+# ============================================
+# Routes: Pending Complex Tasks
+# ============================================
+@app.get("/tasks")
+async def get_pending_tasks(status: str = None, conn=Depends(get_db)):
+    """Get pending complex tasks"""
+    if status:
+        rows = await conn.fetch(
+            "SELECT * FROM pending_complex_tasks WHERE status = $1 ORDER BY created_at DESC",
+            status
+        )
+    else:
+        rows = await conn.fetch(
+            "SELECT * FROM pending_complex_tasks ORDER BY created_at DESC"
+        )
+    return {"tasks": [serialize_record(r) for r in rows], "count": len(rows)}
+
+
+@app.post("/tasks")
+async def create_pending_task(request: Request, conn=Depends(get_db)):
+    """Create a new pending complex task"""
+    import uuid
+    data = await request.json()
+    task_id = data.get('task_id', f"task-{str(uuid.uuid4())[:8]}")
+    await conn.execute(
+        """INSERT INTO pending_complex_tasks (task_id, task_type, description, agent_type, priority, status, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, NOW())""",
+        task_id,
+        data.get('task_type'),
+        data.get('description'),
+        data.get('agent_type'),
+        data.get('priority', 'medium'),
+        data.get('status', 'pending')
+    )
+    return {"task_id": task_id, "created": True}
+
+
+@app.patch("/tasks/{task_id}")
+async def update_pending_task(task_id: str, request: Request, conn=Depends(get_db)):
+    """Update pending task status and result"""
+    data = await request.json()
+    status = data.get('status')
+    result = data.get('result')
+    
+    if status == 'completed':
+        await conn.execute(
+            "UPDATE pending_complex_tasks SET status = $1, result = $2, completed_at = NOW() WHERE task_id = $3",
+            status, result, task_id
+        )
+    else:
+        await conn.execute(
+            "UPDATE pending_complex_tasks SET status = $1, result = $2 WHERE task_id = $3",
+            status, result, task_id
+        )
+    return {"updated": True}
 
 
 # ============================================
