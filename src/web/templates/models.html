@@ -121,7 +121,7 @@
     </div>
     <div class="charts-grid" style="margin-top: var(--space-lg);">
         <div class="chart-container">
-            <h3 class="chart-title">Spend by Model</h3>
+            <h3 class="chart-title">Usage by Model</h3>
             <canvas id="spend-by-model-chart"></canvas>
         </div>
         <div class="chart-container">
@@ -1038,38 +1038,39 @@ async function updateCharts() {
         console.error('Failed to load usage timeline:', err);
     }
     
-    // Spend by model chart - use real data from spend logs
+    // Usage by model chart - show top 5 models by token usage
     const spendCtx = document.getElementById('spend-by-model-chart').getContext('2d');
     if (spendModelChart) spendModelChart.destroy();
     
-    // Aggregate spend by model from logs
+    // Aggregate token usage by model from logs
     try {
         const logsResp2 = await fetch(`${API_URL}/litellm/spend?limit=500`);
         const spendLogs2 = await logsResp2.json();
         
-        const modelSpend = {};
+        const modelTokens = {};
         if (Array.isArray(spendLogs2)) {
             spendLogs2.forEach(log => {
                 const model = (log.model || 'unknown').split('/').pop();
-                modelSpend[model] = (modelSpend[model] || 0) + (log.spend || 0);
+                const tokens = (log.prompt_tokens || 0) + (log.completion_tokens || 0) + (log.total_tokens || 0);
+                modelTokens[model] = (modelTokens[model] || 0) + tokens;
             });
         }
         
-        // Sort by spend and take top 5
-        const sortedModels = Object.entries(modelSpend)
+        // Sort by tokens descending and take top 5
+        const sortedModels = Object.entries(modelTokens)
             .sort((a, b) => b[1] - a[1])
             .slice(0, 5);
         
         const topModels = sortedModels.map(([name]) => name);
-        const topSpend = sortedModels.map(([, spend]) => spend);
+        const topTokens = sortedModels.map(([, tokens]) => tokens);
         
         spendModelChart = new Chart(spendCtx, {
             type: 'bar',
             data: {
                 labels: topModels.length > 0 ? topModels : ['No data'],
                 datasets: [{
-                    label: 'Spend ($)',
-                    data: topSpend.length > 0 ? topSpend : [0],
+                    label: 'Tokens',
+                    data: topTokens.length > 0 ? topTokens : [0],
                     backgroundColor: '#3b82f6',
                     borderRadius: 4
                 }]
@@ -1088,7 +1089,7 @@ async function updateCharts() {
             }
         });
     } catch (err) {
-        console.error('Failed to load spend by model:', err);
+        console.error('Failed to load usage by model:', err);
     }
     
     // Cost breakdown pie - use real input/output token data
