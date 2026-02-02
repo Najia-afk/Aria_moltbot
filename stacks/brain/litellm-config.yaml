@@ -1,25 +1,36 @@
 model_list:
-  # GLM-4.7 - Primary model for Aria
-  - model_name: glm-local
+  # Qwen3-VLTO 8B via MLX (Primary - Native Apple Silicon)
+  - model_name: qwen3-mlx
     litellm_params:
-      model: ollama_chat/hf.co/unsloth/GLM-4.7-Flash-REAP-23B-A3B-GGUF:Q3_K_S
-      api_base: http://host.docker.internal:11434
-      stop: ["<|user|>", "<|observation|>", "[GORILLA]", "[system_message]"]
+      model: openai/nightmedia/Qwen3-VLTO-8B-Instruct-qx86x-hi-mlx
+      api_base: http://host.docker.internal:8080/v1
+      api_key: not-needed
     model_info:
       max_tokens: 32768
       input_cost_per_token: 0
       output_cost_per_token: 0
 
-  # Qwen3-VL - Fallback and vision model
-  - model_name: qwen3-vl
-    litellm_params:
-      model: ollama_chat/qwen3-vl:8b
-      api_base: http://host.docker.internal:11434
-      stop: ["<|user|>", "<|observation|>", "[GORILLA]", "[system_message]"]
-    model_info:
-      max_tokens: 32768
-      input_cost_per_token: 0
-      output_cost_per_token: 0
+  # GLM-4.7 via Ollama (disabled - use MLX instead)
+  # - model_name: glm-local
+  #   litellm_params:
+  #     model: ollama_chat/hf.co/unsloth/GLM-4.7-Flash-REAP-23B-A3B-GGUF:Q3_K_S
+  #     api_base: http://host.docker.internal:11434
+  #     stop: ["<|user|>", "<|observation|>", "[GORILLA]", "[system_message]"]
+  #   model_info:
+  #     max_tokens: 32768
+  #     input_cost_per_token: 0
+  #     output_cost_per_token: 0
+
+  # Qwen3-VL via Ollama (3rd fallback - disabled)
+  # - model_name: qwen3-vl
+  #   litellm_params:
+  #     model: ollama_chat/qwen3-vl:8b
+  #     api_base: http://host.docker.internal:11434
+  #     stop: ["<|user|>", "<|observation|>", "[GORILLA]", "[system_message]"]
+  #   model_info:
+  #     max_tokens: 32768
+  #     input_cost_per_token: 0
+  #     output_cost_per_token: 0
 
   # Moonshot / Kimi (256K context)
   - model_name: kimi-k2.5
