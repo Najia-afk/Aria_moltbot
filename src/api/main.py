@@ -14,7 +14,7 @@ from typing import Optional
 
 import asyncpg
 import httpx
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from prometheus_fastapi_instrumentator import Instrumentator
@@ -39,6 +39,8 @@ SERVICE_URLS = {
     "pgadmin": (os.getenv("PGADMIN_URL", "http://aria-pgadmin:80"), "/"),
     "browser": ("http://aria-browser:3000", "/"),
     "traefik": (os.getenv("TRAEFIK_URL", "http://traefik:8080"), "/api/overview"),
+    "aria-web": (os.getenv("ARIA_WEB_URL", "http://aria-web:5000"), "/"),
+    "aria-api": ("http://localhost:8000", "/health"),
 }
 
 STARTUP_TIME = datetime.utcnow()
@@ -478,19 +480,105 @@ async def api_search(
     return results
 
 
-@app.patch("/goals/{goal_id}")
-async def update_goal(goal_id: str, status: str, progress: int = None, conn=Depends(get_db)):
-    """Update goal status and progress"""
-    if progress is not None:
-        await conn.execute(
-            "UPDATE goals SET status = $1, progress = $2 WHERE id = $3",
-            status, progress, goal_id
+@app.get("/goals")
+async def list_goals(limit: int = 100, status: str = None, conn=Depends(get_db)):
+    """List all goals with optional status filter"""
+    if status:
+        rows = await conn.fetch(
+            """SELECT id, goal_id, title, description, status, progress, priority, 
+                      due_date, created_at, completed_at 
+               FROM goals WHERE status = $1 ORDER BY priority DESC, created_at DESC LIMIT $2""",
+            status, limit
         )
     else:
-        await conn.execute(
-            "UPDATE goals SET status = $1 WHERE id = $2",
-            status, goal_id
+        rows = await conn.fetch(
+            """SELECT id, goal_id, title, description, status, progress, priority, 
+                      due_date, created_at, completed_at 
+               FROM goals ORDER BY priority DESC, created_at DESC LIMIT $1""",
+            limit
         )
+    return [serialize_record(r) for r in rows]
+
+
+@app.post("/goals")
+async def create_goal(request: Request, conn=Depends(get_db)):
+    """Create a new goal"""
+    data = await request.json()
+    import uuid
+    new_id = uuid.uuid4()
+    goal_id = data.get('goal_id', f"goal-{str(new_id)[:8]}")
+    
+    await conn.execute(
+        """INSERT INTO goals (id, goal_id, title, description, status, progress, priority, due_date, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())""",
+        new_id,
+        goal_id,
+        data.get('title'),
+        data.get('description', ''),
+        data.get('status', 'pending'),
+        data.get('progress', 0),
+        data.get('priority', 2),
+        data.get('due_date') or data.get('target_date')
+    )
+    return {"id": str(new_id), "goal_id": goal_id, "created": True}
+
+
+@app.delete("/goals/{goal_id}")
+async def delete_goal(goal_id: str, conn=Depends(get_db)):
+    """Delete a goal by ID or goal_id"""
+    # Try UUID first, then goal_id string
+    try:
+        import uuid
+        uuid.UUID(goal_id)
+        await conn.execute("DELETE FROM goals WHERE id = $1", uuid.UUID(goal_id))
+    except ValueError:
+        await conn.execute("DELETE FROM goals WHERE goal_id = $1", goal_id)
+    return {"deleted": True}
+
+
+@app.patch("/goals/{goal_id}")
+async def update_goal(goal_id: str, request: Request, conn=Depends(get_db)):
+    """Update goal status and progress"""
+    data = await request.json()
+    status = data.get('status')
+    progress = data.get('progress')
+    priority = data.get('priority')
+    
+    # Build dynamic update
+    updates = []
+    values = []
+    idx = 1
+    
+    if status is not None:
+        updates.append(f"status = ${idx}")
+        values.append(status)
+        idx += 1
+        # If completed, set completed_at
+        if status == 'completed':
+            updates.append(f"completed_at = NOW()")
+    if progress is not None:
+        updates.append(f"progress = ${idx}")
+        values.append(progress)
+        idx += 1
+    if priority is not None:
+        updates.append(f"priority = ${idx}")
+        values.append(priority)
+        idx += 1
+    
+    # Try UUID first, then goal_id string
+    try:
+        import uuid
+        uuid.UUID(goal_id)
+        values.append(uuid.UUID(goal_id))
+        id_col = "id"
+    except ValueError:
+        values.append(goal_id)
+        id_col = "goal_id"
+    
+    if updates:
+        query = f"UPDATE goals SET {', '.join(updates)} WHERE {id_col} = ${idx}"
+        await conn.execute(query, *values)
+    
     return {"updated": True}
 
 
@@ -744,7 +832,7 @@ async def api_export(table: str = "activities", conn=Depends(get_db)):
 # ============================================
 @app.get("/schedule")
 async def get_schedule(conn=Depends(get_db)):
-    """Get current schedule tick status"""
+    """Get current schedule tick status with job stats"""
     row = await conn.fetchrow(
         """SELECT * FROM schedule_tick WHERE id = 1"""
     )
@@ -753,11 +841,221 @@ async def get_schedule(conn=Depends(get_db)):
 
 @app.post("/schedule/tick")
 async def manual_tick(conn=Depends(get_db)):
-    """Trigger a manual schedule tick"""
+    """Trigger a manual schedule tick and update job stats from OpenClaw"""
+    import json
+    
+    jobs_path = os.getenv("OPENCLAW_JOBS_PATH", "/openclaw/cron/jobs.json")
+    jobs_total = 0
+    jobs_successful = 0
+    jobs_failed = 0
+    last_job_name = None
+    last_job_status = None
+    next_job_at = None
+    
+    try:
+        with open(jobs_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        
+        jobs = data.get("jobs", [])
+        jobs_total = len(jobs)
+        
+        # Find latest run and next run
+        latest_run_ms = 0
+        earliest_next_ms = float('inf')
+        
+        for job in jobs:
+            state = job.get("state", {})
+            if state.get("lastRunAtMs", 0) > latest_run_ms:
+                latest_run_ms = state.get("lastRunAtMs", 0)
+                last_job_name = job.get("name")
+                last_job_status = state.get("lastStatus")
+            
+            if state.get("nextRunAtMs", 0) < earliest_next_ms and state.get("nextRunAtMs", 0) > 0:
+                earliest_next_ms = state.get("nextRunAtMs", 0)
+            
+            # Count success/fail
+            if state.get("lastStatus") == "ok":
+                jobs_successful += 1
+            elif state.get("lastStatus") == "error":
+                jobs_failed += 1
+        
+        if earliest_next_ms < float('inf'):
+            next_job_at = datetime.fromtimestamp(earliest_next_ms / 1000)
+    except Exception:
+        pass  # If file read fails, just update tick
+    
     await conn.execute(
-        """UPDATE schedule_tick SET last_tick = NOW(), tick_count = tick_count + 1 WHERE id = 1"""
+        """UPDATE schedule_tick SET 
+           last_tick = NOW(), 
+           tick_count = tick_count + 1,
+           jobs_total = $1,
+           jobs_successful = $2,
+           jobs_failed = $3,
+           last_job_name = $4,
+           last_job_status = $5,
+           next_job_at = $6,
+           updated_at = NOW()
+           WHERE id = 1""",
+        jobs_total, jobs_successful, jobs_failed, last_job_name, last_job_status, next_job_at
     )
-    return {"ticked": True, "at": datetime.utcnow().isoformat()}
+    return {"ticked": True, "at": datetime.utcnow().isoformat(), "jobs_total": jobs_total}
+
+
+# ============================================
+# Routes: Scheduled Jobs (OpenClaw Sync)
+# ============================================
+@app.get("/jobs")
+async def get_scheduled_jobs(conn=Depends(get_db)):
+    """Get all scheduled jobs from database (synced from OpenClaw)"""
+    rows = await conn.fetch(
+        """SELECT id, agent_id, name, enabled, schedule_kind, schedule_expr,
+                  session_target, wake_mode, payload_kind, payload_text,
+                  next_run_at, last_run_at, last_status, last_duration_ms,
+                  run_count, success_count, fail_count, synced_at
+           FROM scheduled_jobs
+           ORDER BY name"""
+    )
+    return {"jobs": [dict(r) for r in rows], "count": len(rows)}
+
+
+@app.get("/jobs/live")
+async def get_jobs_live():
+    """
+    Get jobs directly from OpenClaw jobs.json file (live, no DB).
+    This reads the current state from the mounted volume.
+    """
+    import json
+    
+    jobs_path = os.getenv("OPENCLAW_JOBS_PATH", "/openclaw/cron/jobs.json")
+    
+    try:
+        with open(jobs_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        
+        jobs = []
+        for job in data.get("jobs", []):
+            schedule = job.get("schedule", {})
+            state = job.get("state", {})
+            payload = job.get("payload", {})
+            
+            jobs.append({
+                "id": job.get("id"),
+                "agent_id": job.get("agentId", "main"),
+                "name": job.get("name"),
+                "enabled": job.get("enabled", True),
+                "schedule_kind": schedule.get("kind", "cron"),
+                "schedule_expr": schedule.get("expr", ""),
+                "session_target": job.get("sessionTarget"),
+                "wake_mode": job.get("wakeMode"),
+                "payload_kind": payload.get("kind"),
+                "payload_text": payload.get("text"),
+                "next_run_at": datetime.fromtimestamp(state.get("nextRunAtMs", 0) / 1000).isoformat() if state.get("nextRunAtMs") else None,
+                "last_run_at": datetime.fromtimestamp(state.get("lastRunAtMs", 0) / 1000).isoformat() if state.get("lastRunAtMs") else None,
+                "last_status": state.get("lastStatus"),
+                "last_duration_ms": state.get("lastDurationMs"),
+            })
+        
+        return {"jobs": jobs, "count": len(jobs), "source": "live"}
+    
+    except FileNotFoundError:
+        return {"jobs": [], "count": 0, "source": "live", "error": f"File not found: {jobs_path}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/jobs/{job_id}")
+async def get_scheduled_job(job_id: str, conn=Depends(get_db)):
+    """Get a specific scheduled job by ID"""
+    row = await conn.fetchrow(
+        """SELECT * FROM scheduled_jobs WHERE id = $1""", job_id
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return dict(row)
+
+
+@app.post("/jobs/sync")
+async def sync_jobs_from_openclaw(conn=Depends(get_db)):
+    """
+    Sync scheduled jobs from OpenClaw cron system.
+    Reads jobs.json from mounted OpenClaw volume at /openclaw/cron/jobs.json
+    """
+    import json
+    
+    jobs_path = os.getenv("OPENCLAW_JOBS_PATH", "/openclaw/cron/jobs.json")
+    
+    try:
+        with open(jobs_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        
+        jobs = data.get("jobs", [])
+        
+        synced = 0
+        for job in jobs:
+            schedule = job.get("schedule", {})
+            state = job.get("state", {})
+            payload = job.get("payload", {})
+            
+            # Convert millisecond timestamps to datetime
+            next_run = datetime.fromtimestamp(state.get("nextRunAtMs", 0) / 1000) if state.get("nextRunAtMs") else None
+            last_run = datetime.fromtimestamp(state.get("lastRunAtMs", 0) / 1000) if state.get("lastRunAtMs") else None
+            
+            # Upsert job into database
+            await conn.execute("""
+                INSERT INTO scheduled_jobs (
+                    id, agent_id, name, enabled, schedule_kind, schedule_expr,
+                    session_target, wake_mode, payload_kind, payload_text,
+                    next_run_at, last_run_at, last_status, last_duration_ms,
+                    created_at_ms, updated_at_ms, synced_at
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW())
+                ON CONFLICT (id) DO UPDATE SET
+                    agent_id = EXCLUDED.agent_id,
+                    name = EXCLUDED.name,
+                    enabled = EXCLUDED.enabled,
+                    schedule_kind = EXCLUDED.schedule_kind,
+                    schedule_expr = EXCLUDED.schedule_expr,
+                    session_target = EXCLUDED.session_target,
+                    wake_mode = EXCLUDED.wake_mode,
+                    payload_kind = EXCLUDED.payload_kind,
+                    payload_text = EXCLUDED.payload_text,
+                    next_run_at = EXCLUDED.next_run_at,
+                    last_run_at = EXCLUDED.last_run_at,
+                    last_status = EXCLUDED.last_status,
+                    last_duration_ms = EXCLUDED.last_duration_ms,
+                    updated_at_ms = EXCLUDED.updated_at_ms,
+                    synced_at = NOW()
+            """,
+                job.get("id"),
+                job.get("agentId", "main"),
+                job.get("name"),
+                job.get("enabled", True),
+                schedule.get("kind", "cron"),
+                schedule.get("expr", ""),
+                job.get("sessionTarget"),
+                job.get("wakeMode"),
+                payload.get("kind"),
+                payload.get("text"),
+                next_run,
+                last_run,
+                state.get("lastStatus"),
+                state.get("lastDurationMs"),
+                job.get("createdAtMs"),
+                job.get("updatedAtMs")
+            )
+            synced += 1
+        
+        return {"synced": synced, "source": jobs_path, "total_in_file": len(jobs)}
+    
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Jobs file not found at {jobs_path}")
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=500, detail=f"Invalid JSON: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=500, detail=f"Invalid JSON from OpenClaw: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ============================================

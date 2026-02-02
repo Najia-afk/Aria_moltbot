@@ -700,9 +700,9 @@ async function loadGoals() {
     `;
 
     try {
-        const response = await fetch(`${window.ARIA_API_BASE_URL}/records?table=goals&limit=100`);
+        const response = await fetch(`${window.ARIA_API_BASE_URL}/goals?limit=100`);
         const data = await response.json();
-        allGoals = data.records || data || [];
+        allGoals = data || [];
         
         updateStats();
         filterGoals();

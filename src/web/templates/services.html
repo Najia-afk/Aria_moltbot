@@ -3,129 +3,322 @@
 
 {% block extra_css %}
 <style>
-.service-card-large {
+/* Architecture Diagram */
+.architecture-section {
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
     padding: 1.5rem;
-    transition: all 0.2s;
 }
-.service-card-large:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow);
-}
-.service-card-large.online { border-left: 3px solid var(--success); }
-.service-card-large.offline { border-left: 3px solid var(--danger); }
-
-.service-header {
+.architecture-header {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 1rem;
-}
-.service-title {
-    display: flex;
     align-items: center;
-    gap: 0.75rem;
+    margin-bottom: 1.5rem;
 }
-.service-icon-large {
-    width: 48px;
-    height: 48px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--bg-tertiary);
-    border-radius: var(--radius-md);
-    font-size: 1.5rem;
-}
-.service-name-large {
-    font-size: 1.2rem;
+.architecture-title {
+    font-size: 1.3rem;
     font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
-.service-desc {
+.architecture-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+.status-summary {
+    display: flex;
+    gap: 1rem;
     font-size: 0.85rem;
     color: var(--text-muted);
 }
-.service-details {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.75rem;
-    margin: 1rem 0;
-    padding: 1rem;
+.status-summary .online { color: var(--success); }
+.status-summary .offline { color: var(--danger); }
+.architecture-diagram {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+.arch-layer {
     background: var(--bg-tertiary);
     border-radius: var(--radius-md);
+    padding: 1rem;
 }
-.detail-item {
+.arch-layer-title {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px dashed var(--border-color);
+}
+.arch-services {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    justify-content: center;
+}
+.arch-service {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.75rem 1rem;
+    background: var(--bg-secondary);
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-md);
+    min-width: 110px;
+    text-align: center;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+    cursor: pointer;
+    text-decoration: none;
+    color: inherit;
+    position: relative;
+}
+.arch-service:hover {
+    border-color: var(--accent-primary);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
+}
+.arch-service.online {
+    border-color: var(--success);
+}
+.arch-service.offline {
+    border-color: var(--danger);
+}
+.arch-service.checking {
+    border-color: var(--warning);
+}
+.arch-service-icon {
+    font-size: 1.8rem;
+}
+.arch-service-name {
+    font-weight: 600;
     font-size: 0.9rem;
 }
-.detail-label {
+.arch-service-port {
+    font-size: 0.7rem;
     color: var(--text-muted);
-    font-size: 0.8rem;
+    font-family: var(--font-mono);
 }
-.service-actions {
+.arch-service-status {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--border-color);
+}
+.arch-service.online .arch-service-status {
+    background: var(--success);
+    box-shadow: 0 0 6px var(--success);
+}
+.arch-service.offline .arch-service-status {
+    background: var(--danger);
+}
+.arch-service.checking .arch-service-status {
+    background: var(--warning);
+    animation: pulse 1s infinite;
+}
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+.arch-arrow {
     display: flex;
-    gap: 0.5rem;
-    margin-top: 1rem;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 1.2rem;
 }
+.arch-legend {
+    display: flex;
+    gap: 1.5rem;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px dashed var(--border-color);
+}
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+.legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+.legend-dot.online { background: var(--success); }
+.legend-dot.offline { background: var(--danger); }
+.legend-dot.checking { background: var(--warning); }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <h1>🖥️ Services</h1>
+    <h1>⚙️ Services</h1>
     <p>Monitor and manage all Aria stack services</p>
 </div>
 
-<div class="filters">
-    <button class="btn btn-primary" onclick="refreshAllStatus()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 12a9 9 0 11-6.22-8.56"/>
-        </svg>
-        Refresh All
-    </button>
-    <div class="filter-group">
-        <label class="filter-label">Filter:</label>
-        <select id="statusFilter" onchange="filterServices()">
-            <option value="">All Services</option>
-            <option value="online">Online</option>
-            <option value="offline">Offline</option>
-        </select>
+<!-- Architecture Diagram with Live Status -->
+<div class="architecture-section">
+    <div class="architecture-header">
+        <div class="architecture-title">🏗️ Service Architecture</div>
+        <div class="architecture-actions">
+            <div class="status-summary">
+                <span class="online" id="online-count">0 online</span>
+                <span class="offline" id="offline-count">0 offline</span>
+            </div>
+            <button class="btn btn-primary" onclick="refreshAllStatus()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 12a9 9 0 11-6.22-8.56"/>
+                </svg>
+                Refresh
+            </button>
+        </div>
     </div>
-</div>
-
-<div class="grid-3" id="servicesGrid">
-    <!-- Services will be loaded here -->
+    <div class="architecture-diagram">
+        <!-- External Layer -->
+        <div class="arch-layer">
+            <div class="arch-layer-title">🌐 External Access</div>
+            <div class="arch-services">
+                <a href="/traefik/dashboard/" target="_blank" class="arch-service checking" data-service="traefik">
+                    <span class="arch-service-status"></span>
+                    <div class="arch-service-icon">🔀</div>
+                    <div class="arch-service-name">Traefik</div>
+                    <div class="arch-service-port">:80/:443</div>
+                </a>
+                <a href="{{ clawdbot_public_url }}" target="_blank" class="arch-service checking" data-service="clawdbot">
+                    <span class="arch-service-status"></span>
+                    <div class="arch-service-icon">🦞</div>
+                    <div class="arch-service-name">OpenClaw</div>
+                    <div class="arch-service-port">:18789</div>
+                </a>
+                <a href="/litellm" class="arch-service checking" data-service="litellm">
+                    <span class="arch-service-status"></span>
+                    <div class="arch-service-icon">⚡</div>
+                    <div class="arch-service-name">LiteLLM</div>
+                    <div class="arch-service-port">:18793</div>
+                </a>
+            </div>
+        </div>
+        
+        <div class="arch-arrow">▼</div>
+        
+        <!-- Core Services Layer -->
+        <div class="arch-layer">
+            <div class="arch-layer-title">🐳 Docker Core Services</div>
+            <div class="arch-services">
+                <a href="/" class="arch-service checking" data-service="aria-web">
+                    <span class="arch-service-status"></span>
+                    <div class="arch-service-icon">🌐</div>
+                    <div class="arch-service-name">aria-web</div>
+                    <div class="arch-service-port">Flask :5000</div>
+                </a>
+                <a href="/api/docs" target="_blank" class="arch-service checking" data-service="aria-api">
+                    <span class="arch-service-status"></span>
+                    <div class="arch-service-icon">🚀</div>
+                    <div class="arch-service-name">aria-api</div>
+                    <div class="arch-service-port">FastAPI :8000</div>
+                </a>
+            </div>
+        </div>
+        
+        <div class="arch-arrow">▼</div>
+        
+        <!-- LLM Layer -->
+        <div class="arch-layer">
+            <div class="arch-layer-title">🧠 LLM Backends</div>
+            <div class="arch-services">
+                <a href="http://{{ service_host }}:8080/" target="_blank" class="arch-service checking" data-service="mlx">
+                    <span class="arch-service-status"></span>
+                    <div class="arch-service-icon">🍎</div>
+                    <div class="arch-service-name">MLX</div>
+                    <div class="arch-service-port">:8080 (Metal)</div>
+                </a>
+                <a href="/ollama/" target="_blank" class="arch-service checking" data-service="ollama">
+                    <span class="arch-service-status"></span>
+                    <div class="arch-service-icon">🦙</div>
+                    <div class="arch-service-name">Ollama</div>
+                    <div class="arch-service-port">:11434</div>
+                </a>
+                <div class="arch-service" data-service="openrouter" style="cursor: default;">
+                    <span class="arch-service-status" style="background: var(--info);"></span>
+                    <div class="arch-service-icon">🌐</div>
+                    <div class="arch-service-name">OpenRouter</div>
+                    <div class="arch-service-port">Free Models</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="arch-arrow">▼</div>
+        
+        <!-- Storage & Monitoring Layer -->
+        <div class="arch-layer">
+            <div class="arch-layer-title">💾 Storage & Monitoring</div>
+            <div class="arch-services">
+                <div class="arch-service checking" data-service="postgres">
+                    <span class="arch-service-status"></span>
+                    <div class="arch-service-icon">🐘</div>
+                    <div class="arch-service-name">PostgreSQL</div>
+                    <div class="arch-service-port">:5432</div>
+                </div>
+                <a href="/grafana/" target="_blank" class="arch-service checking" data-service="grafana">
+                    <span class="arch-service-status"></span>
+                    <div class="arch-service-icon">📈</div>
+                    <div class="arch-service-name">Grafana</div>
+                    <div class="arch-service-port">:3001</div>
+                </a>
+                <a href="/prometheus/" target="_blank" class="arch-service checking" data-service="prometheus">
+                    <span class="arch-service-status"></span>
+                    <div class="arch-service-icon">📊</div>
+                    <div class="arch-service-name">Prometheus</div>
+                    <div class="arch-service-port">:9090</div>
+                </a>
+                <a href="/pgadmin/" target="_blank" class="arch-service checking" data-service="pgadmin">
+                    <span class="arch-service-status"></span>
+                    <div class="arch-service-icon">🔧</div>
+                    <div class="arch-service-name">PgAdmin</div>
+                    <div class="arch-service-port">:5050</div>
+                </a>
+            </div>
+        </div>
+        
+        <!-- Legend -->
+        <div class="arch-legend">
+            <div class="legend-item"><span class="legend-dot online"></span> Online</div>
+            <div class="legend-item"><span class="legend-dot offline"></span> Offline</div>
+            <div class="legend-item"><span class="legend-dot checking"></span> Checking</div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script data-page-script>
-const serviceHost = "{{ service_host }}";
-const baseUrl = `https://${serviceHost}`;
-const hostName = serviceHost;
-const clawdbotUrl = "{{ clawdbot_public_url }}";
-
 const services = [
-    { id: 'ollama', name: 'Ollama', icon: '🦙', desc: 'Local LLM Server', port: 11434, url: `${baseUrl}/ollama/` },
-    { id: 'mlx', name: 'MLX Server', icon: '🍎', desc: 'Apple Silicon LLM', port: 8080, url: null },
-    { id: 'litellm', name: 'LiteLLM', icon: '⚡', desc: 'LLM Proxy', port: 18793, url: `${baseUrl}/litellm/` },
-    { id: 'clawdbot', name: 'Clawdbot', icon: '🤖', desc: 'AI Gateway', port: 18789, url: clawdbotUrl },
-    { id: 'postgres', name: 'PostgreSQL', icon: '🐘', desc: 'Database Server', port: 5432, url: null },
-    { id: 'grafana', name: 'Grafana', icon: '📊', desc: 'Metrics Dashboard', port: 3001, url: `${baseUrl}/grafana/` },
-    { id: 'prometheus', name: 'Prometheus', icon: '🔥', desc: 'Metrics Collection', port: 9090, url: `${baseUrl}/prometheus/` },
-    { id: 'pgadmin', name: 'PgAdmin', icon: '🔧', desc: 'Database Admin', port: 5050, url: `${baseUrl}/pgadmin/` },
-    { id: 'traefik', name: 'Traefik', icon: '🚦', desc: 'Reverse Proxy', port: 8080, url: `${baseUrl}/dashboard/` },
+    'traefik', 'clawdbot', 'litellm',
+    'aria-web', 'aria-api',
+    'mlx', 'ollama',
+    'postgres', 'grafana', 'prometheus', 'pgadmin'
 ];
 
-const statusCache = {};
+let onlineCount = 0;
+let offlineCount = 0;
 
-let isRefreshing = false;
-
-async function checkServiceStatus(service) {
+async function checkServiceStatus(serviceId) {
     try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000);
-        const response = await fetch(`${window.ARIA_API_BASE_URL}/status/${service.id}`, {
+        const response = await fetch(`${window.ARIA_API_BASE_URL}/status/${serviceId}`, {
             signal: controller.signal
         });
         clearTimeout(timeoutId);
@@ -136,102 +329,45 @@ async function checkServiceStatus(service) {
     }
 }
 
-// Delay helper
-const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+function updateServiceStatus(serviceId, online) {
+    const el = document.querySelector(`[data-service="${serviceId}"]`);
+    if (!el) return;
+    
+    el.classList.remove('checking', 'online', 'offline');
+    el.classList.add(online ? 'online' : 'offline');
+    
+    if (online) onlineCount++;
+    else offlineCount++;
+    
+    document.getElementById('online-count').textContent = `${onlineCount} online`;
+    document.getElementById('offline-count').textContent = `${offlineCount} offline`;
+}
 
 async function refreshAllStatus() {
-    if (isRefreshing) return; // Prevent concurrent refreshes
-    isRefreshing = true;
+    onlineCount = 0;
+    offlineCount = 0;
     
-    const grid = document.getElementById('servicesGrid');
-    grid.innerHTML = services.map(s => renderServiceCard(s, null)).join('');
-    
-    for (const service of services) {
-        const online = await checkServiceStatus(service);
-        statusCache[service.id] = online;
-        updateServiceCard(service.id, online);
-        await delay(100); // Small delay between checks to avoid overwhelming server
-    }
-    
-    isRefreshing = false;
-}
-
-function renderServiceCard(service, online) {
-    const statusClass = online === null ? '' : (online ? 'online' : 'offline');
-    const statusBadge = online === null 
-        ? '<span class="status"><span class="spinner" style="width:14px;height:14px;border-width:2px;"></span></span>'
-        : (online 
-            ? '<span class="status status-online"><span class="status-dot"></span>Online</span>'
-            : '<span class="status status-offline"><span class="status-dot"></span>Offline</span>');
-    
-    return `
-        <div class="service-card-large ${statusClass}" id="service-${service.id}">
-            <div class="service-header">
-                <div class="service-title">
-                    <div class="service-icon-large">${service.icon}</div>
-                    <div>
-                        <div class="service-name-large">${service.name}</div>
-                        <div class="service-desc">${service.desc}</div>
-                    </div>
-                </div>
-                ${statusBadge}
-            </div>
-            <div class="service-details">
-                <div class="detail-item">
-                    <div class="detail-label">Port</div>
-                    <div>${service.port}</div>
-                </div>
-                <div class="detail-item">
-                    <div class="detail-label">Host</div>
-                    <div>${hostName}</div>
-                </div>
-            </div>
-            <div class="service-actions">
-                ${service.url ? `<a href="${service.url}" target="_blank" rel="noopener noreferrer" class="btn btn-primary">Open</a>` : ''}
-                <button class="btn btn-secondary" onclick="checkSingle('${service.id}')">Check</button>
-            </div>
-        </div>
-    `;
-}
-
-function updateServiceCard(id, online) {
-    const card = document.getElementById(`service-${id}`);
-    if (!card) return;
-    
-    card.classList.remove('online', 'offline');
-    card.classList.add(online ? 'online' : 'offline');
-    
-    const statusSpan = card.querySelector('.status');
-    if (statusSpan) {
-        statusSpan.className = `status ${online ? 'status-online' : 'status-offline'}`;
-        statusSpan.innerHTML = `<span class="status-dot"></span>${online ? 'Online' : 'Offline'}`;
-    }
-}
-
-async function checkSingle(id) {
-    const service = services.find(s => s.id === id);
-    if (!service) return;
-    
-    const card = document.getElementById(`service-${id}`);
-    const statusSpan = card.querySelector('.status');
-    statusSpan.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;"></span>';
-    
-    const online = await checkServiceStatus(service);
-    statusCache[id] = online;
-    updateServiceCard(id, online);
-}
-
-function filterServices() {
-    const filter = document.getElementById('statusFilter').value;
-    document.querySelectorAll('.service-card-large').forEach(card => {
-        if (!filter) {
-            card.style.display = 'block';
-        } else {
-            card.style.display = card.classList.contains(filter) ? 'block' : 'none';
+    // Reset all to checking
+    services.forEach(id => {
+        const el = document.querySelector(`[data-service="${id}"]`);
+        if (el) {
+            el.classList.remove('online', 'offline');
+            el.classList.add('checking');
         }
     });
+    
+    document.getElementById('online-count').textContent = '... checking';
+    document.getElementById('offline-count').textContent = '';
+    
+    // Check all services
+    for (const serviceId of services) {
+        const online = await checkServiceStatus(serviceId);
+        updateServiceStatus(serviceId, online);
+        await new Promise(r => setTimeout(r, 100)); // Small delay
+    }
 }
 
+// Initial load
 document.addEventListener('DOMContentLoaded', refreshAllStatus);
 </script>
 {% endblock %}

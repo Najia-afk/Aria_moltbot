@@ -1,409 +1,163 @@
 {% extends "base.html" %}
-{% block title %}Home - Aria Blue{% endblock %}
-
-{% block extra_css %}
-<style>
-    .page-content { padding: var(--spacing-2xl); }
-    
-    /* Hero Section */
-    .hero-section {
-        background: linear-gradient(135deg, var(--surface-color) 0%, var(--surface-elevated) 100%);
-        border-radius: var(--radius-xl);
-        padding: var(--spacing-xl);
-        margin-bottom: var(--spacing-2xl);
-        border: 1px solid var(--border-color);
-        position: relative;
-        overflow: hidden;
-    }
-    .hero-section::before {
-        content: '';
-        position: absolute;
-        top: -50%;
-        right: -20%;
-        width: 400px;
-        height: 400px;
-        background: radial-gradient(circle, rgba(52, 152, 219, 0.15) 0%, transparent 70%);
-        pointer-events: none;
-    }
-    .hero-header {
-        display: flex;
-        align-items: center;
-        gap: var(--spacing-lg);
-        position: relative;
-        z-index: 1;
-    }
-    .hero-icon svg { width: 56px; height: 56px; }
-    .hero-text { flex: 1; }
-    .hero-title {
-        font-size: var(--font-size-2xl);
-        font-weight: var(--font-weight-bold);
-        background: var(--gradient-primary);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        margin-bottom: var(--spacing-xs);
-    }
-    .hero-subtitle { color: var(--text-secondary); font-size: var(--font-size-sm); }
-    .hero-status {
-        display: flex;
-        align-items: center;
-        gap: var(--spacing-sm);
-        padding: var(--spacing-sm) var(--spacing-md);
-        background: var(--surface-color);
-        border-radius: var(--radius-full);
-        border: 1px solid var(--border-color);
-    }
-    
-    /* Stats Grid */
-    .stats-grid {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: var(--spacing-lg);
-        margin-bottom: var(--spacing-2xl);
-    }
-    .stat-card {
-        background: var(--card-background);
-        border-radius: var(--radius-lg);
-        padding: var(--spacing-lg);
-        border: 1px solid var(--border-color);
-        transition: all var(--transition-fast);
-    }
-    .stat-card:hover {
-        transform: translateY(-2px);
-        box-shadow: var(--shadow-lg);
-        border-color: var(--primary-color);
-    }
-    .stat-icon {
-        width: 48px; height: 48px;
-        border-radius: var(--radius-md);
-        display: flex; align-items: center; justify-content: center;
-        font-size: 1.5rem;
-        margin-bottom: var(--spacing-md);
-    }
-    .stat-icon.primary { background: rgba(52, 152, 219, 0.15); }
-    .stat-icon.success { background: rgba(16, 185, 129, 0.15); }
-    .stat-icon.warning { background: rgba(245, 158, 11, 0.15); }
-    .stat-icon.secondary { background: rgba(155, 89, 182, 0.15); }
-    .stat-value {
-        font-size: var(--font-size-3xl);
-        font-weight: var(--font-weight-bold);
-        color: var(--text-primary);
-        margin-bottom: var(--spacing-xs);
-    }
-    .stat-label { color: var(--text-secondary); font-size: var(--font-size-sm); }
-    
-    /* Dashboard Grid */
-    .dashboard-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-        gap: var(--spacing-lg);
-    }
-    .dashboard-card {
-        background: var(--card-background);
-        border-radius: var(--radius-lg);
-        border: 1px solid var(--border-color);
-        overflow: hidden;
-        transition: all var(--transition-fast);
-    }
-    .dashboard-card:hover {
-        transform: translateY(-2px);
-        box-shadow: var(--shadow-lg);
-        border-color: var(--primary-color);
-    }
-    .card-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: var(--spacing-md) var(--spacing-lg);
-        border-bottom: 1px solid var(--border-color);
-    }
-    .card-header-left { display: flex; align-items: center; gap: var(--spacing-sm); }
-    .card-icon {
-        width: 36px; height: 36px;
-        border-radius: var(--radius-md);
-        display: flex; align-items: center; justify-content: center;
-        font-size: 1.1rem;
-    }
-    .card-icon.primary { background: rgba(52, 152, 219, 0.15); }
-    .card-icon.success { background: rgba(16, 185, 129, 0.15); }
-    .card-icon.warning { background: rgba(245, 158, 11, 0.15); }
-    .card-icon.secondary { background: rgba(155, 89, 182, 0.15); }
-    .card-title { font-size: var(--font-size-base); font-weight: var(--font-weight-semibold); color: var(--text-primary); }
-    .card-body { padding: var(--spacing-lg); }
-    
-    /* Buttons */
-    .btn {
-        display: inline-flex; align-items: center; justify-content: center;
-        gap: var(--spacing-sm);
-        padding: var(--spacing-sm) var(--spacing-md);
-        font-size: var(--font-size-sm);
-        font-weight: var(--font-weight-medium);
-        border-radius: var(--radius-md);
-        border: none; cursor: pointer;
-        transition: all var(--transition-fast);
-        text-decoration: none;
-    }
-    .btn-ghost { background: transparent; color: var(--text-secondary); }
-    .btn-ghost:hover { background: var(--surface-elevated); color: var(--text-primary); }
-    .btn-sm { padding: var(--spacing-xs) var(--spacing-sm); font-size: var(--font-size-xs); }
-    
-    /* Services Grid */
-    .services-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-        gap: var(--spacing-md);
-    }
-    .service-card {
-        display: flex; align-items: center;
-        gap: var(--spacing-md);
-        padding: var(--spacing-md);
-        background: var(--surface-color);
-        border-radius: var(--radius-md);
-        border: 1px solid var(--border-color);
-        text-decoration: none;
-        color: var(--text-primary);
-        transition: all var(--transition-fast);
-    }
-    .service-card:hover { background: var(--surface-elevated); border-color: var(--primary-color); }
-    .service-icon {
-        width: 40px; height: 40px;
-        border-radius: var(--radius-md);
-        display: flex; align-items: center; justify-content: center;
-        font-size: 1.25rem;
-        background: var(--surface-elevated);
-    }
-    .service-info h4 { font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); }
-    .service-info p { font-size: var(--font-size-xs); color: var(--text-muted); }
-    .service-status {
-        margin-left: auto;
-        font-size: var(--font-size-xs);
-        padding: 2px 8px;
-        border-radius: var(--radius-full);
-    }
-    .service-status.online { background: var(--success-bg); color: var(--success); }
-    .service-status.offline { background: var(--danger-bg); color: var(--danger); }
-    .service-status.loading { background: var(--warning-bg); color: var(--warning); }
-    
-    /* Status Indicator */
-    .status-indicator { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-    .status-indicator.online {
-        background: var(--status-online);
-        box-shadow: 0 0 8px var(--status-online);
-        animation: pulse 2s ease-in-out infinite;
-    }
-    .status-indicator.offline { background: var(--status-offline); }
-    .status-indicator.pending { background: var(--status-pending); animation: pulse 1s ease-in-out infinite; }
-    
-    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-    
-    /* Skeleton Loaders */
-    .skeleton {
-        background: linear-gradient(90deg, var(--surface-color) 25%, var(--surface-elevated) 50%, var(--surface-color) 75%);
-        background-size: 200% 100%;
-        animation: shimmer 1.5s infinite;
-        border-radius: var(--radius-sm);
-    }
-    .skeleton-text { height: 16px; margin-bottom: var(--spacing-sm); }
-    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-    
-    /* Activity/Thought Item */
-    .activity-item, .thought-item {
-        display: flex; gap: var(--spacing-md);
-        padding: var(--spacing-sm) 0;
-        border-bottom: 1px solid var(--border-color);
-    }
-    .activity-item:last-child, .thought-item:last-child { border-bottom: none; }
-    .activity-icon, .thought-icon {
-        width: 32px; height: 32px;
-        border-radius: var(--radius-md);
-        display: flex; align-items: center; justify-content: center;
-        font-size: 0.9rem;
-        background: var(--surface-elevated);
-        flex-shrink: 0;
-    }
-    .activity-content, .thought-content { flex: 1; min-width: 0; }
-    .activity-title, .thought-title {
-        font-size: var(--font-size-sm);
-        color: var(--text-primary);
-        margin-bottom: 2px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .activity-time, .thought-time { font-size: var(--font-size-xs); color: var(--text-muted); }
-    
-    /* Responsive */
-    @media (max-width: 1200px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
-    @media (max-width: 768px) {
-        .stats-grid { grid-template-columns: 1fr; }
-        .dashboard-grid { grid-template-columns: 1fr; }
-        .hero-header { flex-direction: column; text-align: center; }
-        .page-content { padding: var(--spacing-lg); }
-    }
-</style>
-{% endblock %}
+{% block title %}Home{% endblock %}
 
 {% block content %}
-<div class="page-content">
-    <!-- Hero Section -->
-    <div class="hero-section">
-        <div class="hero-header">
-            <div class="hero-icon">
-                <svg width="56" height="56" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="40" height="40" rx="8" fill="url(#heroGradient)"/>
-                    <path d="M20 8L28 32H12L20 8Z" fill="white" fill-opacity="0.9"/>
-                    <circle cx="20" cy="18" r="4" fill="white"/>
-                    <defs>
-                        <linearGradient id="heroGradient" x1="0" y1="0" x2="40" y2="40">
-                            <stop stop-color="#3498db"/>
-                            <stop offset="1" stop-color="#9b59b6"/>
-                        </linearGradient>
-                    </defs>
-                </svg>
-            </div>
-            <div class="hero-text">
-                <h1 class="hero-title">Aria Blue</h1>
-                <p class="hero-subtitle">Autonomous AI Agent — Dashboard & Control Center</p>
-            </div>
-            <div class="hero-status" id="health-status">
-                <span class="status-indicator pending"></span>
-                <span style="font-size: var(--font-size-sm); color: var(--text-muted);">Checking...</span>
-            </div>
-        </div>
-    </div>
-
-    <!-- Stats Grid -->
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-icon primary">🧠</div>
-            <div class="stat-value" id="stat-thoughts">-</div>
-            <div class="stat-label">Thoughts</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon success">⚡</div>
-            <div class="stat-value" id="stat-activities">-</div>
-            <div class="stat-label">Activities</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon warning">🕐</div>
-            <div class="stat-value" id="stat-last">-</div>
-            <div class="stat-label">Last Activity</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon secondary">✨</div>
-            <div class="stat-value" style="color: var(--status-online);">ONLINE</div>
-            <div class="stat-label">Status</div>
-        </div>
-    </div>
-
-    <!-- Dashboard Cards -->
-    <div class="dashboard-grid">
-        <!-- Activities Card -->
-        <div class="dashboard-card">
-            <div class="card-header">
-                <div class="card-header-left">
-                    <div class="card-icon success">⚡</div>
-                    <h3 class="card-title">Recent Activities</h3>
-                </div>
-                <a href="/activities" class="btn btn-ghost btn-sm">View All</a>
-            </div>
-            <div class="card-body" id="activities-list">
-                <div class="skeleton skeleton-text"></div>
-                <div class="skeleton skeleton-text"></div>
-                <div class="skeleton skeleton-text" style="width: 70%;"></div>
-            </div>
-        </div>
-
-        <!-- Thoughts Card -->
-        <div class="dashboard-card">
-            <div class="card-header">
-                <div class="card-header-left">
-                    <div class="card-icon primary">💭</div>
-                    <h3 class="card-title">Latest Thoughts</h3>
-                </div>
-                <a href="/thoughts" class="btn btn-ghost btn-sm">View All</a>
-            </div>
-            <div class="card-body" id="thoughts-list">
-                <div class="skeleton skeleton-text"></div>
-                <div class="skeleton skeleton-text"></div>
-                <div class="skeleton skeleton-text" style="width: 80%;"></div>
-            </div>
-        </div>
-
-        <!-- Quick Access Card -->
-        <div class="dashboard-card">
-            <div class="card-header">
-                <div class="card-header-left">
-                    <div class="card-icon warning">🚀</div>
-                    <h3 class="card-title">Quick Access</h3>
-                </div>
-            </div>
-            <div class="card-body">
-                <div class="services-grid">
-                    <a href="/dashboard" class="service-card">
-                        <div class="service-icon">📊</div>
-                        <div class="service-info"><h4>Dashboard</h4><p>Stats & Metrics</p></div>
-                    </a>
-                    <a href="/search" class="service-card">
-                        <div class="service-icon">🔍</div>
-                        <div class="service-info"><h4>Search</h4><p>Find Anything</p></div>
-                    </a>
-                    <a href="/litellm" class="service-card">
-                        <div class="service-icon">⚡</div>
-                        <div class="service-info"><h4>LiteLLM</h4><p>Model Router</p></div>
-                    </a>
-                    <a href="{{ clawdbot_public_url }}" target="_blank" class="service-card">
-                        <div class="service-icon">🦞</div>
-                        <div class="service-info"><h4>Clawdbot</h4><p>AI Gateway</p></div>
-                    </a>
-                </div>
-            </div>
-        </div>
-
-        <!-- Services Status Card -->
-        <div class="dashboard-card">
-            <div class="card-header">
-                <div class="card-header-left">
-                    <div class="card-icon secondary">🔗</div>
-                    <h3 class="card-title">Services Status</h3>
-                </div>
-                <a href="/services" class="btn btn-ghost btn-sm">View All</a>
-            </div>
-            <div class="card-body">
-                <div class="services-grid">
-                    <div class="service-card">
-                        <div class="service-icon">🗄️</div>
-                        <div class="service-info"><h4>Database</h4><p>PostgreSQL</p></div>
-                        <span class="service-status loading" id="status-database">...</span>
-                    </div>
-                    <div class="service-card">
-                        <div class="service-icon">📊</div>
-                        <div class="service-info"><h4>Grafana</h4><p>Monitoring</p></div>
-                        <span class="service-status loading" id="status-grafana">...</span>
-                    </div>
-                    <div class="service-card">
-                        <div class="service-icon">🦞</div>
-                        <div class="service-info"><h4>Clawdbot</h4><p>AI Gateway</p></div>
-                        <span class="service-status loading" id="status-clawdbot">...</span>
-                    </div>
-                    <div class="service-card">
-                        <div class="service-icon">⚡</div>
-                        <div class="service-info"><h4>LiteLLM</h4><p>LLM Router</p></div>
-                        <span class="service-status loading" id="status-litellm">...</span>
-                    </div>
-                </div>
-            </div>
-        </div>
+<div class="hero">
+    <div class="hero-content">
+        <div class="hero-icon">🌟</div>
+        <h1>Aria Blue</h1>
+        <p class="hero-subtitle">Autonomous AI Agent - Dashboard & Control Center</p>
     </div>
 </div>
+
+<section class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon">🧠</div>
+        <div class="stat-info">
+            <span class="stat-value" id="stat-thoughts">-</span>
+            <span class="stat-label">Thoughts</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">⚡</div>
+        <div class="stat-info">
+            <span class="stat-value" id="stat-activities">-</span>
+            <span class="stat-label">Activities</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">🕐</div>
+        <div class="stat-info">
+            <span class="stat-value" id="stat-last">-</span>
+            <span class="stat-label">Last Activity</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">✅</div>
+        <div class="stat-info">
+            <span class="stat-value status-online">ONLINE</span>
+            <span class="stat-label">Status</span>
+        </div>
+    </div>
+</section>
+
+<section class="quick-links">
+    <h2 class="section-title">Quick Access</h2>
+    <div class="links-grid">
+        <a href="/dashboard" class="link-card">
+            <div class="link-icon dashboard">📊</div>
+            <div class="link-info">
+                <h3>Dashboard</h3>
+                <p>Stats, graphs, and real-time monitoring</p>
+            </div>
+        </a>
+        <a href="/activities" class="link-card">
+            <div class="link-icon activities">⚡</div>
+            <div class="link-info">
+                <h3>Activities</h3>
+                <p>View and search Aria's activities</p>
+            </div>
+        </a>
+        <a href="/thoughts" class="link-card">
+            <div class="link-icon thoughts">🧠</div>
+            <div class="link-info">
+                <h3>Thoughts</h3>
+                <p>Aria's reasoning and reflections</p>
+            </div>
+        </a>
+        <a href="/search" class="link-card">
+            <div class="link-icon search">🔍</div>
+            <div class="link-info">
+                <h3>Search</h3>
+                <p>Search across all Aria data</p>
+            </div>
+        </a>
+    </div>
+</section>
+
+<section class="services-section">
+    <h2 class="section-title">External Services</h2>
+    <div class="services-grid">
+        <a href="{{ clawdbot_public_url }}" target="_blank" class="service-card">
+            <div class="service-icon clawdbot">🦞</div>
+            <div class="service-info">
+                <h3>Clawdbot</h3>
+                <p>AI Agent Gateway</p>
+            </div>
+            <span class="service-status loading" id="status-clawdbot">...</span>
+        </a>
+        <a href="/grafana/" target="_blank" class="service-card">
+            <div class="service-icon grafana">📈</div>
+            <div class="service-info">
+                <h3>Grafana</h3>
+                <p>Monitoring Dashboard</p>
+            </div>
+            <span class="service-status loading" id="status-grafana">...</span>
+        </a>
+        <a href="/prometheus/" target="_blank" class="service-card">
+            <div class="service-icon prometheus">📊</div>
+            <div class="service-info">
+                <h3>Prometheus</h3>
+                <p>Metrics Engine</p>
+            </div>
+            <span class="service-status loading" id="status-prometheus">...</span>
+        </a>
+        <a href="http://{{ request.host.split(':')[0] }}:11434" target="_blank" class="service-card">
+            <div class="service-icon ollama">🦙</div>
+            <div class="service-info">
+                <h3>Ollama</h3>
+                <p>Local LLM (Metal GPU)</p>
+            </div>
+            <span class="service-status loading" id="status-ollama">...</span>
+        </a>
+        <a href="/pgadmin/" target="_blank" class="service-card">
+            <div class="service-icon pgadmin">🐘</div>
+            <div class="service-info">
+                <h3>PgAdmin</h3>
+                <p>Database Admin</p>
+            </div>
+            <span class="service-status loading" id="status-pgadmin">...</span>
+        </a>
+        <a href="http://{{ request.host.split(':')[0] }}:18793" target="_blank" class="service-card">
+            <div class="service-icon litellm">🔗</div>
+            <div class="service-info">
+                <h3>LiteLLM</h3>
+                <p>Model Router</p>
+            </div>
+            <span class="service-status loading" id="status-litellm">...</span>
+        </a>
+        <a href="/traefik/dashboard/" target="_blank" class="service-card">
+            <div class="service-icon traefik">🔀</div>
+            <div class="service-info">
+                <h3>Traefik</h3>
+                <p>Reverse Proxy</p>
+            </div>
+            <span class="service-status loading" id="status-traefik">...</span>
+        </a>
+        <a href="http://{{ request.host.split(':')[0] }}:3000" target="_blank" class="service-card">
+            <div class="service-icon tor">🌐</div>
+            <div class="service-info">
+                <h3>Browser</h3>
+                <p>Headless Chrome</p>
+            </div>
+            <span class="service-status loading" id="status-browser">...</span>
+        </a>
+        <a href="http://{{ request.host.split(':')[0] }}:8080" target="_blank" class="service-card">
+            <div class="service-icon mlx">🍎</div>
+            <div class="service-info">
+                <h3>MLX</h3>
+                <p>Apple Silicon LLM</p>
+            </div>
+            <span class="service-status loading" id="status-mlx">...</span>
+        </a>
+    </div>
+</section>
 {% endblock %}
 
 {% block extra_js %}
-<script>
-    const API = window.ARIA_API_BASE_URL;
-
+<script data-page-script>
     // Load stats
-    fetch(`${API}/stats`)
+    fetch(`${window.ARIA_API_BASE_URL}/stats`)
         .then(r => r.json())
         .then(data => {
             document.getElementById('stat-thoughts').textContent = data.thoughts_count || 0;
@@ -415,57 +169,24 @@
         })
         .catch(() => {});
 
-    // Load health status
-    fetch(`${API}/health`)
-        .then(r => r.json())
-        .then(data => {
-            const el = document.getElementById('health-status');
-            const isHealthy = data.status === 'ok' || data.database === 'connected';
-            el.innerHTML = `<span class="status-indicator ${isHealthy ? 'online' : 'offline'}"></span><span style="font-size: var(--font-size-sm); color: var(--text-muted);">${isHealthy ? 'All Systems Online' : 'Issues Detected'}</span>`;
-        })
-        .catch(() => {
-            document.getElementById('health-status').innerHTML = `<span class="status-indicator offline"></span><span style="font-size: var(--font-size-sm); color: var(--text-muted);">API Offline</span>`;
-        });
-
     // Load service status
-    fetch(`${API}/status`)
+    fetch(`${window.ARIA_API_BASE_URL}/status`)
         .then(r => r.json())
         .then(data => {
             for (const [name, info] of Object.entries(data)) {
                 const el = document.getElementById('status-' + name);
                 if (el) {
-                    const isUp = info.status === 'up';
-                    el.textContent = isUp ? 'UP' : 'DOWN';
-                    el.className = 'service-status ' + (isUp ? 'online' : 'offline');
+                    el.textContent = info.status === 'up' ? 'ONLINE' : 'OFFLINE';
+                    el.className = 'service-status ' + (info.status === 'up' ? 'online' : 'offline');
                 }
             }
         })
-        .catch(() => {});
-
-    // Load recent activities
-    fetch(`${API}/activities?limit=4`)
-        .then(r => r.json())
-        .then(data => {
-            const container = document.getElementById('activities-list');
-            if (data.activities && data.activities.length > 0) {
-                container.innerHTML = data.activities.map(a => `<div class="activity-item"><div class="activity-icon">⚡</div><div class="activity-content"><div class="activity-title">${a.action || a.type || 'Activity'}</div><div class="activity-time">${new Date(a.created_at).toLocaleString()}</div></div></div>`).join('');
-            } else {
-                container.innerHTML = '<p style="color: var(--text-muted);">No recent activities</p>';
-            }
-        })
-        .catch(() => { document.getElementById('activities-list').innerHTML = '<p style="color: var(--text-muted);">Could not load activities</p>'; });
-
-    // Load recent thoughts
-    fetch(`${API}/thoughts?limit=4`)
-        .then(r => r.json())
-        .then(data => {
-            const container = document.getElementById('thoughts-list');
-            if (data.thoughts && data.thoughts.length > 0) {
-                container.innerHTML = data.thoughts.map(t => `<div class="thought-item"><div class="thought-icon">💭</div><div class="thought-content"><div class="thought-title">${(t.content || '').substring(0, 60)}${t.content && t.content.length > 60 ? '...' : ''}</div><div class="thought-time">${new Date(t.created_at).toLocaleString()}</div></div></div>`).join('');
-            } else {
-                container.innerHTML = '<p style="color: var(--text-muted);">No recent thoughts</p>';
-            }
-        })
-        .catch(() => { document.getElementById('thoughts-list').innerHTML = '<p style="color: var(--text-muted);">Could not load thoughts</p>'; });
+        .catch(() => {
+            // Set all to loading if API fails
+            document.querySelectorAll('.service-status').forEach(el => {
+                el.textContent = '...';
+                el.className = 'service-status loading';
+            });
+        });
 </script>
 {% endblock %}

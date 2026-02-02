@@ -3,7 +3,7 @@
 
 {% block content %}
 <div class="page-header">
-    <h1>📋 Records</h1>
+    <h1>🗃️ Records</h1>
     <p>Browse all stored records and data entries</p>
 </div>
 
@@ -17,12 +17,9 @@
     <div class="filter-group">
         <label class="filter-label">Table:</label>
         <select id="tableFilter" onchange="loadRecords()">
-            <option value="activities">Activity Log</option>
+            <option value="activities">Activities</option>
             <option value="thoughts">Thoughts</option>
             <option value="memories">Memories</option>
-            <option value="goals">Goals</option>
-            <option value="social_posts">Social Posts</option>
-            <option value="heartbeat_log">Heartbeat Log</option>
         </select>
     </div>
     <div class="filter-group">
@@ -114,11 +111,11 @@ function renderPagination(limit) {
     
     let html = '';
     if (currentPage > 1) {
-        html += `<button class="btn btn-secondary" onclick="goToPage(${currentPage - 1})">← Prev</button>`;
+        html += `<button class="btn btn-secondary" onclick="goToPage(${currentPage - 1})">ÔåÉ Prev</button>`;
     }
     html += `<span style="padding: 0.6rem 1rem; color: var(--text-secondary);">Page ${currentPage} of ${totalPages}</span>`;
     if (currentPage < totalPages) {
-        html += `<button class="btn btn-secondary" onclick="goToPage(${currentPage + 1})">Next →</button>`;
+        html += `<button class="btn btn-secondary" onclick="goToPage(${currentPage + 1})">Next ÔåÆ</button>`;
     }
     pagination.innerHTML = html;
 }

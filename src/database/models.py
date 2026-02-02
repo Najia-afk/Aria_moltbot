@@ -276,3 +276,43 @@ class AuditLog(Base):
             'ip_address': self.ip_address,
             'created_at': self.created_at.isoformat() if self.created_at else None,
         }
+
+
+class ScheduleTick(Base):
+    """
+    Scheduler heartbeat status with job statistics.
+    Tracks last tick time and aggregated job stats from OpenClaw.
+    """
+    __tablename__ = 'schedule_tick'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    last_tick: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    tick_count: Mapped[int] = mapped_column(Integer, default=0)
+    heartbeat_interval: Mapped[int] = mapped_column(Integer, default=3600)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    jobs_total: Mapped[int] = mapped_column(Integer, default=0)
+    jobs_successful: Mapped[int] = mapped_column(Integer, default=0)
+    jobs_failed: Mapped[int] = mapped_column(Integer, default=0)
+    last_job_name: Mapped[Optional[str]] = mapped_column(String(255))
+    last_job_status: Mapped[Optional[str]] = mapped_column(String(50))
+    next_job_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, onupdate=datetime.utcnow)
+
+    def __repr__(self) -> str:
+        return f"<ScheduleTick(id={self.id}, jobs_total={self.jobs_total}, last_tick={self.last_tick})>"
+
+    def to_dict(self) -> dict:
+        return {
+            'id': self.id,
+            'last_tick': self.last_tick.isoformat() if self.last_tick else None,
+            'tick_count': self.tick_count,
+            'heartbeat_interval': self.heartbeat_interval,
+            'enabled': self.enabled,
+            'jobs_total': self.jobs_total,
+            'jobs_successful': self.jobs_successful,
+            'jobs_failed': self.jobs_failed,
+            'last_job_name': self.last_job_name,
+            'last_job_status': self.last_job_status,
+            'next_job_at': self.next_job_at.isoformat() if self.next_job_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        }

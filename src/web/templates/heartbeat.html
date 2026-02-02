@@ -5,6 +5,12 @@
 {% block page_subtitle %}Scheduled jobs and system pulse{% endblock %}
 
 {% block header_actions %}
+<button class="btn btn-secondary" onclick="syncJobs()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M23 4v6h-6M1 20v-6h6M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
+    </svg>
+    Sync Jobs
+</button>
 <button class="btn btn-primary" onclick="triggerTick()">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polygon points="5 3 19 12 5 21 5 3"/>
@@ -31,7 +37,7 @@
     <div class="stat-card">
         <div class="stat-icon">🔄</div>
         <div class="stat-info">
-            <span class="stat-value" id="totalJobs">10</span>
+            <span class="stat-value" id="totalJobs">12</span>
             <span class="stat-label">Scheduled Jobs</span>
         </div>
     </div>
@@ -80,7 +86,14 @@
                 <option value="hourly_goal_check">Hourly Goal Check</option>
                 <option value="six_hour_review">Six Hour Review</option>
                 <option value="moltbook_post">Moltbook Post</option>
+                <option value="subagent_delegation">Sub-agent Delegation</option>
                 <option value="daily_reflection">Daily Reflection</option>
+                <option value="morning_checkin">Morning Check-in</option>
+                <option value="weekly_summary">Weekly Summary</option>
+                <option value="social_presence">Social Presence</option>
+                <option value="db_maintenance">DB Maintenance</option>
+                <option value="subagent_management">Sub-agent Management</option>
+                <option value="health_check">Health Check</option>
             </select>
         </div>
     </div>
@@ -463,97 +476,117 @@
 
 {% block extra_js %}
 <script data-page-script>
-// Scheduled Jobs Configuration
-const scheduledJobs = [
-    {
-        id: 'work_cycle',
-        name: 'Work Cycle',
-        icon: '⚡',
-        schedule: '*/5 * * * *',
-        description: 'Productivity pulse - pick a goal, do one action, log progress.',
-        frequency: 'Every 5 minutes'
-    },
-    {
-        id: 'hourly_goal_check',
-        name: 'Hourly Goal Check',
-        icon: '🎯',
-        schedule: '0 * * * *',
-        description: 'Check and complete any goals marked for the current hour.',
-        frequency: 'Every hour'
-    },
-    {
-        id: 'six_hour_review',
-        name: 'Six Hour Review',
-        icon: '📊',
-        schedule: '0 */6 * * *',
-        description: 'Analyze activity patterns and adjust priorities.',
-        frequency: 'Every 6 hours'
-    },
-    {
-        id: 'moltbook_post',
-        name: 'Moltbook Post',
-        icon: '🦞',
-        schedule: '0 */6 * * *',
-        description: 'Create and publish a thoughtful post to Moltbook.',
-        frequency: 'Every 6 hours'
-    },
-    {
-        id: 'subagent_delegation',
-        name: 'Sub-agent Delegation',
-        icon: '🤖',
-        schedule: '0 */6 * * *',
-        description: 'Delegate complex tasks to specialized sub-agents.',
-        frequency: 'Every 6 hours'
-    },
-    {
-        id: 'daily_reflection',
-        name: 'Daily Reflection',
-        icon: '🌙',
-        schedule: '0 23 * * *',
-        description: 'End-of-day summary and accomplishment review.',
-        frequency: 'Daily at 11 PM'
-    },
-    {
-        id: 'morning_checkin',
-        name: 'Morning Check-in',
-        icon: '☀️',
-        schedule: '0 8 * * *',
-        description: 'Start the day with status check and goal planning.',
-        frequency: 'Daily at 8 AM'
-    },
-    {
-        id: 'weekly_summary',
-        name: 'Weekly Summary',
-        icon: '📈',
-        schedule: '0 18 * * 0',
-        description: 'Weekly progress report and goal adjustment.',
-        frequency: 'Sunday 6 PM'
-    },
-    {
-        id: 'social_presence',
-        name: 'Social Presence',
-        icon: '💬',
-        schedule: '0 */4 * * *',
-        description: 'Check Moltbook notifications and engage.',
-        frequency: 'Every 4 hours'
-    },
-    {
-        id: 'db_maintenance',
-        name: 'DB Maintenance',
-        icon: '🗄️',
-        schedule: '0 3 * * *',
-        description: 'VACUUM ANALYZE and clean old data.',
-        frequency: 'Daily at 3 AM'
-    }
-];
-
+// Scheduled Jobs - fetched from API (synced from OpenClaw)
+let scheduledJobs = [];
 let allLogs = [];
+
+// Icon mapping for job names
+const jobIcons = {
+    'work_cycle': '⚡',
+    'hourly_goal_check': '🎯',
+    'six_hour_review': '📊',
+    'moltbook_post': '🦞',
+    'subagent_delegation': '🤖',
+    'daily_reflection': '🌙',
+    'morning_checkin': '☀️',
+    'weekly_summary': '📈',
+    'social_presence': '💬',
+    'db_maintenance': '🗄️',
+    'subagent_management': '🔍',
+    'health_check': '🏥'
+};
+
+// Human-readable frequency from cron expression
+function cronToFrequency(expr) {
+    const patterns = {
+        '*/1 * * * *': 'Every minute',
+        '*/5 * * * *': 'Every 5 minutes',
+        '*/15 * * * *': 'Every 15 minutes',
+        '*/30 * * * *': 'Every 30 minutes',
+        '0 * * * *': 'Every hour',
+        '0 */2 * * *': 'Every 2 hours',
+        '0 */4 * * *': 'Every 4 hours',
+        '0 */6 * * *': 'Every 6 hours',
+        '0 */12 * * *': 'Every 12 hours',
+        '0 0 * * *': 'Daily at midnight',
+        '0 3 * * *': 'Daily at 3 AM',
+        '0 8 * * *': 'Daily at 8 AM',
+        '0 23 * * *': 'Daily at 11 PM',
+        '0 18 * * 0': 'Sunday 6 PM',
+        '0 0 * * 0': 'Weekly (Sunday)',
+        '0 0 1 * *': 'Monthly'
+    };
+    return patterns[expr] || expr;
+}
 
 async function loadHeartbeatData() {
     await Promise.all([
+        loadScheduledJobs(),
         loadScheduleStatus(),
         loadHeartbeatLogs()
     ]);
+}
+
+async function loadScheduledJobs() {
+    try {
+        // Try live endpoint first (direct from OpenClaw file), fallback to DB
+        let response = await fetch(`${window.ARIA_API_BASE_URL}/jobs/live`);
+        let data = await response.json();
+        
+        // If live has no jobs, try synced DB version
+        if (data.jobs.length === 0 && !data.error) {
+            response = await fetch(`${window.ARIA_API_BASE_URL}/jobs`);
+            data = await response.json();
+        }
+        
+        if (data.jobs && data.jobs.length > 0) {
+            scheduledJobs = data.jobs.map(job => ({
+                id: job.id,
+                name: job.name,
+                icon: jobIcons[job.name] || '📋',
+                schedule: job.schedule_expr,
+                description: job.payload_text ? job.payload_text.substring(0, 100) + '...' : 'No description',
+                frequency: cronToFrequency(job.schedule_expr),
+                enabled: job.enabled,
+                lastRun: job.last_run_at,
+                nextRun: job.next_run_at,
+                lastStatus: job.last_status,
+                lastDurationMs: job.last_duration_ms
+            }));
+            document.getElementById('totalJobs').textContent = scheduledJobs.length;
+        } else {
+            // No jobs found anywhere
+            scheduledJobs = [];
+            document.getElementById('totalJobs').textContent = '0';
+        }
+        
+        renderJobsGrid();
+    } catch (error) {
+        console.error('Failed to load jobs:', error);
+        document.getElementById('jobsGrid').innerHTML = `
+            <div class="empty-state">
+                <p>⚠️ Failed to load jobs from API</p>
+                <button class="btn btn-primary" onclick="syncJobs()">Sync from OpenClaw</button>
+            </div>
+        `;
+    }
+}
+
+async function syncJobs() {
+    try {
+        showToast('Syncing jobs from OpenClaw...', 'info');
+        const response = await fetch(`${window.ARIA_API_BASE_URL}/jobs/sync`, { method: 'POST' });
+        const data = await response.json();
+        
+        if (response.ok) {
+            showToast(`✅ Synced ${data.synced} jobs from OpenClaw`, 'success');
+            await loadScheduledJobs();
+        } else {
+            showToast(`❌ Sync failed: ${data.detail}`, 'error');
+        }
+    } catch (error) {
+        showToast(`❌ Sync error: ${error.message}`, 'error');
+    }
 }
 
 async function loadScheduleStatus() {
@@ -568,13 +601,26 @@ async function loadScheduleStatus() {
             const lastTick = new Date(data.last_tick);
             document.getElementById('lastTickTime').textContent = `Last tick: ${formatRelativeTime(lastTick)}`;
         }
+        
+        // Use new columns from schedule_tick if available
+        if (data.jobs_total !== undefined && data.jobs_total !== null) {
+            document.getElementById('totalJobs').textContent = data.jobs_total;
+        }
+        if (data.jobs_successful !== undefined && data.jobs_successful !== null) {
+            document.getElementById('successfulRuns').textContent = data.jobs_successful;
+        }
+        if (data.jobs_failed !== undefined && data.jobs_failed !== null) {
+            document.getElementById('failedRuns').textContent = data.jobs_failed;
+        }
+        if (data.next_job_at) {
+            const nextJobTime = new Date(data.next_job_at);
+            document.getElementById('nextJob').textContent = formatRelativeTime(nextJobTime);
+        }
     } catch (error) {
         document.getElementById('heartbeatStatus').textContent = 'System Offline';
         document.getElementById('pulseIndicator').classList.add('offline');
         document.getElementById('lastTickTime').textContent = 'Unable to reach scheduler';
     }
-    
-    renderJobsGrid();
 }
 
 async function loadHeartbeatLogs() {
@@ -616,21 +662,39 @@ function updateLogStats() {
 function renderJobsGrid() {
     const container = document.getElementById('jobsGrid');
     
+    if (scheduledJobs.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state" style="grid-column: 1 / -1; text-align: center; padding: 3rem;">
+                <h3>📋 No Scheduled Jobs Found</h3>
+                <p>Jobs haven't been synced from OpenClaw yet.</p>
+                <button class="btn btn-primary" onclick="syncJobs()" style="margin-top: 1rem;">
+                    🔄 Sync Jobs from OpenClaw
+                </button>
+            </div>
+        `;
+        return;
+    }
+    
     container.innerHTML = scheduledJobs.map(job => {
-        // Find last execution for this job
-        const lastLog = allLogs.find(log => log.job_name === job.id);
-        const lastRun = lastLog ? formatRelativeTime(new Date(lastLog.executed_at || lastLog.created_at)) : 'Never';
-        const status = lastLog?.status === 'error' ? 'error' : 'active';
+        // Use real data from API
+        const lastRun = job.lastRun ? formatRelativeTime(new Date(job.lastRun)) : 'Never';
+        const nextRun = job.nextRun ? formatRelativeTime(new Date(job.nextRun)) : 'Unknown';
+        const status = !job.enabled ? 'disabled' : 
+                       job.lastStatus === 'error' ? 'error' : 
+                       job.lastStatus === 'ok' ? 'active' : 'idle';
+        const statusLabel = !job.enabled ? 'Disabled' : 
+                           job.lastStatus === 'ok' ? 'Active' : 
+                           job.lastStatus || 'Idle';
         
         return `
-            <div class="job-card">
+            <div class="job-card ${!job.enabled ? 'disabled' : ''}">
                 <div class="job-header">
                     <div class="job-icon">${job.icon}</div>
                     <div class="job-info">
                         <div class="job-name">${job.name}</div>
                         <div class="job-schedule">${job.schedule}</div>
                     </div>
-                    <span class="job-status ${status}">${status}</span>
+                    <span class="job-status ${status}">${statusLabel}</span>
                 </div>
                 <p class="job-description">${job.description}</p>
                 <div class="job-meta">
@@ -642,6 +706,16 @@ function renderJobsGrid() {
                         <span class="job-meta-label">Last Run</span>
                         <span class="job-meta-value">${lastRun}</span>
                     </div>
+                    <div class="job-meta-item">
+                        <span class="job-meta-label">Next Run</span>
+                        <span class="job-meta-value">${nextRun}</span>
+                    </div>
+                    ${job.lastDurationMs ? `
+                    <div class="job-meta-item">
+                        <span class="job-meta-label">Duration</span>
+                        <span class="job-meta-value">${job.lastDurationMs}ms</span>
+                    </div>
+                    ` : ''}
                 </div>
             </div>
         `;

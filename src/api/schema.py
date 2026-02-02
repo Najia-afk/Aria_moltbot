@@ -114,6 +114,61 @@ class HeartbeatLog(Base):
 Index("idx_heartbeat_created", HeartbeatLog.created_at.desc())
 
 
+class ScheduledJob(Base):
+    """
+    Scheduled jobs synced from OpenClaw cron system.
+    Source: /root/.openclaw/cron/jobs.json in clawdbot container
+    """
+    __tablename__ = "scheduled_jobs"
+
+    id: Mapped[str] = mapped_column(String(50), primary_key=True)  # UUID from OpenClaw
+    agent_id: Mapped[str] = mapped_column(String(50), server_default=text("'main'"))
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
+    schedule_kind: Mapped[str] = mapped_column(String(20), server_default=text("'cron'"))
+    schedule_expr: Mapped[str] = mapped_column(String(50), nullable=False)  # Cron expression
+    session_target: Mapped[str | None] = mapped_column(String(50))
+    wake_mode: Mapped[str | None] = mapped_column(String(50))
+    payload_kind: Mapped[str | None] = mapped_column(String(50))
+    payload_text: Mapped[str | None] = mapped_column(Text)
+    next_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_status: Mapped[str | None] = mapped_column(String(20))
+    last_duration_ms: Mapped[int | None] = mapped_column(Integer)
+    run_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    success_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    fail_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    created_at_ms: Mapped[int | None] = mapped_column(Integer)  # OpenClaw timestamp
+    updated_at_ms: Mapped[int | None] = mapped_column(Integer)  # OpenClaw timestamp
+    synced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
+
+
+Index("idx_jobs_name", ScheduledJob.name)
+Index("idx_jobs_enabled", ScheduledJob.enabled)
+Index("idx_jobs_next_run", ScheduledJob.next_run_at)
+
+
+class ScheduleTick(Base):
+    """
+    Scheduler heartbeat status with job statistics.
+    Tracks last tick time and aggregated job stats from OpenClaw.
+    """
+    __tablename__ = "schedule_tick"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    last_tick: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    tick_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    heartbeat_interval: Mapped[int] = mapped_column(Integer, server_default=text("3600"))
+    enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
+    jobs_total: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    jobs_successful: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    jobs_failed: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    last_job_name: Mapped[str | None] = mapped_column(String(255))
+    last_job_status: Mapped[str | None] = mapped_column(String(50))
+    next_job_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
+
+
 def _as_async_url(database_url: str) -> str:
     if database_url.startswith("postgresql+asyncpg://"):
         return database_url

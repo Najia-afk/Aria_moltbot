@@ -16,6 +16,23 @@
 
 ---
 
+## ✅ RESTORED - GOOD VERSION
+
+The UI has been restored from git commit `6d50731` which had the correct:
+- ✅ **Top horizontal navigation** (not sidebar)
+- ✅ **Clean styled dropdowns** in Records page  
+- ✅ **Status badges** in header ("Partial" / "All Systems Online")
+- ✅ **External Services section** with proper status badges
+- ✅ **Service Health grid** with colored tiles
+- ✅ **Proper API status indicator** (no raw JSON!)
+
+**New pages added to navigation:**
+- ✅ Goals (`/goals`)
+- ✅ Heartbeat (`/heartbeat`)  
+- ✅ LiteLLM (`/litellm`)
+
+---
+
 ## 📋 TABLE OF CONTENTS
 
 1. [Executive Summary](#executive-summary)
