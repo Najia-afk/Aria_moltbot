@@ -25,19 +25,24 @@ class PerformanceSkill(BaseSkill):
     
     def __init__(self, config: SkillConfig):
         super().__init__(config)
-        self.api_base = config.settings.get("api_url", "http://aria-api:8000")
+        self.api_base = config.config.get("api_url", "http://aria-api:8000")
     
-    async def _check_health(self) -> SkillStatus:
+    async def initialize(self) -> bool:
+        """Initialize the skill."""
+        status = await self.health_check()
+        return status == SkillStatus.AVAILABLE
+    
+    async def health_check(self) -> SkillStatus:
         """Check if the API is accessible."""
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(f"{self.api_base}/health", timeout=5.0)
                 if response.status_code == 200:
-                    return SkillStatus.HEALTHY
-                return SkillStatus.DEGRADED
+                    return SkillStatus.AVAILABLE
+                return SkillStatus.ERROR
         except Exception as e:
             logger.error(f"Performance API health check failed: {e}")
-            return SkillStatus.UNHEALTHY
+            return SkillStatus.UNAVAILABLE
     
     async def log(
         self,
