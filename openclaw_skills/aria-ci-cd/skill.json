@@ -1,47 +1,57 @@
 {
-  "skill": "aria-ci-cd",
+  "name": "aria-ci-cd",
   "version": "1.0.0",
   "description": "🔄 CI/CD pipeline management and automation for DevSecOps",
-  "focus": "DevSecOps",
   "author": "Aria Blue",
-  "enabled": true,
-  "rate_limit": {
-    "requests_per_minute": 20,
-    "burst": 10
-  },
-  "config": {},
-  "functions": [
+  "tools": [
     {
       "name": "generate_workflow",
       "description": "Generate a GitHub Actions workflow file",
       "parameters": {
-        "workflow_type": { "type": "string", "required": true, "enum": ["test", "build", "deploy", "security"] },
-        "language": { "type": "string", "required": false, "default": "python" },
-        "options": { "type": "object", "required": false }
+        "type": "object",
+        "properties": {
+          "workflow_type": { "type": "string", "description": "The type of workflow to generate", "enum": ["test", "build", "deploy", "security"] },
+          "language": { "type": "string", "description": "The programming language (default: python)" },
+          "options": { "type": "object", "description": "Additional workflow options" }
+        },
+        "required": ["workflow_type"]
       }
     },
     {
       "name": "validate_workflow",
       "description": "Validate a GitHub Actions workflow file",
       "parameters": {
-        "workflow_path": { "type": "string", "required": true }
+        "type": "object",
+        "properties": {
+          "workflow_path": { "type": "string", "description": "Path to the workflow file to validate" }
+        },
+        "required": ["workflow_path"]
       }
     },
     {
       "name": "generate_dockerfile",
       "description": "Generate a secure Dockerfile",
       "parameters": {
-        "language": { "type": "string", "required": false, "default": "python" },
-        "base_image": { "type": "string", "required": false },
-        "options": { "type": "object", "required": false }
+        "type": "object",
+        "properties": {
+          "language": { "type": "string", "description": "The programming language (default: python)" },
+          "base_image": { "type": "string", "description": "Base Docker image to use" },
+          "options": { "type": "object", "description": "Additional Dockerfile options" }
+        },
+        "required": []
       }
     },
     {
       "name": "analyze_deployment",
       "description": "Analyze a docker-compose deployment configuration",
       "parameters": {
-        "compose_file": { "type": "string", "required": true }
+        "type": "object",
+        "properties": {
+          "compose_file": { "type": "string", "description": "Path to the docker-compose file" }
+        },
+        "required": ["compose_file"]
       }
     }
-  ]
+  ],
+  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py ci_cd {{tool}} '{{args_json}}'"
 }

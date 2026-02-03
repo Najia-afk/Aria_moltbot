@@ -1,68 +1,86 @@
 {
-  "skill": "aria-experiment",
+  "name": "aria-experiment",
   "version": "1.0.0",
   "description": "🧪 ML experiment tracking and model management for Data Architect",
-  "focus": "Data Architect",
   "author": "Aria Blue",
-  "enabled": true,
-  "rate_limit": {
-    "requests_per_minute": 30,
-    "burst": 15
-  },
-  "config": {},
-  "functions": [
+  "tools": [
     {
       "name": "create_experiment",
       "description": "Create a new ML experiment",
       "parameters": {
-        "name": { "type": "string", "required": true },
-        "parameters": { "type": "object", "required": true },
-        "tags": { "type": "array", "required": false }
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "description": "The name of the experiment" },
+          "parameters": { "type": "object", "description": "The experiment parameters" },
+          "tags": { "type": "array", "description": "Optional tags for the experiment" }
+        },
+        "required": ["name", "parameters"]
       }
     },
     {
       "name": "log_metrics",
       "description": "Log metrics to an experiment",
       "parameters": {
-        "experiment_id": { "type": "string", "required": true },
-        "metrics": { "type": "object", "required": true },
-        "step": { "type": "integer", "required": false }
+        "type": "object",
+        "properties": {
+          "experiment_id": { "type": "string", "description": "The experiment ID to log metrics to" },
+          "metrics": { "type": "object", "description": "The metrics to log" },
+          "step": { "type": "integer", "description": "Optional step number" }
+        },
+        "required": ["experiment_id", "metrics"]
       }
     },
     {
       "name": "complete_experiment",
       "description": "Mark experiment as completed",
       "parameters": {
-        "experiment_id": { "type": "string", "required": true },
-        "status": { "type": "string", "required": false, "default": "completed" }
+        "type": "object",
+        "properties": {
+          "experiment_id": { "type": "string", "description": "The experiment ID to complete" },
+          "status": { "type": "string", "description": "The completion status (default: completed)" }
+        },
+        "required": ["experiment_id"]
       }
     },
     {
       "name": "compare_experiments",
       "description": "Compare multiple experiments",
       "parameters": {
-        "experiment_ids": { "type": "array", "required": true },
-        "metrics": { "type": "array", "required": false }
+        "type": "object",
+        "properties": {
+          "experiment_ids": { "type": "array", "description": "List of experiment IDs to compare" },
+          "metrics": { "type": "array", "description": "Optional list of metrics to compare" }
+        },
+        "required": ["experiment_ids"]
       }
     },
     {
       "name": "register_model",
       "description": "Register a model version",
       "parameters": {
-        "name": { "type": "string", "required": true },
-        "experiment_id": { "type": "string", "required": true },
-        "metrics": { "type": "object", "required": true },
-        "path": { "type": "string", "required": false }
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "description": "The name of the model" },
+          "experiment_id": { "type": "string", "description": "The experiment ID the model is from" },
+          "metrics": { "type": "object", "description": "The model metrics" },
+          "path": { "type": "string", "description": "Optional path to the model" }
+        },
+        "required": ["name", "experiment_id", "metrics"]
       }
     },
     {
       "name": "promote_model",
       "description": "Promote model to a new stage",
       "parameters": {
-        "name": { "type": "string", "required": true },
-        "version": { "type": "integer", "required": true },
-        "stage": { "type": "string", "required": true, "enum": ["development", "staging", "production"] }
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "description": "The name of the model" },
+          "version": { "type": "integer", "description": "The version of the model" },
+          "stage": { "type": "string", "description": "The stage to promote to", "enum": ["development", "staging", "production"] }
+        },
+        "required": ["name", "version", "stage"]
       }
     }
-  ]
+  ],
+  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py experiment {{tool}} '{{args_json}}'"
 }

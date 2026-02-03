@@ -1,53 +1,67 @@
 {
-  "skill": "aria-data-pipeline",
+  "name": "aria-data-pipeline",
   "version": "1.0.0",
   "description": "📊 Data pipeline management and ETL operations for Data Architect",
-  "focus": "Data Architect",
   "author": "Aria Blue",
-  "enabled": true,
-  "rate_limit": {
-    "requests_per_minute": 30,
-    "burst": 15
-  },
-  "config": {},
-  "functions": [
+  "tools": [
     {
       "name": "define_pipeline",
       "description": "Define a new data pipeline",
       "parameters": {
-        "name": { "type": "string", "required": true },
-        "steps": { "type": "array", "required": true }
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "description": "The name of the pipeline" },
+          "steps": { "type": "array", "description": "The steps in the pipeline" }
+        },
+        "required": ["name", "steps"]
       }
     },
     {
       "name": "validate_data",
       "description": "Validate data against a schema",
       "parameters": {
-        "data": { "type": "array", "required": true },
-        "schema": { "type": "object", "required": true }
+        "type": "object",
+        "properties": {
+          "data": { "type": "array", "description": "The data to validate" },
+          "schema": { "type": "object", "description": "The schema to validate against" }
+        },
+        "required": ["data", "schema"]
       }
     },
     {
       "name": "infer_schema",
       "description": "Infer schema from data samples",
       "parameters": {
-        "data": { "type": "array", "required": true }
+        "type": "object",
+        "properties": {
+          "data": { "type": "array", "description": "The data samples to infer schema from" }
+        },
+        "required": ["data"]
       }
     },
     {
       "name": "transform_data",
       "description": "Apply transformations to data",
       "parameters": {
-        "data": { "type": "array", "required": true },
-        "transformations": { "type": "array", "required": true }
+        "type": "object",
+        "properties": {
+          "data": { "type": "array", "description": "The data to transform" },
+          "transformations": { "type": "array", "description": "The transformations to apply" }
+        },
+        "required": ["data", "transformations"]
       }
     },
     {
       "name": "data_quality_check",
       "description": "Run data quality checks",
       "parameters": {
-        "data": { "type": "array", "required": true }
+        "type": "object",
+        "properties": {
+          "data": { "type": "array", "description": "The data to check" }
+        },
+        "required": ["data"]
       }
     }
-  ]
+  ],
+  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py data_pipeline {{tool}} '{{args_json}}'"
 }

@@ -50,7 +50,7 @@ Aria is a **distributed cognitive architecture** with a **Focus-based persona sy
 │  └──────────────────────────────────────────────────────────────┘   │
 │                             │                                        │
 │  ┌──────────────────────────┼───────────────────────────────────┐   │
-│  │                  SkillRegistry (21 Skills)                    │   │
+│  │                  SkillRegistry (24 Skills)                    │   │
 │  │  ┌──────┐  ┌────────┐  ┌────────┐  ┌───────┐  ┌──────────┐  │   │
 │  │  │ llm  │  │database│  │security│  │market │  │brainstorm│  │   │
 │  │  └──────┘  └────────┘  └────────┘  └───────┘  └──────────┘  │   │
@@ -69,7 +69,7 @@ Aria is a **distributed cognitive architecture** with a **Focus-based persona sy
 | **Memory** | `aria_mind/memory.py` | Short-term and long-term storage |
 | **Heartbeat** | `aria_mind/heartbeat.py` | Health monitoring, scheduling |
 | **AgentCoordinator** | `aria_agents/coordinator.py` | Multi-agent orchestration |
-| **Skills** | `aria_skills/` | Tool implementations (21 skills) |
+| **Skills** | `aria_skills/` | Tool implementations (24 skills) |
 | **OpenClaw Manifests** | `openclaw_skills/` | Skill definitions for LLM |
 | **Entrypoint** | `stacks/brain/openclaw-entrypoint.sh` | Dynamic skill runner |
 
@@ -132,7 +132,7 @@ print(soul.active_focus.skills) # ["security_scan", "ci_cd", ...]
 
 ## 3. Skills Reference
 
-### Complete Skill Registry (21 Skills)
+### Complete Skill Registry (24 Skills)
 
 #### Core Skills (v1.0)
 
@@ -196,6 +196,12 @@ print(soul.active_focus.skills) # ["security_scan", "ci_cd", ...]
 | Skill | Module | Class | Purpose |
 |-------|--------|-------|---------|
 | `community` | `aria_skills.community` | `CommunitySkill` | Community health, engagement metrics |
+
+#### API Client Skills (v1.2)
+
+| Skill | Module | Class | Purpose |
+|-------|--------|-------|---------|
+| `api_client` | `aria_skills.api_client` | `AriaAPIClient` | Centralized HTTP client for aria-api |
 
 ### Skill-to-Focus Matrix
 
@@ -544,7 +550,7 @@ volumes:
 1. Install apt dependencies (curl, jq, python3)
 2. Install OpenClaw if not present
 3. pip install Python dependencies
-4. **Generate `run_skill.py`** with SKILL_REGISTRY (21 skills)
+4. **Generate `run_skill.py`** with SKILL_REGISTRY (24 skills)
 5. Read BOOTSTRAP.md for system prompt
 6. **Generate `openclaw.json`** with all skill entries enabled
 7. Prepare awakening (first boot detection)
@@ -742,10 +748,10 @@ python3 run_skill.py brainstorm ideate '{"topic": "AI agents", "technique": "sca
 python3 /root/.openclaw/workspace/skills/run_skill.py <skill_name> <function> '<json_args>'
 ```
 
-### Available Skills (21)
+### Available Skills (24)
 
 ```
-brainstorm, ci_cd, community, data_pipeline, database, experiment,
+api_client, brainstorm, ci_cd, community, data_pipeline, database, experiment,
 fact_check, goals, health, hourly_goals, knowledge_graph, litellm,
 llm, market_data, model_switcher, moltbook, performance, portfolio,
 pytest, research, schedule, security_scan, social

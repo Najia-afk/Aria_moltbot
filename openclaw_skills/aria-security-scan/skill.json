@@ -1,48 +1,55 @@
 {
-  "skill": "aria-security-scan",
+  "name": "aria-security-scan",
   "version": "1.0.0",
   "description": "🔒 Security scanning and vulnerability detection for DevSecOps",
-  "focus": "DevSecOps",
   "author": "Aria Blue",
-  "enabled": true,
-  "rate_limit": {
-    "requests_per_minute": 10,
-    "burst": 5
-  },
-  "config": {
-    "default_extensions": [".py", ".js", ".ts", ".yaml", ".yml", ".json", ".env"],
-    "exclude_dirs": ["node_modules", ".git", "__pycache__", "venv", ".venv"]
-  },
-  "functions": [
+  "tools": [
     {
       "name": "scan_file",
       "description": "Scan a single file for security issues",
       "parameters": {
-        "file_path": { "type": "string", "required": true }
+        "type": "object",
+        "properties": {
+          "file_path": { "type": "string", "description": "The path to the file to scan" }
+        },
+        "required": ["file_path"]
       }
     },
     {
       "name": "scan_directory",
       "description": "Scan a directory recursively for security issues",
       "parameters": {
-        "directory": { "type": "string", "required": true },
-        "extensions": { "type": "array", "required": false },
-        "exclude_dirs": { "type": "array", "required": false }
+        "type": "object",
+        "properties": {
+          "directory": { "type": "string", "description": "The directory to scan" },
+          "extensions": { "type": "array", "description": "Optional file extensions to include" },
+          "exclude_dirs": { "type": "array", "description": "Optional directories to exclude" }
+        },
+        "required": ["directory"]
       }
     },
     {
       "name": "check_dependencies",
       "description": "Check Python dependencies for known vulnerabilities",
       "parameters": {
-        "requirements_file": { "type": "string", "required": true }
+        "type": "object",
+        "properties": {
+          "requirements_file": { "type": "string", "description": "Path to the requirements file" }
+        },
+        "required": ["requirements_file"]
       }
     },
     {
       "name": "audit_docker",
       "description": "Audit a Dockerfile for security best practices",
       "parameters": {
-        "dockerfile_path": { "type": "string", "required": true }
+        "type": "object",
+        "properties": {
+          "dockerfile_path": { "type": "string", "description": "Path to the Dockerfile" }
+        },
+        "required": ["dockerfile_path"]
       }
     }
-  ]
+  ],
+  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py security_scan {{tool}} '{{args_json}}'"
 }

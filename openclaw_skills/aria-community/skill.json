@@ -1,68 +1,90 @@
 {
-  "skill": "aria-community",
+  "name": "aria-community",
   "version": "1.0.0",
   "description": "🌐 Community management and growth for Social Architect",
-  "focus": "Social Architect",
   "author": "Aria Blue",
-  "enabled": true,
-  "rate_limit": {
-    "requests_per_minute": 30,
-    "burst": 15
-  },
-  "config": {},
-  "functions": [
+  "tools": [
     {
       "name": "track_member",
       "description": "Add or update a community member",
       "parameters": {
-        "username": { "type": "string", "required": true },
-        "tags": { "type": "array", "required": false }
+        "type": "object",
+        "properties": {
+          "username": { "type": "string", "description": "The username of the member" },
+          "tags": { "type": "array", "description": "Optional tags for the member" }
+        },
+        "required": ["username"]
       }
     },
     {
       "name": "record_engagement",
       "description": "Record member engagement activity",
       "parameters": {
-        "username": { "type": "string", "required": true },
-        "engagement_type": { "type": "string", "required": true, "enum": ["post", "comment", "reaction", "share", "mention"] },
-        "content_id": { "type": "string", "required": false }
+        "type": "object",
+        "properties": {
+          "username": { "type": "string", "description": "The username of the member" },
+          "engagement_type": { "type": "string", "description": "The type of engagement", "enum": ["post", "comment", "reaction", "share", "mention"] },
+          "content_id": { "type": "string", "description": "Optional content ID for the engagement" }
+        },
+        "required": ["username", "engagement_type"]
       }
     },
     {
       "name": "get_community_health",
       "description": "Get overall community health metrics",
-      "parameters": {}
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
     },
     {
       "name": "identify_champions",
       "description": "Identify top community champions",
       "parameters": {
-        "limit": { "type": "integer", "required": false, "default": 10 }
+        "type": "object",
+        "properties": {
+          "limit": { "type": "integer", "description": "Number of champions to return (default: 10)" }
+        },
+        "required": []
       }
     },
     {
       "name": "create_campaign",
       "description": "Create a community campaign",
       "parameters": {
-        "name": { "type": "string", "required": true },
-        "goal": { "type": "string", "required": true },
-        "duration_days": { "type": "integer", "required": false, "default": 30 }
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "description": "The name of the campaign" },
+          "goal": { "type": "string", "description": "The goal of the campaign" },
+          "duration_days": { "type": "integer", "description": "Duration in days (default: 30)" }
+        },
+        "required": ["name", "goal"]
       }
     },
     {
       "name": "get_growth_strategies",
       "description": "Get community growth strategies",
       "parameters": {
-        "current_size": { "type": "integer", "required": false }
+        "type": "object",
+        "properties": {
+          "current_size": { "type": "integer", "description": "Current community size" }
+        },
+        "required": []
       }
     },
     {
       "name": "generate_content_calendar",
       "description": "Generate a content calendar",
       "parameters": {
-        "days": { "type": "integer", "required": false, "default": 7 },
-        "posts_per_day": { "type": "integer", "required": false, "default": 2 }
+        "type": "object",
+        "properties": {
+          "days": { "type": "integer", "description": "Number of days to generate (default: 7)" },
+          "posts_per_day": { "type": "integer", "description": "Posts per day (default: 2)" }
+        },
+        "required": []
       }
     }
-  ]
+  ],
+  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py community {{tool}} '{{args_json}}'"
 }

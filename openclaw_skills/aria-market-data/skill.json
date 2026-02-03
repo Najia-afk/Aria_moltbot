@@ -1,63 +1,79 @@
 {
-  "skill": "aria-market-data",
+  "name": "aria-market-data",
   "version": "1.0.0",
   "description": "📈 Cryptocurrency market data and analysis for Crypto Trader",
-  "focus": "Crypto Trader",
   "author": "Aria Blue",
-  "enabled": true,
-  "rate_limit": {
-    "requests_per_minute": 60,
-    "burst": 20
-  },
-  "config": {
-    "default_pairs": ["BTC/USDT", "ETH/USDT", "SOL/USDT"]
-  },
-  "functions": [
+  "tools": [
     {
       "name": "get_price",
       "description": "Get current price for a trading pair",
       "parameters": {
-        "symbol": { "type": "string", "required": true }
+        "type": "object",
+        "properties": {
+          "symbol": { "type": "string", "description": "The trading pair symbol (e.g., BTC/USDT)" }
+        },
+        "required": ["symbol"]
       }
     },
     {
       "name": "get_ohlcv",
       "description": "Get OHLCV candlestick data",
       "parameters": {
-        "symbol": { "type": "string", "required": true },
-        "timeframe": { "type": "string", "required": false, "default": "1h" },
-        "limit": { "type": "integer", "required": false, "default": 24 }
+        "type": "object",
+        "properties": {
+          "symbol": { "type": "string", "description": "The trading pair symbol" },
+          "timeframe": { "type": "string", "description": "The timeframe (default: 1h)" },
+          "limit": { "type": "integer", "description": "Number of candles to return (default: 24)" }
+        },
+        "required": ["symbol"]
       }
     },
     {
       "name": "calculate_indicators",
       "description": "Calculate technical indicators",
       "parameters": {
-        "symbol": { "type": "string", "required": true },
-        "indicators": { "type": "array", "required": true },
-        "timeframe": { "type": "string", "required": false, "default": "1h" }
+        "type": "object",
+        "properties": {
+          "symbol": { "type": "string", "description": "The trading pair symbol" },
+          "indicators": { "type": "array", "description": "List of indicators to calculate" },
+          "timeframe": { "type": "string", "description": "The timeframe (default: 1h)" }
+        },
+        "required": ["symbol", "indicators"]
       }
     },
     {
       "name": "analyze_sentiment",
       "description": "Analyze market sentiment for a symbol",
       "parameters": {
-        "symbol": { "type": "string", "required": true }
+        "type": "object",
+        "properties": {
+          "symbol": { "type": "string", "description": "The trading pair symbol" }
+        },
+        "required": ["symbol"]
       }
     },
     {
       "name": "set_alert",
       "description": "Set a price alert",
       "parameters": {
-        "symbol": { "type": "string", "required": true },
-        "condition": { "type": "string", "required": true, "enum": ["above", "below", "cross"] },
-        "value": { "type": "number", "required": true }
+        "type": "object",
+        "properties": {
+          "symbol": { "type": "string", "description": "The trading pair symbol" },
+          "condition": { "type": "string", "description": "The alert condition", "enum": ["above", "below", "cross"] },
+          "value": { "type": "number", "description": "The price value for the alert" }
+        },
+        "required": ["symbol", "condition", "value"]
       }
     },
     {
       "name": "get_market_overview",
       "description": "Get overall market overview",
-      "parameters": {}
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
     }
-  ]
+  ],
+  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py market_data {{tool}} '{{args_json}}'"
 }

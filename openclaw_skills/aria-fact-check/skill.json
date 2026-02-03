@@ -1,52 +1,66 @@
 {
-  "skill": "aria-fact-check",
+  "name": "aria-fact-check",
   "version": "1.0.0",
   "description": "🔍 Fact-checking and claim verification for Journalist",
-  "focus": "Journalist",
   "author": "Aria Blue",
-  "enabled": true,
-  "rate_limit": {
-    "requests_per_minute": 15,
-    "burst": 5
-  },
-  "config": {},
-  "functions": [
+  "tools": [
     {
       "name": "extract_claims",
       "description": "Extract checkable claims from text",
       "parameters": {
-        "text": { "type": "string", "required": true }
+        "type": "object",
+        "properties": {
+          "text": { "type": "string", "description": "The text to extract claims from" }
+        },
+        "required": ["text"]
       }
     },
     {
       "name": "assess_claim",
       "description": "Assess a claim and generate verdict",
       "parameters": {
-        "claim_id": { "type": "string", "required": true },
-        "evidence": { "type": "array", "required": false }
+        "type": "object",
+        "properties": {
+          "claim_id": { "type": "string", "description": "The claim ID to assess" },
+          "evidence": { "type": "array", "description": "Optional evidence to consider" }
+        },
+        "required": ["claim_id"]
       }
     },
     {
       "name": "quick_check",
       "description": "Quick assessment of a claim's characteristics",
       "parameters": {
-        "claim_text": { "type": "string", "required": true }
+        "type": "object",
+        "properties": {
+          "claim_text": { "type": "string", "description": "The claim text to check" }
+        },
+        "required": ["claim_text"]
       }
     },
     {
       "name": "compare_sources",
       "description": "Compare how different sources report a claim",
       "parameters": {
-        "claim_text": { "type": "string", "required": true },
-        "sources": { "type": "array", "required": true }
+        "type": "object",
+        "properties": {
+          "claim_text": { "type": "string", "description": "The claim text to compare" },
+          "sources": { "type": "array", "description": "The sources to compare" }
+        },
+        "required": ["claim_text", "sources"]
       }
     },
     {
       "name": "get_verdict_summary",
       "description": "Get summary of verdicts",
       "parameters": {
-        "claim_ids": { "type": "array", "required": false }
+        "type": "object",
+        "properties": {
+          "claim_ids": { "type": "array", "description": "Optional list of claim IDs to summarize" }
+        },
+        "required": []
       }
     }
-  ]
+  ],
+  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py fact_check {{tool}} '{{args_json}}'"
 }

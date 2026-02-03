@@ -163,6 +163,12 @@ SKILL_REGISTRY = {
             'moltbook': os.environ.get('MOLTBOOK_TOKEN')
         }
     }),
+    
+    # === API Client Skill (v1.2) ===
+    'api_client': ('aria_skills.api_client', 'AriaAPIClient', lambda: {
+        'api_url': os.environ.get('ARIA_API_URL', 'http://aria-api:8000/api'),
+        'timeout': int(os.environ.get('ARIA_API_TIMEOUT', '30'))
+    }),
 }
 
 async def run_skill(skill_name: str, function_name: str, args: dict):
@@ -288,7 +294,10 @@ cat > /root/.openclaw/openclaw.json << EOF
       "aria-brainstorm": { "enabled": true },
       "aria-research": { "enabled": true },
       "aria-fact-check": { "enabled": true },
-      "aria-community": { "enabled": true }
+      "aria-community": { "enabled": true },
+      "aria-llm": { "enabled": true },
+      "aria-knowledge-graph": { "enabled": true },
+      "aria-api-client": { "enabled": true }
     }
   },
   "gateway": {

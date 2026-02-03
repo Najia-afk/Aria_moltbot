@@ -1,71 +1,93 @@
 {
-  "skill": "aria-brainstorm",
+  "name": "aria-brainstorm",
   "version": "1.0.0",
   "description": "🎨 Creative brainstorming and ideation for Creative Adventurer",
-  "focus": "Creative",
   "author": "Aria Blue",
-  "enabled": true,
-  "rate_limit": {
-    "requests_per_minute": 20,
-    "burst": 10
-  },
-  "config": {},
-  "functions": [
+  "tools": [
     {
       "name": "start_session",
       "description": "Start a new brainstorming session",
       "parameters": {
-        "topic": { "type": "string", "required": true },
-        "constraints": { "type": "array", "required": false }
+        "type": "object",
+        "properties": {
+          "topic": { "type": "string", "description": "The topic for the brainstorming session" },
+          "constraints": { "type": "array", "description": "Optional constraints for the session" }
+        },
+        "required": ["topic"]
       }
     },
     {
       "name": "add_idea",
       "description": "Add an idea to a session",
       "parameters": {
-        "session_id": { "type": "string", "required": true },
-        "title": { "type": "string", "required": true },
-        "description": { "type": "string", "required": true },
-        "tags": { "type": "array", "required": false }
+        "type": "object",
+        "properties": {
+          "session_id": { "type": "string", "description": "The session ID to add the idea to" },
+          "title": { "type": "string", "description": "The title of the idea" },
+          "description": { "type": "string", "description": "The description of the idea" },
+          "tags": { "type": "array", "description": "Optional tags for the idea" }
+        },
+        "required": ["session_id", "title", "description"]
       }
     },
     {
       "name": "apply_technique",
       "description": "Apply a brainstorming technique",
       "parameters": {
-        "session_id": { "type": "string", "required": true },
-        "technique": { "type": "string", "required": true, "enum": ["scamper", "six_hats", "random_word", "worst_idea"] }
+        "type": "object",
+        "properties": {
+          "session_id": { "type": "string", "description": "The session ID to apply the technique to" },
+          "technique": { "type": "string", "description": "The technique to apply", "enum": ["scamper", "six_hats", "random_word", "worst_idea"] }
+        },
+        "required": ["session_id", "technique"]
       }
     },
     {
       "name": "get_random_prompt",
       "description": "Get a random creative prompt",
       "parameters": {
-        "category": { "type": "string", "required": false, "enum": ["tech", "content", "business", "design"] }
+        "type": "object",
+        "properties": {
+          "category": { "type": "string", "description": "Optional category for the prompt", "enum": ["tech", "content", "business", "design"] }
+        },
+        "required": []
       }
     },
     {
       "name": "connect_ideas",
       "description": "Find connections between ideas",
       "parameters": {
-        "session_id": { "type": "string", "required": true },
-        "idea_ids": { "type": "array", "required": false }
+        "type": "object",
+        "properties": {
+          "session_id": { "type": "string", "description": "The session ID to find connections in" },
+          "idea_ids": { "type": "array", "description": "Optional list of specific idea IDs to connect" }
+        },
+        "required": ["session_id"]
       }
     },
     {
       "name": "evaluate_ideas",
       "description": "Evaluate and rank ideas",
       "parameters": {
-        "session_id": { "type": "string", "required": true },
-        "criteria": { "type": "array", "required": false }
+        "type": "object",
+        "properties": {
+          "session_id": { "type": "string", "description": "The session ID to evaluate ideas from" },
+          "criteria": { "type": "array", "description": "Optional evaluation criteria" }
+        },
+        "required": ["session_id"]
       }
     },
     {
       "name": "summarize_session",
       "description": "Get a summary of a brainstorming session",
       "parameters": {
-        "session_id": { "type": "string", "required": true }
+        "type": "object",
+        "properties": {
+          "session_id": { "type": "string", "description": "The session ID to summarize" }
+        },
+        "required": ["session_id"]
       }
     }
-  ]
+  ],
+  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py brainstorm {{tool}} '{{args_json}}'"
 }

@@ -1,285 +1,597 @@
 {
   "name": "aria-api-client",
-  "class": "AriaAPIClient",
-  "module": "aria_skills.api_client",
-  "description": "Centralized HTTP client for all aria-api interactions. Skills should use this instead of direct database access.",
-  "env_requirements": [
-    "ARIA_API_URL"
-  ],
-  "config_schema": {
-    "api_url": {
-      "type": "string",
-      "description": "Base URL for aria-api",
-      "default": "http://aria-api:8000/api"
-    },
-    "timeout": {
-      "type": "integer",
-      "description": "Request timeout in seconds",
-      "default": 30
-    }
-  },
-  "methods": [
+  "version": "1.0.0",
+  "description": "Centralized HTTP client for all aria-api interactions. Use for activities, thoughts, memories, goals, knowledge graph, social posts, heartbeats, performance logs, and tasks.",
+  "author": "Aria Team",
+  "tools": [
     {
       "name": "get_activities",
-      "description": "Get recent activities",
+      "description": "Get recent activities from the activity log.",
       "parameters": {
-        "limit": { "type": "integer", "default": 100 }
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "description": "Maximum number of activities to return (default: 100)"
+          }
+        }
       }
     },
     {
       "name": "create_activity",
-      "description": "Log an activity",
+      "description": "Log an activity to the activity log.",
       "parameters": {
-        "action": { "type": "string", "required": true },
-        "skill": { "type": "string" },
-        "details": { "type": "object" },
-        "success": { "type": "boolean", "default": true },
-        "error_message": { "type": "string" }
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "The action performed"
+          },
+          "skill": {
+            "type": "string",
+            "description": "Skill that performed the action"
+          },
+          "details": {
+            "type": "object",
+            "description": "Additional details as JSON"
+          },
+          "success": {
+            "type": "boolean",
+            "description": "Whether the action succeeded (default: true)"
+          },
+          "error_message": {
+            "type": "string",
+            "description": "Error message if action failed"
+          }
+        },
+        "required": ["action"]
       }
     },
     {
       "name": "get_thoughts",
-      "description": "Get recent thoughts",
+      "description": "Get recent thoughts.",
       "parameters": {
-        "limit": { "type": "integer", "default": 100 }
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "description": "Maximum number of thoughts to return (default: 100)"
+          }
+        }
       }
     },
     {
       "name": "create_thought",
-      "description": "Create a thought",
+      "description": "Create a new thought.",
       "parameters": {
-        "content": { "type": "string", "required": true },
-        "category": { "type": "string", "default": "general" },
-        "metadata": { "type": "object" }
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "The thought content"
+          },
+          "category": {
+            "type": "string",
+            "description": "Thought category (default: general)"
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Additional metadata"
+          }
+        },
+        "required": ["content"]
       }
     },
     {
       "name": "get_memories",
-      "description": "Get memories",
+      "description": "Get memories, optionally filtered by category.",
       "parameters": {
-        "limit": { "type": "integer", "default": 100 },
-        "category": { "type": "string" }
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "description": "Maximum number of memories (default: 100)"
+          },
+          "category": {
+            "type": "string",
+            "description": "Filter by category"
+          }
+        }
       }
     },
     {
       "name": "get_memory",
-      "description": "Get a specific memory by key",
+      "description": "Get a specific memory by key.",
       "parameters": {
-        "key": { "type": "string", "required": true }
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "The memory key"
+          }
+        },
+        "required": ["key"]
       }
     },
     {
       "name": "set_memory",
-      "description": "Create or update a memory",
+      "description": "Create or update a memory.",
       "parameters": {
-        "key": { "type": "string", "required": true },
-        "value": { "type": "any", "required": true },
-        "category": { "type": "string", "default": "general" }
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "The memory key"
+          },
+          "value": {
+            "type": "string",
+            "description": "The memory value (can be JSON string)"
+          },
+          "category": {
+            "type": "string",
+            "description": "Memory category (default: general)"
+          }
+        },
+        "required": ["key", "value"]
       }
     },
     {
       "name": "delete_memory",
-      "description": "Delete a memory",
+      "description": "Delete a memory by key.",
       "parameters": {
-        "key": { "type": "string", "required": true }
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "The memory key to delete"
+          }
+        },
+        "required": ["key"]
       }
     },
     {
       "name": "get_goals",
-      "description": "Get goals",
+      "description": "Get goals, optionally filtered by status.",
       "parameters": {
-        "limit": { "type": "integer", "default": 100 },
-        "status": { "type": "string" }
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "description": "Maximum number of goals (default: 100)"
+          },
+          "status": {
+            "type": "string",
+            "description": "Filter by status (pending, in_progress, completed)"
+          }
+        }
       }
     },
     {
       "name": "create_goal",
-      "description": "Create a goal",
+      "description": "Create a new goal.",
       "parameters": {
-        "title": { "type": "string", "required": true },
-        "description": { "type": "string" },
-        "priority": { "type": "integer", "default": 2 },
-        "status": { "type": "string", "default": "pending" },
-        "due_date": { "type": "string" },
-        "goal_id": { "type": "string" }
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Goal title"
+          },
+          "description": {
+            "type": "string",
+            "description": "Goal description"
+          },
+          "priority": {
+            "type": "integer",
+            "description": "Priority level (1-5, default: 2)"
+          },
+          "status": {
+            "type": "string",
+            "description": "Initial status (default: pending)"
+          },
+          "due_date": {
+            "type": "string",
+            "description": "Due date in ISO format"
+          }
+        },
+        "required": ["title"]
       }
     },
     {
       "name": "update_goal",
-      "description": "Update a goal",
+      "description": "Update an existing goal.",
       "parameters": {
-        "goal_id": { "type": "string", "required": true },
-        "status": { "type": "string" },
-        "progress": { "type": "integer" },
-        "priority": { "type": "integer" }
+        "type": "object",
+        "properties": {
+          "goal_id": {
+            "type": "string",
+            "description": "The goal ID to update"
+          },
+          "status": {
+            "type": "string",
+            "description": "New status"
+          },
+          "progress": {
+            "type": "integer",
+            "description": "Progress percentage (0-100)"
+          },
+          "priority": {
+            "type": "integer",
+            "description": "New priority level"
+          }
+        },
+        "required": ["goal_id"]
       }
     },
     {
       "name": "delete_goal",
-      "description": "Delete a goal",
+      "description": "Delete a goal.",
       "parameters": {
-        "goal_id": { "type": "string", "required": true }
+        "type": "object",
+        "properties": {
+          "goal_id": {
+            "type": "string",
+            "description": "The goal ID to delete"
+          }
+        },
+        "required": ["goal_id"]
       }
     },
     {
       "name": "get_hourly_goals",
-      "description": "Get hourly goals",
+      "description": "Get hourly goals for the current day.",
       "parameters": {
-        "status": { "type": "string" }
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Filter by status"
+          }
+        }
       }
     },
     {
       "name": "create_hourly_goal",
-      "description": "Create an hourly goal",
+      "description": "Create an hourly goal.",
       "parameters": {
-        "hour_slot": { "type": "integer", "required": true },
-        "goal_type": { "type": "string", "required": true },
-        "description": { "type": "string", "required": true },
-        "status": { "type": "string", "default": "pending" }
+        "type": "object",
+        "properties": {
+          "hour_slot": {
+            "type": "integer",
+            "description": "Hour slot (0-23)"
+          },
+          "goal_type": {
+            "type": "string",
+            "description": "Type of goal"
+          },
+          "description": {
+            "type": "string",
+            "description": "Goal description"
+          },
+          "status": {
+            "type": "string",
+            "description": "Initial status (default: pending)"
+          }
+        },
+        "required": ["hour_slot", "goal_type", "description"]
       }
     },
     {
       "name": "update_hourly_goal",
-      "description": "Update an hourly goal status",
+      "description": "Update an hourly goal status.",
       "parameters": {
-        "goal_id": { "type": "integer", "required": true },
-        "status": { "type": "string", "required": true }
+        "type": "object",
+        "properties": {
+          "goal_id": {
+            "type": "integer",
+            "description": "The hourly goal ID"
+          },
+          "status": {
+            "type": "string",
+            "description": "New status"
+          }
+        },
+        "required": ["goal_id", "status"]
       }
     },
     {
       "name": "get_knowledge_graph",
-      "description": "Get full knowledge graph"
+      "description": "Get the full knowledge graph with entities and relations.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
     },
     {
       "name": "get_entities",
-      "description": "Get knowledge entities",
+      "description": "Get knowledge graph entities.",
       "parameters": {
-        "limit": { "type": "integer", "default": 100 },
-        "entity_type": { "type": "string" }
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "description": "Maximum entities (default: 100)"
+          },
+          "entity_type": {
+            "type": "string",
+            "description": "Filter by entity type"
+          }
+        }
       }
     },
     {
       "name": "create_entity",
-      "description": "Create a knowledge entity",
+      "description": "Create a knowledge graph entity.",
       "parameters": {
-        "name": { "type": "string", "required": true },
-        "entity_type": { "type": "string", "required": true },
-        "properties": { "type": "object" }
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Entity name"
+          },
+          "entity_type": {
+            "type": "string",
+            "description": "Entity type (person, place, concept, etc.)"
+          },
+          "properties": {
+            "type": "object",
+            "description": "Additional properties"
+          }
+        },
+        "required": ["name", "entity_type"]
       }
     },
     {
       "name": "create_relation",
-      "description": "Create a knowledge relation",
+      "description": "Create a relation between entities.",
       "parameters": {
-        "from_entity": { "type": "string", "required": true },
-        "to_entity": { "type": "string", "required": true },
-        "relation_type": { "type": "string", "required": true },
-        "properties": { "type": "object" }
+        "type": "object",
+        "properties": {
+          "from_entity": {
+            "type": "string",
+            "description": "Source entity name"
+          },
+          "to_entity": {
+            "type": "string",
+            "description": "Target entity name"
+          },
+          "relation_type": {
+            "type": "string",
+            "description": "Type of relation"
+          },
+          "properties": {
+            "type": "object",
+            "description": "Relation properties"
+          }
+        },
+        "required": ["from_entity", "to_entity", "relation_type"]
       }
     },
     {
       "name": "get_social_posts",
-      "description": "Get social posts",
+      "description": "Get social posts.",
       "parameters": {
-        "limit": { "type": "integer", "default": 50 },
-        "platform": { "type": "string" }
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "description": "Maximum posts (default: 50)"
+          },
+          "platform": {
+            "type": "string",
+            "description": "Filter by platform"
+          }
+        }
       }
     },
     {
       "name": "create_social_post",
-      "description": "Create a social post",
+      "description": "Create a social post.",
       "parameters": {
-        "content": { "type": "string", "required": true },
-        "platform": { "type": "string", "default": "moltbook" },
-        "visibility": { "type": "string", "default": "public" },
-        "post_id": { "type": "string" },
-        "reply_to": { "type": "string" },
-        "url": { "type": "string" },
-        "metadata": { "type": "object" }
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "Post content"
+          },
+          "platform": {
+            "type": "string",
+            "description": "Platform (default: moltbook)"
+          },
+          "visibility": {
+            "type": "string",
+            "description": "Visibility (default: public)"
+          },
+          "reply_to": {
+            "type": "string",
+            "description": "ID of post to reply to"
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Additional metadata"
+          }
+        },
+        "required": ["content"]
       }
     },
     {
       "name": "get_heartbeats",
-      "description": "Get heartbeat logs",
+      "description": "Get heartbeat logs.",
       "parameters": {
-        "limit": { "type": "integer", "default": 50 }
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "description": "Maximum heartbeats (default: 50)"
+          }
+        }
       }
     },
     {
       "name": "get_latest_heartbeat",
-      "description": "Get latest heartbeat"
+      "description": "Get the most recent heartbeat.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
     },
     {
       "name": "create_heartbeat",
-      "description": "Log a heartbeat",
+      "description": "Log a heartbeat.",
       "parameters": {
-        "beat_number": { "type": "integer", "default": 0 },
-        "status": { "type": "string", "default": "healthy" },
-        "details": { "type": "object" }
+        "type": "object",
+        "properties": {
+          "beat_number": {
+            "type": "integer",
+            "description": "Beat sequence number"
+          },
+          "status": {
+            "type": "string",
+            "description": "Health status (default: healthy)"
+          },
+          "details": {
+            "type": "object",
+            "description": "Additional details"
+          }
+        }
       }
     },
     {
       "name": "get_performance_logs",
-      "description": "Get performance logs",
+      "description": "Get performance review logs.",
       "parameters": {
-        "limit": { "type": "integer", "default": 50 }
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "description": "Maximum logs (default: 50)"
+          }
+        }
       }
     },
     {
       "name": "create_performance_log",
-      "description": "Create a performance log",
+      "description": "Create a performance review log.",
       "parameters": {
-        "review_period": { "type": "string", "required": true },
-        "successes": { "type": "string" },
-        "failures": { "type": "string" },
-        "improvements": { "type": "string" }
+        "type": "object",
+        "properties": {
+          "review_period": {
+            "type": "string",
+            "description": "Period being reviewed"
+          },
+          "successes": {
+            "type": "string",
+            "description": "Summary of successes"
+          },
+          "failures": {
+            "type": "string",
+            "description": "Summary of failures"
+          },
+          "improvements": {
+            "type": "string",
+            "description": "Suggested improvements"
+          }
+        },
+        "required": ["review_period"]
       }
     },
     {
       "name": "get_tasks",
-      "description": "Get pending complex tasks",
+      "description": "Get pending complex tasks.",
       "parameters": {
-        "status": { "type": "string" }
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Filter by status"
+          }
+        }
       }
     },
     {
       "name": "create_task",
-      "description": "Create a pending complex task",
+      "description": "Create a pending complex task.",
       "parameters": {
-        "task_type": { "type": "string", "required": true },
-        "description": { "type": "string", "required": true },
-        "agent_type": { "type": "string", "required": true },
-        "priority": { "type": "string", "default": "medium" },
-        "task_id": { "type": "string" }
+        "type": "object",
+        "properties": {
+          "task_type": {
+            "type": "string",
+            "description": "Type of task"
+          },
+          "description": {
+            "type": "string",
+            "description": "Task description"
+          },
+          "agent_type": {
+            "type": "string",
+            "description": "Agent to handle the task"
+          },
+          "priority": {
+            "type": "string",
+            "description": "Priority (low, medium, high)"
+          }
+        },
+        "required": ["task_type", "description", "agent_type"]
       }
     },
     {
       "name": "update_task",
-      "description": "Update a task status",
+      "description": "Update a task status.",
       "parameters": {
-        "task_id": { "type": "string", "required": true },
-        "status": { "type": "string", "required": true },
-        "result": { "type": "string" }
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "The task ID"
+          },
+          "status": {
+            "type": "string",
+            "description": "New status"
+          },
+          "result": {
+            "type": "string",
+            "description": "Task result"
+          }
+        },
+        "required": ["task_id", "status"]
       }
     },
     {
       "name": "get_schedule",
-      "description": "Get schedule tick status"
+      "description": "Get the schedule tick status.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
     },
     {
       "name": "trigger_schedule_tick",
-      "description": "Trigger a manual schedule tick"
+      "description": "Trigger a manual schedule tick.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
     },
     {
       "name": "get_jobs",
-      "description": "Get scheduled jobs",
+      "description": "Get scheduled jobs.",
       "parameters": {
-        "live": { "type": "boolean", "default": false }
+        "type": "object",
+        "properties": {
+          "live": {
+            "type": "boolean",
+            "description": "Include live job status (default: false)"
+          }
+        }
       }
     },
     {
       "name": "sync_jobs",
-      "description": "Sync jobs from OpenClaw"
+      "description": "Sync jobs from OpenClaw scheduler.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
     }
-  ]
+  ],
+  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py api_client {{tool}} '{{args_json}}'"
 }
