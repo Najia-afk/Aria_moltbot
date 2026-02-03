@@ -97,6 +97,8 @@ services:
       - aria-net
     mem_limit: ${CLAWDBOT_MEM_LIMIT?CLAWDBOT_MEM_LIMIT is required}
     cpus: ${CLAWDBOT_CPU_LIMIT?CLAWDBOT_CPU_LIMIT is required}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   # Tor Proxy for privacy
   tor-proxy:
@@ -184,6 +186,8 @@ services:
       - aria-net
     mem_limit: ${LITELLM_MEM_LIMIT?LITELLM_MEM_LIMIT is required}
     cpus: ${LITELLM_CPU_LIMIT?LITELLM_CPU_LIMIT is required}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   # NOTE: Ollama runs NATIVELY on macOS for Metal GPU acceleration (~20 tok/s)
   # Start with: OLLAMA_HOST=0.0.0.0:11434 ollama serve
@@ -325,7 +329,7 @@ services:
       GRAFANA_URL: http://grafana:3000
       PROMETHEUS_URL: http://prometheus:9090
       OLLAMA_URL: http://host.docker.internal:11434
-      MLX_URL: http://192.168.1.53:8080
+      MLX_URL: http://host.docker.internal:8080
       LITELLM_URL: http://litellm:4000
       CLAWDBOT_URL: http://clawdbot:18789
       PGADMIN_URL: http://aria-pgadmin:80
@@ -353,6 +357,8 @@ services:
       retries: 10
     mem_limit: ${ARIA_API_MEM_LIMIT?ARIA_API_MEM_LIMIT is required}
     cpus: ${ARIA_API_CPU_LIMIT?ARIA_API_CPU_LIMIT is required}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 volumes:
   aria_pg_data:
