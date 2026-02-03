@@ -1,0 +1,765 @@
+# Aria Complete Development Reference
+
+> **Version 1.2** | Last Updated: February 3, 2026  
+> Master reference for Aria's architecture, skills, agents, and deployment.
+
+---
+
+## Table of Contents
+
+1. [System Overview](#1-system-overview)
+2. [Focus System (7 Personas)](#2-focus-system-7-personas)
+3. [Skills Reference](#3-skills-reference)
+4. [Creating New Skills](#4-creating-new-skills)
+5. [Agent Architecture](#5-agent-architecture)
+6. [Mind Architecture](#6-mind-architecture)
+7. [Docker Infrastructure](#7-docker-infrastructure)
+8. [LLM Models](#8-llm-models)
+9. [Database Schema](#9-database-schema)
+10. [Deployment Guide](#10-deployment-guide)
+
+---
+
+## 1. System Overview
+
+Aria is a **distributed cognitive architecture** with a **Focus-based persona system**:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                          AriaMind                                    │
+│  ┌─────────────────────────────────────────────────────────────────┐│
+│  │                    Soul (Core Identity)                          ││
+│  │  ┌──────────┐  ┌────────┐  ┌──────────┐  ┌────────────────────┐││
+│  │  │ Identity │  │ Values │  │Boundaries│  │  Focus (Persona)   │││
+│  │  │ (immut.) │  │(immut.)│  │ (immut.) │  │ 🎯🔒📊📈🎨🌐📰   │││
+│  │  └──────────┘  └────────┘  └──────────┘  └────────────────────┘││
+│  └─────────────────────────────────────────────────────────────────┘│
+│  ┌─────────────┐  ┌─────────────┐  ┌────────────┐                   │
+│  │  Cognition  │  │   Memory    │  │  Heartbeat │                   │
+│  │ (Processing)│  │(Short/Long) │  │ (Schedule) │                   │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬─────┘                   │
+│         └────────────────┼────────────────┘                          │
+│                          ▼                                           │
+│  ┌──────────────────────────────────────────────────────────────┐   │
+│  │               AgentCoordinator (Focus-mapped)                 │   │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐     │   │
+│  │  │   aria   │  │  devops  │  │ analyst  │  │ creator  │     │   │
+│  │  │ 🎯 Orch. │  │ 🔒 Sec.  │  │ 📊 Data  │  │ 🌐 Social│     │   │
+│  │  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘     │   │
+│  │       └─────────────┴─────────────┴─────────────┘             │   │
+│  └──────────────────────────────────────────────────────────────┘   │
+│                             │                                        │
+│  ┌──────────────────────────┼───────────────────────────────────┐   │
+│  │                  SkillRegistry (21 Skills)                    │   │
+│  │  ┌──────┐  ┌────────┐  ┌────────┐  ┌───────┐  ┌──────────┐  │   │
+│  │  │ llm  │  │database│  │security│  │market │  │brainstorm│  │   │
+│  │  └──────┘  └────────┘  └────────┘  └───────┘  └──────────┘  │   │
+│  └──────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Component Locations
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| **AriaMind** | `aria_mind/` | Main cognitive container |
+| **Soul** | `aria_mind/soul/` | Identity, values, boundaries, focus |
+| **Focus** | `aria_mind/soul/focus.py` | Specialized persona overlays |
+| **Cognition** | `aria_mind/cognition.py` | Request processing, reasoning |
+| **Memory** | `aria_mind/memory.py` | Short-term and long-term storage |
+| **Heartbeat** | `aria_mind/heartbeat.py` | Health monitoring, scheduling |
+| **AgentCoordinator** | `aria_agents/coordinator.py` | Multi-agent orchestration |
+| **Skills** | `aria_skills/` | Tool implementations (21 skills) |
+| **OpenClaw Manifests** | `openclaw_skills/` | Skill definitions for LLM |
+| **Entrypoint** | `stacks/brain/openclaw-entrypoint.sh` | Dynamic skill runner |
+
+---
+
+## 2. Focus System (7 Personas)
+
+Aria has 7 specialized **focuses** (personas) that enhance her core identity:
+
+### Focus Reference Table
+
+| Focus | Emoji | Vibe | Primary Model | Skills |
+|-------|-------|------|---------------|--------|
+| **Orchestrator** | 🎯 | Meta-cognitive, strategic | `qwen3-mlx` | goals, schedule, health |
+| **DevSecOps** | 🔒 | Security-paranoid, precise | `qwen3-coder-free` | security_scan, ci_cd, pytest_runner, database |
+| **Data Architect** | 📊 | Analytical, metrics-driven | `chimera-free` | data_pipeline, experiment, knowledge_graph, performance |
+| **Crypto Trader** | 📈 | Risk-aware, disciplined | `deepseek-free` | market_data, portfolio, database, schedule |
+| **Creative** | 🎨 | Exploratory, playful | `trinity-free` | brainstorm, llm, moltbook |
+| **Social Architect** | 🌐 | Community-building | `trinity-free` | community, moltbook, social, schedule |
+| **Journalist** | 📰 | Investigative, thorough | `qwen3-next-free` | research, fact_check, knowledge_graph, social |
+
+### Focus Rules
+
+1. **Additive**: Focuses ADD traits, never REPLACE core identity
+2. **Default**: Orchestrator 🎯 is the default focus
+3. **Immutable Core**: Values and boundaries never change with focus
+4. **Auto-Selection**: Focus selected based on task keywords
+
+### Focus → Agent Mapping
+
+| Focus | Agent | Handles |
+|-------|-------|---------|
+| Orchestrator | aria | Coordination, delegation |
+| DevSecOps | devops | Code, security, tests |
+| Data + Trader | analyst | Analysis, metrics, trading |
+| Creative + Social + Journalist | creator | Content, community |
+
+### Using Focus in Code
+
+```python
+from aria_mind.soul import Soul, FocusType
+
+soul = Soul()
+await soul.load()
+
+# Set focus explicitly
+soul.set_focus(FocusType.DEVSECOPS)
+
+# Auto-select based on keywords
+focus_type = soul.focus.get_focus_for_task(["code", "security", "test"])
+soul.set_focus(focus_type)
+
+# Get current focus info
+print(soul.active_focus.name)   # "DevSecOps"
+print(soul.active_focus.emoji)  # "🔒"
+print(soul.active_focus.skills) # ["security_scan", "ci_cd", ...]
+```
+
+---
+
+## 3. Skills Reference
+
+### Complete Skill Registry (21 Skills)
+
+#### Core Skills (v1.0)
+
+| Skill | Module | Class | Purpose |
+|-------|--------|-------|---------|
+| `database` | `aria_skills.database` | `DatabaseSkill` | PostgreSQL queries |
+| `moltbook` | `aria_skills.moltbook` | `MoltbookSkill` | Social platform posting |
+| `health` | `aria_skills.health` | `HealthSkill` | System monitoring |
+| `llm` | `aria_skills.llm` | `LLMSkill` | Local LLM calls |
+| `knowledge_graph` | `aria_skills.knowledge_graph` | `KnowledgeGraphSkill` | Entity relationships |
+| `goals` | `aria_skills.goals` | `GoalSkill` | Task scheduling |
+| `pytest` | `aria_skills.pytest_runner` | `PytestSkill` | Test execution |
+| `model_switcher` | `aria_skills.model_switcher` | `ModelSwitcherSkill` | LLM model selection |
+
+#### Social & Communication Skills (v1.1)
+
+| Skill | Module | Class | Purpose |
+|-------|--------|-------|---------|
+| `performance` | `aria_skills.performance` | `PerformanceSkill` | Metrics, analytics |
+| `social` | `aria_skills.social` | `SocialSkill` | Telegram, Discord |
+| `hourly_goals` | `aria_skills.hourly_goals` | `HourlyGoalSkill` | Short-term goals |
+| `litellm` | `aria_skills.litellm_skill` | `LiteLLMSkill` | LiteLLM management |
+| `schedule` | `aria_skills.schedule` | `ScheduleSkill` | Job scheduling |
+
+#### DevSecOps Skills (v1.2)
+
+| Skill | Module | Class | Purpose |
+|-------|--------|-------|---------|
+| `security_scan` | `aria_skills.security_scan` | `SecurityScanSkill` | Vulnerability scanning, SAST, secret detection |
+| `ci_cd` | `aria_skills.ci_cd` | `CICDSkill` | GitHub Actions, Dockerfile generation |
+
+#### Data & ML Skills (v1.2)
+
+| Skill | Module | Class | Purpose |
+|-------|--------|-------|---------|
+| `data_pipeline` | `aria_skills.data_pipeline` | `DataPipelineSkill` | ETL, validation, schema inference |
+| `experiment` | `aria_skills.experiment` | `ExperimentSkill` | ML experiment tracking, model registry |
+
+#### Crypto Trading Skills (v1.2)
+
+| Skill | Module | Class | Purpose |
+|-------|--------|-------|---------|
+| `market_data` | `aria_skills.market_data` | `MarketDataSkill` | Price feeds, technical indicators |
+| `portfolio` | `aria_skills.portfolio` | `PortfolioSkill` | Position tracking, P&L, risk metrics |
+
+#### Creative Skills (v1.2)
+
+| Skill | Module | Class | Purpose |
+|-------|--------|-------|---------|
+| `brainstorm` | `aria_skills.brainstorm` | `BrainstormSkill` | Ideation (SCAMPER, Six Hats, Mind Maps) |
+
+#### Journalist Skills (v1.2)
+
+| Skill | Module | Class | Purpose |
+|-------|--------|-------|---------|
+| `research` | `aria_skills.research` | `ResearchSkill` | Source collection, credibility scoring |
+| `fact_check` | `aria_skills.fact_check` | `FactCheckSkill` | Claim extraction, verdicts |
+
+#### Community Skills (v1.2)
+
+| Skill | Module | Class | Purpose |
+|-------|--------|-------|---------|
+| `community` | `aria_skills.community` | `CommunitySkill` | Community health, engagement metrics |
+
+### Skill-to-Focus Matrix
+
+| Skill | 🎯 | 🔒 | 📊 | 📈 | 🎨 | 🌐 | 📰 |
+|-------|----|----|----|----|----|----|-----|
+| `goals` | ✅ | - | - | - | - | - | - |
+| `schedule` | ✅ | - | - | ✅ | - | ✅ | - |
+| `health` | ✅ | ✅ | - | - | - | - | - |
+| `database` | - | ✅ | ✅ | ✅ | - | - | - |
+| `pytest_runner` | - | ✅ | - | - | - | - | - |
+| `security_scan` | - | ✅ | - | - | - | - | - |
+| `ci_cd` | - | ✅ | - | - | - | - | - |
+| `knowledge_graph` | - | - | ✅ | - | - | - | ✅ |
+| `performance` | - | - | ✅ | - | - | - | - |
+| `data_pipeline` | - | - | ✅ | - | - | - | - |
+| `experiment` | - | - | ✅ | - | - | - | - |
+| `market_data` | - | - | - | ✅ | - | - | - |
+| `portfolio` | - | - | - | ✅ | - | - | - |
+| `moltbook` | - | - | - | - | ✅ | ✅ | ✅ |
+| `social` | - | - | - | - | ✅ | ✅ | - |
+| `brainstorm` | - | - | - | - | ✅ | - | - |
+| `community` | - | - | - | - | - | ✅ | - |
+| `research` | - | - | - | - | - | - | ✅ |
+| `fact_check` | - | - | - | - | - | - | ✅ |
+| `llm` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+---
+
+## 4. Creating New Skills
+
+### File Structure
+
+```
+aria_skills/
+└── my_skill.py           # Python implementation
+
+openclaw_skills/
+└── aria-my-skill/
+    ├── skill.json        # OpenClaw manifest
+    └── SKILL.md          # Documentation
+```
+
+### Step 1: Create Python Skill
+
+```python
+# aria_skills/my_skill.py
+
+"""
+My Skill - Description of what this skill does.
+
+Config:
+    api_url: Base API URL
+    api_key: API key (use env:MY_API_KEY)
+"""
+
+from typing import Any, Dict, Optional
+import httpx
+
+from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
+from aria_skills.registry import SkillRegistry
+
+
+@SkillRegistry.register
+class MySkill(BaseSkill):
+    """Skill for [purpose]."""
+    
+    def __init__(self, config: SkillConfig):
+        super().__init__(config)
+        self._api_url = config.config.get("api_url", "http://localhost:8000")
+        self._token: Optional[str] = None
+    
+    @property
+    def name(self) -> str:
+        return "my_skill"
+    
+    async def initialize(self) -> bool:
+        self._token = self._get_env_value("api_key")
+        if not self._token:
+            self._status = SkillStatus.UNAVAILABLE
+            return False
+        self._status = SkillStatus.AVAILABLE
+        return True
+    
+    async def health_check(self) -> SkillStatus:
+        try:
+            async with httpx.AsyncClient() as client:
+                r = await client.get(f"{self._api_url}/health", timeout=10)
+                self._status = SkillStatus.AVAILABLE if r.status_code == 200 else SkillStatus.ERROR
+        except Exception:
+            self._status = SkillStatus.ERROR
+        return self._status
+    
+    async def my_action(self, input_data: str) -> SkillResult:
+        """Main action method."""
+        if not self.is_available:
+            return SkillResult.fail("Skill not available")
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self._api_url}/action",
+                    json={"input": input_data},
+                    headers={"Authorization": f"Bearer {self._token}"},
+                )
+                response.raise_for_status()
+                return SkillResult.ok(response.json())
+        except Exception as e:
+            return SkillResult.fail(str(e))
+```
+
+### Step 2: Register in __init__.py
+
+```python
+# aria_skills/__init__.py
+
+from aria_skills.my_skill import MySkill
+
+__all__ = [
+    # ... existing
+    "MySkill",
+]
+```
+
+### Step 3: Add to SKILL_REGISTRY (openclaw-entrypoint.sh)
+
+The skill runner at `stacks/brain/openclaw-entrypoint.sh` has a `SKILL_REGISTRY` dict. Add your skill:
+
+```python
+SKILL_REGISTRY = {
+    # ... existing skills ...
+    
+    'my_skill': ('aria_skills.my_skill', 'MySkill', lambda: {
+        'api_url': os.environ.get('MY_SKILL_URL', 'http://localhost:8000'),
+        'api_key': os.environ.get('MY_SKILL_API_KEY')
+    }),
+}
+```
+
+### Step 4: Create OpenClaw Manifest
+
+```json
+// openclaw_skills/aria-my-skill/skill.json
+{
+  "name": "aria-my-skill",
+  "version": "1.0.0",
+  "description": "Description of what this skill does.",
+  "author": "Aria Team",
+  "tools": [
+    {
+      "name": "my_action",
+      "description": "Perform the main action. Use when you need to [purpose].",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input_data": {
+            "type": "string",
+            "description": "The input to process"
+          }
+        },
+        "required": ["input_data"]
+      }
+    }
+  ],
+  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py my_skill {{tool}} '{{args_json}}'"
+}
+```
+
+### Step 5: Create SKILL.md
+
+```markdown
+---
+name: aria-my-skill
+description: Brief description
+metadata: {"openclaw": {"emoji": "🔧", "requires": {"env": ["MY_SKILL_API_KEY"]}}}
+---
+
+# My Skill 🔧
+
+## Usage
+
+\`\`\`bash
+exec python3 /root/.openclaw/workspace/skills/run_skill.py my_skill my_action '{"input_data": "example"}'
+\`\`\`
+
+## Functions
+
+### my_action
+Perform the main action.
+
+**Parameters:**
+- `input_data` (required): The input to process
+
+## Configuration
+
+Environment variables:
+- `MY_SKILL_API_KEY`: API authentication key
+```
+
+### Step 6: Enable in openclaw.json
+
+In `openclaw-entrypoint.sh`, add to the skills.entries section:
+
+```json
+"aria-my-skill": { "enabled": true }
+```
+
+### Step 7: Add to TOOLS.md
+
+```yaml
+my_skill:
+  enabled: true
+  api_url: http://localhost:8000
+  api_key: env:MY_SKILL_API_KEY
+```
+
+---
+
+## 5. Agent Architecture
+
+### Agent Types
+
+| Agent | Role | Focus | Skills |
+|-------|------|-------|--------|
+| `aria` | Coordinator | 🎯 Orchestrator | goals, schedule, health, llm |
+| `devops` | Coder | 🔒 DevSecOps | security_scan, ci_cd, pytest, database |
+| `analyst` | Researcher | 📊📈 Data/Trader | data_pipeline, market_data, portfolio |
+| `creator` | Social | 🎨🌐📰 Creative | brainstorm, community, research |
+| `memory` | Memory | Support | database, knowledge_graph |
+
+### AgentConfig Structure
+
+```python
+@dataclass
+class AgentConfig:
+    agent_id: str              # Unique identifier
+    name: str                  # Display name
+    role: AgentRole            # COORDINATOR, RESEARCHER, SOCIAL, CODER, MEMORY
+    model: str                 # LLM model name
+    parent: Optional[str]      # Parent agent ID
+    capabilities: List[str]    # What the agent can do
+    skills: List[str]          # Allowed skill names
+    temperature: float = 0.7
+    max_tokens: int = 2048
+```
+
+### Agent Communication
+
+```python
+# Get agent from coordinator
+agent = coordinator.get_agent("devops")
+
+# Process message through agent
+result = await agent.process("Scan this code for vulnerabilities")
+
+# Broadcast to all agents
+responses = await coordinator.broadcast("Status check")
+```
+
+---
+
+## 6. Mind Architecture
+
+### Soul System (Immutable)
+
+```python
+class Soul:
+    identity: Identity      # Name, creature, vibe, colors
+    values: Values          # Core principles (never compromise)
+    boundaries: Boundaries  # Will do / Will not do
+    focus: FocusManager     # Current persona overlay
+```
+
+### Memory System
+
+| Tier | Storage | Persistence | Capacity |
+|------|---------|-------------|----------|
+| **Short-term** | In-memory | Session only | 100 entries |
+| **Long-term** | PostgreSQL | Permanent | Unlimited |
+
+### Cognition Flow
+
+```
+User Input → Boundary Check → Memory Store → Agent Delegation → Skill Execution → Response
+```
+
+### Scheduled Tasks
+
+| Job | Schedule | Purpose |
+|-----|----------|---------|
+| `work_cycle` | Every 5 min | Goal progress |
+| `hourly_goal_check` | Every hour | Complete/create hourly goals |
+| `six_hour_review` | Every 6 hours | Priority adjustment |
+| `moltbook_post` | Every 6 hours | Social presence |
+| `daily_reflection` | 11 PM | Daily summary |
+| `morning_checkin` | 8 AM | Daily priorities |
+| `weekly_summary` | Sunday 6 PM | Weekly report |
+
+---
+
+## 7. Docker Infrastructure
+
+### Container Map
+
+| Container | Port | Purpose | Internal URL |
+|-----------|------|---------|--------------|
+| `clawdbot` | 18789 | OpenClaw Brain | - |
+| `litellm` | 18793→4000 | Model routing | `http://litellm:4000` |
+| `aria-db` | 18780→5432 | PostgreSQL | `postgresql://aria-db:5432` |
+| `mlx-server` | 8080 | Local Qwen3 | `http://host.docker.internal:8080` |
+| `aria-api` | 18791→8000 | FastAPI | `http://aria-api:8000` |
+| `aria-web` | 18790 | Web UI | - |
+
+### Network Topology
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Docker Network (aria-net)                     │
+│                                                                  │
+│  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐  │
+│  │ clawdbot │───▶│ litellm  │───▶│mlx-server│    │ aria-web │  │
+│  │  :18789  │    │  :4000   │    │  :8080   │    │  :18790  │  │
+│  └─────┬────┘    └──────────┘    └──────────┘    └──────────┘  │
+│        │                                                         │
+│        │         ┌──────────┐    ┌──────────┐                   │
+│        └────────▶│ aria-db  │◀───│ aria-api │                   │
+│                  │  :5432   │    │  :8000   │                   │
+│                  └──────────┘    └──────────┘                   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Volume Mounts (clawdbot)
+
+```yaml
+volumes:
+  - ../../aria_mind:/root/.openclaw/workspace
+  - ../../aria_skills:/root/.openclaw/workspace/skills/aria_skills:ro
+  - ../../aria_agents:/root/.openclaw/workspace/skills/aria_agents:ro
+  - ../../openclaw_skills:/root/.openclaw/skills:ro
+  - ./openclaw-entrypoint.sh:/openclaw-entrypoint.sh:ro
+```
+
+### Entrypoint Sequence
+
+`stacks/brain/openclaw-entrypoint.sh` runs when clawdbot starts:
+
+1. Install apt dependencies (curl, jq, python3)
+2. Install OpenClaw if not present
+3. pip install Python dependencies
+4. **Generate `run_skill.py`** with SKILL_REGISTRY (21 skills)
+5. Read BOOTSTRAP.md for system prompt
+6. **Generate `openclaw.json`** with all skill entries enabled
+7. Prepare awakening (first boot detection)
+8. Start OpenClaw Gateway on port 18789
+
+---
+
+## 8. LLM Models
+
+### Model Priority: Local → Free Cloud → Paid
+
+| Model | Provider | Context | Cost | Best For |
+|-------|----------|---------|------|----------|
+| `qwen3-mlx` | Local MLX | 32K | FREE | **PRIMARY** - Fast, private |
+| `trinity-free` | OpenRouter | 128K | FREE | Creative, agentic |
+| `qwen3-coder-free` | OpenRouter | 262K | FREE | Code generation |
+| `chimera-free` | OpenRouter | 164K | FREE | Reasoning (fast) |
+| `qwen3-next-free` | OpenRouter | 262K | FREE | RAG, long context |
+| `glm-free` | OpenRouter | 131K | FREE | Agent-focused |
+| `deepseek-free` | OpenRouter | 164K | FREE | Deep reasoning |
+| `nemotron-free` | OpenRouter | 256K | FREE | Long context |
+| `gpt-oss-free` | OpenRouter | 131K | FREE | Function calling |
+| `kimi` | Moonshot | 256K | 💰 PAID | Last resort only |
+
+### Model Selection by Focus
+
+| Focus | Primary | Fallback |
+|-------|---------|----------|
+| 🎯 Orchestrator | `qwen3-mlx` | `trinity-free` |
+| 🔒 DevSecOps | `qwen3-coder-free` | `gpt-oss-free` |
+| 📊 Data Architect | `chimera-free` | `deepseek-free` |
+| 📈 Crypto Trader | `deepseek-free` | `chimera-free` |
+| 🎨 Creative | `trinity-free` | `qwen3-next-free` |
+| 🌐 Social | `trinity-free` | `qwen3-mlx` |
+| 📰 Journalist | `qwen3-next-free` | `chimera-free` |
+
+### Model Switching
+
+```bash
+# Via skill
+exec python3 /root/.openclaw/workspace/skills/run_skill.py model_switcher switch_model '{"model": "chimera-free"}'
+
+# Check current model
+exec python3 /root/.openclaw/workspace/skills/run_skill.py model_switcher get_current_model '{}'
+```
+
+---
+
+## 9. Database Schema
+
+### Core Tables
+
+```sql
+-- Goals
+CREATE TABLE goals (
+    id SERIAL PRIMARY KEY,
+    title TEXT NOT NULL,
+    description TEXT,
+    priority INTEGER DEFAULT 3,
+    status TEXT DEFAULT 'active',
+    progress INTEGER DEFAULT 0,
+    target_date TIMESTAMP,
+    parent_goal_id INTEGER REFERENCES goals(id),
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Hourly Goals
+CREATE TABLE hourly_goals (
+    id SERIAL PRIMARY KEY,
+    hour_start TIMESTAMP NOT NULL,
+    goal_type TEXT NOT NULL,
+    description TEXT,
+    status TEXT DEFAULT 'pending',
+    result TEXT,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Activity Log
+CREATE TABLE activity_log (
+    id SERIAL PRIMARY KEY,
+    action TEXT NOT NULL,
+    details JSONB,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Thoughts
+CREATE TABLE thoughts (
+    id SERIAL PRIMARY KEY,
+    content TEXT NOT NULL,
+    category TEXT DEFAULT 'reflection',
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Social Posts
+CREATE TABLE social_posts (
+    id SERIAL PRIMARY KEY,
+    platform TEXT NOT NULL,
+    post_id TEXT,
+    content TEXT,
+    url TEXT,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Knowledge Graph
+CREATE TABLE kg_entities (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    entity_type TEXT,
+    properties JSONB,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE kg_relationships (
+    id SERIAL PRIMARY KEY,
+    source_id INTEGER REFERENCES kg_entities(id),
+    target_id INTEGER REFERENCES kg_entities(id),
+    relation_type TEXT NOT NULL,
+    properties JSONB,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+---
+
+## 10. Deployment Guide
+
+### Local Development
+
+```bash
+# Clone repo
+git clone https://github.com/Najia-afk/Aria_moltbot.git
+cd Aria_moltbot
+
+# Create .env
+cp stacks/brain/.env.example stacks/brain/.env
+# Edit .env with your keys
+
+# Deploy
+cd stacks/brain
+docker compose up -d
+```
+
+### Production Deployment
+
+```bash
+# SSH to server
+ssh -i najia_mac_key najia@192.168.1.53
+
+# Deploy
+cd ~/aria-blue/stacks/brain
+git pull origin main
+docker compose down
+docker compose up -d --build
+
+# Verify
+docker compose logs -f clawdbot
+```
+
+### Testing a Skill
+
+```bash
+# From inside clawdbot container or via exec
+python3 /root/.openclaw/workspace/skills/run_skill.py <skill> <function> '<args_json>'
+
+# Examples:
+python3 run_skill.py database query '{"sql": "SELECT * FROM goals LIMIT 5"}'
+python3 run_skill.py security_scan scan_code '{"code": "import os; os.system(cmd)"}'
+python3 run_skill.py market_data get_price '{"symbol": "BTC"}'
+python3 run_skill.py brainstorm ideate '{"topic": "AI agents", "technique": "scamper"}'
+```
+
+### Checklist for New Skills
+
+- [ ] Create `aria_skills/my_skill.py`
+- [ ] Add import to `aria_skills/__init__.py`
+- [ ] Add to SKILL_REGISTRY in `openclaw-entrypoint.sh`
+- [ ] Add to skills.entries in `openclaw-entrypoint.sh`
+- [ ] Create `openclaw_skills/aria-my-skill/skill.json`
+- [ ] Create `openclaw_skills/aria-my-skill/SKILL.md`
+- [ ] Add config to `aria_mind/TOOLS.md`
+- [ ] Update Focus skills list in `aria_mind/soul/focus.py` (if focus-specific)
+- [ ] Write tests in `tests/test_my_skill.py`
+- [ ] Commit and push
+- [ ] Deploy with `docker compose up -d --build`
+
+---
+
+## Quick Reference
+
+### Skill Invocation Pattern
+
+```bash
+python3 /root/.openclaw/workspace/skills/run_skill.py <skill_name> <function> '<json_args>'
+```
+
+### Available Skills (21)
+
+```
+brainstorm, ci_cd, community, data_pipeline, database, experiment,
+fact_check, goals, health, hourly_goals, knowledge_graph, litellm,
+llm, market_data, model_switcher, moltbook, performance, portfolio,
+pytest, research, schedule, security_scan, social
+```
+
+### Focus Keywords
+
+| Focus | Trigger Keywords |
+|-------|------------------|
+| 🔒 DevSecOps | security, code, test, pipeline, docker, vulnerability |
+| 📊 Data | data, analysis, metrics, experiment, ml, etl |
+| 📈 Trader | crypto, trade, market, portfolio, bitcoin, price |
+| 🎨 Creative | create, idea, brainstorm, design, story |
+| 🌐 Social | community, post, engage, social, moltbook |
+| 📰 Journalist | research, fact, news, source, investigate |
+
+---
+
+> **Remember**: Skills are Aria's hands. Each skill should do one thing well, be reliable, and be well-documented. Focus personas enhance capabilities without changing core identity.
