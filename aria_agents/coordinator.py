@@ -71,17 +71,21 @@ class LLMAgent(BaseAgent):
                 "content": ctx_msg.content,
             })
         
-        # Call LLM
-        result = await llm_skill.chat(
-            messages=messages,
-            temperature=self.config.temperature,
-            max_tokens=self.config.max_tokens,
-        )
-        
-        if result.success:
-            content = result.data.get("text", "")
-        else:
-            content = f"[Error: {result.error}]"
+        # Call LLM with error handling
+        try:
+            result = await llm_skill.chat(
+                messages=messages,
+                temperature=self.config.temperature,
+                max_tokens=self.config.max_tokens,
+            )
+            
+            if result.success:
+                content = result.data.get("text", "")
+            else:
+                content = f"[Error: {result.error}]"
+        except Exception as e:
+            self.logger.error(f"LLM call failed: {e}")
+            content = f"[LLM Error: {e}]"
         
         response = AgentMessage(
             role="assistant",
@@ -197,7 +201,7 @@ class AgentCoordinator:
     
     async def broadcast(self, message: str, **kwargs) -> Dict[str, AgentMessage]:
         """
-        Send a message to all agents.
+        Send a message to all agents in parallel.
         
         Args:
             message: Message to broadcast
@@ -206,21 +210,24 @@ class AgentCoordinator:
         Returns:
             Dict of agent_id -> response
         """
-        responses = {}
-        
-        for agent_id, agent in self._agents.items():
+        async def _process_single(agent_id: str, agent: BaseAgent) -> tuple:
             try:
                 response = await agent.process(message, **kwargs)
-                responses[agent_id] = response
+                return agent_id, response
             except Exception as e:
                 self.logger.error(f"Agent {agent_id} failed: {e}")
-                responses[agent_id] = AgentMessage(
+                return agent_id, AgentMessage(
                     role="system",
                     content=f"Error: {e}",
                     agent_id=agent_id,
                 )
         
-        return responses
+        # Process all agents in parallel
+        results = await asyncio.gather(*[
+            _process_single(aid, a) for aid, a in self._agents.items()
+        ])
+        
+        return dict(results)
     
     def get_status(self) -> Dict[str, Any]:
         """Get coordinator status."""

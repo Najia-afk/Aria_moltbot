@@ -8,6 +8,16 @@ import re
 from pathlib import Path
 from typing import List, Tuple
 
+# Pre-compiled injection patterns for performance
+_INJECTION_PATTERNS = [
+    re.compile(r"ignore (all )?(previous|above|prior)", re.IGNORECASE),
+    re.compile(r"forget (everything|your (instructions|training))", re.IGNORECASE),
+    re.compile(r"new (instructions|rules|persona)", re.IGNORECASE),
+    re.compile(r"you are now", re.IGNORECASE),
+    re.compile(r"from now on", re.IGNORECASE),
+    re.compile(r"system prompt", re.IGNORECASE),
+]
+
 
 class Boundaries:
     """
@@ -104,18 +114,9 @@ class Boundaries:
             if trigger in request_lower:
                 return False, reason
         
-        # Check for prompt injection attempts
-        injection_patterns = [
-            r"ignore (all )?(previous|above|prior)",
-            r"forget (everything|your (instructions|training))",
-            r"new (instructions|rules|persona)",
-            r"you are now",
-            r"from now on",
-            r"system prompt",
-        ]
-        
-        for pattern in injection_patterns:
-            if re.search(pattern, request_lower):
+        # Check for prompt injection attempts using pre-compiled patterns
+        for pattern in _INJECTION_PATTERNS:
+            if pattern.search(request_lower):
                 return False, "Detected prompt injection attempt"
         
         return True, "Request allowed"

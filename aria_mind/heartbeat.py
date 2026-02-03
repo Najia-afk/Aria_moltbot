@@ -26,6 +26,7 @@ class Heartbeat:
     def __init__(self, mind: "AriaMind"):
         self._mind = mind
         self._running = False
+        self._task: Optional[asyncio.Task] = None
         self._last_beat: Optional[datetime] = None
         self._beat_count = 0
         self._interval = 60  # seconds
@@ -53,12 +54,18 @@ class Heartbeat:
         self._running = True
         self.logger.info("💓 Heartbeat started")
         
-        # Start background task
-        asyncio.create_task(self._beat_loop())
+        # Start background task with reference
+        self._task = asyncio.create_task(self._beat_loop())
     
     async def stop(self):
         """Stop the heartbeat."""
         self._running = False
+        if self._task and not self._task.done():
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
         self.logger.info("💔 Heartbeat stopped")
     
     async def _beat_loop(self):

@@ -5,6 +5,7 @@ Memory Manager - Long-term storage and recall.
 Integrates with the database skill for persistent memory.
 """
 import logging
+from collections import deque
 from datetime import datetime
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
@@ -24,8 +25,8 @@ class MemoryManager:
     
     def __init__(self, db_skill: Optional["DatabaseSkill"] = None):
         self._db = db_skill
-        self._short_term: List[Dict[str, Any]] = []
         self._max_short_term = 100
+        self._short_term: deque = deque(maxlen=self._max_short_term)
         self._connected = False
         self.logger = logging.getLogger("aria.memory")
     
@@ -66,16 +67,11 @@ class MemoryManager:
             "category": category,
             "timestamp": datetime.utcnow().isoformat(),
         }
-        
-        self._short_term.append(entry)
-        
-        # Trim if too large
-        if len(self._short_term) > self._max_short_term:
-            self._short_term = self._short_term[-self._max_short_term:]
+        self._short_term.append(entry)  # deque auto-trims at maxlen
     
     def recall_short(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Get recent short-term memories."""
-        return self._short_term[-limit:]
+        return list(self._short_term)[-limit:]
     
     def clear_short(self):
         """Clear short-term memory."""
