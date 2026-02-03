@@ -1,5 +1,5 @@
 {
-  "name": "aria-knowledge-graph",
+  "name": "aria-knowledgegraph",
   "version": "1.0.0",
   "description": "Build and query Aria's knowledge graph. Store entities (people, places, concepts) and their relationships.",
   "author": "Aria Team",

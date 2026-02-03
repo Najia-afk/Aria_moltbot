@@ -31,24 +31,27 @@ rm -rf "$OPENCLAW_SKILLS_DIR"/aria-*
 if [ -d "$ARIA_SKILLS_DIR" ]; then
     for skill_dir in "$ARIA_SKILLS_DIR"/*/; do
         if [ -d "$skill_dir" ]; then
-            skill_name=$(basename "$skill_dir")
             manifest="$skill_dir/skill.json"
             
             if [ -f "$manifest" ]; then
-                # Convert underscores to hyphens for OpenClaw compatibility
-                skill_name_hyphen=$(echo "$skill_name" | tr '_' '-')
+                # Extract skill name from skill.json (the authoritative source)
+                skill_name=$(jq -r '.name' "$manifest" 2>/dev/null)
                 
-                # Create aria-<skill> directory in OpenClaw skills dir
-                target_dir="$OPENCLAW_SKILLS_DIR/aria-$skill_name_hyphen"
-                mkdir -p "$target_dir"
-                
-                # Create symlink to skill.json
-                ln -sf "$manifest" "$target_dir/skill.json"
-                echo "  Linked: aria-$skill_name_hyphen -> $manifest"
-                
-                # Also link SKILL.md if it exists
-                if [ -f "$skill_dir/SKILL.md" ]; then
-                    ln -sf "$skill_dir/SKILL.md" "$target_dir/SKILL.md"
+                if [ -n "$skill_name" ] && [ "$skill_name" != "null" ]; then
+                    # Create directory matching the skill name from skill.json
+                    target_dir="$OPENCLAW_SKILLS_DIR/$skill_name"
+                    mkdir -p "$target_dir"
+                    
+                    # Create symlink to skill.json
+                    ln -sf "$manifest" "$target_dir/skill.json"
+                    echo "  Linked: $skill_name -> $manifest"
+                    
+                    # Also link SKILL.md if it exists
+                    if [ -f "$skill_dir/SKILL.md" ]; then
+                        ln -sf "$skill_dir/SKILL.md" "$target_dir/SKILL.md"
+                    fi
+                else
+                    echo "  WARNING: Could not extract name from $manifest"
                 fi
             fi
         fi
