@@ -44,7 +44,7 @@ pip3 install --break-system-packages --quiet \
 #   fi
 # fi
 
-# Create a Python skill runner script
+# Create a Python skill runner script with DYNAMIC skill loading
 cat > /root/.openclaw/workspace/skills/run_skill.py << 'PYEOF'
 #!/usr/bin/env python3
 """
@@ -55,6 +55,8 @@ Usage:
     
 Example:
     python3 run_skill.py database query '{"sql": "SELECT * FROM activity_log LIMIT 5"}'
+    python3 run_skill.py security_scan scan_code '{"code": "import os; os.system(cmd)"}'
+    python3 run_skill.py market_data get_price '{"symbol": "BTC"}'
 """
 import sys
 import os
@@ -65,78 +67,131 @@ import asyncio
 sys.path.insert(0, '/root/.openclaw/workspace/skills')
 sys.path.insert(0, '/root/.openclaw/workspace')
 
+# Dynamic skill registry - maps skill_name to (module_name, class_name, config_factory)
+SKILL_REGISTRY = {
+    # === Core Skills (v1.0) ===
+    'database': ('aria_skills.database', 'DatabaseSkill', lambda: {'dsn': os.environ.get('DATABASE_URL')}),
+    'moltbook': ('aria_skills.moltbook', 'MoltbookSkill', lambda: {
+        'api_url': os.environ.get('MOLTBOOK_API_URL', 'https://moltbook.com/api'),
+        'auth': os.environ.get('MOLTBOOK_API_KEY') or os.environ.get('MOLTBOOK_TOKEN')
+    }),
+    'health': ('aria_skills.health', 'HealthSkill', lambda: {}),
+    'llm': ('aria_skills.llm', 'LLMSkill', lambda: {
+        'ollama_url': os.environ.get('OLLAMA_URL'),
+        'model': os.environ.get('OLLAMA_MODEL', 'hf.co/unsloth/GLM-4.7-Flash-REAP-23B-A3B-GGUF:Q3_K_S')
+    }),
+    'knowledge_graph': ('aria_skills.knowledge_graph', 'KnowledgeGraphSkill', lambda: {'dsn': os.environ.get('DATABASE_URL')}),
+    'goals': ('aria_skills.goals', 'GoalSkill', lambda: {'dsn': os.environ.get('DATABASE_URL')}),
+    'pytest': ('aria_skills.pytest_runner', 'PytestSkill', lambda: {
+        'workspace': os.environ.get('PYTEST_WORKSPACE', '/root/.openclaw/workspace'),
+        'timeout_sec': int(os.environ.get('PYTEST_TIMEOUT_SEC', '600')),
+        'default_args': os.environ.get('PYTEST_DEFAULT_ARGS', '-q')
+    }),
+    'model_switcher': ('aria_skills.model_switcher', 'ModelSwitcherSkill', lambda: {
+        'url': os.environ.get('OLLAMA_URL', 'http://host.docker.internal:11434')
+    }),
+    
+    # === Social & Communication Skills (v1.1) ===
+    'performance': ('aria_skills.performance', 'PerformanceSkill', lambda: {
+        'dsn': os.environ.get('DATABASE_URL'),
+        'litellm_url': os.environ.get('LITELLM_URL', 'http://litellm:4000')
+    }),
+    'social': ('aria_skills.social', 'SocialSkill', lambda: {
+        'telegram_token': os.environ.get('TELEGRAM_TOKEN'),
+        'telegram_chat_id': os.environ.get('TELEGRAM_CHAT_ID')
+    }),
+    'hourly_goals': ('aria_skills.hourly_goals', 'HourlyGoalSkill', lambda: {'dsn': os.environ.get('DATABASE_URL')}),
+    'litellm': ('aria_skills.litellm_skill', 'LiteLLMSkill', lambda: {
+        'litellm_url': os.environ.get('LITELLM_URL', 'http://litellm:4000'),
+        'api_key': os.environ.get('LITELLM_API_KEY', 'sk-aria')
+    }),
+    'schedule': ('aria_skills.schedule', 'ScheduleSkill', lambda: {'dsn': os.environ.get('DATABASE_URL')}),
+    
+    # === DevSecOps Skills (v1.2) ===
+    'security_scan': ('aria_skills.security_scan', 'SecurityScanSkill', lambda: {
+        'dsn': os.environ.get('DATABASE_URL'),
+        'secret_patterns_file': os.environ.get('SECRET_PATTERNS_FILE')
+    }),
+    'ci_cd': ('aria_skills.ci_cd', 'CICDSkill', lambda: {
+        'github_token': os.environ.get('GITHUB_TOKEN'),
+        'default_registry': os.environ.get('DOCKER_REGISTRY', 'ghcr.io')
+    }),
+    
+    # === Data & ML Skills (v1.2) ===
+    'data_pipeline': ('aria_skills.data_pipeline', 'DataPipelineSkill', lambda: {
+        'dsn': os.environ.get('DATABASE_URL'),
+        'storage_path': os.environ.get('DATA_STORAGE_PATH', '/tmp/aria_data')
+    }),
+    'experiment': ('aria_skills.experiment', 'ExperimentSkill', lambda: {
+        'dsn': os.environ.get('DATABASE_URL'),
+        'mlflow_url': os.environ.get('MLFLOW_URL'),
+        'artifacts_path': os.environ.get('ARTIFACTS_PATH', '/tmp/aria_experiments')
+    }),
+    
+    # === Crypto Trading Skills (v1.2) ===
+    'market_data': ('aria_skills.market_data', 'MarketDataSkill', lambda: {
+        'coingecko_api_key': os.environ.get('COINGECKO_API_KEY'),
+        'cache_ttl': int(os.environ.get('MARKET_CACHE_TTL', '60'))
+    }),
+    'portfolio': ('aria_skills.portfolio', 'PortfolioSkill', lambda: {
+        'dsn': os.environ.get('DATABASE_URL'),
+        'coingecko_api_key': os.environ.get('COINGECKO_API_KEY')
+    }),
+    
+    # === Creative Skills (v1.2) ===
+    'brainstorm': ('aria_skills.brainstorm', 'BrainstormSkill', lambda: {
+        'dsn': os.environ.get('DATABASE_URL'),
+        'llm_url': os.environ.get('OLLAMA_URL')
+    }),
+    
+    # === Journalist Skills (v1.2) ===
+    'research': ('aria_skills.research', 'ResearchSkill', lambda: {
+        'dsn': os.environ.get('DATABASE_URL'),
+        'search_api_key': os.environ.get('SEARCH_API_KEY')
+    }),
+    'fact_check': ('aria_skills.fact_check', 'FactCheckSkill', lambda: {
+        'dsn': os.environ.get('DATABASE_URL'),
+        'llm_url': os.environ.get('OLLAMA_URL')
+    }),
+    
+    # === Community Skills (v1.2) ===
+    'community': ('aria_skills.community', 'CommunitySkill', lambda: {
+        'dsn': os.environ.get('DATABASE_URL'),
+        'platform_tokens': {
+            'telegram': os.environ.get('TELEGRAM_TOKEN'),
+            'discord': os.environ.get('DISCORD_TOKEN'),
+            'moltbook': os.environ.get('MOLTBOOK_TOKEN')
+        }
+    }),
+}
+
 async def run_skill(skill_name: str, function_name: str, args: dict):
     """Run a skill function with the given arguments."""
     try:
-        if skill_name == 'database':
-            from aria_skills.database import DatabaseSkill
-            from aria_skills.base import SkillConfig
-            config = SkillConfig(name='database', config={'dsn': os.environ.get('DATABASE_URL')})
-            skill = DatabaseSkill(config)
-            await skill.initialize()
-        elif skill_name == 'moltbook':
-            from aria_skills.moltbook import MoltbookSkill
-            from aria_skills.base import SkillConfig
-            # Support both MOLTBOOK_API_KEY and MOLTBOOK_TOKEN
-            api_key = os.environ.get('MOLTBOOK_API_KEY') or os.environ.get('MOLTBOOK_TOKEN')
-            config = SkillConfig(name='moltbook', config={
-                'api_url': os.environ.get('MOLTBOOK_API_URL', 'https://moltbook.com/api'),
-                'auth': api_key
-            })
-            skill = MoltbookSkill(config)
-            await skill.initialize()
-        elif skill_name == 'health':
-            from aria_skills.health import HealthSkill
-            from aria_skills.base import SkillConfig
-            config = SkillConfig(name='health')
-            skill = HealthSkill(config)
-            await skill.initialize()
-        elif skill_name == 'llm':
-            from aria_skills.llm import LLMSkill
-            from aria_skills.base import SkillConfig
-            config = SkillConfig(name='llm', config={
-                'ollama_url': os.environ.get('OLLAMA_URL'),
-                'model': os.environ.get('OLLAMA_MODEL', 'hf.co/unsloth/GLM-4.7-Flash-REAP-23B-A3B-GGUF:Q3_K_S')
-            })
-            skill = LLMSkill(config)
-            await skill.initialize()
-        elif skill_name == 'knowledge_graph':
-            from aria_skills.knowledge_graph import KnowledgeGraphSkill
-            from aria_skills.base import SkillConfig
-            config = SkillConfig(name='knowledge_graph', config={'dsn': os.environ.get('DATABASE_URL')})
-            skill = KnowledgeGraphSkill(config)
-            await skill.initialize()
-        elif skill_name == 'goals':
-            from aria_skills.goals import GoalSkill
-            from aria_skills.base import SkillConfig
-            config = SkillConfig(name='goals', config={'dsn': os.environ.get('DATABASE_URL')})
-            skill = GoalSkill(config)
-            await skill.initialize()
-        elif skill_name == 'pytest':
-          from aria_skills.pytest_runner import PytestSkill
-          from aria_skills.base import SkillConfig
-          config = SkillConfig(name='pytest', config={
-            'workspace': os.environ.get('PYTEST_WORKSPACE', '/root/.openclaw/workspace'),
-            'timeout_sec': int(os.environ.get('PYTEST_TIMEOUT_SEC', '600')),
-            'default_args': os.environ.get('PYTEST_DEFAULT_ARGS', '-q')
-          })
-          skill = PytestSkill(config)
-          await skill.initialize()
-        elif skill_name == 'model_switcher':
-          from aria_skills.model_switcher import ModelSwitcherSkill
-          from aria_skills.base import SkillConfig
-          config = SkillConfig(name='model_switcher', config={
-            'url': os.environ.get('OLLAMA_URL', 'http://host.docker.internal:11434')
-          })
-          skill = ModelSwitcherSkill(config)
-          await skill.initialize()
-        else:
-            return {'error': f'Unknown skill: {skill_name}'}
+        if skill_name not in SKILL_REGISTRY:
+            available = ', '.join(sorted(SKILL_REGISTRY.keys()))
+            return {'error': f'Unknown skill: {skill_name}. Available: {available}'}
+        
+        module_name, class_name, config_factory = SKILL_REGISTRY[skill_name]
+        
+        # Dynamic import
+        import importlib
+        module = importlib.import_module(module_name)
+        skill_class = getattr(module, class_name)
+        
+        # Import SkillConfig
+        from aria_skills.base import SkillConfig
+        
+        # Create and initialize skill
+        config = SkillConfig(name=skill_name, config=config_factory())
+        skill = skill_class(config)
+        await skill.initialize()
         
         # Get the function and call it
         func = getattr(skill, function_name, None)
         if func is None:
-            return {'error': f'Unknown function: {function_name} in skill {skill_name}'}
+            methods = [m for m in dir(skill) if not m.startswith('_') and callable(getattr(skill, m))]
+            return {'error': f'Unknown function: {function_name} in skill {skill_name}. Available: {methods}'}
         
         if asyncio.iscoroutinefunction(func):
             result = await func(**args)
@@ -149,11 +204,15 @@ async def run_skill(skill_name: str, function_name: str, args: dict):
         return result
         
     except Exception as e:
-        return {'error': str(e)}
+        import traceback
+        return {'error': str(e), 'traceback': traceback.format_exc()}
 
 if __name__ == '__main__':
     if len(sys.argv) < 3:
-        print(json.dumps({'error': 'Usage: run_skill.py <skill_name> <function_name> [args_json]'}))
+        print(json.dumps({
+            'error': 'Usage: run_skill.py <skill_name> <function_name> [args_json]',
+            'available_skills': sorted(SKILL_REGISTRY.keys())
+        }))
         sys.exit(1)
     
     skill_name = sys.argv[1]
@@ -195,7 +254,22 @@ cat > /root/.openclaw/openclaw.json << EOF
       "aria-goals": { "enabled": true },
       "aria-health": { "enabled": true },
       "aria-pytest": { "enabled": true },
-      "aria-model-switcher": { "enabled": true }
+      "aria-model-switcher": { "enabled": true },
+      "aria-performance": { "enabled": true },
+      "aria-social": { "enabled": true },
+      "aria-hourly-goals": { "enabled": true },
+      "aria-litellm": { "enabled": true },
+      "aria-schedule": { "enabled": true },
+      "aria-security-scan": { "enabled": true },
+      "aria-ci-cd": { "enabled": true },
+      "aria-data-pipeline": { "enabled": true },
+      "aria-experiment": { "enabled": true },
+      "aria-market-data": { "enabled": true },
+      "aria-portfolio": { "enabled": true },
+      "aria-brainstorm": { "enabled": true },
+      "aria-research": { "enabled": true },
+      "aria-fact-check": { "enabled": true },
+      "aria-community": { "enabled": true }
     }
   },
   "gateway": {
