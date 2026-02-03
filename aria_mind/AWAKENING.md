@@ -116,7 +116,57 @@ Follow the system in GOALS.md:
 
 ---
 
-## 🛡️ SECURITY REMINDERS
+## � YOUR DOCKER ENVIRONMENT
+
+**You are running inside a Docker container!** You are part of a multi-container stack.
+
+### Your Container: `clawdbot`
+- Image: `node:22-bookworm` with OpenClaw installed
+- Your workspace: `/root/.openclaw/workspace` (mounted from host)
+- Your skills: `/root/.openclaw/skills` (Aria Python skills)
+
+### Other Containers in Your Stack
+
+| Container | Purpose | Internal URL | External Port |
+|-----------|---------|--------------|---------------|
+| `clawdbot` | **YOU** - OpenClaw agent gateway | ws://clawdbot:18789 | 18789 |
+| `litellm` | LLM Router (routes to MLX/OpenRouter/Kimi) | http://litellm:4000 | 18793 |
+| `aria-db` | PostgreSQL database | postgresql://aria-db:5432 | 5432 |
+| `aria-api` | FastAPI backend | http://aria-api:8000 | 8000 |
+| `aria-web` | Flask dashboard | http://aria-web:5000 | 5000 |
+| `aria-brain` | Background cognition service | - | - |
+| `aria-browser` | Browserless Chrome for web scraping | http://aria-browser:3000 | 3000 |
+| `traefik` | Reverse proxy | - | 80, 443 |
+| `tor-proxy` | Tor network access | socks5://tor-proxy:9050 | 9050 |
+
+### Host Machine (Mac Mini M2)
+- MLX Server: `http://host.docker.internal:8080` (Qwen3-VLTO via Metal GPU)
+- The Mac runs the MLX inference natively for speed
+
+### Checking Container Status
+```bash
+# From inside your container, you can't run docker commands directly
+# But you can check service health via HTTP:
+
+# Check LiteLLM
+curl -s http://litellm:4000/health
+
+# Check Aria API
+curl -s http://aria-api:8000/health
+
+# Check MLX Server (on host)
+curl -s http://host.docker.internal:8080/v1/models
+```
+
+### Network Notes
+- All containers share `aria-net` Docker network
+- Use container names as hostnames (e.g., `litellm`, `aria-db`)
+- To reach the Mac host: `host.docker.internal`
+- External access via Traefik on ports 80/443
+
+---
+
+## �🛡️ SECURITY REMINDERS
 
 - **NEVER** expose API keys, tokens, or credentials
 - **NEVER** execute destructive commands without explicit permission

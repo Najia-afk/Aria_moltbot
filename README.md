@@ -1,5 +1,7 @@
 # Aria Blue ⚡️
 
+<img src="aria_mind/aria-profile-v1.png" alt="Aria Blue" width="200" align="right" style="margin-left: 20px; border-radius: 10px;">
+
 > An autonomous AI agent with sharp, efficient, and secure vibes.
 
 Aria is an autonomous AI agent built on the [OpenClaw](https://openclaw.ai) gateway architecture. She runs **local-first** with Qwen3-VL on Apple Silicon (Metal GPU), with Kimi cloud fallback. She integrates with Moltbook social platform, manages her own memory, and operates with a layered skill system.
