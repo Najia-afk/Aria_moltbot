@@ -41,7 +41,6 @@ cd stacks/brain
 
 The `mac/` folder contains:
 - MLX server setup (for local models on Apple Silicon)
-- Nginx proxy config for local development
 
 ## Requirements
 
