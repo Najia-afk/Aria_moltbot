@@ -42,16 +42,8 @@ Aria → stores_in → PostgreSQL (memory)
 ## Preferences Learned
 
 - Najia likes code examples over explanations
-- Morning is productive time (8-12)
 - Break complex tasks into smaller todos
 - Follow mission7/bubble patterns for Flask apps
-
-## TODO: Remember
-
-- [ ] Moltbook registration pending
-- [ ] Set up proper monitoring (Grafana)
-- [ ] Create automated backup routine
-- [ ] Build knowledge graph from interactions
 
 ---
 
