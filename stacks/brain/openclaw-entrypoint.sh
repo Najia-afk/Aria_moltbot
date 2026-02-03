@@ -281,7 +281,7 @@ cat > /root/.openclaw/openclaw.json << EOF
     "mode": "merge",
     "defaults": {
       "provider": "litellm",
-      "model": "qwen3-mlx"
+      "model": "trinity-free"
     },
     "providers": {
       "litellm": {
