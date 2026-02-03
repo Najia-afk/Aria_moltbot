@@ -1,5 +1,5 @@
 {
-  "name": "aria-pytest",
+  "name": "aria-pytest-runner",
   "version": "1.0.0",
   "description": "Run pytest for Aria codebase and return structured results.",
   "author": "Aria Team",
