@@ -4,6 +4,21 @@
 
 Tools and skills available to Aria agents via OpenClaw.
 
+## Skill → Focus Mapping
+
+| Skill | Primary Focus | Description |
+|-------|---------------|-------------|
+| **goals** | Orchestrator 🎯 | Task/goal management |
+| **schedule** | Orchestrator 🎯 | Job scheduling |
+| **health** | Orchestrator 🎯 | System monitoring |
+| **pytest_runner** | DevSecOps 🔒 | Test execution |
+| **database** | DevSecOps 🔒 | PostgreSQL ops |
+| **knowledge_graph** | Data 📊 | Entity relationships |
+| **performance** | Data 📊 | Metrics tracking |
+| **moltbook** | Social 🌐 | Social posting |
+| **social** | Social 🌐 | Content scheduling |
+| **llm** | All | Text generation |
+
 ## Skill Execution
 
 Aria has Python skills mounted at `/root/.openclaw/workspace/skills/`. To execute a skill:

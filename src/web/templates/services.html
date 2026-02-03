@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% set dynamic_host = request.host.split(':')[0] %}
 {% block title %}Services - Aria{% endblock %}
 
 {% block extra_css %}
@@ -238,7 +239,7 @@
         <div class="arch-layer">
             <div class="arch-layer-title">🧠 LLM Backends</div>
             <div class="arch-services">
-                <a href="http://{{ service_host }}:8080/" target="_blank" class="arch-service checking" data-service="mlx">
+                <a href="http://{{ dynamic_host }}:8080/" target="_blank" class="arch-service checking" data-service="mlx">
                     <span class="arch-service-status"></span>
                     <div class="arch-service-icon">🍎</div>
                     <div class="arch-service-name">MLX</div>

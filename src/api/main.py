@@ -342,11 +342,21 @@ async def api_provider_balances():
                 resp = await client.get("https://openrouter.ai/api/v1/auth/key", headers=headers)
                 if resp.status_code == 200:
                     data = resp.json()
+                    limit_val = data.get("data", {}).get("limit")
+                    usage_val = data.get("data", {}).get("usage") or 0
+                    # If no limit is set, show usage as negative (prepaid credits spent)
+                    # If limit exists, calculate remaining
+                    if limit_val is not None:
+                        remaining = limit_val - usage_val
+                    else:
+                        # No credit limit - free tier or prepaid, show balance differently
+                        remaining = -usage_val if usage_val > 0 else 0
                     balances["openrouter"] = {
                         "provider": "OpenRouter",
-                        "limit": data.get("data", {}).get("limit"),
-                        "usage": data.get("data", {}).get("usage"),
-                        "remaining": (data.get("data", {}).get("limit") or 0) - (data.get("data", {}).get("usage") or 0),
+                        "limit": limit_val,
+                        "usage": usage_val,
+                        "remaining": remaining,
+                        "is_free_tier": limit_val is None,
                         "currency": "USD",
                         "status": "ok"
                     }

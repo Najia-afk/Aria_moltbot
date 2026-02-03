@@ -576,14 +576,32 @@ async function loadBalances() {
             const or = data.openrouter;
             if (or.status === 'ok') {
                 const remaining = or.remaining || 0;
-                totalUSD += remaining;
+                const usage = or.usage || 0;
+                const limit = or.limit;
                 
-                document.getElementById('openrouter-status').textContent = 'Active';
-                document.getElementById('openrouter-status').className = 'wallet-status ok';
-                document.getElementById('openrouter-balance').textContent = '$' + remaining.toFixed(2);
-                document.getElementById('openrouter-limit').textContent = '$' + (or.limit || 0).toFixed(2);
-                document.getElementById('openrouter-used').textContent = '$' + (or.usage || 0).toFixed(2);
-                document.getElementById('openrouter-remaining').textContent = '$' + remaining.toFixed(2);
+                // Only add positive remaining to total
+                if (remaining > 0) {
+                    totalUSD += remaining;
+                }
+                
+                document.getElementById('openrouter-status').textContent = or.is_free_tier ? 'Free Tier' : 'Active';
+                document.getElementById('openrouter-status').className = 'wallet-status ' + (or.is_free_tier ? 'free' : 'ok');
+                
+                if (or.is_free_tier) {
+                    // Free tier - show usage as spend
+                    document.getElementById('openrouter-balance').textContent = usage > 0 ? '-$' + usage.toFixed(2) : 'FREE';
+                    if (usage > 0) {
+                        document.getElementById('openrouter-balance').classList.add('negative');
+                    } else {
+                        document.getElementById('openrouter-balance').classList.add('free');
+                    }
+                    document.getElementById('openrouter-limit').textContent = 'No limit (free)';
+                } else {
+                    document.getElementById('openrouter-balance').textContent = '$' + remaining.toFixed(2);
+                    document.getElementById('openrouter-limit').textContent = '$' + (limit || 0).toFixed(2);
+                }
+                document.getElementById('openrouter-used').textContent = '$' + usage.toFixed(2);
+                document.getElementById('openrouter-remaining').textContent = remaining >= 0 ? '$' + remaining.toFixed(2) : '-$' + Math.abs(remaining).toFixed(2);
             } else if (or.status === 'free_tier') {
                 document.getElementById('openrouter-status').textContent = 'Free Tier';
                 document.getElementById('openrouter-status').className = 'wallet-status free';
