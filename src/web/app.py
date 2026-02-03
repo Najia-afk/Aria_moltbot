@@ -16,6 +16,8 @@ def create_app():
     service_host = os.environ['SERVICE_HOST']
     api_base_url = os.environ['API_BASE_URL']
     clawdbot_public_url = os.environ['CLAWDBOT_PUBLIC_URL']
+    # Extract token from clawdbot URL for dynamic URL generation
+    clawdbot_token = os.environ.get('CLAWDBOT_TOKEN', '')
 
     @app.context_processor
     def inject_config():
@@ -23,6 +25,7 @@ def create_app():
             'service_host': service_host,
             'api_base_url': api_base_url,
             'clawdbot_public_url': clawdbot_public_url,
+            'clawdbot_token': clawdbot_token,
         }
     
     @app.after_request

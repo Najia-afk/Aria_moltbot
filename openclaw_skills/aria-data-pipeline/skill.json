@@ -1,0 +1,53 @@
+{
+  "skill": "aria-data-pipeline",
+  "version": "1.0.0",
+  "description": "📊 Data pipeline management and ETL operations for Data Architect",
+  "focus": "Data Architect",
+  "author": "Aria Blue",
+  "enabled": true,
+  "rate_limit": {
+    "requests_per_minute": 30,
+    "burst": 15
+  },
+  "config": {},
+  "functions": [
+    {
+      "name": "define_pipeline",
+      "description": "Define a new data pipeline",
+      "parameters": {
+        "name": { "type": "string", "required": true },
+        "steps": { "type": "array", "required": true }
+      }
+    },
+    {
+      "name": "validate_data",
+      "description": "Validate data against a schema",
+      "parameters": {
+        "data": { "type": "array", "required": true },
+        "schema": { "type": "object", "required": true }
+      }
+    },
+    {
+      "name": "infer_schema",
+      "description": "Infer schema from data samples",
+      "parameters": {
+        "data": { "type": "array", "required": true }
+      }
+    },
+    {
+      "name": "transform_data",
+      "description": "Apply transformations to data",
+      "parameters": {
+        "data": { "type": "array", "required": true },
+        "transformations": { "type": "array", "required": true }
+      }
+    },
+    {
+      "name": "data_quality_check",
+      "description": "Run data quality checks",
+      "parameters": {
+        "data": { "type": "array", "required": true }
+      }
+    }
+  ]
+}

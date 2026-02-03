@@ -1,0 +1,75 @@
+{
+  "skill": "aria-research",
+  "version": "1.0.0",
+  "description": "📰 Research and information gathering for Journalist",
+  "focus": "Journalist",
+  "author": "Aria Blue",
+  "enabled": true,
+  "rate_limit": {
+    "requests_per_minute": 20,
+    "burst": 10
+  },
+  "config": {},
+  "functions": [
+    {
+      "name": "create_project",
+      "description": "Create a new research project",
+      "parameters": {
+        "topic": { "type": "string", "required": true },
+        "initial_questions": { "type": "array", "required": false }
+      }
+    },
+    {
+      "name": "add_source",
+      "description": "Add a source to a research project",
+      "parameters": {
+        "project_id": { "type": "string", "required": true },
+        "title": { "type": "string", "required": true },
+        "url": { "type": "string", "required": false },
+        "author": { "type": "string", "required": false },
+        "date": { "type": "string", "required": false },
+        "summary": { "type": "string", "required": false }
+      }
+    },
+    {
+      "name": "add_note",
+      "description": "Add a research note",
+      "parameters": {
+        "project_id": { "type": "string", "required": true },
+        "content": { "type": "string", "required": true },
+        "source_ids": { "type": "array", "required": false },
+        "tags": { "type": "array", "required": false }
+      }
+    },
+    {
+      "name": "generate_questions",
+      "description": "Generate research questions",
+      "parameters": {
+        "project_id": { "type": "string", "required": true },
+        "depth": { "type": "string", "required": false, "default": "medium", "enum": ["surface", "medium", "deep"] }
+      }
+    },
+    {
+      "name": "assess_sources",
+      "description": "Assess source quality and coverage",
+      "parameters": {
+        "project_id": { "type": "string", "required": true }
+      }
+    },
+    {
+      "name": "synthesize",
+      "description": "Synthesize research into a summary",
+      "parameters": {
+        "project_id": { "type": "string", "required": true }
+      }
+    },
+    {
+      "name": "get_bibliography",
+      "description": "Generate bibliography",
+      "parameters": {
+        "project_id": { "type": "string", "required": true },
+        "style": { "type": "string", "required": false, "default": "apa", "enum": ["apa", "mla", "chicago"] }
+      }
+    }
+  ]
+}

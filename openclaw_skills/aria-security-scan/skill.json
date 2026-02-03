@@ -1,0 +1,48 @@
+{
+  "skill": "aria-security-scan",
+  "version": "1.0.0",
+  "description": "🔒 Security scanning and vulnerability detection for DevSecOps",
+  "focus": "DevSecOps",
+  "author": "Aria Blue",
+  "enabled": true,
+  "rate_limit": {
+    "requests_per_minute": 10,
+    "burst": 5
+  },
+  "config": {
+    "default_extensions": [".py", ".js", ".ts", ".yaml", ".yml", ".json", ".env"],
+    "exclude_dirs": ["node_modules", ".git", "__pycache__", "venv", ".venv"]
+  },
+  "functions": [
+    {
+      "name": "scan_file",
+      "description": "Scan a single file for security issues",
+      "parameters": {
+        "file_path": { "type": "string", "required": true }
+      }
+    },
+    {
+      "name": "scan_directory",
+      "description": "Scan a directory recursively for security issues",
+      "parameters": {
+        "directory": { "type": "string", "required": true },
+        "extensions": { "type": "array", "required": false },
+        "exclude_dirs": { "type": "array", "required": false }
+      }
+    },
+    {
+      "name": "check_dependencies",
+      "description": "Check Python dependencies for known vulnerabilities",
+      "parameters": {
+        "requirements_file": { "type": "string", "required": true }
+      }
+    },
+    {
+      "name": "audit_docker",
+      "description": "Audit a Dockerfile for security best practices",
+      "parameters": {
+        "dockerfile_path": { "type": "string", "required": true }
+      }
+    }
+  ]
+}

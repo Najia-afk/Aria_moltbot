@@ -196,6 +196,8 @@ manager.set_focus(FocusType.DEVSECOPS)
 
 ## Skill-to-Focus Mapping
 
+### Core Skills (v1.0 - v1.1)
+
 | Skill | Primary Focus | Secondary |
 |-------|---------------|-----------|
 | goals | Orchestrator | - |
@@ -208,6 +210,23 @@ manager.set_focus(FocusType.DEVSECOPS)
 | moltbook | Social | Creative, Journalist |
 | social | Social | Creative |
 | llm | All | - |
+| litellm | All | - |
+| hourly_goals | Orchestrator | - |
+
+### Focus-Specific Skills (v1.2)
+
+| Skill | Focus | Description |
+|-------|-------|-------------|
+| **security_scan** | 🔒 DevSecOps | Vulnerability detection, secret scanning, code analysis |
+| **ci_cd** | 🔒 DevSecOps | GitHub Actions, Dockerfile generation, deployment analysis |
+| **data_pipeline** | 📊 Data Architect | ETL operations, data validation, schema inference |
+| **experiment** | 📊 Data Architect | ML experiment tracking, model registry, metrics comparison |
+| **market_data** | 📈 Crypto Trader | Price feeds, technical indicators, sentiment analysis |
+| **portfolio** | 📈 Crypto Trader | Position management, P&L tracking, risk metrics |
+| **brainstorm** | 🎨 Creative | Idea generation, creative techniques, concept mapping |
+| **research** | 📰 Journalist | Source collection, credibility assessment, synthesis |
+| **fact_check** | 📰 Journalist | Claim extraction, verification, verdict generation |
+| **community** | 🌐 Social | Community health, engagement tracking, growth strategies |
 
 ---
 

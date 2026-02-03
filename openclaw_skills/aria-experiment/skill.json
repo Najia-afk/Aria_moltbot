@@ -1,0 +1,68 @@
+{
+  "skill": "aria-experiment",
+  "version": "1.0.0",
+  "description": "🧪 ML experiment tracking and model management for Data Architect",
+  "focus": "Data Architect",
+  "author": "Aria Blue",
+  "enabled": true,
+  "rate_limit": {
+    "requests_per_minute": 30,
+    "burst": 15
+  },
+  "config": {},
+  "functions": [
+    {
+      "name": "create_experiment",
+      "description": "Create a new ML experiment",
+      "parameters": {
+        "name": { "type": "string", "required": true },
+        "parameters": { "type": "object", "required": true },
+        "tags": { "type": "array", "required": false }
+      }
+    },
+    {
+      "name": "log_metrics",
+      "description": "Log metrics to an experiment",
+      "parameters": {
+        "experiment_id": { "type": "string", "required": true },
+        "metrics": { "type": "object", "required": true },
+        "step": { "type": "integer", "required": false }
+      }
+    },
+    {
+      "name": "complete_experiment",
+      "description": "Mark experiment as completed",
+      "parameters": {
+        "experiment_id": { "type": "string", "required": true },
+        "status": { "type": "string", "required": false, "default": "completed" }
+      }
+    },
+    {
+      "name": "compare_experiments",
+      "description": "Compare multiple experiments",
+      "parameters": {
+        "experiment_ids": { "type": "array", "required": true },
+        "metrics": { "type": "array", "required": false }
+      }
+    },
+    {
+      "name": "register_model",
+      "description": "Register a model version",
+      "parameters": {
+        "name": { "type": "string", "required": true },
+        "experiment_id": { "type": "string", "required": true },
+        "metrics": { "type": "object", "required": true },
+        "path": { "type": "string", "required": false }
+      }
+    },
+    {
+      "name": "promote_model",
+      "description": "Promote model to a new stage",
+      "parameters": {
+        "name": { "type": "string", "required": true },
+        "version": { "type": "integer", "required": true },
+        "stage": { "type": "string", "required": true, "enum": ["development", "staging", "production"] }
+      }
+    }
+  ]
+}

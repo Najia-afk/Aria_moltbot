@@ -1,0 +1,71 @@
+{
+  "skill": "aria-brainstorm",
+  "version": "1.0.0",
+  "description": "🎨 Creative brainstorming and ideation for Creative Adventurer",
+  "focus": "Creative",
+  "author": "Aria Blue",
+  "enabled": true,
+  "rate_limit": {
+    "requests_per_minute": 20,
+    "burst": 10
+  },
+  "config": {},
+  "functions": [
+    {
+      "name": "start_session",
+      "description": "Start a new brainstorming session",
+      "parameters": {
+        "topic": { "type": "string", "required": true },
+        "constraints": { "type": "array", "required": false }
+      }
+    },
+    {
+      "name": "add_idea",
+      "description": "Add an idea to a session",
+      "parameters": {
+        "session_id": { "type": "string", "required": true },
+        "title": { "type": "string", "required": true },
+        "description": { "type": "string", "required": true },
+        "tags": { "type": "array", "required": false }
+      }
+    },
+    {
+      "name": "apply_technique",
+      "description": "Apply a brainstorming technique",
+      "parameters": {
+        "session_id": { "type": "string", "required": true },
+        "technique": { "type": "string", "required": true, "enum": ["scamper", "six_hats", "random_word", "worst_idea"] }
+      }
+    },
+    {
+      "name": "get_random_prompt",
+      "description": "Get a random creative prompt",
+      "parameters": {
+        "category": { "type": "string", "required": false, "enum": ["tech", "content", "business", "design"] }
+      }
+    },
+    {
+      "name": "connect_ideas",
+      "description": "Find connections between ideas",
+      "parameters": {
+        "session_id": { "type": "string", "required": true },
+        "idea_ids": { "type": "array", "required": false }
+      }
+    },
+    {
+      "name": "evaluate_ideas",
+      "description": "Evaluate and rank ideas",
+      "parameters": {
+        "session_id": { "type": "string", "required": true },
+        "criteria": { "type": "array", "required": false }
+      }
+    },
+    {
+      "name": "summarize_session",
+      "description": "Get a summary of a brainstorming session",
+      "parameters": {
+        "session_id": { "type": "string", "required": true }
+      }
+    }
+  ]
+}

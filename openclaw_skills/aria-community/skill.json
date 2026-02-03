@@ -1,0 +1,68 @@
+{
+  "skill": "aria-community",
+  "version": "1.0.0",
+  "description": "🌐 Community management and growth for Social Architect",
+  "focus": "Social Architect",
+  "author": "Aria Blue",
+  "enabled": true,
+  "rate_limit": {
+    "requests_per_minute": 30,
+    "burst": 15
+  },
+  "config": {},
+  "functions": [
+    {
+      "name": "track_member",
+      "description": "Add or update a community member",
+      "parameters": {
+        "username": { "type": "string", "required": true },
+        "tags": { "type": "array", "required": false }
+      }
+    },
+    {
+      "name": "record_engagement",
+      "description": "Record member engagement activity",
+      "parameters": {
+        "username": { "type": "string", "required": true },
+        "engagement_type": { "type": "string", "required": true, "enum": ["post", "comment", "reaction", "share", "mention"] },
+        "content_id": { "type": "string", "required": false }
+      }
+    },
+    {
+      "name": "get_community_health",
+      "description": "Get overall community health metrics",
+      "parameters": {}
+    },
+    {
+      "name": "identify_champions",
+      "description": "Identify top community champions",
+      "parameters": {
+        "limit": { "type": "integer", "required": false, "default": 10 }
+      }
+    },
+    {
+      "name": "create_campaign",
+      "description": "Create a community campaign",
+      "parameters": {
+        "name": { "type": "string", "required": true },
+        "goal": { "type": "string", "required": true },
+        "duration_days": { "type": "integer", "required": false, "default": 30 }
+      }
+    },
+    {
+      "name": "get_growth_strategies",
+      "description": "Get community growth strategies",
+      "parameters": {
+        "current_size": { "type": "integer", "required": false }
+      }
+    },
+    {
+      "name": "generate_content_calendar",
+      "description": "Generate a content calendar",
+      "parameters": {
+        "days": { "type": "integer", "required": false, "default": 7 },
+        "posts_per_day": { "type": "integer", "required": false, "default": 2 }
+      }
+    }
+  ]
+}

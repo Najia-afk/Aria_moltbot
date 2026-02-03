@@ -1,0 +1,68 @@
+{
+  "skill": "aria-portfolio",
+  "version": "1.0.0",
+  "description": "💼 Portfolio and position management for Crypto Trader",
+  "focus": "Crypto Trader",
+  "author": "Aria Blue",
+  "enabled": true,
+  "rate_limit": {
+    "requests_per_minute": 30,
+    "burst": 10
+  },
+  "config": {
+    "initial_balance": 10000,
+    "max_position_size": 0.2,
+    "max_drawdown": 0.1
+  },
+  "functions": [
+    {
+      "name": "open_position",
+      "description": "Open a new trading position",
+      "parameters": {
+        "symbol": { "type": "string", "required": true },
+        "quantity": { "type": "number", "required": true },
+        "price": { "type": "number", "required": true },
+        "side": { "type": "string", "required": false, "default": "long" },
+        "stop_loss": { "type": "number", "required": false },
+        "take_profit": { "type": "number", "required": false }
+      }
+    },
+    {
+      "name": "close_position",
+      "description": "Close an existing position",
+      "parameters": {
+        "symbol": { "type": "string", "required": true },
+        "price": { "type": "number", "required": true },
+        "reason": { "type": "string", "required": false, "default": "manual" }
+      }
+    },
+    {
+      "name": "get_positions",
+      "description": "Get all open positions with unrealized P&L",
+      "parameters": {
+        "current_prices": { "type": "object", "required": false }
+      }
+    },
+    {
+      "name": "get_trade_history",
+      "description": "Get trade history",
+      "parameters": {
+        "symbol": { "type": "string", "required": false },
+        "limit": { "type": "integer", "required": false, "default": 50 }
+      }
+    },
+    {
+      "name": "get_performance_metrics",
+      "description": "Calculate portfolio performance metrics",
+      "parameters": {}
+    },
+    {
+      "name": "check_risk_limits",
+      "description": "Check if portfolio respects risk limits",
+      "parameters": {
+        "max_position_size": { "type": "number", "required": false, "default": 0.2 },
+        "max_drawdown": { "type": "number", "required": false, "default": 0.1 }
+      }
+    }
+  ]
+}

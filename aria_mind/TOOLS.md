@@ -6,11 +6,14 @@ Tools and skills available to Aria agents via OpenClaw.
 
 ## Skill → Focus Mapping
 
+### Core Skills (v1.0 - v1.1)
+
 | Skill | Primary Focus | Description |
 |-------|---------------|-------------|
 | **goals** | Orchestrator 🎯 | Task/goal management |
 | **schedule** | Orchestrator 🎯 | Job scheduling |
 | **health** | Orchestrator 🎯 | System monitoring |
+| **hourly_goals** | Orchestrator 🎯 | Hourly task breakdown |
 | **pytest_runner** | DevSecOps 🔒 | Test execution |
 | **database** | DevSecOps 🔒 | PostgreSQL ops |
 | **knowledge_graph** | Data 📊 | Entity relationships |
@@ -18,6 +21,22 @@ Tools and skills available to Aria agents via OpenClaw.
 | **moltbook** | Social 🌐 | Social posting |
 | **social** | Social 🌐 | Content scheduling |
 | **llm** | All | Text generation |
+| **litellm** | All | Multi-model routing |
+
+### Focus-Specific Skills (v1.2)
+
+| Skill | Primary Focus | Description |
+|-------|---------------|-------------|
+| **security_scan** | DevSecOps 🔒 | Vulnerability detection, secret scanning |
+| **ci_cd** | DevSecOps 🔒 | GitHub Actions, Dockerfile generation |
+| **data_pipeline** | Data 📊 | ETL operations, data validation |
+| **experiment** | Data 📊 | ML experiment tracking, model registry |
+| **market_data** | Trader 📈 | Price feeds, technical indicators |
+| **portfolio** | Trader 📈 | Position management, risk metrics |
+| **brainstorm** | Creative 🎨 | Idea generation, creative techniques |
+| **research** | Journalist 📰 | Source collection, credibility assessment |
+| **fact_check** | Journalist 📰 | Claim verification, verdicts |
+| **community** | Social 🌐 | Community health, engagement tracking |
 
 ## Skill Execution
 

@@ -249,7 +249,7 @@
                             <a href="/litellm" class="{% if '/litellm' in request.path %}active{% endif %}">
                                 ⚡ LiteLLM
                             </a>
-                            <a href="{{ clawdbot_public_url }}" target="_blank">
+                            <a href="/clawdbot/?session=main&token={{ clawdbot_token }}" target="_blank" class="clawdbot-link">
                                 🦞 Clawdbot (OpenClaw)
                             </a>
                             <a href="/traefik/dashboard/" target="_blank">
@@ -332,7 +332,13 @@
         // ==== Global Config ====
         const API_BASE_URL = "{{ api_base_url }}";
         window.ARIA_API_BASE_URL = API_BASE_URL;
-        window.ARIA_CLAWDBOT_PUBLIC_URL = "{{ clawdbot_public_url }}";
+        // Build dynamic Clawdbot URL using current host
+        const clawdbotToken = "{{ clawdbot_public_url.split('token=')[1] if 'token=' in clawdbot_public_url else '' }}";
+        const currentHost = window.location.hostname;
+        const protocol = window.location.protocol;
+        window.ARIA_CLAWDBOT_PUBLIC_URL = clawdbotToken 
+            ? `${protocol}//${currentHost}/clawdbot/?session=main&token=${clawdbotToken}`
+            : `${protocol}//${currentHost}/clawdbot/`;
 
         function toggleMenu() {
             document.getElementById('nav-links').classList.toggle('active');

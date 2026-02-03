@@ -93,7 +93,7 @@ You are in executive mode. Your role is to:
         name="DevSecOps",
         emoji="🔒",
         vibe="Security-paranoid, infrastructure-aware, systematic",
-        skills=["pytest_runner", "database", "health", "llm"],
+        skills=["pytest_runner", "database", "health", "llm", "security_scan", "ci_cd"],
         model_hint="qwen3-coder-free",
         context="""
 You are in DevSecOps mode. Your priorities:
@@ -116,7 +116,7 @@ Key patterns:
         name="Data Architect",
         emoji="📊",
         vibe="Analytical, pattern-seeking, metrics-driven",
-        skills=["database", "knowledge_graph", "performance", "llm"],
+        skills=["database", "knowledge_graph", "performance", "llm", "data_pipeline", "experiment"],
         model_hint="chimera-free",
         context="""
 You are in Data Science/MLOps mode. Your approach:
@@ -140,7 +140,7 @@ Key patterns:
         name="Crypto Trader",
         emoji="📈",
         vibe="Risk-aware, market-analytical, disciplined",
-        skills=["database", "schedule", "knowledge_graph", "llm"],
+        skills=["database", "schedule", "knowledge_graph", "llm", "market_data", "portfolio"],
         model_hint="deepseek-free",
         context="""
 You are in Crypto/Trading analysis mode. Your principles:
@@ -164,7 +164,7 @@ Key patterns:
         name="Creative",
         emoji="🎨",
         vibe="Exploratory, unconventional, playful",
-        skills=["llm", "moltbook", "social", "knowledge_graph"],
+        skills=["llm", "moltbook", "social", "knowledge_graph", "brainstorm"],
         model_hint="trinity-free",
         context="""
 You are in Creative/Adventure mode. Your approach:
@@ -188,7 +188,7 @@ Key patterns:
         name="Social Architect",
         emoji="🌐",
         vibe="Community-building, engaging, authentic",
-        skills=["moltbook", "social", "schedule", "llm"],
+        skills=["moltbook", "social", "schedule", "llm", "community"],
         model_hint="trinity-free",
         context="""
 You are in Social Media/Startuper mode. Your principles:
@@ -212,7 +212,7 @@ Key patterns for Moltbook:
         name="Journalist",
         emoji="📰",
         vibe="Investigative, fact-checking, narrative-building",
-        skills=["knowledge_graph", "social", "moltbook", "llm"],
+        skills=["knowledge_graph", "social", "moltbook", "llm", "research", "fact_check"],
         model_hint="qwen3-next-free",
         context="""
 You are in Journalist/Reporter mode. Your standards:

@@ -1,0 +1,47 @@
+{
+  "skill": "aria-ci-cd",
+  "version": "1.0.0",
+  "description": "🔄 CI/CD pipeline management and automation for DevSecOps",
+  "focus": "DevSecOps",
+  "author": "Aria Blue",
+  "enabled": true,
+  "rate_limit": {
+    "requests_per_minute": 20,
+    "burst": 10
+  },
+  "config": {},
+  "functions": [
+    {
+      "name": "generate_workflow",
+      "description": "Generate a GitHub Actions workflow file",
+      "parameters": {
+        "workflow_type": { "type": "string", "required": true, "enum": ["test", "build", "deploy", "security"] },
+        "language": { "type": "string", "required": false, "default": "python" },
+        "options": { "type": "object", "required": false }
+      }
+    },
+    {
+      "name": "validate_workflow",
+      "description": "Validate a GitHub Actions workflow file",
+      "parameters": {
+        "workflow_path": { "type": "string", "required": true }
+      }
+    },
+    {
+      "name": "generate_dockerfile",
+      "description": "Generate a secure Dockerfile",
+      "parameters": {
+        "language": { "type": "string", "required": false, "default": "python" },
+        "base_image": { "type": "string", "required": false },
+        "options": { "type": "object", "required": false }
+      }
+    },
+    {
+      "name": "analyze_deployment",
+      "description": "Analyze a docker-compose deployment configuration",
+      "parameters": {
+        "compose_file": { "type": "string", "required": true }
+      }
+    }
+  ]
+}
