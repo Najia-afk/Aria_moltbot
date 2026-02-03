@@ -10,6 +10,9 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 import pytest_asyncio
 
+# Ensure API URL resolves when running tests outside Docker
+os.environ.setdefault("ARIA_API_URL", "http://localhost:8000/api")
+
 from aria_skills.base import SkillConfig, SkillStatus
 from aria_skills.registry import SkillRegistry
 from aria_agents.base import AgentConfig, AgentRole
@@ -136,6 +139,7 @@ def mock_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("MOONSHOT_API_KEY", "test-moonshot-key")
     monkeypatch.setenv("MOLTBOOK_TOKEN", "test-moltbook-token")
     monkeypatch.setenv("DATABASE_URL", "postgresql://test:test@localhost/test")
+    monkeypatch.setenv("ARIA_API_URL", "http://localhost:8000/api")
 
 
 # ============================================================================

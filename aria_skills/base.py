@@ -52,6 +52,9 @@ class SkillResult:
     def fail(cls, error: str) -> "SkillResult":
         return cls(success=False, error=error)
 
+    def __bool__(self) -> bool:
+        return self.success
+
 
 class BaseSkill(ABC):
     """

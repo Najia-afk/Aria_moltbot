@@ -29,6 +29,8 @@ class SkillRegistry:
     def __init__(self):
         self._skills: Dict[str, BaseSkill] = {}
         self._configs: Dict[str, SkillConfig] = {}
+        # Backward-compatible alias for tests
+        self._registered_classes = self._skill_classes
     
     @classmethod
     def register(cls, skill_class: Type[BaseSkill]):

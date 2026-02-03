@@ -46,6 +46,10 @@ class LLMAgent(BaseAgent):
             else:
                 # Default: try local first, then cloud
                 llm_skill = self._skill_registry.get("ollama") or self._skill_registry.get("moonshot")
+
+            # Fallback if routed skill is missing
+            if not llm_skill:
+                llm_skill = self._skill_registry.get("moonshot") or self._skill_registry.get("ollama")
         
         if not llm_skill:
             self.logger.warning("No LLM skill available, returning placeholder")

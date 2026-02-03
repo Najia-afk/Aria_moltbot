@@ -39,6 +39,7 @@ class MoltbookSkill(BaseSkill):
         # MUST use www subdomain to avoid redirect stripping auth header
         self._api_url = config.config.get("api_url", "https://www.moltbook.com/api/v1")
         self._token: Optional[str] = None
+        self._post_times: List[datetime] = []
         self._last_post_time: Optional[datetime] = None
         self._last_comment_time: Optional[datetime] = None
         self._comments_today: int = 0
@@ -120,6 +121,29 @@ class MoltbookSkill(BaseSkill):
         
         remaining = self.POST_COOLDOWN_MINUTES - int(elapsed.total_seconds() / 60)
         return False, remaining
+
+    def _check_rate_limit(self) -> bool:
+        """Check configured rate limits for posts (hour/day)."""
+        if not self.config.rate_limit:
+            return True
+
+        now = datetime.utcnow()
+        posts_per_hour = self.config.rate_limit.get("posts_per_hour")
+        posts_per_day = self.config.rate_limit.get("posts_per_day")
+
+        if posts_per_hour is not None:
+            hour_ago = now - timedelta(hours=1)
+            recent = [t for t in self._post_times if t >= hour_ago]
+            if len(recent) >= posts_per_hour:
+                return False
+
+        if posts_per_day is not None:
+            day_ago = now - timedelta(days=1)
+            recent = [t for t in self._post_times if t >= day_ago]
+            if len(recent) >= posts_per_day:
+                return False
+
+        return True
     
     def _can_comment(self) -> tuple[bool, Optional[int], int]:
         """Check if we can comment (20 sec cooldown, 50/day)."""
@@ -233,6 +257,7 @@ class MoltbookSkill(BaseSkill):
                 else:
                     self._log_usage("create_post", False)
                     return SkillResult.fail(data.get("error", f"HTTP {response.status_code}"))
+                    self._post_times.append(self._last_post_time)
                     
         except Exception as e:
             self._log_usage("create_post", False)
