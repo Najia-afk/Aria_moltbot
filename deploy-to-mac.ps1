@@ -7,10 +7,10 @@ param(
     [string]$Message = "Auto-deploy: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')",
     [switch]$NoPush,
     [switch]$RebuildOnly,
-    [string]$KeyPath = ".\najia_mac_key",
+    [string]$KeyPath = "$env:USERPROFILE\.ssh\najia_mac_key",
     [string]$MacUser = "najia",
     [string]$MacHost = "192.168.1.53",
-    [string]$RemotePath = "/Users/najia/git/Aria_moltbot"
+    [string]$RemotePath = "/Users/najia/aria"
 )
 
 $ErrorActionPreference = "Stop"
