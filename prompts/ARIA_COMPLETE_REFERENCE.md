@@ -69,9 +69,8 @@ Aria is a **distributed cognitive architecture** with a **Focus-based persona sy
 | **Memory** | `aria_mind/memory.py` | Short-term and long-term storage |
 | **Heartbeat** | `aria_mind/heartbeat.py` | Health monitoring, scheduling |
 | **AgentCoordinator** | `aria_agents/coordinator.py` | Multi-agent orchestration |
-| **Skills** | `aria_skills/` | Tool implementations (24 skills) |
-| **OpenClaw Manifests** | `openclaw_skills/` | Skill definitions for LLM |
-| **Entrypoint** | `stacks/brain/openclaw-entrypoint.sh` | Dynamic skill runner |
+| **Skills** | `aria_skills/<skill>/` | Tool implementations + manifests (24 skills) |
+| **Entrypoint** | `stacks/brain/openclaw-entrypoint.sh` | Dynamic skill runner + symlink generation |
 
 ---
 
@@ -154,7 +153,7 @@ print(soul.active_focus.skills) # ["security_scan", "ci_cd", ...]
 | `performance` | `aria_skills.performance` | `PerformanceSkill` | Metrics, analytics |
 | `social` | `aria_skills.social` | `SocialSkill` | Telegram, Discord |
 | `hourly_goals` | `aria_skills.hourly_goals` | `HourlyGoalSkill` | Short-term goals |
-| `litellm` | `aria_skills.litellm_skill` | `LiteLLMSkill` | LiteLLM management |
+| `litellm` | `aria_skills.litellm` | `LiteLLMSkill` | LiteLLM management |
 | `schedule` | `aria_skills.schedule` | `ScheduleSkill` | Job scheduling |
 
 #### DevSecOps Skills (v1.2)
@@ -232,22 +231,27 @@ print(soul.active_focus.skills) # ["security_scan", "ci_cd", ...]
 
 ## 4. Creating New Skills
 
-### File Structure
+### File Structure (Consolidated v2.0)
+
+Each skill is a **subdirectory** containing code, manifest, and docs together:
 
 ```
 aria_skills/
-└── my_skill.py           # Python implementation
-
-openclaw_skills/
-└── aria-my-skill/
+├── base.py               # BaseSkill, SkillConfig, SkillResult
+├── registry.py           # SkillRegistry
+├── __init__.py           # Package exports
+└── my_skill/             # One directory per skill
+    ├── __init__.py       # Python implementation
     ├── skill.json        # OpenClaw manifest
-    └── SKILL.md          # Documentation
+    └── SKILL.md          # Documentation (optional)
 ```
+
+> **Note**: The entrypoint automatically creates symlinks from `/root/.openclaw/skills/aria-<skill>/` to each `skill.json` at container startup.
 
 ### Step 1: Create Python Skill
 
 ```python
-# aria_skills/my_skill.py
+# aria_skills/my_skill/__init__.py
 
 """
 My Skill - Description of what this skill does.
@@ -266,6 +270,7 @@ from aria_skills.registry import SkillRegistry
 
 @SkillRegistry.register
 class MySkill(BaseSkill):
+    """Skill for [purpose]."""
     """Skill for [purpose]."""
     
     def __init__(self, config: SkillConfig):
@@ -317,7 +322,7 @@ class MySkill(BaseSkill):
 ```python
 # aria_skills/__init__.py
 
-from aria_skills.my_skill import MySkill
+from aria_skills.my_skill import MySkill  # Import from subdirectory
 
 __all__ = [
     # ... existing
@@ -343,7 +348,7 @@ SKILL_REGISTRY = {
 ### Step 4: Create OpenClaw Manifest
 
 ```json
-// openclaw_skills/aria-my-skill/skill.json
+// aria_skills/my_skill/skill.json
 {
   "name": "aria-my-skill",
   "version": "1.0.0",
@@ -369,7 +374,9 @@ SKILL_REGISTRY = {
 }
 ```
 
-### Step 5: Create SKILL.md
+### Step 5: Create SKILL.md (Optional)
+
+Create `aria_skills/my_skill/SKILL.md`:
 
 ```markdown
 ---
@@ -400,13 +407,15 @@ Environment variables:
 - `MY_SKILL_API_KEY`: API authentication key
 ```
 
-### Step 6: Enable in openclaw.json
+### Step 6: Add to skills.entries in Entrypoint
 
-In `openclaw-entrypoint.sh`, add to the skills.entries section:
+In `stacks/brain/openclaw-entrypoint.sh`, add to the `skills.entries` section:
 
 ```json
 "aria-my-skill": { "enabled": true }
 ```
+
+> **Note**: Symlinks are created automatically by the entrypoint script for any `skill.json` found in `aria_skills/*/`.
 
 ### Step 7: Add to TOOLS.md
 
@@ -539,9 +548,10 @@ volumes:
   - ../../aria_mind:/root/.openclaw/workspace
   - ../../aria_skills:/root/.openclaw/workspace/skills/aria_skills:ro
   - ../../aria_agents:/root/.openclaw/workspace/skills/aria_agents:ro
-  - ../../openclaw_skills:/root/.openclaw/skills:ro
   - ./openclaw-entrypoint.sh:/openclaw-entrypoint.sh:ro
 ```
+
+> **Note**: OpenClaw skill manifests are symlinked at startup from `aria_skills/*/skill.json` to `/root/.openclaw/skills/aria-*/skill.json`.
 
 ### Entrypoint Sequence
 
@@ -549,12 +559,13 @@ volumes:
 
 1. Install apt dependencies (curl, jq, python3)
 2. Install OpenClaw if not present
-3. pip install Python dependencies
-4. **Generate `run_skill.py`** with SKILL_REGISTRY (24 skills)
-5. Read BOOTSTRAP.md for system prompt
-6. **Generate `openclaw.json`** with all skill entries enabled
-7. Prepare awakening (first boot detection)
-8. Start OpenClaw Gateway on port 18789
+3. **Create skill manifest symlinks** from `aria_skills/*/skill.json` to `/root/.openclaw/skills/aria-*/`
+4. pip install Python dependencies
+5. **Generate `run_skill.py`** with SKILL_REGISTRY (24 skills)
+6. Read BOOTSTRAP.md for system prompt
+7. **Generate `openclaw.json`** with all skill entries enabled
+8. Prepare awakening (first boot detection)
+9. Start OpenClaw Gateway on port 18789
 
 ---
 
@@ -726,17 +737,18 @@ python3 run_skill.py brainstorm ideate '{"topic": "AI agents", "technique": "sca
 
 ### Checklist for New Skills
 
-- [ ] Create `aria_skills/my_skill.py`
+- [ ] Create directory `aria_skills/my_skill/`
+- [ ] Create `aria_skills/my_skill/__init__.py` (Python implementation)
+- [ ] Create `aria_skills/my_skill/skill.json` (OpenClaw manifest)
+- [ ] Create `aria_skills/my_skill/SKILL.md` (documentation, optional)
 - [ ] Add import to `aria_skills/__init__.py`
 - [ ] Add to SKILL_REGISTRY in `openclaw-entrypoint.sh`
 - [ ] Add to skills.entries in `openclaw-entrypoint.sh`
-- [ ] Create `openclaw_skills/aria-my-skill/skill.json`
-- [ ] Create `openclaw_skills/aria-my-skill/SKILL.md`
 - [ ] Add config to `aria_mind/TOOLS.md`
 - [ ] Update Focus skills list in `aria_mind/soul/focus.py` (if focus-specific)
 - [ ] Write tests in `tests/test_my_skill.py`
 - [ ] Commit and push
-- [ ] Deploy with `docker compose up -d --build`
+- [ ] Deploy with `docker compose up -d`
 
 ---
 
