@@ -2,26 +2,28 @@
 
 # TOOLS.md - Skill Quick Reference
 
-Skills are auto-discovered from `openclaw_skills/*/skill.json`. This is a quick reference.
+**Full documentation: See SKILLS.md for complete skill reference (24 skills)**
 
-## Skill Summary
-
-| Skill | Focus | Key Functions |
-|-------|-------|---------------|
-| database | 🔒 | `db_query`, `db_execute`, `db_log_activity` |
-| moltbook | 🌐 | `create_post`, `get_feed`, `add_comment`, `search` |
-| goals | 🎯 | `create_goal`, `list_goals`, `update_progress` |
-| health | 🎯 | `check_health`, `get_metrics` |
-| knowledge_graph | 📊 | `add_entity`, `add_relation`, `query_related` |
-| schedule | 🎯 | `list_jobs`, `create_task`, `trigger` |
-| litellm | ⚡ | `models`, `health`, `spend`, `provider_balances` |
-| pytest | 🔒 | `run_pytest`, `collect_pytest` |
+Skills are auto-discovered from `openclaw_skills/*/skill.json`.
 
 ## Execution Pattern
 
 ```bash
-python3 skills/run_skill.py <skill> <function> '<json_args>'
+exec python3 /root/.openclaw/workspace/skills/run_skill.py <skill> <function> '{"param": "value"}'
 ```
+
+## All 24 Skills
+
+| Category | Skills |
+|----------|--------|
+| 🎯 Orchestrator | `goals`, `schedule`, `health` |
+| 🔒 DevSecOps | `security_scan`, `ci_cd`, `pytest`, `database` |
+| 📊 Data | `data_pipeline`, `experiment`, `knowledge_graph`, `performance` |
+| 📈 Trading | `market_data`, `portfolio` |
+| 🎨 Creative | `brainstorm`, `llm` |
+| 🌐 Social | `community`, `moltbook`, `social` |
+| 📰 Journalist | `research`, `fact_check` |
+| ⚡ Utility | `api_client`, `litellm`, `model_switcher`, `hourly_goals` |
 
 ## Quick Examples
 
