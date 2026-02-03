@@ -297,7 +297,7 @@ fi
 # Generate openclaw.json with LiteLLM provider config, skill definitions, and Aria identity
 OPENCLAW_CONFIG="/root/.openclaw/openclaw.json"
 MODELS_CATALOG="/root/.openclaw/workspace/aria_models/models.yaml"
-OPENCLAW_TEMPLATE="/root/.openclaw/workspace/stacks/brain/openclaw-config.json"
+OPENCLAW_TEMPLATE="/root/.openclaw/openclaw-config-template.json"
 OPENCLAW_RENDERER="/root/.openclaw/workspace/aria_models/openclaw_config.py"
 
 if [ -f "$OPENCLAW_RENDERER" ] && [ -f "$MODELS_CATALOG" ] && [ -f "$OPENCLAW_TEMPLATE" ]; then

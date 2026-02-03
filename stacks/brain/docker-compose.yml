@@ -77,6 +77,7 @@ services:
       # NOTE: Each skill subdirectory now contains skill.json for OpenClaw
       - ../../aria_skills:/root/.openclaw/workspace/skills/aria_skills:ro
       - ../../aria_agents:/root/.openclaw/workspace/skills/aria_agents:ro
+      - ../../aria_models:/root/.openclaw/workspace/aria_models:ro
       - ../../skills:/root/.openclaw/workspace/skills/legacy:ro
       # Mount patch artifacts
       - ../../patch:/root/.openclaw/patches:ro
@@ -84,6 +85,8 @@ services:
       - ../../tests:/root/.openclaw/workspace/tests:ro
       - ../../pyproject.toml:/root/.openclaw/workspace/pyproject.toml:ro
       - ./openclaw-entrypoint.sh:/openclaw-entrypoint.sh:ro
+      # Mount OpenClaw config template
+      - ./openclaw-config.json:/root/.openclaw/openclaw-config-template.json:ro
     ports:
       - "18789:18789"
     depends_on:
