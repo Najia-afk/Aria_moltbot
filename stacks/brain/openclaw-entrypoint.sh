@@ -198,10 +198,17 @@ async def run_skill(skill_name: str, function_name: str, args: dict):
         else:
             result = func(**args)
         
-        # Convert SkillResult to dict if needed
-        if hasattr(result, '__dict__'):
+        # Convert result to dict
+        if hasattr(result, 'success') and hasattr(result, 'data'):
+            # SkillResult object
             return {'success': result.success, 'data': result.data, 'error': result.error}
-        return result
+        elif hasattr(result, 'value'):
+            # Enum (like SkillStatus)
+            return {'success': True, 'data': result.value, 'error': None}
+        elif isinstance(result, dict):
+            return result
+        else:
+            return {'success': True, 'data': str(result), 'error': None}
         
     except Exception as e:
         import traceback
