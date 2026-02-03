@@ -365,42 +365,35 @@ cat /root/.openclaw/openclaw.json
 
 # Check if this is first boot (awakening)
 FIRST_BOOT_MARKER="/root/.openclaw/.awakened"
+NEEDS_AWAKENING_MARKER="/root/.openclaw/.needs_awakening"
 
-# Function to send awakening message after gateway starts
-send_awakening_message() {
-    sleep 15  # Wait for gateway to be fully ready
+# Function to prepare awakening (don't send via CLI - causes lock issues)
+prepare_awakening() {
+    sleep 5  # Brief wait for filesystem
     
     if [ ! -f "$FIRST_BOOT_MARKER" ]; then
-        echo "=== FIRST BOOT DETECTED - Sending Awakening Message ==="
+        echo "=== FIRST BOOT DETECTED ==="
+        echo "Creating awakening marker for Aria to process..."
         
-        # Read the awakening message
+        # Create marker that tells Aria she needs to awaken
+        echo "$(date -Iseconds)" > "$NEEDS_AWAKENING_MARKER"
+        
+        # Also copy AWAKENING.md content to a prompt file the hook can read
         if [ -f "/root/.openclaw/workspace/AWAKENING.md" ]; then
-            AWAKENING_MSG=$(cat /root/.openclaw/workspace/AWAKENING.md | jq -Rs .)
-            
-            # Send via OpenClaw CLI (creates a new chat message)
-            # Retrying loop to ensure gateway is ready
-            echo "Waiting for gateway..."
-            for i in {1..10}; do
-                /usr/local/bin/openclaw agent --session-id main --message "$AWAKENING_MSG" --deliver > /tmp/awakening.log 2>&1
-                if [ $? -eq 0 ]; then
-                    echo "Awakening message sent successfully!"
-                    touch "$FIRST_BOOT_MARKER"
-                    echo "=== Aria is now alive! ==="
-                    break
-                fi
-                echo "Gateway not ready yet, retrying in 5s..."
-                sleep 5
-            done
-        else
-            echo "Warning: AWAKENING.md not found in workspace"
+            cp /root/.openclaw/workspace/AWAKENING.md /root/.openclaw/BOOT_PROMPT.md
+            echo "Boot prompt prepared at /root/.openclaw/BOOT_PROMPT.md"
         fi
+        
+        # Mark as awakened (Aria will see the markers)
+        touch "$FIRST_BOOT_MARKER"
+        echo "=== Aria awakening prepared - she will process on first interaction ==="
     else
-        echo "=== Aria already awakened (marker exists) === "
+        echo "=== Aria already awakened (marker exists) ==="
     fi
 }
 
-# Run awakening check in background
-send_awakening_message &
+# Run awakening preparation in background
+prepare_awakening &
 
 # Start the gateway
 exec /usr/local/bin/openclaw gateway run \
