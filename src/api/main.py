@@ -28,12 +28,16 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable is required")
 
+# Configuration - uses environment variables for portability
+DOCKER_HOST_IP = os.getenv("DOCKER_HOST_IP", "host.docker.internal")
+MLX_ENABLED = os.getenv("MLX_ENABLED", "true").lower() == "true"
+
 # Service URLs with specific health check paths
 SERVICE_URLS = {
     "grafana": (os.getenv("GRAFANA_URL", "http://grafana:3000"), "/api/health"),
     "prometheus": (os.getenv("PROMETHEUS_URL", "http://prometheus:9090"), "/prometheus/-/healthy"),
-    "ollama": (os.getenv("OLLAMA_URL", "http://host.docker.internal:11434"), "/api/tags"),
-    "mlx": (os.getenv("MLX_URL", "http://host.docker.internal:8080"), "/v1/models"),
+    "ollama": (os.getenv("OLLAMA_URL", f"http://{DOCKER_HOST_IP}:11434"), "/api/tags"),
+    "mlx": (os.getenv("MLX_URL", f"http://{DOCKER_HOST_IP}:8080"), "/v1/models") if MLX_ENABLED else (None, None),
     "litellm": (os.getenv("LITELLM_URL", "http://litellm:4000"), "/health/liveliness"),
     "clawdbot": (os.getenv("CLAWDBOT_URL", "http://clawdbot:18789"), "/"),
     "pgadmin": (os.getenv("PGADMIN_URL", "http://aria-pgadmin:80"), "/"),
@@ -42,6 +46,10 @@ SERVICE_URLS = {
     "aria-web": (os.getenv("ARIA_WEB_URL", "http://aria-web:5000"), "/"),
     "aria-api": ("http://localhost:8000", "/health"),
 }
+
+# Remove MLX from services if disabled
+if not MLX_ENABLED:
+    SERVICE_URLS.pop("mlx", None)
 
 STARTUP_TIME = datetime.utcnow()
 
