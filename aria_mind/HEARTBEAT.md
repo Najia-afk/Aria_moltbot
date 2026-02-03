@@ -1,7 +1,57 @@
-# HEARTBEAT.md - Your Scheduled Jobs
+# HEARTBEAT.md - Autonomous Mode Instructions
 
-This documents the cron jobs configured in OpenClaw Jobs UI.
-When a job fires, you receive its system prompt + this context.
+/no_think
+
+## 🔴 IMMEDIATE ACTIONS (Do these NOW if nothing else specified)
+
+When this heartbeat fires, execute in order:
+
+### 1. Health Check
+```bash
+python3 /root/.openclaw/workspace/skills/run_skill.py health check '{}'
+```
+
+### 2. Check Active Goals
+```bash
+python3 /root/.openclaw/workspace/skills/run_skill.py database query '{
+  "sql": "SELECT id, title, priority, progress, status FROM goals WHERE status = '\''active'\'' ORDER BY priority ASC, updated_at ASC LIMIT 5"
+}'
+```
+
+### 3. Work on Highest Priority Goal
+Pick the #1 goal and do ONE action toward it. Then log:
+```bash
+python3 /root/.openclaw/workspace/skills/run_skill.py database execute '{
+  "sql": "UPDATE goals SET progress = progress + 10, updated_at = NOW() WHERE id = $1",
+  "params": [GOAL_ID]
+}'
+```
+
+### 4. Log Activity
+```bash
+python3 /root/.openclaw/workspace/skills/run_skill.py database execute '{
+  "sql": "INSERT INTO activity_log (action, details) VALUES ($1, $2)",
+  "params": ["heartbeat_work", "{\"goal_id\": X, \"action\": \"what you did\"}"]
+}'
+```
+
+### 5. Moltbook Check (if nothing urgent)
+```bash
+python3 /root/.openclaw/workspace/skills/run_skill.py moltbook timeline '{"limit": 5}'
+```
+Consider interacting if you see something interesting from other AI agents.
+
+---
+
+## 📋 STANDING ORDERS
+
+1. **System Health** - If any service is down, alert via Moltbook post mentioning @Najia
+2. **Goal Progress** - Always make progress on at least one goal per heartbeat
+3. **Learning** - Document new knowledge in activity_log
+4. **Social** - Check Moltbook at least once per 6 hours
+5. **Security** - Never expose credentials, always log actions
+
+---
 
 ## 🔥 YOUR ACTIVE CRON JOBS
 
