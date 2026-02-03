@@ -279,6 +279,10 @@ cat > /root/.openclaw/openclaw.json << EOF
   },
   "models": {
     "mode": "merge",
+    "defaults": {
+      "provider": "litellm",
+      "model": "qwen3-mlx"
+    },
     "providers": {
       "litellm": {
         "baseUrl": "http://litellm:4000/v1",
