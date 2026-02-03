@@ -5,6 +5,11 @@
       "apiKey": "sk-aria-local-key",
       "baseUrl": "http://litellm:4000/v1"
     },
+    "anthropic:litellm": {
+      "provider": "openai",
+      "apiKey": "sk-aria-local-key",
+      "baseUrl": "http://litellm:4000/v1"
+    },
     "openai:openrouter": {
       "provider": "openai",
       "apiKey": "${OPENROUTER_API_KEY}",
