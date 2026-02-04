@@ -1,67 +1,152 @@
 {
   "name": "aria-database",
   "version": "1.0.0",
-  "description": "Query Aria's PostgreSQL database. Execute SQL queries on activity logs, memories, user data, knowledge graph, and goals.",
+  "description": "Query Aria's PostgreSQL database. Execute SQL queries on activity logs, memories, thoughts, and goals.",
   "author": "Aria Team",
   "tools": [
     {
-      "name": "db_query",
-      "description": "Execute a read-only SQL query on Aria's database. Returns results as JSON. Use for: activity_log, memories, entity/relation tables, goals, user preferences.",
+      "name": "fetch_all",
+      "description": "Execute a SQL query and return all rows as JSON array.",
       "parameters": {
         "type": "object",
         "properties": {
-          "sql": {
+          "query": {
             "type": "string",
-            "description": "SQL SELECT query to execute. Must be read-only."
+            "description": "SQL SELECT query to execute"
           },
-          "params": {
+          "args": {
             "type": "array",
-            "description": "Optional query parameters for parameterized queries ($1, $2, etc.)",
+            "description": "Query parameters ($1, $2, etc.)",
             "items": { "type": "string" }
           }
         },
-        "required": ["sql"]
+        "required": ["query"]
       }
     },
     {
-      "name": "db_execute",
-      "description": "Execute a write SQL statement (INSERT, UPDATE, DELETE) on Aria's database.",
+      "name": "fetch_one",
+      "description": "Execute a SQL query and return first row.",
       "parameters": {
         "type": "object",
         "properties": {
-          "sql": {
+          "query": {
+            "type": "string",
+            "description": "SQL query to execute"
+          },
+          "args": {
+            "type": "array",
+            "description": "Query parameters ($1, $2, etc.)",
+            "items": { "type": "string" }
+          }
+        },
+        "required": ["query"]
+      }
+    },
+    {
+      "name": "execute",
+      "description": "Execute a write SQL statement (INSERT, UPDATE, DELETE).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
             "type": "string",
             "description": "SQL statement to execute"
           },
-          "params": {
+          "args": {
             "type": "array",
-            "description": "Query parameters for parameterized queries ($1, $2, etc.)",
+            "description": "Query parameters ($1, $2, etc.)",
             "items": { "type": "string" }
           }
         },
-        "required": ["sql"]
+        "required": ["query"]
       }
     },
     {
-      "name": "db_log_activity",
-      "description": "Log an activity to Aria's activity log with type, message, and optional metadata.",
+      "name": "log_thought",
+      "description": "Log a thought to the database.",
       "parameters": {
         "type": "object",
         "properties": {
-          "activity_type": {
+          "content": {
             "type": "string",
-            "description": "Type of activity (e.g., 'conversation', 'task', 'reminder', 'learning')"
+            "description": "Thought content"
           },
-          "message": {
+          "category": {
             "type": "string",
-            "description": "Activity message or description"
-          },
-          "metadata": {
-            "type": "object",
-            "description": "Optional JSON metadata"
+            "description": "Category (default: general)"
           }
         },
-        "required": ["activity_type", "message"]
+        "required": ["content"]
+      }
+    },
+    {
+      "name": "get_recent_thoughts",
+      "description": "Get recent thoughts from database.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "description": "Max thoughts to return (default: 10)"
+          }
+        }
+      }
+    },
+    {
+      "name": "store_memory",
+      "description": "Store a key-value memory.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Memory key"
+          },
+          "value": {
+            "type": "string",
+            "description": "Memory value"
+          },
+          "category": {
+            "type": "string",
+            "description": "Category (default: general)"
+          }
+        },
+        "required": ["key", "value"]
+      }
+    },
+    {
+      "name": "recall_memory",
+      "description": "Recall a memory by key.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Memory key to recall"
+          }
+        },
+        "required": ["key"]
+      }
+    },
+    {
+      "name": "search_memories",
+      "description": "Search memories by pattern.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "pattern": {
+            "type": "string",
+            "description": "Search pattern (SQL LIKE)"
+          },
+          "category": {
+            "type": "string",
+            "description": "Filter by category"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max results (default: 10)"
+          }
+        }
       }
     }
   ],

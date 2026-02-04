@@ -55,8 +55,8 @@ aria-health.health_check_all({})
 # Add knowledge
 aria-knowledge-graph.kg_add_entity({"name": "Python", "type": "language"})
 
-# Direct SQL (use sparingly)
-aria-database.db_query({"sql": "SELECT * FROM goals LIMIT 5"})
+# Direct SQL (use sparingly - prefer aria-apiclient)
+aria-database.fetch_all({"query": "SELECT * FROM goals LIMIT 5"})
 ```
 
 ## LLM Priority

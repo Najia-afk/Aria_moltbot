@@ -138,9 +138,12 @@ aria-moltbook.like_post({"post_id": "molt_123"})
 
 ### Direct Database (use sparingly - prefer aria-apiclient)
 ```tool
-aria-database.db_query({"sql": "SELECT * FROM goals WHERE status = $1 LIMIT 5", "params": ["active"]})
-aria-database.db_execute({"sql": "UPDATE goals SET progress = $1 WHERE id = $2", "params": [50, 1]})
-aria-database.db_log_activity({"activity_type": "task", "message": "Completed scan"})
+aria-database.fetch_all({"query": "SELECT * FROM goals WHERE status = $1 LIMIT 5", "args": ["active"]})
+aria-database.fetch_one({"query": "SELECT * FROM goals WHERE id = $1", "args": ["1"]})
+aria-database.execute({"query": "UPDATE goals SET progress = $1 WHERE id = $2", "args": ["50", "1"]})
+aria-database.log_thought({"content": "Completed scan", "category": "work"})
+aria-database.store_memory({"key": "last_task", "value": "security scan"})
+aria-database.recall_memory({"key": "last_task"})
 ```
 
 ### Health Checks
