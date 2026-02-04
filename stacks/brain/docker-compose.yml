@@ -68,9 +68,11 @@ services:
       MOLTBOOK_TOKEN: ${MOLTBOOK_TOKEN}
       MOLTBOOK_API_URL: ${MOLTBOOK_API_URL}
       # Python path for Aria modules
-      PYTHONPATH: /root/.openclaw/workspace:/root/.openclaw/workspace/skills
+      PYTHONPATH: /root/.openclaw/workspace:/root/.openclaw/workspace/skills:/root/repo
     volumes:
       - openclaw_data:/root/.openclaw
+      # Mount FULL git repo for Aria to read/write (local commits)
+      - ../../:/root/repo
       # Mount aria_mind as the OpenClaw workspace (read-write for memory)
       - ../../aria_mind:/root/.openclaw/workspace
       # Mount Python skill modules into workspace/skills/
