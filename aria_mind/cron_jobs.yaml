@@ -7,7 +7,7 @@
 
 jobs:
   - name: work_cycle
-    every: "30m"
+    every: "15m"
     message: "Read HEARTBEAT.md work_cycle section. Check goals, pick highest priority, make progress, log activity."
     agent: main
     session: isolated
