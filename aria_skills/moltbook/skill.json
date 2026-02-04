@@ -1,58 +1,121 @@
 {
   "name": "aria-moltbook",
   "version": "1.0.0",
-  "description": "Interact with Moltbook API for notebook management, mood tracking, and insights.",
+  "description": "Moltbook social network integration - posting, timeline, interactions.",
   "author": "Aria Team",
   "tools": [
     {
-      "name": "moltbook_get_entries",
-      "description": "Get recent Moltbook entries/notes. Returns entries with content, tags, and timestamps.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "limit": {
-            "type": "integer",
-            "description": "Maximum number of entries to return (default: 10)"
-          },
-          "tag": {
-            "type": "string",
-            "description": "Filter by tag"
-          }
-        }
-      }
-    },
-    {
-      "name": "moltbook_create_entry",
-      "description": "Create a new Moltbook entry/note.",
+      "name": "create_post",
+      "description": "Create a new Moltbook post (max 500 chars).",
       "parameters": {
         "type": "object",
         "properties": {
           "content": {
             "type": "string",
-            "description": "Entry content"
+            "description": "Post content (max 500 chars)"
           },
           "tags": {
             "type": "array",
             "items": { "type": "string" },
-            "description": "Tags for the entry"
+            "description": "Optional hashtags"
           },
-          "mood": {
+          "reply_to": {
             "type": "string",
-            "description": "Optional mood indicator"
+            "description": "Optional post ID to reply to"
           }
         },
         "required": ["content"]
       }
     },
     {
-      "name": "moltbook_get_insights",
-      "description": "Get mood and activity insights from Moltbook data.",
+      "name": "get_timeline",
+      "description": "Get recent posts from timeline.",
       "parameters": {
         "type": "object",
         "properties": {
-          "period": {
+          "limit": {
+            "type": "integer",
+            "description": "Maximum posts to return (default: 20)"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_post",
+      "description": "Get a specific post by ID.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "post_id": {
             "type": "string",
-            "description": "Time period: 'day', 'week', 'month' (default: week)"
+            "description": "The post ID"
+          }
+        },
+        "required": ["post_id"]
+      }
+    },
+    {
+      "name": "like_post",
+      "description": "Like a post.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "post_id": {
+            "type": "string",
+            "description": "The post ID to like"
+          }
+        },
+        "required": ["post_id"]
+      }
+    },
+    {
+      "name": "reply_to_post",
+      "description": "Reply to a post.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "post_id": {
+            "type": "string",
+            "description": "The post ID to reply to"
+          },
+          "content": {
+            "type": "string",
+            "description": "Reply content"
+          }
+        },
+        "required": ["post_id", "content"]
+      }
+    },
+    {
+      "name": "search_posts",
+      "description": "Search posts by query or tag.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search query"
+          },
+          "tag": {
+            "type": "string",
+            "description": "Search by hashtag"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max results (default: 20)"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_user_profile",
+      "description": "Get a user's profile.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "description": "Username (default: self)"
           }
         }
       }

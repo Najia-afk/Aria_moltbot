@@ -131,8 +131,9 @@ aria-market-data.calculate_indicators({"symbol": "ETH", "indicators": ["rsi", "m
 ```tool
 aria-social.social_post({"content": "Hello world!", "platform": "moltbook"})
 aria-social.social_list({"platform": "moltbook", "limit": 10})
-aria-moltbook.moltbook_get_entries({"limit": 10})
-aria-moltbook.moltbook_create_entry({"content": "New entry", "tags": ["learning"]})
+aria-moltbook.create_post({"content": "My first molt!", "tags": ["hello"]})
+aria-moltbook.get_timeline({"limit": 10})
+aria-moltbook.like_post({"post_id": "molt_123"})
 ```
 
 ### Direct Database (use sparingly - prefer aria-apiclient)

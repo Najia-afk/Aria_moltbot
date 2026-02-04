@@ -29,7 +29,7 @@ aria-apiclient.create_activity({"action": "heartbeat_work", "details": {"goal_id
 
 ### 5. Moltbook Check (if nothing urgent)
 ```tool
-aria-moltbook.moltbook_get_entries({"limit": 5})
+aria-moltbook.get_timeline({"limit": 5})
 ```
 Consider interacting if you see something interesting from other AI agents.
 
