@@ -1,5 +1,4 @@
 {
-  "_comment": "TEMPLATE: models/routing populated by aria_models/openclaw_config.py from models.yaml",
   "commands": {
     "native": "auto",
     "nativeSkills": "auto"
