@@ -39,7 +39,7 @@
     "port": 18789,
     "mode": "local",
     "bind": "lan",
-    "auth": { "mode": "none" },
+    "auth": { "mode": "token" },
     "trustedProxies": [
       "172.18.0.1",
       "172.18.0.2",
