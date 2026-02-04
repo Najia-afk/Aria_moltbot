@@ -102,6 +102,10 @@ def create_app():
     def performance():
         return render_template('performance.html')
 
+    @app.route('/security')
+    def security():
+        return render_template('security.html')
+
     # Flask remains UI-only. All data access goes through the FastAPI service.
 
     return app

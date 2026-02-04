@@ -215,6 +215,31 @@ Index("idx_jobs_enabled", ScheduledJob.enabled)
 Index("idx_jobs_next_run", ScheduledJob.next_run_at)
 
 
+class SecurityEvent(Base):
+    """
+    Security events logged by the input_guard skill.
+    Tracks prompt injection attempts, malicious inputs, rate limit violations.
+    """
+    __tablename__ = "security_events"
+
+    id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
+    threat_level: Mapped[str] = mapped_column(String(20), nullable=False)  # NONE, LOW, MEDIUM, HIGH, CRITICAL
+    threat_type: Mapped[str] = mapped_column(String(100), nullable=False)  # prompt_injection, sql_injection, etc.
+    threat_patterns: Mapped[list] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))  # List of matched patterns
+    input_preview: Mapped[str | None] = mapped_column(Text)  # First 500 chars of input (sanitized)
+    source: Mapped[str | None] = mapped_column(String(100))  # api, chat, skill, etc.
+    user_id: Mapped[str | None] = mapped_column(String(100))  # User/session identifier
+    blocked: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))  # Was the request blocked?
+    details: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))  # Additional context
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
+
+
+Index("idx_security_threat_level", SecurityEvent.threat_level)
+Index("idx_security_threat_type", SecurityEvent.threat_type)
+Index("idx_security_created", SecurityEvent.created_at.desc())
+Index("idx_security_blocked", SecurityEvent.blocked)
+
+
 class ScheduleTick(Base):
     """
     Scheduler heartbeat status with job statistics.

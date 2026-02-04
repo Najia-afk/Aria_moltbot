@@ -133,7 +133,7 @@
 
                     <!-- Aria's Data Dropdown -->
                     <div class="nav-dropdown">
-                        <button class="nav-dropdown-toggle {% if '/activities' in request.path or '/thoughts' in request.path or '/memories' in request.path or '/records' in request.path or '/search' in request.path or '/goals' in request.path or '/heartbeat' in request.path or '/knowledge' in request.path or '/social' in request.path or '/performance' in request.path %}active{% endif %}">
+                        <button class="nav-dropdown-toggle {% if '/activities' in request.path or '/thoughts' in request.path or '/memories' in request.path or '/records' in request.path or '/search' in request.path or '/goals' in request.path or '/heartbeat' in request.path or '/knowledge' in request.path or '/social' in request.path or '/performance' in request.path or '/security' in request.path %}active{% endif %}">
                             <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
                                 <path d="M5 4a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1H5zm-.5 2.5A.5.5 0 0 1 5 6h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zM5 8a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1H5zm0 2a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1H5z"/>
                                 <path d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2zm10-1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1z"/>
@@ -174,9 +174,12 @@
                                 📱 Social / Moltbook
                             </a>
                             <div class="divider"></div>
-                            <div class="section-label">Performance & Data</div>
+                            <div class="section-label">Performance & Security</div>
                             <a href="/performance" class="{% if '/performance' in request.path %}active{% endif %}">
                                 📊 Performance
+                            </a>
+                            <a href="/security" class="{% if '/security' in request.path %}active{% endif %}">
+                                🛡️ Security Events
                             </a>
                             <a href="/records" class="{% if '/records' in request.path %}active{% endif %}">
                                 🗃️ All Records

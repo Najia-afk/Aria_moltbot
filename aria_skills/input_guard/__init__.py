@@ -9,8 +9,12 @@ Config:
     block_threshold: Minimum threat level to block (default: high)
     enable_logging: Log security events (default: true)
     rate_limit_rpm: Requests per minute per user (default: 60)
+    api_base_url: Base URL for Aria API (default: http://aria-api:8000)
 """
+import asyncio
 from typing import Any, Dict, List, Optional
+
+import httpx
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
 from aria_skills.registry import SkillRegistry
@@ -82,6 +86,13 @@ class InputGuardSkill(BaseSkill):
             }
         )
         
+        # API config for logging security events
+        self._api_base_url = self.config.config.get(
+            "api_base_url", 
+            "http://aria-api:8000"
+        )
+        self._enable_logging = self.config.config.get("enable_logging", True)
+        
         self._status = SkillStatus.AVAILABLE
         self.logger.info(f"🛡️ Input guard initialized (threshold: {block_threshold_str})")
         return True
@@ -89,6 +100,42 @@ class InputGuardSkill(BaseSkill):
     async def health_check(self) -> SkillStatus:
         """Check skill availability."""
         return self._status
+    
+    async def _log_security_event(
+        self,
+        threat_level: str,
+        threat_type: str,
+        threat_patterns: List[str],
+        input_preview: str,
+        source: str,
+        user_id: Optional[str],
+        blocked: bool,
+        details: Optional[Dict] = None,
+    ) -> None:
+        """Log security event to database via API."""
+        if not self._enable_logging:
+            return
+        
+        try:
+            # Truncate input preview for safety
+            preview = input_preview[:500] if input_preview else ""
+            
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                await client.post(
+                    f"{self._api_base_url}/api/security-events",
+                    json={
+                        "threat_level": threat_level,
+                        "threat_type": threat_type,
+                        "threat_patterns": threat_patterns,
+                        "input_preview": preview,
+                        "source": source,
+                        "user_id": user_id,
+                        "blocked": blocked,
+                        "details": details or {},
+                    }
+                )
+        except Exception as e:
+            self.logger.warning(f"Failed to log security event: {e}")
     
     async def analyze_input(
         self,
@@ -123,6 +170,35 @@ class InputGuardSkill(BaseSkill):
             )
             
             self._log_usage("analyze_input", True)
+            
+            # Log to database if threat detected
+            if result.threat_level.value != "NONE" and result.detections:
+                # Determine threat type from detections
+                threat_type = "prompt_injection"
+                if any("sql" in d.lower() for d in result.detections):
+                    threat_type = "sql_injection"
+                elif any("path" in d.lower() for d in result.detections):
+                    threat_type = "path_traversal"
+                elif any("command" in d.lower() for d in result.detections):
+                    threat_type = "command_injection"
+                elif any("xss" in d.lower() for d in result.detections):
+                    threat_type = "xss"
+                
+                # Fire and forget - don't block on logging
+                asyncio.create_task(
+                    self._log_security_event(
+                        threat_level=result.threat_level.value,
+                        threat_type=threat_type,
+                        threat_patterns=result.detections,
+                        input_preview=text,
+                        source=source,
+                        user_id=user_id,
+                        blocked=not result.allowed,
+                        details={
+                            "rejection_message": result.rejection_message,
+                        }
+                    )
+                )
             
             return SkillResult.ok({
                 "allowed": result.allowed,

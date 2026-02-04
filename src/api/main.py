@@ -523,6 +523,121 @@ async def create_activity(request: Request, conn=Depends(get_db)):
     return {"id": str(new_id), "created": True}
 
 
+# ============================================
+# Security Events Endpoints
+# ============================================
+@app.get("/security-events")
+async def api_security_events(
+    limit: int = 100,
+    threat_level: Optional[str] = None,
+    blocked_only: bool = False,
+    conn=Depends(get_db)
+):
+    """Get security events with optional filtering"""
+    query = """
+        SELECT id, threat_level, threat_type, threat_patterns, input_preview,
+               source, user_id, blocked, details, created_at
+        FROM security_events
+        WHERE 1=1
+    """
+    params = []
+    param_idx = 1
+    
+    if threat_level:
+        query += f" AND threat_level = ${param_idx}"
+        params.append(threat_level.upper())
+        param_idx += 1
+    
+    if blocked_only:
+        query += " AND blocked = true"
+    
+    query += f" ORDER BY created_at DESC LIMIT ${param_idx}"
+    params.append(limit)
+    
+    rows = await conn.fetch(query, *params)
+    return [
+        {
+            "id": str(r[0]),
+            "threat_level": r[1],
+            "threat_type": r[2],
+            "threat_patterns": r[3] or [],
+            "input_preview": r[4],
+            "source": r[5],
+            "user_id": r[6],
+            "blocked": r[7],
+            "details": r[8] or {},
+            "created_at": r[9].isoformat() if r[9] else None,
+        }
+        for r in rows
+    ]
+
+
+@app.post("/security-events")
+async def create_security_event(request: Request, conn=Depends(get_db)):
+    """Log a new security event"""
+    import uuid
+    import json as json_lib
+    data = await request.json()
+    new_id = uuid.uuid4()
+    
+    # Sanitize input preview - truncate and remove sensitive data
+    input_preview = data.get('input_preview', '')
+    if input_preview and len(input_preview) > 500:
+        input_preview = input_preview[:500] + '...'
+    
+    threat_patterns = data.get('threat_patterns', [])
+    details = data.get('details', {})
+    
+    await conn.execute(
+        """INSERT INTO security_events 
+           (id, threat_level, threat_type, threat_patterns, input_preview, 
+            source, user_id, blocked, details, created_at)
+           VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8, $9::jsonb, NOW())""",
+        new_id,
+        data.get('threat_level', 'LOW'),
+        data.get('threat_type', 'unknown'),
+        json_lib.dumps(threat_patterns),
+        input_preview,
+        data.get('source', 'api'),
+        data.get('user_id'),
+        data.get('blocked', False),
+        json_lib.dumps(details)
+    )
+    return {"id": str(new_id), "created": True}
+
+
+@app.get("/security-events/stats")
+async def api_security_stats(conn=Depends(get_db)):
+    """Get security event statistics"""
+    total = await conn.fetchval("SELECT COUNT(*) FROM security_events")
+    blocked = await conn.fetchval("SELECT COUNT(*) FROM security_events WHERE blocked = true")
+    by_level = await conn.fetch("""
+        SELECT threat_level, COUNT(*) as count 
+        FROM security_events 
+        GROUP BY threat_level 
+        ORDER BY count DESC
+    """)
+    by_type = await conn.fetch("""
+        SELECT threat_type, COUNT(*) as count 
+        FROM security_events 
+        GROUP BY threat_type 
+        ORDER BY count DESC
+        LIMIT 10
+    """)
+    recent = await conn.fetchval("""
+        SELECT COUNT(*) FROM security_events 
+        WHERE created_at > NOW() - INTERVAL '24 hours'
+    """)
+    
+    return {
+        "total_events": total or 0,
+        "blocked_count": blocked or 0,
+        "last_24h": recent or 0,
+        "by_level": {r[0]: r[1] for r in by_level},
+        "by_type": {r[0]: r[1] for r in by_type},
+    }
+
+
 @app.get("/thoughts")
 async def api_thoughts(limit: int = 100, conn=Depends(get_db)):
     rows = await conn.fetch(
