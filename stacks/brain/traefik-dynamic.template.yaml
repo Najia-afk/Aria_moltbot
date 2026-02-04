@@ -1,0 +1,360 @@
+# Traefik Dynamic Configuration - HTTP & HTTPS routes
+# TEMPLATE FILE: Use envsubst to generate traefik-dynamic.yaml
+# Tokens are injected from environment variables at container startup
+tls:
+  stores:
+    default:
+      defaultCertificate:
+        certFile: /certs/cert.pem
+        keyFile: /certs/key.pem
+  certificates:
+    - certFile: /certs/cert.pem
+      keyFile: /certs/key.pem
+
+http:
+  routers:
+    # HTTP Routers (fast LAN access)
+    
+    # OpenClaw WebSocket at root - higher priority than portal for WS upgrades
+    clawdbot-ws-http:
+      rule: "PathPrefix(`/`) && Header(`Connection`, `Upgrade`) && Header(`Upgrade`, `websocket`)"
+      priority: 95
+      entryPoints:
+        - web
+      service: clawdbot
+      middlewares:
+        - clawdbot-auth
+
+    portal-http:
+      rule: "PathPrefix(`/`)"
+      priority: 1
+      entryPoints:
+        - web
+      service: portal
+      middlewares:
+        - secure-headers
+
+    api-http:
+      rule: "PathPrefix(`/api`)"
+      priority: 100
+      entryPoints:
+        - web
+      service: aria-api
+      middlewares:
+        - api-strip
+        - secure-headers
+
+    # Clawdbot - All traffic (HTTP + WebSocket) - Token auth injected by Traefik
+    clawdbot-http:
+      rule: "PathPrefix(`/clawdbot`)"
+      priority: 90
+      entryPoints:
+        - web
+      service: clawdbot
+      middlewares:
+        - clawdbot-auth
+
+    grafana-http:
+      rule: "PathPrefix(`/grafana`)"
+      priority: 80
+      entryPoints:
+        - web
+      service: grafana
+      middlewares:
+        - secure-headers
+
+
+    prometheus-http:
+      rule: "PathPrefix(`/prometheus`)"
+      priority: 80
+      entryPoints:
+        - web
+      service: prometheus
+
+    pgadmin-http:
+      rule: "PathPrefix(`/pgadmin`)"
+      priority: 80
+      entryPoints:
+        - web
+      service: pgadmin
+
+    ollama-http:
+      rule: "PathPrefix(`/ollama`)"
+      priority: 80
+      entryPoints:
+        - web
+      service: ollama
+      middlewares:
+        - ollama-strip
+
+    litellm-http:
+      rule: "PathPrefix(`/litellm`)"
+      priority: 80
+      entryPoints:
+        - web
+      service: litellm
+      middlewares:
+        - litellm-strip
+
+    traefik-dashboard-http:
+      rule: "PathPrefix(`/traefik`)"
+      priority: 70
+      entryPoints:
+        - web
+      service: api@internal
+      middlewares:
+        - traefik-strip
+
+    # HTTPS Routers (secure access)
+    
+    # OpenClaw WebSocket at root - higher priority than portal for WS upgrades
+    clawdbot-ws:
+      rule: "PathPrefix(`/`) && Header(`Connection`, `Upgrade`) && Header(`Upgrade`, `websocket`)"
+      priority: 95
+      entryPoints:
+        - websecure
+      service: clawdbot
+      middlewares:
+        - clawdbot-auth
+      tls: {}
+
+    portal:
+      rule: "PathPrefix(`/`)"
+      priority: 1
+      entryPoints:
+        - websecure
+      service: portal
+      middlewares:
+        - secure-headers
+      tls: {}
+
+    api:
+      rule: "PathPrefix(`/api`)"
+      priority: 100
+      entryPoints:
+        - websecure
+      service: aria-api
+      middlewares:
+        - api-strip
+        - secure-headers
+      tls: {}
+
+    # Clawdbot HTTPS - All traffic (HTTP + WebSocket) - Token auth injected by Traefik
+    clawdbot:
+      rule: "PathPrefix(`/clawdbot`)"
+      priority: 90
+      entryPoints:
+        - websecure
+      service: clawdbot
+      middlewares:
+        - clawdbot-auth
+      tls: {}
+
+    grafana:
+      rule: "PathPrefix(`/grafana`)"
+      priority: 80
+      entryPoints:
+        - websecure
+      service: grafana
+      middlewares:
+        - secure-headers
+      tls: {}
+
+    prometheus:
+      rule: "PathPrefix(`/prometheus`)"
+      priority: 80
+      entryPoints:
+        - websecure
+      service: prometheus
+      tls: {}
+
+    pgadmin:
+      rule: "PathPrefix(`/pgadmin`)"
+      priority: 80
+      entryPoints:
+        - websecure
+      service: pgadmin
+      tls: {}
+
+    ollama:
+      rule: "PathPrefix(`/ollama`)"
+      priority: 80
+      entryPoints:
+        - websecure
+      service: ollama
+      middlewares:
+        - ollama-strip
+      tls: {}
+
+    litellm:
+      rule: "PathPrefix(`/litellm`)"
+      priority: 80
+      entryPoints:
+        - websecure
+      service: litellm
+      middlewares:
+        - litellm-strip
+      tls: {}
+
+    traefik-dashboard:
+      rule: "PathPrefix(`/traefik`)"
+      priority: 70
+      entryPoints:
+        - websecure
+      service: api@internal
+      middlewares:
+        - traefik-strip
+      tls: {}
+
+  middlewares:
+    # Inject OpenClaw gateway token for transparent browser auth
+    # Token injected from CLAWDBOT_TOKEN environment variable via envsubst
+    clawdbot-auth:
+      headers:
+        customRequestHeaders:
+          Authorization: "Bearer ${CLAWDBOT_TOKEN}"
+
+    api-strip:
+      stripPrefix:
+        prefixes:
+          - /api
+    clawdbot-strip:
+      stripPrefix:
+        prefixes:
+          - /clawdbot
+    # WebSocket-friendly headers for OpenClaw (no Keep-Alive, allow upgrade)
+    clawdbot-headers:
+      headers:
+        accessControlAllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+        accessControlAllowHeaders:
+          - "*"
+        accessControlAllowOriginList: 
+          - "*"
+        accessControlMaxAge: 100
+        addVaryHeader: true
+        # Don't add Connection headers - let WebSocket upgrade work
+        customRequestHeaders:
+          X-Forwarded-Proto: "https"
+    grafana-strip:
+      stripPrefix:
+        prefixes:
+          - /grafana
+    prometheus-strip:
+      stripPrefix:
+        prefixes:
+          - /prometheus
+    pgadmin-strip:
+      stripPrefix:
+        prefixes:
+          - /pgadmin
+    ollama-strip:
+      stripPrefix:
+        prefixes:
+          - /ollama
+    litellm-strip:
+      stripPrefix:
+        prefixes:
+          - /litellm
+    traefik-strip:
+      stripPrefix:
+        prefixes:
+          - /traefik
+    socketio-strip:
+      stripPrefix:
+        prefixes:
+          - /socket.io
+
+    # CORS Only (Safe for WebSockets)
+    cors-only:
+      headers:
+        accessControlAllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+        accessControlAllowHeaders:
+          - "*"
+        accessControlAllowOriginList: 
+          - "*"
+        accessControlMaxAge: 100
+        addVaryHeader: true
+
+    # Security Headers for Websockets (No Keep-Alive)
+    secure-headers-ws:
+      headers:
+        accessControlAllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+        accessControlAllowHeaders:
+          - "*"
+        accessControlAllowOriginList: 
+          - "*"
+        accessControlMaxAge: 100
+        addVaryHeader: true
+        contentTypeNosniff: true
+        browserXssFilter: true
+
+    # Security Headers for Standard HTTP (With Keep-Alive for stability)
+    secure-headers:
+      headers:
+        accessControlAllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+        accessControlAllowHeaders:
+          - "*"
+        accessControlAllowOriginList: 
+          - "*"
+        accessControlMaxAge: 100
+        addVaryHeader: true
+        contentTypeNosniff: true
+        browserXssFilter: true
+        # Helps with "Network Changed" / stalled connection issues
+        customResponseHeaders:
+          Connection: "keep-alive"
+          Keep-Alive: "timeout=5, max=1000"
+
+  services:
+    portal:
+      loadBalancer:
+        servers:
+          - url: "http://aria-web:5000"
+    aria-api:
+      loadBalancer:
+        servers:
+          - url: "http://aria-api:8000"
+    clawdbot:
+      loadBalancer:
+        servers:
+          - url: "http://clawdbot:18789"
+    grafana:
+      loadBalancer:
+        servers:
+          - url: "http://grafana:3000"
+    prometheus:
+      loadBalancer:
+        servers:
+          - url: "http://prometheus:9090"
+    pgadmin:
+      loadBalancer:
+        servers:
+          - url: "http://aria-pgadmin:80"
+    ollama:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:11434"
+    litellm:
+      loadBalancer:
+        servers:
+          - url: "http://litellm:4000"

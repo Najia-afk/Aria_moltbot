@@ -130,10 +130,12 @@ services:
       - aria-net
 
   # Traefik reverse proxy (HTTPS)
+  # Token injection via envsubst at startup - NO HARDCODED SECRETS
   traefik:
     image: traefik:v3.1
     container_name: traefik
     restart: unless-stopped
+    entrypoint: ["/bin/sh", "/traefik-entrypoint.sh"]
     command:
       - "--api=true"
       - "--api.dashboard=true"
@@ -145,12 +147,15 @@ services:
       - "--entrypoints.websecure.address=:443"
       - "--entrypoints.websecure.forwardedHeaders.insecure=true"
       - "--metrics.prometheus=true"
+    environment:
+      CLAWDBOT_TOKEN: ${CLAWDBOT_TOKEN?CLAWDBOT_TOKEN is required}
     ports:
       - "0.0.0.0:80:80"
       - "0.0.0.0:443:443"
       - "0.0.0.0:8081:8080"
     volumes:
-      - ./traefik-dynamic.yaml:/etc/traefik/dynamic.yaml:ro
+      - ./traefik-entrypoint.sh:/traefik-entrypoint.sh:ro
+      - ./traefik-dynamic.template.yaml:/etc/traefik/dynamic.template.yaml:ro
       - ./certs:/certs:ro
     depends_on:
       certs-init:
