@@ -581,7 +581,14 @@ function calculateLogCost(log) {
         }
     }
     
-    return (inputTokens / 1000000) * pricing.input + (outputTokens / 1000000) * pricing.output;
+    const cost = (inputTokens / 1000000) * pricing.input + (outputTokens / 1000000) * pricing.output;
+    // Debug first few logs
+    if (!window._debugCount) window._debugCount = 0;
+    if (window._debugCount < 3) {
+        console.log('calculateLogCost:', { model, inputTokens, outputTokens, pricing, cost });
+        window._debugCount++;
+    }
+    return cost;
 }
 
 function formatMoney(amount, currency = 'USD') {
@@ -688,8 +695,10 @@ async function loadBalances() {
 async function loadSpend() {
     try {
         // Fetch all spend logs to calculate real spend from tokens
+        console.log('loadSpend: Fetching from', `${API_URL}/litellm/spend?limit=5000`);
         const logsResp = await fetch(`${API_URL}/litellm/spend?limit=5000`);
         const spendLogs = await logsResp.json();
+        console.log('loadSpend: Got', Array.isArray(spendLogs) ? spendLogs.length : 0, 'logs');
         
         // Calculate period boundaries
         const now = new Date();
@@ -722,6 +731,8 @@ async function loadSpend() {
                 }
             });
         }
+        
+        console.log('loadSpend: Total spend calculated:', totalSpend);
         
         // Store logs for chart
         window._walletSpendLogs = spendLogs;
