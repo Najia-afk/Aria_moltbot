@@ -331,17 +331,31 @@ async def api_litellm_health():
 
 
 @app.get("/litellm/spend")
-async def api_litellm_spend(limit: int = 20):
-    """Get LiteLLM spend logs"""
+async def api_litellm_spend(limit: int = 20, lite: bool = False):
+    """Get LiteLLM spend logs. Use lite=true for lightweight response (charts)."""
     litellm_base = SERVICE_URLS.get("litellm", ("http://litellm:4000", "/health"))[0]
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             headers = {"Authorization": f"Bearer {LITELLM_MASTER_KEY}"} if LITELLM_MASTER_KEY else {}
             resp = await client.get(f"{litellm_base}/spend/logs", headers=headers)
             logs = resp.json()
             # Apply limit (LiteLLM may not support limit param)
             if isinstance(logs, list):
-                return logs[:limit]
+                logs = logs[:limit]
+                # Return lightweight version for charts (removes heavy metadata)
+                if lite:
+                    return [
+                        {
+                            "model": log.get("model", ""),
+                            "prompt_tokens": log.get("prompt_tokens", 0),
+                            "completion_tokens": log.get("completion_tokens", 0),
+                            "total_tokens": log.get("total_tokens", 0),
+                            "spend": log.get("spend", 0),
+                            "startTime": log.get("startTime"),
+                            "status": log.get("status", "success"),
+                        }
+                        for log in logs
+                    ]
             return logs
     except Exception as e:
         return {"logs": [], "error": str(e)}

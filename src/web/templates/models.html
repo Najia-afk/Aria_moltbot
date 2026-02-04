@@ -794,7 +794,7 @@ async function loadGlobalSpend() {
     
     try {
         // Fetch all logs to calculate real spend
-        const logsResp = await fetch(`${API_URL}/litellm/spend?limit=5000`);
+        const logsResp = await fetch(`${API_URL}/litellm/spend?limit=500&lite=true`);
         const logs = await logsResp.json();
         
         let totalSpend = 0;
@@ -1015,7 +1015,7 @@ async function updateCharts() {
     // Fetch all spend logs once
     let allLogs = [];
     try {
-        const logsResp = await fetch(`${API_URL}/litellm/spend?limit=2000`);
+        const logsResp = await fetch(`${API_URL}/litellm/spend?limit=500&lite=true`);
         const logsData = await logsResp.json();
         allLogs = Array.isArray(logsData) ? filterLogsByPeriod(logsData, periodDays) : [];
     } catch (err) {
