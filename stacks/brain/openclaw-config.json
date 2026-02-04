@@ -67,7 +67,17 @@
         "target": "last",
         "prompt": "Read HEARTBEAT.md if it exists (workspace context). Follow it strictly. Do not infer or repeat old tasks from prior chats. If nothing needs attention, reply HEARTBEAT_OK."
       },
-      "memorySearch": { "enabled": false, "fallback": "none" }
+      "memorySearch": { "enabled": false, "fallback": "none" },
+      "model": {
+        "primary": "litellm/qwen3-mlx",
+        "timeout": 180,
+        "fallbacks": [
+          "litellm/qwen3-next-free",
+          "litellm/trinity-free",
+          "litellm/chimera-free",
+          "litellm/kimi"
+        ]
+      }
     },
     "list": [{
       "id": "main",
