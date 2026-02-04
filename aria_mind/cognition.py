@@ -3,6 +3,7 @@
 Cognition - Thinking, reasoning, and decision-making.
 
 The cognitive engine that processes inputs and generates responses.
+Includes integrated security checks against prompt injection.
 """
 import logging
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
@@ -12,6 +13,18 @@ if TYPE_CHECKING:
     from aria_mind.memory import MemoryManager
     from aria_skills import SkillRegistry
     from aria_agents import AgentCoordinator
+
+# Import security module
+try:
+    from aria_mind.security import (
+        AriaSecurityGateway,
+        OutputFilter,
+        ThreatLevel,
+        get_security_gateway,
+    )
+    HAS_SECURITY = True
+except ImportError:
+    HAS_SECURITY = False
 
 
 class Cognition:
@@ -37,6 +50,18 @@ class Cognition:
         self._skills = skill_registry
         self._agents = agent_coordinator
         self.logger = logging.getLogger("aria.cognition")
+        
+        # Initialize security gateway
+        self._security: Optional["AriaSecurityGateway"] = None
+        if HAS_SECURITY:
+            try:
+                self._security = get_security_gateway()
+                # Attach to soul boundaries for unified protection
+                if hasattr(self.soul, 'boundaries'):
+                    self.soul.boundaries.set_security_gateway(self._security)
+                self.logger.info("🛡️ Security gateway initialized for cognition")
+            except Exception as e:
+                self.logger.warning(f"Failed to initialize security gateway: {e}")
     
     def set_skill_registry(self, registry: "SkillRegistry"):
         """Inject skill registry."""
@@ -50,6 +75,7 @@ class Cognition:
         self,
         prompt: str,
         context: Optional[Dict[str, Any]] = None,
+        user_id: Optional[str] = None,
     ) -> str:
         """
         Process a prompt and generate a response.
@@ -57,13 +83,35 @@ class Cognition:
         Args:
             prompt: User input or thought
             context: Additional context
+            user_id: Optional user identifier for rate limiting
             
         Returns:
             Response string
         """
         context = context or {}
         
-        # Step 1: Check boundaries
+        # Step 0: Security check (if available)
+        if self._security:
+            security_result = self._security.check_input(
+                prompt,
+                source="cognition",
+                user_id=user_id,
+                check_rate_limit=bool(user_id),
+            )
+            if not security_result.allowed:
+                self.logger.warning(f"🛡️ Request blocked by security: {security_result.threat_level.value}")
+                # Log security event
+                await self.memory.log_thought(
+                    f"Blocked request (threat: {security_result.threat_level.value}): {prompt[:100]}...",
+                    category="security",
+                )
+                return f"I can't process that request. {security_result.rejection_message}"
+            
+            # Use sanitized input if available
+            if security_result.sanitized_input:
+                prompt = security_result.sanitized_input
+        
+        # Step 1: Check boundaries (legacy - also checked by security gateway)
         allowed, reason = self.soul.check_request(prompt)
         if not allowed:
             self.logger.warning(f"Request blocked: {reason}")
@@ -88,7 +136,11 @@ class Cognition:
         else:
             result = await self._fallback_process(prompt, context)
         
-        # Step 5: Log thought
+        # Step 5: Filter output for sensitive data (if security available)
+        if self._security and HAS_SECURITY:
+            result = OutputFilter.filter_output(result)
+        
+        # Step 6: Log thought
         await self.memory.log_thought(f"Responded to: {prompt[:50]}...")
         
         return result

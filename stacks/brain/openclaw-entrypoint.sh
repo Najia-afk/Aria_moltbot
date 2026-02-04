@@ -213,6 +213,13 @@ SKILL_REGISTRY = {
         'api_url': os.environ.get('ARIA_API_URL', 'http://aria-api:8000/api'),
         'timeout': int(os.environ.get('ARIA_API_TIMEOUT', '30'))
     }),
+    
+    # === Security Skills (v1.3) ===
+    'input_guard': ('aria_skills.input_guard', 'InputGuardSkill', lambda: {
+        'block_threshold': os.environ.get('ARIA_SECURITY_BLOCK_THRESHOLD', 'high'),
+        'enable_logging': os.environ.get('ARIA_SECURITY_LOGGING', 'true').lower() == 'true',
+        'rate_limit_rpm': int(os.environ.get('ARIA_RATE_LIMIT_RPM', '60'))
+    }),
 }
 
 async def run_skill(skill_name: str, function_name: str, args: dict):

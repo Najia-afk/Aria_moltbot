@@ -1,0 +1,166 @@
+{
+  "name": "aria-input-guard",
+  "version": "1.0.0",
+  "description": "🛡️ Runtime security for Aria - analyzes inputs for prompt injection, validates API params, and filters sensitive output",
+  "author": "Aria Team",
+  "tools": [
+    {
+      "name": "analyze_input",
+      "description": "Analyze user input for security threats including prompt injection, jailbreak attempts, and malicious patterns. Use this before processing any untrusted input.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "The input text to analyze for security threats"
+          },
+          "source": {
+            "type": "string",
+            "description": "Source of the input (user, api, skill, webhook, etc.)",
+            "default": "user"
+          },
+          "user_id": {
+            "type": "string",
+            "description": "Optional user identifier for rate limiting"
+          }
+        },
+        "required": ["text"]
+      }
+    },
+    {
+      "name": "sanitize_for_html",
+      "description": "Sanitize text for safe HTML display. Escapes HTML entities to prevent XSS attacks.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "Text to sanitize for HTML output"
+          }
+        },
+        "required": ["text"]
+      }
+    },
+    {
+      "name": "check_sql_safety",
+      "description": "Check if text contains SQL injection patterns. Use before incorporating user input into queries.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "Text to check for SQL injection patterns"
+          }
+        },
+        "required": ["text"]
+      }
+    },
+    {
+      "name": "check_path_safety",
+      "description": "Check if a file path contains path traversal attempts (../ etc).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "File path to check for traversal attempts"
+          }
+        },
+        "required": ["path"]
+      }
+    },
+    {
+      "name": "filter_output",
+      "description": "Filter sensitive data (API keys, passwords, tokens) from output text before displaying to users.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "Text to filter for sensitive data"
+          },
+          "strict": {
+            "type": "boolean",
+            "description": "Use more aggressive filtering",
+            "default": false
+          }
+        },
+        "required": ["text"]
+      }
+    },
+    {
+      "name": "build_safe_query",
+      "description": "Build a safe parameterized SQL query. Prevents SQL injection by validating table/column names and using parameters.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "enum": ["select", "insert", "update"],
+            "description": "SQL operation type"
+          },
+          "table": {
+            "type": "string",
+            "description": "Table name (must be in allowed list)"
+          },
+          "columns": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Columns for SELECT"
+          },
+          "data": {
+            "type": "object",
+            "description": "Data for INSERT/UPDATE"
+          },
+          "where": {
+            "type": "object",
+            "description": "WHERE conditions as {column: value}"
+          },
+          "order_by": {
+            "type": "string",
+            "description": "ORDER BY column (prefix with - for DESC)"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "LIMIT value"
+          }
+        },
+        "required": ["operation", "table"]
+      }
+    },
+    {
+      "name": "get_security_summary",
+      "description": "Get a summary of recent security events including blocked requests, threat levels, and patterns detected.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "hours": {
+            "type": "integer",
+            "description": "Number of hours to look back",
+            "default": 24
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "validate_api_params",
+      "description": "Validate API parameters against a type schema. Checks types and sanitizes string values.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "params": {
+            "type": "object",
+            "description": "Parameters to validate"
+          },
+          "schema": {
+            "type": "object",
+            "description": "Schema as {param_name: type} where type is str|int|float|bool|list|dict"
+          }
+        },
+        "required": ["params", "schema"]
+      }
+    }
+  ],
+  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py input_guard {{tool}} '{{args_json}}'"
+}

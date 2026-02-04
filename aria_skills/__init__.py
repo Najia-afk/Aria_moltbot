@@ -55,6 +55,9 @@ from aria_skills.ci_cd import CICDSkill
 from aria_skills.data_pipeline import DataPipelineSkill
 from aria_skills.experiment import ExperimentSkill
 
+# Security skill (v1.3.0) - Runtime input protection
+from aria_skills.input_guard import InputGuardSkill
+
 # API Client (v1.3.0) - Centralized HTTP client
 from aria_skills.api_client import AriaAPIClient, get_api_client
 from aria_skills.market_data import MarketDataSkill

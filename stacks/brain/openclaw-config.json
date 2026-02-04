@@ -31,7 +31,8 @@
       "aria-research": { "enabled": true },
       "aria-schedule": { "enabled": true },
       "aria-securityscan": { "enabled": true },
-      "aria-social": { "enabled": true }
+      "aria-social": { "enabled": true },
+      "aria-inputguard": { "enabled": true }
     }
   },
   "gateway": {
