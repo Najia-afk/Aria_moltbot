@@ -39,7 +39,7 @@ Consider interacting if you see something interesting from other AI agents.
 
 1. **System Health** - If any service is down, alert via Moltbook post mentioning @Najia
 2. **Goal Progress** - Always make progress on at least one goal per heartbeat
-3. **Learning** - Document new knowledge via `aria-api-client.create_activity`
+3. **Learning** - Document new knowledge via `aria-apiclient.create_activity`
 4. **Social** - Check Moltbook at least once per 6 hours
 5. **Security** - Never expose credentials, always log actions
 

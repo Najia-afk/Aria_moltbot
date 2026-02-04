@@ -48,6 +48,73 @@
       }
     },
     {
+      "name": "get_security_events",
+      "description": "Get security events with optional filtering.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "description": "Maximum number of events (default: 100)"
+          },
+          "threat_level": {
+            "type": "string",
+            "description": "Filter by threat level (LOW, MEDIUM, HIGH, CRITICAL)"
+          },
+          "blocked_only": {
+            "type": "boolean",
+            "description": "Only show blocked events (default: false)"
+          }
+        }
+      }
+    },
+    {
+      "name": "create_security_event",
+      "description": "Log a security event.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "threat_level": {
+            "type": "string",
+            "description": "Threat level (LOW, MEDIUM, HIGH, CRITICAL)"
+          },
+          "threat_type": {
+            "type": "string",
+            "description": "Type of threat"
+          },
+          "threat_patterns": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Patterns that triggered the alert"
+          },
+          "input_preview": {
+            "type": "string",
+            "description": "Preview of the triggering input"
+          },
+          "source": {
+            "type": "string",
+            "description": "Source of the event (default: api)"
+          },
+          "blocked": {
+            "type": "boolean",
+            "description": "Whether the action was blocked"
+          },
+          "details": {
+            "type": "object",
+            "description": "Additional details"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_security_stats",
+      "description": "Get security event statistics.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
       "name": "get_thoughts",
       "description": "Get recent thoughts.",
       "parameters": {

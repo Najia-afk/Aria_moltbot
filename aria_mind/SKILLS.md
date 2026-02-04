@@ -57,7 +57,7 @@ aria-apiclient.health_check({})
 | `security_scan` | `scan_file`, `scan_directory`, `check_dependencies`, `audit_docker` | Vulnerability scanning |
 | `ci_cd` | `generate_workflow`, `generate_dockerfile`, `lint_workflow` | CI/CD automation |
 | `pytest` | `run_pytest`, `collect_pytest` | Test execution |
-| `database` | `db_query`, `db_execute`, `db_log_activity` | PostgreSQL operations |
+| `database` | `fetch_all`, `fetch_one`, `execute`, `log_thought`, `store_memory` | PostgreSQL operations |
 
 ### 📊 Data Architect Skills
 | Skill | Functions | Use For |

@@ -122,6 +122,65 @@ class AriaAPIClient(BaseSkill):
             return SkillResult.fail(f"Failed to create activity: {e}")
     
     # ========================================
+    # Security Events
+    # ========================================
+    async def get_security_events(
+        self, 
+        limit: int = 100, 
+        threat_level: Optional[str] = None,
+        blocked_only: bool = False
+    ) -> SkillResult:
+        """Get security events."""
+        try:
+            url = f"/security-events?limit={limit}"
+            if threat_level:
+                url += f"&threat_level={threat_level}"
+            if blocked_only:
+                url += "&blocked_only=true"
+            resp = await self._client.get(url)
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to get security events: {e}")
+    
+    async def create_security_event(
+        self,
+        threat_level: str = "LOW",
+        threat_type: str = "unknown",
+        threat_patterns: Optional[List[str]] = None,
+        input_preview: Optional[str] = None,
+        source: str = "api",
+        user_id: Optional[str] = None,
+        blocked: bool = False,
+        details: Optional[Dict] = None
+    ) -> SkillResult:
+        """Log a security event."""
+        try:
+            resp = await self._client.post("/security-events", json={
+                "threat_level": threat_level,
+                "threat_type": threat_type,
+                "threat_patterns": threat_patterns or [],
+                "input_preview": input_preview,
+                "source": source,
+                "user_id": user_id,
+                "blocked": blocked,
+                "details": details or {}
+            })
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to create security event: {e}")
+    
+    async def get_security_stats(self) -> SkillResult:
+        """Get security event statistics."""
+        try:
+            resp = await self._client.get("/security-events/stats")
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to get security stats: {e}")
+    
+    # ========================================
     # Thoughts
     # ========================================
     async def get_thoughts(self, limit: int = 100) -> SkillResult:
