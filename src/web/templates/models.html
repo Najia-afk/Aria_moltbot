@@ -930,141 +930,206 @@ async function loadSpendLogs() {
     }
 }
 
-// Update charts
-async function updateCharts() {
-    // Provider distribution chart
-    const providerCounts = {};
-    allModels.forEach(model => {
-        const provider = getProvider(model.id);
-        providerCounts[provider] = (providerCounts[provider] || 0) + 1;
+// Get period in days from selector
+function getPeriodDays() {
+    const period = document.getElementById('chart-period')?.value || '7d';
+    switch (period) {
+        case '24h': return 1;
+        case '7d': return 7;
+        case '30d': return 30;
+        case 'all': return 365; // max 1 year
+        default: return 7;
+    }
+}
+
+// Filter logs by period
+function filterLogsByPeriod(logs, days) {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    return logs.filter(log => {
+        const logDate = new Date(log.startTime || log.created_at);
+        return logDate >= cutoff;
     });
+}
+
+// Update charts with real data
+async function updateCharts() {
+    const periodDays = getPeriodDays();
     
-    const providers = Object.keys(providerCounts);
-    const counts = Object.values(providerCounts);
-    const colors = providers.map(p => getProviderColor(p));
-    
-    // Don't render empty charts
-    if (providers.length === 0) {
-        document.getElementById('tokens-by-provider-chart').parentElement.innerHTML = '<div class="empty-state"><p>No model data available</p></div>';
-        return;
+    // Fetch all spend logs once
+    let allLogs = [];
+    try {
+        const logsResp = await fetch(`${API_URL}/litellm/spend?limit=2000`);
+        const logsData = await logsResp.json();
+        allLogs = Array.isArray(logsData) ? filterLogsByPeriod(logsData, periodDays) : [];
+    } catch (err) {
+        console.error('Failed to fetch spend logs:', err);
     }
     
-    const providerCtx = document.getElementById('tokens-by-provider-chart').getContext('2d');
-    if (providerChart) providerChart.destroy();
-    providerChart = new Chart(providerCtx, {
-        type: 'doughnut',
-        data: {
-            labels: providers.map(p => p.charAt(0).toUpperCase() + p.slice(1)),
-            datasets: [{
-                data: counts,
-                backgroundColor: colors,
-                borderWidth: 0
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'right',
-                    labels: { color: '#9ca3af', font: { size: 12 } }
-                }
-            }
-        }
+    // === TOKENS BY PROVIDER (Doughnut) - Real token usage, not model counts ===
+    const providerTokens = {};
+    allLogs.forEach(log => {
+        const provider = getProvider(log.model || '');
+        const tokens = (log.prompt_tokens || 0) + (log.completion_tokens || 0) + (log.total_tokens || 0);
+        providerTokens[provider] = (providerTokens[provider] || 0) + tokens;
     });
     
-    // Usage timeline - aggregate real spend logs by day
-    const timelineCtx = document.getElementById('usage-timeline-chart').getContext('2d');
-    if (timelineChart) timelineChart.destroy();
+    const providers = Object.keys(providerTokens);
+    const tokenCounts = Object.values(providerTokens);
+    const colors = providers.map(p => getProviderColor(p));
     
-    // Fetch spend logs for real data
-    try {
-        const logsResp = await fetch(`${API_URL}/litellm/spend?limit=500`);
-        const spendLogs = await logsResp.json();
+    const providerCtx = document.getElementById('tokens-by-provider-chart');
+    if (providerCtx) {
+        if (providerChart) providerChart.destroy();
         
-        // Group tokens by day (last 7 days)
-        const dayData = {};
-        const now = new Date();
-        for (let i = 6; i >= 0; i--) {
-            const d = new Date(now);
-            d.setDate(d.getDate() - i);
-            const key = d.toISOString().split('T')[0];
-            dayData[key] = 0;
-        }
-        
-        if (Array.isArray(spendLogs)) {
-            spendLogs.forEach(log => {
-                const logDate = new Date(log.startTime || log.created_at);
-                const key = logDate.toISOString().split('T')[0];
-                if (dayData.hasOwnProperty(key)) {
-                    const tokens = (log.prompt_tokens || 0) + (log.completion_tokens || 0) + (log.total_tokens || 0);
-                    dayData[key] += tokens;
+        if (providers.length === 0) {
+            providerCtx.parentElement.innerHTML = `
+                <h3 class="chart-title">Tokens by Provider</h3>
+                <div class="empty-state" style="height: 250px; display: flex; align-items: center; justify-content: center;">
+                    <p>No token usage data for this period</p>
+                </div>`;
+        } else {
+            providerChart = new Chart(providerCtx.getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: providers.map(p => p.charAt(0).toUpperCase() + p.slice(1)),
+                    datasets: [{
+                        data: tokenCounts,
+                        backgroundColor: colors,
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: { color: '#9ca3af', font: { size: 12 } }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => `${ctx.label}: ${formatNumber(ctx.raw)} tokens`
+                            }
+                        }
+                    }
                 }
             });
         }
+    }
+    
+    // === USAGE OVER TIME (Line) - Aggregate by day/hour based on period ===
+    const timelineCtx = document.getElementById('usage-timeline-chart');
+    if (timelineCtx) {
+        if (timelineChart) timelineChart.destroy();
         
-        const days = Object.keys(dayData).map(d => {
+        const dayData = {};
+        const now = new Date();
+        
+        // Create date buckets based on period
+        const bucketCount = periodDays === 1 ? 24 : Math.min(periodDays, 30);
+        for (let i = bucketCount - 1; i >= 0; i--) {
+            const d = new Date(now);
+            if (periodDays === 1) {
+                d.setHours(d.getHours() - i);
+                d.setMinutes(0, 0, 0);
+            } else {
+                d.setDate(d.getDate() - i);
+            }
+            const key = periodDays === 1 
+                ? d.toISOString().slice(0, 13) // YYYY-MM-DDTHH
+                : d.toISOString().split('T')[0]; // YYYY-MM-DD
+            dayData[key] = 0;
+        }
+        
+        // Aggregate logs into buckets
+        allLogs.forEach(log => {
+            const logDate = new Date(log.startTime || log.created_at);
+            const key = periodDays === 1
+                ? logDate.toISOString().slice(0, 13)
+                : logDate.toISOString().split('T')[0];
+            if (dayData.hasOwnProperty(key)) {
+                const tokens = (log.prompt_tokens || 0) + (log.completion_tokens || 0) + (log.total_tokens || 0);
+                dayData[key] += tokens;
+            }
+        });
+        
+        const labels = Object.keys(dayData).map(d => {
             const date = new Date(d);
-            return date.toLocaleDateString('en-US', { weekday: 'short' });
+            if (periodDays === 1) {
+                return date.toLocaleTimeString('en-US', { hour: 'numeric' });
+            } else if (periodDays <= 7) {
+                return date.toLocaleDateString('en-US', { weekday: 'short' });
+            } else {
+                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            }
         });
         const usageData = Object.values(dayData);
         
-        timelineChart = new Chart(timelineCtx, {
+        timelineChart = new Chart(timelineCtx.getContext('2d'), {
             type: 'line',
             data: {
-                labels: days,
+                labels: labels,
                 datasets: [{
                     label: 'Tokens',
                     data: usageData,
                     borderColor: '#8b5cf6',
                     backgroundColor: 'rgba(139, 92, 246, 0.1)',
                     fill: true,
-                    tension: 0.4
+                    tension: 0.4,
+                    pointRadius: periodDays <= 7 ? 4 : 2,
+                    pointHoverRadius: 6
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { display: false }
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => `${formatNumber(ctx.raw)} tokens`
+                        }
+                    }
                 },
                 scales: {
-                    x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } },
-                    y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } }
+                    x: { 
+                        grid: { color: 'rgba(255,255,255,0.05)' }, 
+                        ticks: { color: '#9ca3af', maxRotation: 45 } 
+                    },
+                    y: { 
+                        grid: { color: 'rgba(255,255,255,0.05)' }, 
+                        ticks: { 
+                            color: '#9ca3af',
+                            callback: (value) => formatNumber(value)
+                        },
+                        beginAtZero: true
+                    }
                 }
             }
         });
-    } catch (err) {
-        console.error('Failed to load usage timeline:', err);
     }
     
-    // Usage by model chart - show top 5 models by token usage
-    const spendCtx = document.getElementById('spend-by-model-chart').getContext('2d');
-    if (spendModelChart) spendModelChart.destroy();
-    
-    // Aggregate token usage by model from logs
-    try {
-        const logsResp2 = await fetch(`${API_URL}/litellm/spend?limit=500`);
-        const spendLogs2 = await logsResp2.json();
+    // === USAGE BY MODEL (Horizontal Bar) - Top 5 models ===
+    const spendCtx = document.getElementById('spend-by-model-chart');
+    if (spendCtx) {
+        if (spendModelChart) spendModelChart.destroy();
         
         const modelTokens = {};
-        if (Array.isArray(spendLogs2)) {
-            spendLogs2.forEach(log => {
-                const model = (log.model || 'unknown').split('/').pop();
-                const tokens = (log.prompt_tokens || 0) + (log.completion_tokens || 0) + (log.total_tokens || 0);
-                modelTokens[model] = (modelTokens[model] || 0) + tokens;
-            });
-        }
+        allLogs.forEach(log => {
+            const model = (log.model || 'unknown').split('/').pop();
+            const tokens = (log.prompt_tokens || 0) + (log.completion_tokens || 0) + (log.total_tokens || 0);
+            modelTokens[model] = (modelTokens[model] || 0) + tokens;
+        });
         
-        // Sort by tokens descending and take top 5
         const sortedModels = Object.entries(modelTokens)
             .sort((a, b) => b[1] - a[1])
             .slice(0, 5);
         
-        const topModels = sortedModels.map(([name]) => name);
+        const topModels = sortedModels.map(([name]) => name.length > 25 ? name.slice(0, 22) + '...' : name);
         const topTokens = sortedModels.map(([, tokens]) => tokens);
         
-        spendModelChart = new Chart(spendCtx, {
+        spendModelChart = new Chart(spendCtx.getContext('2d'), {
             type: 'bar',
             data: {
                 labels: topModels.length > 0 ? topModels : ['No data'],
@@ -1080,53 +1145,86 @@ async function updateCharts() {
                 maintainAspectRatio: false,
                 indexAxis: 'y',
                 plugins: {
-                    legend: { display: false }
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => `${formatNumber(ctx.raw)} tokens`
+                        }
+                    }
                 },
                 scales: {
-                    x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } },
+                    x: { 
+                        grid: { color: 'rgba(255,255,255,0.05)' }, 
+                        ticks: { 
+                            color: '#9ca3af',
+                            callback: (value) => formatNumber(value)
+                        }
+                    },
                     y: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 10 } } }
                 }
             }
         });
-    } catch (err) {
-        console.error('Failed to load usage by model:', err);
     }
     
-    // Cost breakdown pie - use real input/output token data
-    const costCtx = document.getElementById('cost-breakdown-chart').getContext('2d');
-    if (costBreakdownChart) costBreakdownChart.destroy();
-    
-    // Get aggregated token data from global spend
-    try {
-        const globalResp = await fetch(`${API_URL}/litellm/global-spend`);
-        const globalData = await globalResp.json();
+    // === COST BREAKDOWN (Pie) - Input vs Output tokens ===
+    const costCtx = document.getElementById('cost-breakdown-chart');
+    if (costCtx) {
+        if (costBreakdownChart) costBreakdownChart.destroy();
         
-        const inputTokens = globalData.input_tokens || 0;
-        const outputTokens = globalData.output_tokens || 0;
+        let inputTokens = 0;
+        let outputTokens = 0;
         
-        costBreakdownChart = new Chart(costCtx, {
-            type: 'pie',
-            data: {
-                labels: ['Input Tokens', 'Output Tokens'],
-                datasets: [{
-                    data: [inputTokens, outputTokens],
-                    backgroundColor: ['#22c55e', '#f59e0b'],
-                    borderWidth: 0
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'bottom',
-                        labels: { color: '#9ca3af', font: { size: 12 } }
+        allLogs.forEach(log => {
+            inputTokens += log.prompt_tokens || 0;
+            outputTokens += log.completion_tokens || 0;
+        });
+        
+        // If no breakdown available, try global spend
+        if (inputTokens === 0 && outputTokens === 0) {
+            try {
+                const globalResp = await fetch(`${API_URL}/litellm/global-spend`);
+                const globalData = await globalResp.json();
+                inputTokens = globalData.input_tokens || 0;
+                outputTokens = globalData.output_tokens || 0;
+            } catch (err) {
+                console.error('Failed to load global spend:', err);
+            }
+        }
+        
+        if (inputTokens === 0 && outputTokens === 0) {
+            costCtx.parentElement.innerHTML = `
+                <h3 class="chart-title">Cost Breakdown</h3>
+                <div class="empty-state" style="height: 250px; display: flex; align-items: center; justify-content: center;">
+                    <p>No token data available</p>
+                </div>`;
+        } else {
+            costBreakdownChart = new Chart(costCtx.getContext('2d'), {
+                type: 'pie',
+                data: {
+                    labels: ['Input Tokens', 'Output Tokens'],
+                    datasets: [{
+                        data: [inputTokens, outputTokens],
+                        backgroundColor: ['#22c55e', '#f59e0b'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: '#9ca3af', font: { size: 12 } }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => `${ctx.label}: ${formatNumber(ctx.raw)}`
+                            }
+                        }
                     }
                 }
-            }
-        });
-    } catch (err) {
-        console.error('Failed to load cost breakdown:', err);
+            });
+        }
     }
 }
 
