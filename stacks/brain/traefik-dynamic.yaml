@@ -20,8 +20,6 @@ http:
       entryPoints:
         - web
       service: clawdbot
-      middlewares:
-        - clawdbot-headers
 
     portal-http:
       rule: "PathPrefix(`/`)"
@@ -49,8 +47,6 @@ http:
       entryPoints:
         - web
       service: clawdbot
-      middlewares:
-        - clawdbot-headers
 
     grafana-http:
       rule: "PathPrefix(`/grafana`)"
@@ -112,8 +108,6 @@ http:
       entryPoints:
         - websecure
       service: clawdbot
-      middlewares:
-        - clawdbot-headers
       tls: {}
 
     portal:
@@ -144,8 +138,6 @@ http:
       entryPoints:
         - websecure
       service: clawdbot
-      middlewares:
-        - clawdbot-headers
       tls: {}
 
     grafana:
