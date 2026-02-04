@@ -1026,7 +1026,8 @@ async function updateCharts() {
     const providerTokens = {};
     allLogs.forEach(log => {
         const provider = getProvider(log.model || '');
-        const tokens = (log.prompt_tokens || 0) + (log.completion_tokens || 0) + (log.total_tokens || 0);
+        // Use total_tokens (which is prompt + completion) or fall back to sum
+        const tokens = log.total_tokens || ((log.prompt_tokens || 0) + (log.completion_tokens || 0));
         providerTokens[provider] = (providerTokens[provider] || 0) + tokens;
     });
     
@@ -1105,7 +1106,8 @@ async function updateCharts() {
                 ? logDate.toISOString().slice(0, 13)
                 : logDate.toISOString().split('T')[0];
             if (dayData.hasOwnProperty(key)) {
-                const tokens = (log.prompt_tokens || 0) + (log.completion_tokens || 0) + (log.total_tokens || 0);
+                // Use total_tokens (which is prompt + completion) or fall back to sum
+                const tokens = log.total_tokens || ((log.prompt_tokens || 0) + (log.completion_tokens || 0));
                 dayData[key] += tokens;
             }
         });
