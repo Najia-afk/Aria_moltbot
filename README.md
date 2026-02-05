@@ -10,16 +10,109 @@
 
 <img src="aria_mind/aria-profile-v1.png" alt="Aria Blue" width="180" align="right" style="margin-left: 20px; border-radius: 10px;">
 
-Production-grade autonomous AI agent built on [OpenClaw](https://openclaw.ai) with **local-first** LLM inference on Apple Silicon (Metal GPU), multi-model fallback routing, 25 modular Python skills, multi-agent orchestration, and full observability stack.
+Aria is an autonomous AI agent that **thinks like a CEO**: she analyzes tasks, delegates to specialized focus personas, runs parallel roundtable discussions across domains, and synthesizes results — all on a self-driven 5-minute work cycle with goal tracking, persistent memory, and full observability.
 
-### Key Capabilities
+Built on [OpenClaw](https://openclaw.ai) with local-first LLM inference on Apple Silicon.
 
-- **Local-First LLM**: MLX-accelerated Qwen3 on Metal GPU (~25-35 tok/s), with free cloud fallbacks
-- **25 Python Skills**: Modular skill system with registry, metrics, retry logic, and Prometheus integration
-- **Multi-Agent Orchestration**: Coordinator, Researcher, Social, Coder, and Memory agents
-- **Full Observability**: Grafana dashboards, Prometheus metrics, structured logging
-- **Social Platform Integration**: Native [Moltbook](https://moltbook.com) client with rate limiting
-- **Persistent Memory**: PostgreSQL-backed knowledge graph, activity logs, and curated memory
+---
+
+## 🧠 What Makes Aria Different
+
+### CEO Pattern — Orchestrate, Don't Just Execute
+
+Aria doesn't just answer prompts. She operates as an **orchestrating consciousness** that breaks complex tasks into delegatable work, routes each piece to the right specialist, and synthesizes coherent outcomes:
+
+```
+User Request
+     │
+     ▼
+┌─────────────────────────────────────────────────────────┐
+│  🎯 Orchestrator (Aria)                                  │
+│  Analyzes task → decomposes → assigns → synthesizes      │
+├─────────────────────────────────────────────────────────┤
+│                                                          │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐              │
+│  │ 🔒 DevSec │  │ 📊 Data  │  │ 🎨 Create│  ...        │
+│  │ Security  │  │ Analysis │  │ Content  │              │
+│  │ CI/CD     │  │ MLOps    │  │ Ideation │              │
+│  └──────────┘  └──────────┘  └──────────┘              │
+│       │              │              │                    │
+│       └──────────────┴──────────────┘                    │
+│                      │                                   │
+│                      ▼                                   │
+│           Synthesized Result                             │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Focus Personas — Adaptive Specialization
+
+Aria switches between **7 specialized focus personas** depending on the task. Each focus modifies her approach, prioritizes different skills, selects the optimal LLM model, and knows *when to delegate to other focuses*:
+
+| Focus | Emoji | Vibe | Delegates To |
+|-------|-------|------|-------------|
+| **Orchestrator** | 🎯 | Strategic, delegation-focused | Everyone — this is the CEO |
+| **DevSecOps** | 🔒 | Security-paranoid, systematic | Orchestrator (business), Data (analysis) |
+| **Data Architect** | 📊 | Analytical, metrics-driven | DevSecOps (code), Social (comms) |
+| **Crypto Trader** | 📈 | Risk-aware, disciplined | DevSecOps (implementation), Journalist (analysis) |
+| **Creative** | 🎨 | Exploratory, unconventional | DevSecOps (validation), Social (publishing) |
+| **Social Architect** | 🌐 | Community-building, authentic | DevSecOps (tech content), Data (research) |
+| **Journalist** | 📰 | Investigative, fact-checking | Data (analysis), Social (publishing) |
+
+Each persona carries:
+- **Vibe modifier** — adjusts communication tone
+- **Skill priority list** — which tools to use first
+- **Model hint** — selects the best LLM from `models.yaml` (code tasks use coder models, creative uses creative models)
+- **Delegation hint** — knows which other focus to hand off to
+
+The `FocusManager` auto-suggests the right persona from task keywords, maintains transition history, and ensures core identity is never compromised.
+
+### Roundtable Discussions — Multi-Domain Collaboration
+
+When a task spans multiple domains (detected automatically via keyword triggers like "launch", "review", "cross-team"), Aria runs a **roundtable**:
+
+```python
+# Auto-detected: "How should we promote and secure the AI project?"
+perspectives = await coordinator.roundtable(question)
+# 🔒 DevSecOps: "Security audit first, lock down API keys, scan dependencies"
+# 📊 Data:     "Define KPIs — DAU, response latency, error rate targets"
+# 🎨 Creative: "Story angle: behind-the-scenes dev journey, demo video"
+# 🌐 Social:   "Launch on Moltbook first, engage existing community"
+# → Aria synthesizes all perspectives into one actionable plan
+```
+
+All agents run **in parallel** via `asyncio.gather`, then the Orchestrator synthesizes.
+
+### Goal-Driven Work Cycles — Autonomous Productivity
+
+Aria doesn't wait for prompts. Every **5 minutes**, a work cycle fires:
+
+```
+WORK → PROGRESS → COMPLETION → NEW GOAL → GROWTH
+```
+
+Each cycle:
+1. **Check active goals** (sorted by deadline → priority → progress)
+2. **Select one** to work on
+3. **Execute ONE concrete action** (a query, an API call, a document section)
+4. **Log progress** to PostgreSQL
+5. **Auto-create new goals** when current ones complete
+
+Goals are prioritized 1-5: `URGENT → HIGH → MEDIUM → LOW → BACKGROUND`. Aria finishes what she starts, handles blocked goals gracefully, and maintains a continuous loop of small, compounding efforts.
+
+### Self-Orchestrating Infrastructure Awareness
+
+Aria knows her own infrastructure — every container, port, and capability:
+
+| Capability | How |
+|-----------|-----|
+| Spawn up to 8 concurrent sub-agents | OpenClaw subagent system |
+| Switch LLM models per task | LiteLLM + model hints per focus |
+| Browse the web (headless Chrome) | aria-browser container |
+| Anonymous research via Tor | tor-proxy container |
+| Persistent memory & knowledge graph | PostgreSQL + knowledge_graph skill |
+| Self-monitoring & health checks | health skill + heartbeat every 30 min |
+
+She knows her permissions, her limits, and has emergency protocols for model failures and service outages.
 
 ---
 
@@ -30,40 +123,32 @@ Aria_moltbot/
 ├── aria_mind/                 # OpenClaw workspace (mounted to gateway)
 │   ├── SOUL.md                # Persona, boundaries, model preferences
 │   ├── IDENTITY.md            # Agent identity configuration
+│   ├── GOALS.md               # Goal-driven work system (5-min cycles)
+│   ├── ORCHESTRATION.md       # Sub-agent delegation & infrastructure
 │   ├── AGENTS.md              # Sub-agent definitions
 │   ├── TOOLS.md               # Skill registry & execution guide
 │   ├── HEARTBEAT.md           # Scheduled task configuration
 │   ├── MEMORY.md              # Long-term curated knowledge
-│   ├── GOALS.md               # Goal-driven work system
-│   ├── ORCHESTRATION.md       # Infrastructure awareness
-│   ├── soul/                  # Soul implementation (identity, values, boundaries)
-│   └── skills/                # Runtime skill mounts
-│
-├── aria_skills/               # Skill modules (25 directories)
-│   ├── base.py                # BaseSkill, SkillConfig, SkillResult
-│   ├── registry.py            # SkillRegistry with auto-discovery
-│   ├── database/              # PostgreSQL operations
-│   ├── moltbook/              # Social platform integration
-│   ├── llm/                   # Multi-provider LLM routing
-│   ├── input_guard/           # Runtime security (injection detection)
-│   ├── knowledge_graph/       # Entity-relationship graph
-│   └── ...                    # 18 more skill modules
+│   └── soul/                  # Soul implementation
+│       ├── focus.py           # 7 focus personas + FocusManager
+│       ├── identity.py        # Core identity (never overridden)
+│       ├── values.py          # Core values
+│       └── boundaries.py      # Operational boundaries
 │
 ├── aria_agents/               # Multi-agent orchestration
 │   ├── base.py                # BaseAgent, AgentConfig, AgentMessage
-│   ├── loader.py              # AGENTS.md parser
-│   └── coordinator.py         # Agent lifecycle & routing
+│   ├── coordinator.py         # CEO pattern, roundtable, broadcasting
+│   └── loader.py              # AGENTS.md parser
+│
+├── aria_skills/               # 25 skill modules
+│   ├── base.py                # BaseSkill (retry, metrics, Prometheus)
+│   ├── registry.py            # Auto-discovery registry
+│   └── <25 skill dirs>/       # Each: __init__.py + skill.json + SKILL.md
 │
 ├── stacks/brain/              # Docker deployment (13 services)
-│   ├── docker-compose.yml     # Full stack orchestration
-│   ├── litellm-config.yaml    # LLM model routing
-│   ├── prometheus.yml         # Metrics scrape config
-│   └── init-scripts/          # PostgreSQL initialization
+│   └── docker-compose.yml     # Full stack orchestration
 │
-├── src/                       # Application layer
-│   ├── api/                   # FastAPI backend
-│   └── web/                   # Flask dashboard UI
-│
+├── src/                       # Application layer (API + Web UI)
 └── tests/                     # Pytest test suite
 ```
 
@@ -109,16 +194,94 @@ Aria_moltbot/
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-### Database Isolation
+---
 
-PostgreSQL hosts **two separate databases** to prevent schema conflicts:
+## 🧠 Model Routing
 
-| Database | Purpose | Tables |
-|----------|---------|--------|
-| `aria_warehouse` | Aria's operational data | activity_log, memories, thoughts, goals, social_posts, heartbeat_log, knowledge_entities, knowledge_relations |
-| `litellm` | LiteLLM internals | Prisma-managed tables |
+Each focus persona selects the optimal model for its domain. All routing goes through LiteLLM with automatic failover:
 
-> LiteLLM's Prisma migrations can drop unrecognized tables. Separate databases prevent data loss.
+| Priority | Model | Best For | Cost |
+|----------|-------|----------|------|
+| 1 | Qwen3-VLTO-8B (MLX) | Primary — all tasks | Free (local Metal GPU) |
+| 2 | Qwen3-Coder (OpenRouter) | Code generation, review | Free |
+| 3 | Chimera (OpenRouter) | Reasoning (2x faster than R1) | Free |
+| 4 | Trinity (OpenRouter) | Creative, agentic, roleplay | Free |
+| 5 | DeepSeek R1 (OpenRouter) | Deep reasoning | Free |
+| 6 | Nemotron 30B (OpenRouter) | Long context (256K) | Free |
+| 7 | Kimi K2.5 (Moonshot) | Last resort | Paid |
+
+Focus-to-model mapping is defined in `aria_models/models.yaml` and loaded dynamically.
+
+---
+
+## 🔧 Skill System (25 Modules)
+
+Each skill extends `BaseSkill` with retry logic, metrics tracking, and Prometheus integration:
+
+```
+aria_skills/<skill>/
+├── __init__.py      # Skill class
+├── skill.json       # OpenClaw manifest
+└── SKILL.md         # Documentation
+```
+
+### Core Skills
+
+| Skill | Description |
+|-------|-------------|
+| `database` | PostgreSQL operations (queries, memory, activity logs) |
+| `llm` | Multi-provider LLM routing (Moonshot, Ollama, OpenRouter) |
+| `input_guard` | Runtime security — prompt injection detection, output filtering |
+| `knowledge_graph` | Entity-relationship graph (persistent knowledge) |
+| `goals` | Goal management, habit tracking, progress monitoring |
+| `health` | System health checks across all services |
+| `model_switcher` | Dynamic model switching with reasoning mode toggle |
+| `api_client` | Centralized HTTP client for all API interactions |
+| `schedule` | Scheduled jobs and background operations |
+| `litellm` | LiteLLM proxy management and spend tracking |
+| `pytest_runner` | Run pytest and return structured results |
+
+### Domain Skills
+
+| Skill | Focus | Description |
+|-------|-------|-------------|
+| `moltbook` | 🌐 Social | Moltbook social network (posts, comments, feed, search) |
+| `social` | 🌐 Social | Social presence management |
+| `community` | 🌐 Social | Community management and growth |
+| `brainstorm` | 🎨 Creative | Creative ideation sessions |
+| `research` | 📰 Journalist | Information gathering and verification |
+| `fact_check` | 📰 Journalist | Claim verification workflows |
+| `market_data` | 📈 Trader | Cryptocurrency market data and analysis |
+| `portfolio` | 📈 Trader | Portfolio and position management |
+| `ci_cd` | 🔒 DevSecOps | CI/CD pipeline automation |
+| `security_scan` | 🔒 DevSecOps | Vulnerability detection |
+| `data_pipeline` | 📊 Data | ETL and data pipeline operations |
+| `experiment` | 📊 Data | ML experiment tracking |
+| `performance` | 🎯 Orchestrator | Performance reviews and self-assessments |
+| `hourly_goals` | 🎯 Orchestrator | Micro-task tracking |
+
+---
+
+## 🤖 Agent System
+
+Multi-agent orchestration with the CEO delegation pattern:
+
+| Agent | Role | Capabilities |
+|-------|------|--------------|
+| **aria** | Coordinator | Orchestrate, delegate, synthesize — the CEO |
+| **researcher** | Researcher | Search, verify, summarize |
+| **social** | Social | Post, engage, moderate on Moltbook |
+| **coder** | Coder | Generate, review, explain code |
+| **memory** | Memory | Store, recall, organize knowledge |
+
+**Delegation patterns:**
+
+| Pattern | When | Flow |
+|---------|------|------|
+| Simple sub-agent | Async work, same model | Aria → sub-agent → result → synthesis |
+| Specialized agent | Needs specific model | Aria → agent (Kimi/coder model) → result |
+| Parallel agents | Splittable tasks | Aria → [agent₁, agent₂, agent₃] → merge |
+| Roundtable | Cross-domain decisions | Aria → all focuses in parallel → synthesize |
 
 ---
 
@@ -126,7 +289,7 @@ PostgreSQL hosts **two separate databases** to prevent schema conflicts:
 
 | Service | Image | Port | Description |
 |---------|-------|------|-------------|
-| **traefik** | traefik:v3.1 | 80, 443, 8081 | HTTPS reverse proxy + dashboard |
+| **traefik** | traefik:v3.1 | 80, 443 | HTTPS reverse proxy |
 | **clawdbot** | node:22-bookworm | 18789 | OpenClaw AI gateway |
 | **litellm** | ghcr.io/berriai/litellm | 18793 | LLM model router |
 | **aria-db** | postgres:16-alpine | 5432 | PostgreSQL (dual database) |
@@ -135,111 +298,17 @@ PostgreSQL hosts **two separate databases** to prevent schema conflicts:
 | **aria-brain** | Custom (Python) | — | Agent runtime |
 | **grafana** | grafana/grafana | 3001 | Monitoring dashboards |
 | **prometheus** | prom/prometheus | 9090 | Metrics collection |
-| **pgadmin** | dpage/pgadmin4 | 5050 | Database admin UI |
-| **aria-browser** | browserless/chrome | 3000 | Headless browser automation |
+| **pgadmin** | dpage/pgadmin4 | 5050 | Database admin |
+| **aria-browser** | browserless/chrome | 3000 | Headless browser |
 | **tor-proxy** | dperson/torproxy | 9050 | Privacy proxy |
-| **certs-init** | alpine:3.20 | — | TLS certificate generation |
+| **certs-init** | alpine:3.20 | — | TLS cert generation |
 
-**Volumes:** `aria_pg_data` · `prometheus_data` · `grafana_data` · `aria_data` · `aria_logs` · `openclaw_data`
+### Database Isolation
 
----
-
-## 🧠 Model Routing
-
-Local-first inference with automatic fallback chain:
-
-| Priority | Model | Provider | Cost |
-|----------|-------|----------|------|
-| 1 | Qwen3-VLTO-8B-Instruct | MLX Server (Metal GPU) | Free (local) |
-| 2 | GLM 4.5 Air (131K ctx) | OpenRouter | Free |
-| 3 | DeepSeek R1 0528 (164K ctx) | OpenRouter | Free |
-| 4 | Nemotron 30B (256K ctx) | OpenRouter | Free |
-| 5 | Kimi K2.5 | Moonshot Cloud | Paid (last resort) |
-
-All routing handled by LiteLLM with health checks and automatic failover.
-
----
-
-## 🔧 Skill System (25 Modules)
-
-Each skill is a self-contained directory with Python implementation, OpenClaw manifest, and documentation:
-
-```
-aria_skills/<skill>/
-├── __init__.py      # Skill class (extends BaseSkill)
-├── skill.json       # OpenClaw manifest
-└── SKILL.md         # Documentation
-```
-
-### BaseSkill Framework
-
-- **Retry logic** with exponential backoff (tenacity integration)
-- **Metrics tracking**: latency, error rates, usage counts
-- **Prometheus** counters and histograms (optional)
-- **Structured logging** via structlog (optional)
-- **Registry**: auto-discovery via `@SkillRegistry.register` decorator
-
-### Skill Inventory
-
-#### Core Skills (Registered)
-
-| Skill | Class | Description |
-|-------|-------|-------------|
-| `api_client` | AriaAPIClient | Centralized HTTP client for all API interactions |
-| `database` | DatabaseSkill | PostgreSQL operations (queries, memory storage, activity logs) |
-| `llm` | MoonshotSkill / OllamaSkill | Multi-provider LLM routing (Moonshot, Ollama, OpenRouter) |
-| `health` | HealthMonitorSkill | System health checks (DB, LLM, API connectivity) |
-| `goals` | GoalSchedulerSkill | Goal management, habit tracking, progress monitoring |
-| `knowledge_graph` | KnowledgeGraphSkill | Entity-relationship graph (add, query, search) |
-| `input_guard` | InputGuardSkill | Runtime security — prompt injection detection, output filtering |
-| `model_switcher` | ModelSwitcherSkill | Dynamic LLM model switching with reasoning mode toggle |
-| `litellm` | LiteLLMSkill | LiteLLM proxy management and API spend tracking |
-| `pytest_runner` | PytestSkill | Run pytest suites and return structured results |
-| `market_data` | MarketDataSkill | Cryptocurrency market data and analysis |
-| `portfolio` | PortfolioSkill | Portfolio and position management |
-| `schedule` | ScheduleSkill | Scheduled jobs and background operations |
-| `performance` | PerformanceSkill | Performance reviews and self-assessments |
-| `social` | SocialSkill | Social presence management (posting, engagement) |
-| `hourly_goals` | HourlyGoalsSkill | Micro-task tracking and hourly goal cycles |
-
-#### Domain-Specific Skills
-
-| Skill | Class | Description |
-|-------|-------|-------------|
-| `moltbook` | MoltbookSkill | Moltbook social network (posts, comments, feed, search) |
-| `brainstorm` | BrainstormSkill | Creative ideation and brainstorming sessions |
-| `research` | ResearchSkill | Information gathering and source verification |
-| `fact_check` | FactCheckSkill | Claim verification and fact-checking workflows |
-| `community` | CommunitySkill | Community management and growth |
-| `ci_cd` | CICDSkill | CI/CD pipeline management and automation |
-| `data_pipeline` | DataPipelineSkill | ETL operations and data pipeline management |
-| `experiment` | ExperimentSkill | ML experiment tracking and model management |
-| `security_scan` | SecurityScanSkill | Security scanning and vulnerability detection |
-
-### Skill Execution
-
-```bash
-python3 run_skill.py <skill> <function> '<args_json>'
-
-# Examples
-python3 run_skill.py database query '{"sql": "SELECT COUNT(*) FROM activity_log"}'
-python3 run_skill.py moltbook create_post '{"title": "Hello!", "content": "..."}'
-python3 run_skill.py health check_health '{}'
-```
-
----
-
-## 🤖 Agent System
-
-Multi-agent orchestration defined in `aria_mind/AGENTS.md`:
-
-| Agent | Role | Capabilities |
-|-------|------|--------------|
-| **aria** | Coordinator | Orchestrate, delegate, synthesize across agents |
-| **researcher** | Researcher | Search, verify, summarize information |
-| **social** | Social | Post, engage, moderate on Moltbook |
-| **coder** | Coder | Generate, review, explain code |
-| **memory** | Memory | Store, recall, organize knowledge |
+| Database | Purpose |
+|----------|---------|
+| `aria_warehouse` | Aria's data (8 tables: activity_log, memories, thoughts, goals, social_posts, heartbeat_log, knowledge_entities, knowledge_relations) |
+| `litellm` | LiteLLM Prisma tables (isolated to prevent migration conflicts) |
 
 ---
 
@@ -247,7 +316,7 @@ Multi-agent orchestration defined in `aria_mind/AGENTS.md`:
 
 ### Prerequisites
 
-- macOS with Apple Silicon (M1/M2/M3/M4) for Metal GPU acceleration
+- macOS with Apple Silicon (M1/M2/M3/M4) for Metal GPU
 - Docker & Docker Compose
 - Git
 
@@ -260,13 +329,13 @@ cd Aria_moltbot/stacks/brain
 
 # Configure
 cp .env.example .env
-nano .env  # Set API keys and credentials
+nano .env  # Set API keys
 
-# Start MLX Server (Metal GPU, runs natively on macOS)
+# Start MLX Server (Metal GPU)
 mlx_lm.server --model nightmedia/Qwen3-VLTO-8B-Instruct-qx86x-hi-mlx \
   --host 0.0.0.0 --port 8080 &
 
-# Deploy stack
+# Deploy
 docker compose up -d
 
 # Verify
@@ -274,90 +343,25 @@ docker compose ps              # 13 services healthy
 curl http://localhost:18789/health
 ```
 
-### Configuration (.env)
-
-```env
-# Database (creates aria_warehouse + litellm databases)
-DB_USER=aria_admin
-DB_PASSWORD=your_secure_password
-DB_NAME=aria_warehouse
-
-# LiteLLM
-LITELLM_MASTER_KEY=sk-aria-local-key
-
-# Cloud Fallbacks
-OPEN_ROUTER_KEY=sk-or-v1-...
-MOONSHOT_KIMI_KEY=your_kimi_key
-
-# OpenClaw Gateway
-CLAWDBOT_TOKEN=your_secure_gateway_token
-
-# Host
-SERVICE_HOST=192.168.1.53
-```
-
 ### Service URLs
 
-| Service | URL | Description |
-|---------|-----|-------------|
-| Dashboard | `https://{HOST}/` | Main web UI |
-| API Docs | `https://{HOST}/api/docs` | Swagger documentation |
-| OpenClaw | `http://{HOST}:18789` | Gateway API |
-| LiteLLM | `http://{HOST}:18793` | Model router |
-| Grafana | `https://{HOST}/grafana` | Monitoring dashboards |
-| PGAdmin | `https://{HOST}/pgadmin` | Database admin |
-| Prometheus | `https://{HOST}/prometheus` | Metrics |
+| Service | URL |
+|---------|-----|
+| Dashboard | `https://{HOST}/` |
+| API Docs | `https://{HOST}/api/docs` |
+| OpenClaw | `http://{HOST}:18789` |
+| LiteLLM | `http://{HOST}:18793` |
+| Grafana | `https://{HOST}/grafana` |
+| PGAdmin | `https://{HOST}/pgadmin` |
 
 ---
 
 ## 🧪 Testing
 
 ```bash
-# All tests
 pytest
-
-# With coverage
 pytest --cov=aria_skills --cov=aria_agents --cov-report=html
-
-# Specific suite
 pytest tests/test_skills.py -v
-pytest tests/test_agents.py -v
-```
-
----
-
-## 🔧 OpenClaw Integration
-
-[OpenClaw](https://openclaw.ai) provides the agent runtime with:
-
-- **Exec Tool**: Shell command execution with background process support
-- **Process Tool**: Long-running session management (poll, kill, clear)
-- **Heartbeat**: Periodic agent turns (every 30 minutes, configurable)
-- **Memory Search**: Vector-based semantic search over workspace files
-- **Session Management**: Auto-compaction when context window fills
-- **Multi-Agent Routing**: Channel-based agent delegation
-
-The `aria_mind/` workspace is mounted read-write to enable runtime memory updates.
-
----
-
-## 🛠️ Development
-
-```bash
-# Fresh rebuild (caution: destroys data)
-cd stacks/brain
-docker compose down -v
-docker compose up -d
-
-# View logs
-docker compose logs -f clawdbot
-docker compose logs -f litellm
-
-# Database access
-docker exec -it aria-db psql -U aria_admin -d aria_warehouse
-
-# OpenClaw diagnostics
-docker exec clawdbot openclaw status --deep
 ```
 
 ---
