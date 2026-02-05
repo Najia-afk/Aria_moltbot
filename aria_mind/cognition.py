@@ -14,9 +14,9 @@ if TYPE_CHECKING:
     from aria_skills import SkillRegistry
     from aria_agents import AgentCoordinator
 
-# Import security module
+# Import security module (try container path first, then local)
 try:
-    from aria_mind.security import (
+    from security import (
         AriaSecurityGateway,
         OutputFilter,
         ThreatLevel,
@@ -24,7 +24,16 @@ try:
     )
     HAS_SECURITY = True
 except ImportError:
-    HAS_SECURITY = False
+    try:
+        from aria_mind.security import (
+            AriaSecurityGateway,
+            OutputFilter,
+            ThreatLevel,
+            get_security_gateway,
+        )
+        HAS_SECURITY = True
+    except ImportError:
+        HAS_SECURITY = False
 
 
 class Cognition:

@@ -76,10 +76,12 @@ pip3 install --break-system-packages --quiet \
     python-dateutil \
     httpx \
     pyyaml \
-  tenacity \
-  pytest \
-  pytest-asyncio \
-  pytest-cov || echo "Warning: Some Python packages failed to install"
+    tenacity \
+    pytest \
+    pytest-asyncio \
+    pytest-cov \
+    structlog \
+    prometheus_client || echo "Warning: Some Python packages failed to install"
 
 # Apply OpenClaw patch if present (idempotent)
 # PATCH_MARKER_DIR="/root/.openclaw/.patches"
@@ -127,9 +129,13 @@ SKILL_REGISTRY = {
         'auth': os.environ.get('MOLTBOOK_API_KEY') or os.environ.get('MOLTBOOK_TOKEN')
     }),
     'health': ('aria_skills.health', 'HealthMonitorSkill', lambda: {}),
-    'llm': ('aria_skills.llm', 'BaseLLMSkill', lambda: {
-        'ollama_url': os.environ.get('OLLAMA_URL'),
-        'model': os.environ.get('OLLAMA_MODEL', 'hf.co/unsloth/GLM-4.7-Flash-REAP-23B-A3B-GGUF:Q3_K_S')
+    'llm': ('aria_skills.llm', 'OllamaSkill', lambda: {
+        'host': os.environ.get('OLLAMA_URL', 'http://host.docker.internal:11434'),
+        'model': os.environ.get('OLLAMA_MODEL', 'qwen3:latest')
+    }),
+    'moonshot': ('aria_skills.llm', 'MoonshotSkill', lambda: {
+        'api_key': os.environ.get('MOONSHOT_API_KEY'),
+        'model': os.environ.get('MOONSHOT_MODEL', 'moonshot-v1-8k')
     }),
     'knowledge_graph': ('aria_skills.knowledge_graph', 'KnowledgeGraphSkill', lambda: {'dsn': os.environ.get('DATABASE_URL')}),
     'goals': ('aria_skills.goals', 'GoalSchedulerSkill', lambda: {'dsn': os.environ.get('DATABASE_URL')}),

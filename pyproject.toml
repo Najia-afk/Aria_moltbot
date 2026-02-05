@@ -1,19 +1,19 @@
 [project]
 name = "aria-blue"
 version = "1.0.0"
-description = "Aria Blue - A silicon familiar with sharp, efficient, and secure vibes"
+description = "Autonomous AI agent platform with local-first LLM inference, modular skills, and multi-agent orchestration"
 readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "MIT"}
+license = {file = "LICENSE"}
 authors = [
-    {name = "Najia", email = "najia@aria.blue"}
+    {name = "Najia-afk"}
 ]
-keywords = ["ai", "assistant", "moltbook", "social", "agent"]
+keywords = ["ai", "agent", "autonomous", "llm", "openclaw", "moltbook", "multi-agent"]
 
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
+    "License :: Other/Proprietary License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -49,9 +49,10 @@ all = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/aria-blue/aria"
-Documentation = "https://aria.blue/docs"
-Repository = "https://github.com/aria-blue/aria"
+Homepage = "https://datascience-adventure.xyz"
+Repository = "https://github.com/Najia-afk/Aria_moltbot"
+Issues = "https://github.com/Najia-afk/Aria_moltbot/issues"
+License = "https://datascience-adventure.xyz/contact"
 
 [project.scripts]
 aria = "aria_mind.cli:main"

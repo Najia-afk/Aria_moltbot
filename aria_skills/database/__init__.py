@@ -6,7 +6,7 @@ Handles all database operations with connection pooling and safe queries.
 """
 import asyncio
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
@@ -307,3 +307,344 @@ class DatabaseSkill(BaseSkill):
                 f"%{pattern}%",
                 limit,
             )
+
+    # -------------------------------------------------------------------------
+    # Operations tracking helpers
+    # -------------------------------------------------------------------------
+
+    async def log_model_usage(
+        self,
+        model: str,
+        provider: Optional[str] = None,
+        input_tokens: int = 0,
+        output_tokens: int = 0,
+        cost_usd: float = 0.0,
+        latency_ms: Optional[int] = None,
+        success: bool = True,
+        error_message: Optional[str] = None,
+        session_id: Optional[str] = None,
+    ) -> SkillResult:
+        """Log model usage for cost and performance tracking."""
+        return await self.execute(
+            """
+            INSERT INTO model_usage 
+            (model, provider, input_tokens, output_tokens, cost_usd, 
+             latency_ms, success, error_message, session_id, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::uuid, NOW())
+            """,
+            model,
+            provider,
+            input_tokens,
+            output_tokens,
+            cost_usd,
+            latency_ms,
+            success,
+            error_message,
+            session_id,
+        )
+
+    async def get_model_usage_summary(self, hours: int = 24) -> SkillResult:
+        """Get model usage summary for the last N hours."""
+        return await self.fetch_all(
+            """
+            SELECT model, provider,
+                   COUNT(*) as request_count,
+                   SUM(input_tokens) as total_input,
+                   SUM(output_tokens) as total_output,
+                   SUM(cost_usd) as total_cost,
+                   AVG(latency_ms)::int as avg_latency
+            FROM model_usage
+            WHERE created_at > NOW() - make_interval(hours => $1)
+            GROUP BY model, provider
+            ORDER BY total_cost DESC
+            """,
+            hours,
+        )
+
+    async def start_agent_session(
+        self,
+        agent_id: str,
+        session_type: str = "interactive",
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> SkillResult:
+        """Start a new agent session and return its ID."""
+        result = await self.fetch_one(
+            """
+            INSERT INTO agent_sessions (agent_id, session_type, metadata, started_at)
+            VALUES ($1, $2, $3, NOW())
+            RETURNING id
+            """,
+            agent_id,
+            session_type,
+            metadata or {},
+        )
+        return result
+
+    async def end_agent_session(
+        self,
+        session_id: str,
+        messages_count: int = 0,
+        tokens_used: int = 0,
+        cost_usd: float = 0.0,
+    ) -> SkillResult:
+        """End an agent session with final stats."""
+        return await self.execute(
+            """
+            UPDATE agent_sessions
+            SET ended_at = NOW(),
+                status = 'completed',
+                messages_count = $2,
+                tokens_used = $3,
+                cost_usd = $4
+            WHERE id = $1::uuid
+            """,
+            session_id,
+            messages_count,
+            tokens_used,
+            cost_usd,
+        )
+
+    async def get_active_sessions(self) -> SkillResult:
+        """Get all active agent sessions."""
+        return await self.fetch_all(
+            """
+            SELECT id, agent_id, session_type, started_at, 
+                   messages_count, tokens_used, cost_usd, metadata
+            FROM agent_sessions
+            WHERE status = 'active'
+            ORDER BY started_at DESC
+            """
+        )
+
+    async def update_rate_limit(
+        self,
+        skill: str,
+        action_type: str = "action",
+    ) -> SkillResult:
+        """Update rate limit tracking for a skill."""
+        if action_type == "post":
+            return await self.execute(
+                """
+                INSERT INTO rate_limits (skill, last_post, action_count, window_start, updated_at)
+                VALUES ($1, NOW(), 1, NOW(), NOW())
+                ON CONFLICT (skill) DO UPDATE SET
+                    last_post = NOW(),
+                    action_count = rate_limits.action_count + 1,
+                    updated_at = NOW()
+                """,
+                skill,
+            )
+        else:
+            return await self.execute(
+                """
+                INSERT INTO rate_limits (skill, last_action, action_count, window_start, updated_at)
+                VALUES ($1, NOW(), 1, NOW(), NOW())
+                ON CONFLICT (skill) DO UPDATE SET
+                    last_action = NOW(),
+                    action_count = rate_limits.action_count + 1,
+                    updated_at = NOW()
+                """,
+                skill,
+            )
+
+    async def check_rate_limit(
+        self,
+        skill: str,
+        max_actions: int = 100,
+        window_seconds: int = 3600,
+    ) -> SkillResult:
+        """Check if a skill is within rate limits."""
+        result = await self.fetch_one(
+            """
+            SELECT skill, action_count, window_start,
+                   EXTRACT(EPOCH FROM (NOW() - window_start)) as window_age
+            FROM rate_limits
+            WHERE skill = $1
+            """,
+            skill,
+        )
+        if not result.success or result.data is None:
+            return SkillResult.ok({"allowed": True, "remaining": max_actions})
+        
+        data = result.data
+        window_age = data.get("window_age", 0)
+        
+        # Reset window if expired
+        if window_age > window_seconds:
+            await self.execute(
+                "UPDATE rate_limits SET action_count = 0, window_start = NOW() WHERE skill = $1",
+                skill,
+            )
+            return SkillResult.ok({"allowed": True, "remaining": max_actions})
+        
+        count = data.get("action_count", 0)
+        remaining = max(0, max_actions - count)
+        return SkillResult.ok({
+            "allowed": count < max_actions,
+            "remaining": remaining,
+            "window_age": window_age,
+        })
+
+    async def log_security_event(
+        self,
+        threat_level: str,
+        threat_type: str,
+        source: Optional[str] = None,
+        details: Optional[Dict[str, Any]] = None,
+        blocked: bool = False,
+    ) -> SkillResult:
+        """Log a security event."""
+        return await self.execute(
+            """
+            INSERT INTO security_events 
+            (threat_level, threat_type, source, details, blocked, created_at)
+            VALUES ($1, $2, $3, $4, $5, NOW())
+            """,
+            threat_level.upper(),
+            threat_type,
+            source,
+            details or {},
+            blocked,
+        )
+
+    async def log_api_key_rotation(
+        self,
+        service: str,
+        reason: Optional[str] = None,
+        rotated_by: str = "system",
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> SkillResult:
+        """Log an API key rotation event."""
+        return await self.execute(
+            """
+            INSERT INTO api_key_rotations (service, reason, rotated_by, metadata, rotated_at)
+            VALUES ($1, $2, $3, $4, NOW())
+            """,
+            service,
+            reason,
+            rotated_by,
+            metadata or {},
+        )
+
+    async def kv_set(
+        self,
+        key: str,
+        value: Any,
+        category: str = "general",
+        ttl_seconds: Optional[int] = None,
+    ) -> SkillResult:
+        """Set a key-value pair with optional TTL."""
+        expires_at = None
+        if ttl_seconds:
+            expires_at = datetime.utcnow() + timedelta(seconds=ttl_seconds)
+        
+        return await self.execute(
+            """
+            INSERT INTO key_value_memory (key, value, category, ttl_seconds, expires_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, NOW())
+            ON CONFLICT (key) DO UPDATE SET
+                value = EXCLUDED.value,
+                category = EXCLUDED.category,
+                ttl_seconds = EXCLUDED.ttl_seconds,
+                expires_at = EXCLUDED.expires_at,
+                updated_at = NOW()
+            """,
+            key,
+            value,
+            category,
+            ttl_seconds,
+            expires_at,
+        )
+
+    async def kv_get(self, key: str) -> SkillResult:
+        """Get a key-value pair (checks expiry)."""
+        result = await self.fetch_one(
+            """
+            SELECT key, value, category, expires_at
+            FROM key_value_memory
+            WHERE key = $1 AND (expires_at IS NULL OR expires_at > NOW())
+            """,
+            key,
+        )
+        return result
+
+    async def kv_delete(self, key: str) -> SkillResult:
+        """Delete a key-value pair."""
+        return await self.execute(
+            "DELETE FROM key_value_memory WHERE key = $1",
+            key,
+        )
+
+    # -------------------------------------------------------------------------
+    # Knowledge graph helpers
+    # -------------------------------------------------------------------------
+
+    async def create_entity(
+        self,
+        name: str,
+        entity_type: str,
+        properties: Optional[Dict[str, Any]] = None,
+    ) -> SkillResult:
+        """Create a knowledge graph entity."""
+        return await self.fetch_one(
+            """
+            INSERT INTO knowledge_entities (name, entity_type, properties)
+            VALUES ($1, $2, $3)
+            RETURNING id
+            """,
+            name,
+            entity_type,
+            properties or {},
+        )
+
+    async def create_relation(
+        self,
+        from_entity_id: str,
+        to_entity_id: str,
+        relation_type: str,
+        properties: Optional[Dict[str, Any]] = None,
+    ) -> SkillResult:
+        """Create a knowledge graph relation."""
+        return await self.execute(
+            """
+            INSERT INTO knowledge_relations 
+            (from_entity_id, to_entity_id, relation_type, properties)
+            VALUES ($1::uuid, $2::uuid, $3, $4)
+            """,
+            from_entity_id,
+            to_entity_id,
+            relation_type,
+            properties or {},
+        )
+
+    async def get_entity_relations(
+        self,
+        entity_id: str,
+        direction: str = "both",
+    ) -> SkillResult:
+        """Get all relations for an entity."""
+        if direction == "outgoing":
+            query = """
+                SELECT r.*, e.name as target_name, e.entity_type as target_type
+                FROM knowledge_relations r
+                JOIN knowledge_entities e ON r.to_entity_id = e.id
+                WHERE r.from_entity_id = $1::uuid
+            """
+        elif direction == "incoming":
+            query = """
+                SELECT r.*, e.name as source_name, e.entity_type as source_type
+                FROM knowledge_relations r
+                JOIN knowledge_entities e ON r.from_entity_id = e.id
+                WHERE r.to_entity_id = $1::uuid
+            """
+        else:
+            query = """
+                SELECT r.*, 
+                       e1.name as from_name, e1.entity_type as from_type,
+                       e2.name as to_name, e2.entity_type as to_type
+                FROM knowledge_relations r
+                JOIN knowledge_entities e1 ON r.from_entity_id = e1.id
+                JOIN knowledge_entities e2 ON r.to_entity_id = e2.id
+                WHERE r.from_entity_id = $1::uuid OR r.to_entity_id = $1::uuid
+            """
+        return await self.fetch_all(query, entity_id)

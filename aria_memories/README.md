@@ -1,29 +1,58 @@
-# Aria's Memory Files
+# Aria's File Memories
 
-This folder contains files written by Aria during operation.
-These files are synced to the git repository for visibility.
+This folder contains **file-based artifacts** created by Aria during operation.
+These are NOT database records - they are files: research papers, action plans, drafts, exports, etc.
 
-## Structure
+## What goes here vs. Database
+
+| aria_memories/ (Files) | Database (Tables) |
+|------------------------|-------------------|
+| Research papers (md)   | Key-value memories |
+| Action plans           | Thoughts log |
+| Draft content          | Goals & tasks |
+| Exported data (json)   | Activity log |
+| Session logs           | Rate limits |
+| Income operations      | Social posts |
+
+## Folder Structure
 
 ```
 aria_memories/
 ├── README.md           # This file
-├── sessions/           # Session summaries and logs
-├── learnings/          # Documented learnings
+├── logs/               # Session logs, heartbeat logs, activity reviews
+│   ├── heartbeat_*.md
+│   ├── hourly_goal_*.md
+│   └── activity_*_review_*.md
+├── research/           # Research papers and findings
+├── plans/              # Action plans and strategies
 ├── drafts/             # Draft content before publishing
-└── exports/            # Exported data and backups
+├── exports/            # JSON exports, backups, snapshots
+├── income_ops/         # Income operations tracking
+└── knowledge/          # Knowledge base articles
 ```
 
-## Usage
+## Access from OpenClaw/Aria
 
-Aria writes to this folder via:
-1. File operations skill (when implemented)
-2. Direct file writes from workspace
+Inside the clawdbot container, aria_memories is mounted at:
+- **Primary**: `/root/.openclaw/aria_memories`  
+- **Via repo**: `/root/repo/aria_memories`
 
-## Sync
+Aria uses the `memory.py` methods:
+```python
+# Save markdown artifact
+memory.save_artifact(content, "research_v1.md", category="research")
 
-This folder is mounted into the clawdbot container at:
-`/root/.openclaw/aria_memories` (needs docker-compose update)
+# Save JSON data
+memory.save_json_artifact(data, "portfolio_snapshot", category="exports")
 
-Or via the full repo mount at:
-`/root/repo/aria_memories`
+# List recent logs
+files = memory.list_artifacts(category="logs", pattern="*.md")
+
+# Load artifact
+result = memory.load_artifact("action_plan.md", category="plans")
+```
+
+## Git Sync
+
+This folder is tracked by git for visibility and backup.
+Aria can commit her own changes via the git skill.

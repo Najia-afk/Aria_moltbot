@@ -109,6 +109,8 @@ nav {
     display: flex;
     align-items: center;
     gap: var(--space-xl);
+    width: 100%;
+    justify-content: space-between;
 }
 
 /* Logo */
@@ -206,6 +208,11 @@ nav {
     color: var(--text-secondary);
 }
 
+/* Menu Toggle (hamburger) - hidden on desktop */
+.menu-toggle {
+    display: none;
+}
+
 .status-dot {
     width: 8px;
     height: 8px;
@@ -283,7 +290,73 @@ footer p {
     .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
     main { padding: var(--space-md); }
     header .container { padding: 0 var(--space-md); }
-    .nav-links { display: none; }
+    
+    /* Mobile: hide nav by default, show hamburger */
+    .nav-links {
+        display: none;
+        position: fixed;
+        top: 64px;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        flex-direction: column;
+        background: var(--bg-secondary);
+        padding: var(--space-lg);
+        gap: var(--space-sm);
+        overflow-y: auto;
+        z-index: 999;
+        border-top: 1px solid var(--border-subtle);
+    }
+    
+    .nav-links.active {
+        display: flex;
+    }
+    
+    /* Stack dropdowns vertically on mobile */
+    .nav-links .nav-dropdown {
+        width: 100%;
+    }
+    .nav-links .nav-dropdown-menu {
+        position: static;
+        opacity: 1;
+        visibility: visible;
+        transform: none;
+        box-shadow: none;
+        border: 1px solid var(--border-subtle);
+        margin-top: var(--space-xs);
+        display: none;
+    }
+    .nav-links .nav-dropdown.open .nav-dropdown-menu {
+        display: block;
+    }
+    .nav-links .nav-dropdown:hover .nav-dropdown-menu {
+        display: none;
+    }
+    .nav-links .nav-dropdown.open:hover .nav-dropdown-menu {
+        display: block;
+    }
+    
+    .menu-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-md);
+        color: var(--text-primary);
+        cursor: pointer;
+        transition: all var(--transition-fast);
+    }
+    .menu-toggle:hover {
+        background: var(--bg-hover);
+        border-color: var(--accent-primary);
+    }
+    
+    .api-status {
+        display: none;
+    }
 }
 
 /* Utility Classes */

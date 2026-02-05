@@ -22,10 +22,21 @@ Usage:
 __version__ = "1.0.0"
 __author__ = "Aria Blue"
 
-from aria_mind.soul import Soul
-from aria_mind.heartbeat import Heartbeat
-from aria_mind.cognition import Cognition
-from aria_mind.memory import MemoryManager
+# Use try/except for import compatibility between local dev and container
+# In container: workspace is /root/.openclaw/workspace (aria_mind contents at root)
+# Locally: aria_mind is a package
+try:
+    # Try relative imports first (works in container where aria_mind is workspace root)
+    from soul import Soul
+    from heartbeat import Heartbeat
+    from cognition import Cognition
+    from memory import MemoryManager
+except ImportError:
+    # Fall back to absolute imports (works in local dev)
+    from aria_mind.soul import Soul
+    from aria_mind.heartbeat import Heartbeat
+    from aria_mind.cognition import Cognition
+    from aria_mind.memory import MemoryManager
 
 __all__ = ["Soul", "Heartbeat", "Cognition", "MemoryManager", "AriaMind"]
 

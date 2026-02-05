@@ -9,10 +9,11 @@ The soul defines WHO Aria is:
 - Focus (specialized persona overlay) - MUTABLE, but additive only
 """
 
-from aria_mind.soul.identity import Identity
-from aria_mind.soul.values import Values
-from aria_mind.soul.boundaries import Boundaries
-from aria_mind.soul.focus import FocusManager, FocusType, Focus, get_focus_manager
+# Use relative imports for portability (works in both local dev and container)
+from .identity import Identity
+from .values import Values
+from .boundaries import Boundaries
+from .focus import FocusManager, FocusType, Focus, get_focus_manager
 
 __all__ = ["Soul", "Identity", "Values", "Boundaries", "FocusManager", "FocusType", "Focus"]
 

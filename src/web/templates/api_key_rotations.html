@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+{% block title %}API Key Rotations{% endblock %}
+
+{% block extra_css %}
+<style>
+    .page-controls {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 25px;
+        flex-wrap: wrap;
+    }
+    .search-box {
+        flex: 1;
+        min-width: 250px;
+        padding: 12px 16px;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        color: var(--text-primary);
+        font-size: 14px;
+    }
+    .search-box:focus {
+        outline: none;
+        border-color: var(--accent-blue);
+    }
+    .filter-select {
+        padding: 12px 16px;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        color: var(--text-primary);
+        cursor: pointer;
+    }
+    
+    .info-card {
+        background: linear-gradient(135deg, rgba(124, 58, 237, 0.1), rgba(59, 130, 246, 0.1));
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 25px;
+    }
+    .info-card h3 {
+        font-size: 14px;
+        color: var(--text-secondary);
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .info-card p {
+        font-size: 13px;
+        color: var(--text-muted);
+        line-height: 1.6;
+    }
+    
+    .data-table {
+        width: 100%;
+        background: var(--bg-secondary);
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid var(--border-color);
+    }
+    .data-table th, .data-table td {
+        padding: 15px;
+        text-align: left;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .data-table th {
+        background: rgba(0,0,0,0.2);
+        font-weight: 600;
+        color: var(--text-secondary);
+        font-size: 12px;
+        text-transform: uppercase;
+    }
+    .data-table tr:hover {
+        background: rgba(0,212,255,0.05);
+    }
+    .data-table tr:last-child td {
+        border-bottom: none;
+    }
+    
+    .service-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 12px;
+        background: rgba(245, 158, 11, 0.15);
+        border-radius: 15px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #f59e0b;
+    }
+    
+    .rotator-badge {
+        display: inline-block;
+        padding: 3px 8px;
+        background: rgba(124, 58, 237, 0.15);
+        border-radius: 10px;
+        font-size: 11px;
+        color: #a855f7;
+    }
+    
+    .reason-text {
+        color: var(--text-secondary);
+        font-size: 13px;
+        max-width: 300px;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--text-secondary);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>🔑 API Key Rotations</h1>
+    <p>Track API key rotation history for all services</p>
+</div>
+
+<div class="info-card">
+    <h3>🔐 Security Best Practice</h3>
+    <p>
+        API keys are rotated automatically when they expire, when a security event is detected,
+        or when manually triggered. This log tracks all rotation events to help maintain security
+        compliance and audit trails.
+    </p>
+</div>
+
+<div class="page-controls">
+    <input type="text" class="search-box" id="search-input" placeholder="Search by service name...">
+    <select class="filter-select" id="service-filter">
+        <option value="">All Services</option>
+    </select>
+    <button class="btn btn-primary" onclick="loadRotations()">Refresh</button>
+</div>
+
+<table class="data-table" id="rotations-table">
+    <thead>
+        <tr>
+            <th>Service</th>
+            <th>Reason</th>
+            <th>Rotated By</th>
+            <th>Rotated At</th>
+            <th>Metadata</th>
+        </tr>
+    </thead>
+    <tbody id="rotations-body">
+        <tr><td colspan="5" class="empty-state">Loading...</td></tr>
+    </tbody>
+</table>
+{% endblock %}
+
+{% block extra_js %}
+<script data-page-script>
+    let allRotations = [];
+    
+    function formatDate(isoString) {
+        if (!isoString) return '-';
+        return new Date(isoString).toLocaleString();
+    }
+    
+    function formatMetadata(meta) {
+        if (!meta || Object.keys(meta).length === 0) return '-';
+        return Object.entries(meta)
+            .slice(0, 3)
+            .map(([k, v]) => `${k}: ${v}`)
+            .join(', ');
+    }
+
+    async function loadRotations() {
+        const service = document.getElementById('service-filter').value;
+        const url = service 
+            ? `${API_BASE_URL}/api-key-rotations?limit=100&service=${encodeURIComponent(service)}`
+            : `${API_BASE_URL}/api-key-rotations?limit=100`;
+        
+        document.getElementById('rotations-body').innerHTML = '<tr><td colspan="5" class="empty-state">Loading...</td></tr>';
+        
+        try {
+            const res = await fetch(url);
+            const data = await res.json();
+            allRotations = data.rotations || [];
+            
+            // Populate service filter
+            const services = [...new Set(allRotations.map(r => r.service).filter(Boolean))];
+            const select = document.getElementById('service-filter');
+            const existingServices = new Set(Array.from(select.options).map(o => o.value));
+            services.forEach(s => {
+                if (!existingServices.has(s)) {
+                    const opt = document.createElement('option');
+                    opt.value = s;
+                    opt.textContent = s;
+                    select.appendChild(opt);
+                }
+            });
+            
+            renderRotations(allRotations);
+        } catch (e) {
+            document.getElementById('rotations-body').innerHTML = `
+                <tr><td colspan="5" class="empty-state">
+                    <div>Could not load rotations</div>
+                    <div style="font-size:12px;margin-top:10px">${e.message}</div>
+                </td></tr>`;
+        }
+    }
+
+    function renderRotations(rotations) {
+        if (!rotations || rotations.length === 0) {
+            document.getElementById('rotations-body').innerHTML = `
+                <tr><td colspan="5" class="empty-state">
+                    <div>No rotation records</div>
+                    <div style="font-size:14px;margin-top:10px">API key rotations will appear here when they occur</div>
+                </td></tr>`;
+            return;
+        }
+
+        let html = '';
+        rotations.forEach(r => {
+            html += `<tr>
+                <td><span class="service-badge">🔧 ${r.service}</span></td>
+                <td><span class="reason-text">${r.reason || 'No reason provided'}</span></td>
+                <td><span class="rotator-badge">${r.rotated_by || 'system'}</span></td>
+                <td>${formatDate(r.rotated_at)}</td>
+                <td><span style="font-size:12px;color:var(--text-muted)">${formatMetadata(r.metadata)}</span></td>
+            </tr>`;
+        });
+        document.getElementById('rotations-body').innerHTML = html;
+    }
+
+    function filterRotations() {
+        const search = document.getElementById('search-input').value.toLowerCase();
+        let filtered = allRotations;
+        
+        if (search) {
+            filtered = filtered.filter(r => 
+                (r.service && r.service.toLowerCase().includes(search)) ||
+                (r.reason && r.reason.toLowerCase().includes(search))
+            );
+        }
+        
+        renderRotations(filtered);
+    }
+
+    document.getElementById('search-input').addEventListener('input', filterRotations);
+    document.getElementById('service-filter').addEventListener('change', loadRotations);
+
+    loadRotations();
+    
+    // Auto-refresh every 60 seconds
+    setInterval(loadRotations, 60000);
+</script>
+{% endblock %}

@@ -7,7 +7,7 @@
 - **Avatar:** ⚡
 
 ## Handles
-- moltbook: @aria
+- moltbook: @aria_moltbot
 - telegram: @aria_blue_bot
 
 ---

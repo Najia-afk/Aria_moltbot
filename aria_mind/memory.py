@@ -2,15 +2,24 @@
 """
 Memory Manager - Long-term storage and recall.
 
-Integrates with the database skill for persistent memory.
+Integrates with:
+- Database skill for persistent key-value memory
+- File-based storage for artifacts (research, plans, drafts, exports)
 """
+import json
 import logging
+import os
 from collections import deque
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from aria_skills.database import DatabaseSkill
+
+# File-based storage paths (inside container)
+ARIA_MEMORIES_PATH = os.environ.get("ARIA_MEMORIES_PATH", "/root/.openclaw/aria_memories")
+ARIA_REPO_PATH = os.environ.get("ARIA_REPO_PATH", "/root/repo/aria_memories")
 
 
 class MemoryManager:
@@ -150,15 +159,178 @@ class MemoryManager:
             if m.get("category") in ("reflection", "thought")
         ]
     
+    # -------------------------------------------------------------------------
+    # File-based memory (aria_memories/)
+    # For artifacts: research, plans, drafts, exports, etc.
+    # -------------------------------------------------------------------------
+    
+    def _get_memories_path(self) -> Path:
+        """Get the aria_memories base path."""
+        # Try dedicated mount first
+        if Path(ARIA_MEMORIES_PATH).exists():
+            return Path(ARIA_MEMORIES_PATH)
+        # Fall back to repo mount
+        if Path(ARIA_REPO_PATH).exists():
+            return Path(ARIA_REPO_PATH)
+        # Local development
+        local = Path(__file__).parent.parent / "aria_memories"
+        if local.exists():
+            return local
+        return Path(ARIA_MEMORIES_PATH)  # Default, may not exist
+    
+    def save_artifact(
+        self,
+        content: str,
+        filename: str,
+        category: str = "general",
+        subfolder: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Save a file artifact to aria_memories.
+        
+        Args:
+            content: File content to write
+            filename: Name of the file (e.g., "research_report.md")
+            category: Folder category (logs, research, plans, drafts, exports)
+            subfolder: Optional subfolder within category
+        
+        Returns:
+            Dict with success status and file path
+        """
+        base = self._get_memories_path()
+        
+        # Build path: aria_memories/<category>/<subfolder>/<filename>
+        folder = base / category
+        if subfolder:
+            folder = folder / subfolder
+        
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+            filepath = folder / filename
+            
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(content)
+            
+            self.logger.info(f"Saved artifact: {filepath}")
+            return {
+                "success": True,
+                "path": str(filepath),
+                "relative": f"aria_memories/{category}/{subfolder}/{filename}" if subfolder else f"aria_memories/{category}/{filename}",
+            }
+        except Exception as e:
+            self.logger.error(f"Failed to save artifact: {e}")
+            return {"success": False, "error": str(e)}
+    
+    def load_artifact(
+        self,
+        filename: str,
+        category: str = "general",
+        subfolder: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Load a file artifact from aria_memories.
+        
+        Returns:
+            Dict with success status and content
+        """
+        base = self._get_memories_path()
+        
+        folder = base / category
+        if subfolder:
+            folder = folder / subfolder
+        
+        filepath = folder / filename
+        
+        try:
+            if not filepath.exists():
+                return {"success": False, "error": f"File not found: {filepath}"}
+            
+            with open(filepath, "r", encoding="utf-8") as f:
+                content = f.read()
+            
+            return {"success": True, "content": content, "path": str(filepath)}
+        except Exception as e:
+            self.logger.error(f"Failed to load artifact: {e}")
+            return {"success": False, "error": str(e)}
+    
+    def list_artifacts(
+        self,
+        category: str = "general",
+        subfolder: Optional[str] = None,
+        pattern: str = "*",
+    ) -> List[Dict[str, Any]]:
+        """
+        List artifacts in a category folder.
+        
+        Returns:
+            List of file info dicts
+        """
+        base = self._get_memories_path()
+        
+        folder = base / category
+        if subfolder:
+            folder = folder / subfolder
+        
+        if not folder.exists():
+            return []
+        
+        files = []
+        for f in folder.glob(pattern):
+            if f.is_file():
+                stat = f.stat()
+                files.append({
+                    "name": f.name,
+                    "path": str(f),
+                    "size": stat.st_size,
+                    "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                })
+        
+        return sorted(files, key=lambda x: x["modified"], reverse=True)
+    
+    def save_json_artifact(
+        self,
+        data: Any,
+        filename: str,
+        category: str = "exports",
+        subfolder: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Save structured data as JSON."""
+        content = json.dumps(data, indent=2, default=str)
+        if not filename.endswith(".json"):
+            filename += ".json"
+        return self.save_artifact(content, filename, category, subfolder)
+    
+    def load_json_artifact(
+        self,
+        filename: str,
+        category: str = "exports",
+        subfolder: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Load JSON artifact."""
+        result = self.load_artifact(filename, category, subfolder)
+        if result.get("success") and result.get("content"):
+            try:
+                result["data"] = json.loads(result["content"])
+            except json.JSONDecodeError as e:
+                result["success"] = False
+                result["error"] = f"Invalid JSON: {e}"
+        return result
+    
     def get_status(self) -> Dict[str, Any]:
         """Get memory system status."""
+        memories_path = self._get_memories_path()
         return {
             "connected": self._connected,
             "has_database": self._db is not None,
             "short_term_count": len(self._short_term),
             "max_short_term": self._max_short_term,
+            "file_storage": {
+                "path": str(memories_path),
+                "available": memories_path.exists(),
+            },
         }
     
     def __repr__(self):
         db_status = "db" if self._db else "memory-only"
-        return f"<MemoryManager: {db_status}, {len(self._short_term)} short-term>"
+        file_status = "files" if self._get_memories_path().exists() else "no-files"
+        return f"<MemoryManager: {db_status}, {file_status}, {len(self._short_term)} short-term>"

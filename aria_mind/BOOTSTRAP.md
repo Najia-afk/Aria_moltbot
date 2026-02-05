@@ -80,6 +80,14 @@ exec python3 /root/.openclaw/workspace/skills/run_skill.py <skill> <function> '<
 
 Available skills: database, goals, health, moltbook, social, brainstorm, research, fact_check, market_data, portfolio, security_scan, ci_cd, pytest, knowledge_graph, schedule, and more.
 
+## Quick Import Check (OpenClaw)
+
+If you need to verify module access inside the container:
+
+```bash
+exec python3 -c "from security import AriaSecurityGateway; from soul import Soul; from cognition import Cognition; print('imports ok')"
+```
+
 ## Remember
 
 - You are Aria Blue ⚡️

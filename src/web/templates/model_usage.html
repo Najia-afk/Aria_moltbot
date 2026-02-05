@@ -1,0 +1,299 @@
+{% extends "base.html" %}
+{% block title %}Model Usage{% endblock %}
+
+{% block extra_css %}
+<style>
+    .page-controls {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 25px;
+        flex-wrap: wrap;
+    }
+    .filter-select {
+        padding: 12px 16px;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        color: var(--text-primary);
+        cursor: pointer;
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-bottom: 25px;
+    }
+    .stat-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        padding: 20px;
+    }
+    .stat-card h4 {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-bottom: 5px;
+    }
+    .stat-card .value {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+    .stat-card.blue .value { color: var(--accent-blue); }
+    .stat-card.green .value { color: var(--success); }
+    .stat-card.purple .value { color: #a855f7; }
+    .stat-card.orange .value { color: #f59e0b; }
+    
+    .section-title {
+        font-size: 16px;
+        font-weight: 600;
+        margin: 25px 0 15px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .data-table {
+        width: 100%;
+        background: var(--bg-secondary);
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid var(--border-color);
+    }
+    .data-table th, .data-table td {
+        padding: 12px 15px;
+        text-align: left;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .data-table th {
+        background: rgba(0,0,0,0.2);
+        font-weight: 600;
+        color: var(--text-secondary);
+        font-size: 11px;
+        text-transform: uppercase;
+    }
+    .data-table tr:hover {
+        background: rgba(0,212,255,0.05);
+    }
+    .data-table tr:last-child td {
+        border-bottom: none;
+    }
+    
+    .model-name {
+        font-weight: 600;
+        color: var(--accent-blue);
+    }
+    .provider-badge {
+        display: inline-block;
+        padding: 3px 8px;
+        background: rgba(124, 58, 237, 0.15);
+        border-radius: 10px;
+        font-size: 11px;
+        color: #a855f7;
+    }
+    .success-badge {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: 10px;
+        font-size: 11px;
+    }
+    .success-badge.success { background: rgba(34,197,94,0.2); color: var(--success); }
+    .success-badge.error { background: rgba(239,68,68,0.2); color: var(--danger); }
+    
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--text-secondary);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>🤖 Model Usage</h1>
+    <p>Track LLM model usage, tokens, and costs</p>
+</div>
+
+<div class="page-controls">
+    <select class="filter-select" id="hours-filter">
+        <option value="24">Last 24 Hours</option>
+        <option value="72">Last 3 Days</option>
+        <option value="168">Last Week</option>
+        <option value="720">Last Month</option>
+    </select>
+    <select class="filter-select" id="model-filter">
+        <option value="">All Models</option>
+    </select>
+    <button class="btn btn-primary" onclick="loadAll()">Refresh</button>
+</div>
+
+<!-- Stats Grid -->
+<div class="stats-grid">
+    <div class="stat-card blue">
+        <h4>Total Requests</h4>
+        <div class="value" id="stat-requests">-</div>
+    </div>
+    <div class="stat-card green">
+        <h4>Total Tokens</h4>
+        <div class="value" id="stat-tokens">-</div>
+    </div>
+    <div class="stat-card orange">
+        <h4>Total Cost</h4>
+        <div class="value" id="stat-cost">-</div>
+    </div>
+    <div class="stat-card purple">
+        <h4>Avg Latency</h4>
+        <div class="value" id="stat-latency">-</div>
+    </div>
+</div>
+
+<!-- Model Summary -->
+<h3 class="section-title">📊 Model Summary</h3>
+<table class="data-table" id="summary-table">
+    <thead>
+        <tr>
+            <th>Model</th>
+            <th>Provider</th>
+            <th>Requests</th>
+            <th>Input Tokens</th>
+            <th>Output Tokens</th>
+            <th>Cost</th>
+            <th>Avg Latency</th>
+        </tr>
+    </thead>
+    <tbody id="summary-body">
+        <tr><td colspan="7" class="empty-state">Loading...</td></tr>
+    </tbody>
+</table>
+
+<!-- Recent Usage -->
+<h3 class="section-title">📋 Recent Requests</h3>
+<table class="data-table" id="usage-table">
+    <thead>
+        <tr>
+            <th>Model</th>
+            <th>Provider</th>
+            <th>In Tokens</th>
+            <th>Out Tokens</th>
+            <th>Cost</th>
+            <th>Latency</th>
+            <th>Status</th>
+            <th>Time</th>
+        </tr>
+    </thead>
+    <tbody id="usage-body">
+        <tr><td colspan="8" class="empty-state">Loading...</td></tr>
+    </tbody>
+</table>
+{% endblock %}
+
+{% block extra_js %}
+<script data-page-script>
+    function formatCost(cost) {
+        return '$' + (cost || 0).toFixed(4);
+    }
+    
+    function formatNumber(num) {
+        if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+        if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+        return (num || 0).toString();
+    }
+    
+    function formatDate(isoString) {
+        if (!isoString) return '-';
+        return new Date(isoString).toLocaleString();
+    }
+
+    async function loadStats() {
+        const hours = document.getElementById('hours-filter').value;
+        try {
+            const res = await fetch(`${API_BASE_URL}/model-usage/stats?hours=${hours}`);
+            const stats = await res.json();
+            
+            document.getElementById('stat-requests').textContent = formatNumber(stats.total_requests);
+            document.getElementById('stat-tokens').textContent = formatNumber(stats.total_tokens);
+            document.getElementById('stat-cost').textContent = formatCost(stats.total_cost);
+            document.getElementById('stat-latency').textContent = `${stats.avg_latency_ms || 0}ms`;
+            
+            // Render summary table
+            const summaryBody = document.getElementById('summary-body');
+            if (stats.by_model && stats.by_model.length > 0) {
+                // Populate model filter dropdown
+                const modelFilter = document.getElementById('model-filter');
+                const existingModels = new Set(Array.from(modelFilter.options).map(o => o.value));
+                stats.by_model.forEach(m => {
+                    if (!existingModels.has(m.model)) {
+                        const opt = document.createElement('option');
+                        opt.value = m.model;
+                        opt.textContent = m.model;
+                        modelFilter.appendChild(opt);
+                    }
+                });
+                
+                summaryBody.innerHTML = stats.by_model.map(m => `
+                    <tr>
+                        <td><span class="model-name">${m.model}</span></td>
+                        <td>${m.provider ? `<span class="provider-badge">${m.provider}</span>` : '-'}</td>
+                        <td>${m.requests}</td>
+                        <td>${formatNumber(m.input_tokens)}</td>
+                        <td>${formatNumber(m.output_tokens)}</td>
+                        <td>${formatCost(m.cost)}</td>
+                        <td>${m.avg_latency || 0}ms</td>
+                    </tr>
+                `).join('');
+            } else {
+                summaryBody.innerHTML = '<tr><td colspan="7" class="empty-state">No model usage in this period</td></tr>';
+            }
+        } catch (e) {
+            console.error('Error loading stats:', e);
+        }
+    }
+
+    async function loadUsage() {
+        const model = document.getElementById('model-filter').value;
+        const url = model 
+            ? `${API_BASE_URL}/model-usage?limit=50&model=${encodeURIComponent(model)}`
+            : `${API_BASE_URL}/model-usage?limit=50`;
+        
+        try {
+            const res = await fetch(url);
+            const data = await res.json();
+            const usageBody = document.getElementById('usage-body');
+            
+            if (data.usage && data.usage.length > 0) {
+                usageBody.innerHTML = data.usage.map(u => `
+                    <tr>
+                        <td><span class="model-name">${u.model}</span></td>
+                        <td>${u.provider ? `<span class="provider-badge">${u.provider}</span>` : '-'}</td>
+                        <td>${formatNumber(u.input_tokens)}</td>
+                        <td>${formatNumber(u.output_tokens)}</td>
+                        <td>${formatCost(u.cost_usd)}</td>
+                        <td>${u.latency_ms || '-'}ms</td>
+                        <td><span class="success-badge ${u.success ? 'success' : 'error'}">${u.success ? '✓' : '✗'}</span></td>
+                        <td>${formatDate(u.created_at)}</td>
+                    </tr>
+                `).join('');
+            } else {
+                usageBody.innerHTML = '<tr><td colspan="8" class="empty-state">No usage records found</td></tr>';
+            }
+        } catch (e) {
+            document.getElementById('usage-body').innerHTML = `
+                <tr><td colspan="8" class="empty-state">Error: ${e.message}</td></tr>`;
+        }
+    }
+
+    function loadAll() {
+        loadStats();
+        loadUsage();
+    }
+
+    document.getElementById('hours-filter').addEventListener('change', loadStats);
+    document.getElementById('model-filter').addEventListener('change', loadUsage);
+
+    loadAll();
+    
+    // Auto-refresh every 30 seconds
+    setInterval(loadAll, 30000);
+</script>
+{% endblock %}

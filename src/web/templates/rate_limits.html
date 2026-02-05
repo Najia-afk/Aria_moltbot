@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% block title %}Rate Limits{% endblock %}
+
+{% block extra_css %}
+<style>
+    .page-controls {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 25px;
+        flex-wrap: wrap;
+    }
+    .search-box {
+        flex: 1;
+        min-width: 250px;
+        padding: 12px 16px;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        color: var(--text-primary);
+        font-size: 14px;
+    }
+    .search-box:focus {
+        outline: none;
+        border-color: var(--accent-blue);
+    }
+    
+    .info-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 25px;
+    }
+    .info-card h3 {
+        font-size: 14px;
+        color: var(--text-secondary);
+        margin-bottom: 10px;
+    }
+    .info-card p {
+        font-size: 13px;
+        color: var(--text-muted);
+        line-height: 1.6;
+    }
+    
+    .data-table {
+        width: 100%;
+        background: var(--bg-secondary);
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid var(--border-color);
+    }
+    .data-table th, .data-table td {
+        padding: 15px;
+        text-align: left;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .data-table th {
+        background: rgba(0,0,0,0.2);
+        font-weight: 600;
+        color: var(--text-secondary);
+        font-size: 12px;
+        text-transform: uppercase;
+    }
+    .data-table tr:hover {
+        background: rgba(0,212,255,0.05);
+    }
+    .data-table tr:last-child td {
+        border-bottom: none;
+    }
+    
+    .skill-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 12px;
+        background: rgba(59, 130, 246, 0.15);
+        border-radius: 15px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--accent-blue);
+    }
+    
+    .count-badge {
+        display: inline-block;
+        min-width: 50px;
+        text-align: center;
+        padding: 4px 10px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+    }
+    .count-badge.low { background: rgba(34,197,94,0.2); color: var(--success); }
+    .count-badge.medium { background: rgba(245,158,11,0.2); color: #f59e0b; }
+    .count-badge.high { background: rgba(239,68,68,0.2); color: var(--danger); }
+    
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--text-secondary);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>⏱️ Rate Limits</h1>
+    <p>Monitor API and skill rate limiting status</p>
+</div>
+
+<div class="info-card">
+    <h3>ℹ️ About Rate Limits</h3>
+    <p>
+        Rate limits help prevent abuse and ensure fair usage of resources. Each skill tracks its action count
+        within a rolling time window. When the action count exceeds the configured limit, requests are temporarily
+        blocked until the window resets.
+    </p>
+</div>
+
+<div class="page-controls">
+    <input type="text" class="search-box" id="search-input" placeholder="Search by skill name...">
+    <button class="btn btn-primary" onclick="loadRateLimits()">Refresh</button>
+</div>
+
+<table class="data-table" id="limits-table">
+    <thead>
+        <tr>
+            <th>Skill</th>
+            <th>Action Count</th>
+            <th>Last Action</th>
+            <th>Last Post</th>
+            <th>Window Start</th>
+            <th>Updated</th>
+        </tr>
+    </thead>
+    <tbody id="limits-body">
+        <tr><td colspan="6" class="empty-state">Loading...</td></tr>
+    </tbody>
+</table>
+{% endblock %}
+
+{% block extra_js %}
+<script data-page-script>
+    let allLimits = [];
+    
+    function formatDate(isoString) {
+        if (!isoString) return '-';
+        return new Date(isoString).toLocaleString();
+    }
+    
+    function getCountClass(count) {
+        if (count < 25) return 'low';
+        if (count < 75) return 'medium';
+        return 'high';
+    }
+
+    async function loadRateLimits() {
+        document.getElementById('limits-body').innerHTML = '<tr><td colspan="6" class="empty-state">Loading...</td></tr>';
+        
+        try {
+            const res = await fetch(`${API_BASE_URL}/rate-limits`);
+            const data = await res.json();
+            allLimits = data.rate_limits || [];
+            renderLimits(allLimits);
+        } catch (e) {
+            document.getElementById('limits-body').innerHTML = `
+                <tr><td colspan="6" class="empty-state">
+                    <div>Could not load rate limits</div>
+                    <div style="font-size:12px;margin-top:10px">${e.message}</div>
+                </td></tr>`;
+        }
+    }
+
+    function renderLimits(limits) {
+        if (!limits || limits.length === 0) {
+            document.getElementById('limits-body').innerHTML = `
+                <tr><td colspan="6" class="empty-state">
+                    <div>No rate limit records</div>
+                    <div style="font-size:14px;margin-top:10px">Rate limits will appear here as skills are used</div>
+                </td></tr>`;
+            return;
+        }
+
+        let html = '';
+        limits.forEach(r => {
+            const countClass = getCountClass(r.action_count || 0);
+            html += `<tr>
+                <td><span class="skill-badge">🔧 ${r.skill}</span></td>
+                <td><span class="count-badge ${countClass}">${r.action_count || 0}</span></td>
+                <td>${formatDate(r.last_action)}</td>
+                <td>${formatDate(r.last_post)}</td>
+                <td>${formatDate(r.window_start)}</td>
+                <td>${formatDate(r.updated_at)}</td>
+            </tr>`;
+        });
+        document.getElementById('limits-body').innerHTML = html;
+    }
+
+    function filterLimits() {
+        const search = document.getElementById('search-input').value.toLowerCase();
+        let filtered = allLimits;
+        
+        if (search) {
+            filtered = filtered.filter(r => 
+                r.skill.toLowerCase().includes(search)
+            );
+        }
+        
+        renderLimits(filtered);
+    }
+
+    document.getElementById('search-input').addEventListener('input', filterLimits);
+
+    loadRateLimits();
+    
+    // Auto-refresh every 30 seconds
+    setInterval(loadRateLimits, 30000);
+</script>
+{% endblock %}

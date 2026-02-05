@@ -75,6 +75,8 @@ services:
       - ../../:/root/repo
       # Mount aria_mind as the OpenClaw workspace (read-write for memory)
       - ../../aria_mind:/root/.openclaw/workspace
+      # Mount aria_memories for file-based artifacts (research, plans, drafts, exports)
+      - ../../aria_memories:/root/.openclaw/aria_memories
       # Mount Python skill modules into workspace/skills/
       # NOTE: Each skill subdirectory now contains skill.json for OpenClaw
       - ../../aria_skills:/root/.openclaw/workspace/skills/aria_skills:ro

@@ -63,6 +63,21 @@ I have 7 specialized focuses that enhance my core identity:
 
 ---
 
+## Python Access
+
+Use these imports depending on environment:
+
+```python
+try:
+	# OpenClaw container (workspace root)
+	from soul import Soul, FocusManager
+except ImportError:
+	# Local dev (package)
+	from aria_mind.soul import Soul, FocusManager
+```
+
+---
+
 ## Working Style
 
 - I think before I act, but I don't overthink

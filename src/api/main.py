@@ -683,6 +683,467 @@ async def api_security_stats(conn=Depends(get_db)):
     }
 
 
+# ============================================
+# Operations: Agent Sessions
+# ============================================
+@app.get("/sessions")
+async def get_agent_sessions(
+    limit: int = 50,
+    status: Optional[str] = None,
+    agent_id: Optional[str] = None,
+    conn=Depends(get_db)
+):
+    """Get agent sessions with optional filtering"""
+    query = """
+        SELECT id, agent_id, session_type, started_at, ended_at,
+               messages_count, tokens_used, cost_usd, status, metadata
+        FROM agent_sessions
+        WHERE 1=1
+    """
+    params = []
+    param_idx = 1
+    
+    if status:
+        query += f" AND status = ${param_idx}"
+        params.append(status)
+        param_idx += 1
+    
+    if agent_id:
+        query += f" AND agent_id = ${param_idx}"
+        params.append(agent_id)
+        param_idx += 1
+    
+    query += f" ORDER BY started_at DESC LIMIT ${param_idx}"
+    params.append(limit)
+    
+    rows = await conn.fetch(query, *params)
+    return {
+        "sessions": [
+            {
+                "id": str(r[0]),
+                "agent_id": r[1],
+                "session_type": r[2],
+                "started_at": r[3].isoformat() if r[3] else None,
+                "ended_at": r[4].isoformat() if r[4] else None,
+                "messages_count": r[5],
+                "tokens_used": r[6],
+                "cost_usd": float(r[7]) if r[7] else 0,
+                "status": r[8],
+                "metadata": r[9] or {},
+            }
+            for r in rows
+        ],
+        "count": len(rows)
+    }
+
+
+@app.post("/sessions")
+async def create_agent_session(request: Request, conn=Depends(get_db)):
+    """Start a new agent session"""
+    import uuid
+    import json as json_lib
+    data = await request.json()
+    new_id = uuid.uuid4()
+    metadata = data.get('metadata', {})
+    
+    await conn.execute(
+        """INSERT INTO agent_sessions 
+           (id, agent_id, session_type, status, metadata, started_at)
+           VALUES ($1, $2, $3, 'active', $4::jsonb, NOW())""",
+        new_id,
+        data.get('agent_id', 'main'),
+        data.get('session_type', 'interactive'),
+        json_lib.dumps(metadata) if isinstance(metadata, dict) else metadata
+    )
+    return {"id": str(new_id), "created": True}
+
+
+@app.patch("/sessions/{session_id}")
+async def update_agent_session(session_id: str, request: Request, conn=Depends(get_db)):
+    """Update or end an agent session"""
+    import uuid
+    data = await request.json()
+    
+    updates = []
+    values = []
+    idx = 1
+    
+    if data.get('status'):
+        updates.append(f"status = ${idx}")
+        values.append(data['status'])
+        idx += 1
+        if data['status'] in ('completed', 'ended', 'error'):
+            updates.append("ended_at = NOW()")
+    
+    if data.get('messages_count') is not None:
+        updates.append(f"messages_count = ${idx}")
+        values.append(data['messages_count'])
+        idx += 1
+    
+    if data.get('tokens_used') is not None:
+        updates.append(f"tokens_used = ${idx}")
+        values.append(data['tokens_used'])
+        idx += 1
+    
+    if data.get('cost_usd') is not None:
+        updates.append(f"cost_usd = ${idx}")
+        values.append(data['cost_usd'])
+        idx += 1
+    
+    if updates:
+        values.append(uuid.UUID(session_id))
+        query = f"UPDATE agent_sessions SET {', '.join(updates)} WHERE id = ${idx}"
+        await conn.execute(query, *values)
+    
+    return {"updated": True}
+
+
+@app.get("/sessions/stats")
+async def get_session_stats(conn=Depends(get_db)):
+    """Get session statistics"""
+    total = await conn.fetchval("SELECT COUNT(*) FROM agent_sessions")
+    active = await conn.fetchval("SELECT COUNT(*) FROM agent_sessions WHERE status = 'active'")
+    total_tokens = await conn.fetchval("SELECT COALESCE(SUM(tokens_used), 0) FROM agent_sessions")
+    total_cost = await conn.fetchval("SELECT COALESCE(SUM(cost_usd), 0) FROM agent_sessions")
+    
+    by_agent = await conn.fetch("""
+        SELECT agent_id, COUNT(*) as sessions, 
+               COALESCE(SUM(tokens_used), 0) as tokens,
+               COALESCE(SUM(cost_usd), 0) as cost
+        FROM agent_sessions
+        GROUP BY agent_id
+        ORDER BY sessions DESC
+    """)
+    
+    return {
+        "total_sessions": total or 0,
+        "active_sessions": active or 0,
+        "total_tokens": total_tokens or 0,
+        "total_cost": float(total_cost) if total_cost else 0,
+        "by_agent": [
+            {"agent_id": r[0], "sessions": r[1], "tokens": r[2], "cost": float(r[3])}
+            for r in by_agent
+        ]
+    }
+
+
+# ============================================
+# Operations: Model Usage
+# ============================================
+@app.get("/model-usage")
+async def get_model_usage(
+    limit: int = 100,
+    model: Optional[str] = None,
+    provider: Optional[str] = None,
+    conn=Depends(get_db)
+):
+    """Get model usage logs with optional filtering"""
+    query = """
+        SELECT id, model, provider, input_tokens, output_tokens, cost_usd,
+               latency_ms, success, error_message, session_id, created_at
+        FROM model_usage
+        WHERE 1=1
+    """
+    params = []
+    param_idx = 1
+    
+    if model:
+        query += f" AND model = ${param_idx}"
+        params.append(model)
+        param_idx += 1
+    
+    if provider:
+        query += f" AND provider = ${param_idx}"
+        params.append(provider)
+        param_idx += 1
+    
+    query += f" ORDER BY created_at DESC LIMIT ${param_idx}"
+    params.append(limit)
+    
+    rows = await conn.fetch(query, *params)
+    return {
+        "usage": [
+            {
+                "id": str(r[0]),
+                "model": r[1],
+                "provider": r[2],
+                "input_tokens": r[3],
+                "output_tokens": r[4],
+                "total_tokens": (r[3] or 0) + (r[4] or 0),
+                "cost_usd": float(r[5]) if r[5] else 0,
+                "latency_ms": r[6],
+                "success": r[7],
+                "error_message": r[8],
+                "session_id": str(r[9]) if r[9] else None,
+                "created_at": r[10].isoformat() if r[10] else None,
+            }
+            for r in rows
+        ],
+        "count": len(rows)
+    }
+
+
+@app.post("/model-usage")
+async def log_model_usage(request: Request, conn=Depends(get_db)):
+    """Log a model usage record"""
+    import uuid
+    data = await request.json()
+    new_id = uuid.uuid4()
+    
+    session_id = data.get('session_id')
+    if session_id:
+        session_id = uuid.UUID(session_id)
+    
+    await conn.execute(
+        """INSERT INTO model_usage 
+           (id, model, provider, input_tokens, output_tokens, cost_usd,
+            latency_ms, success, error_message, session_id, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())""",
+        new_id,
+        data.get('model'),
+        data.get('provider'),
+        data.get('input_tokens', 0),
+        data.get('output_tokens', 0),
+        data.get('cost_usd', 0),
+        data.get('latency_ms'),
+        data.get('success', True),
+        data.get('error_message'),
+        session_id
+    )
+    return {"id": str(new_id), "created": True}
+
+
+@app.get("/model-usage/stats")
+async def get_model_usage_stats(hours: int = 24, conn=Depends(get_db)):
+    """Get model usage statistics for the last N hours"""
+    total_requests = await conn.fetchval(
+        "SELECT COUNT(*) FROM model_usage WHERE created_at > NOW() - make_interval(hours => $1)",
+        hours
+    )
+    total_tokens = await conn.fetchval(
+        "SELECT COALESCE(SUM(input_tokens + output_tokens), 0) FROM model_usage WHERE created_at > NOW() - make_interval(hours => $1)",
+        hours
+    )
+    total_cost = await conn.fetchval(
+        "SELECT COALESCE(SUM(cost_usd), 0) FROM model_usage WHERE created_at > NOW() - make_interval(hours => $1)",
+        hours
+    )
+    avg_latency = await conn.fetchval(
+        "SELECT COALESCE(AVG(latency_ms), 0)::int FROM model_usage WHERE created_at > NOW() - make_interval(hours => $1) AND latency_ms IS NOT NULL",
+        hours
+    )
+    success_rate = await conn.fetchval(
+        "SELECT COALESCE(AVG(CASE WHEN success THEN 1 ELSE 0 END) * 100, 0) FROM model_usage WHERE created_at > NOW() - make_interval(hours => $1)",
+        hours
+    )
+    
+    by_model = await conn.fetch("""
+        SELECT model, provider,
+               COUNT(*) as requests,
+               COALESCE(SUM(input_tokens), 0) as input_tokens,
+               COALESCE(SUM(output_tokens), 0) as output_tokens,
+               COALESCE(SUM(cost_usd), 0) as cost,
+               COALESCE(AVG(latency_ms), 0)::int as avg_latency
+        FROM model_usage
+        WHERE created_at > NOW() - make_interval(hours => $1)
+        GROUP BY model, provider
+        ORDER BY requests DESC
+    """, hours)
+    
+    return {
+        "period_hours": hours,
+        "total_requests": total_requests or 0,
+        "total_tokens": total_tokens or 0,
+        "total_cost": float(total_cost) if total_cost else 0,
+        "avg_latency_ms": avg_latency or 0,
+        "success_rate": float(success_rate) if success_rate else 100,
+        "by_model": [
+            {
+                "model": r[0],
+                "provider": r[1],
+                "requests": r[2],
+                "input_tokens": r[3],
+                "output_tokens": r[4],
+                "cost": float(r[5]),
+                "avg_latency": r[6]
+            }
+            for r in by_model
+        ]
+    }
+
+
+# ============================================
+# Operations: Rate Limits
+# ============================================
+@app.get("/rate-limits")
+async def get_rate_limits(conn=Depends(get_db)):
+    """Get all rate limit records"""
+    rows = await conn.fetch(
+        """SELECT id, skill, last_action, last_post, action_count,
+                  window_start, created_at, updated_at
+           FROM rate_limits
+           ORDER BY updated_at DESC"""
+    )
+    return {
+        "rate_limits": [
+            {
+                "id": str(r[0]),
+                "skill": r[1],
+                "last_action": r[2].isoformat() if r[2] else None,
+                "last_post": r[3].isoformat() if r[3] else None,
+                "action_count": r[4],
+                "window_start": r[5].isoformat() if r[5] else None,
+                "created_at": r[6].isoformat() if r[6] else None,
+                "updated_at": r[7].isoformat() if r[7] else None,
+            }
+            for r in rows
+        ],
+        "count": len(rows)
+    }
+
+
+@app.post("/rate-limits/check")
+async def check_rate_limit(request: Request, conn=Depends(get_db)):
+    """Check if a skill is within rate limits"""
+    data = await request.json()
+    skill = data.get('skill')
+    max_actions = data.get('max_actions', 100)
+    window_seconds = data.get('window_seconds', 3600)
+    
+    if not skill:
+        raise HTTPException(status_code=400, detail="skill is required")
+    
+    row = await conn.fetchrow(
+        """SELECT skill, action_count, window_start,
+                  EXTRACT(EPOCH FROM (NOW() - window_start)) as window_age
+           FROM rate_limits
+           WHERE skill = $1""",
+        skill
+    )
+    
+    if not row:
+        return {"allowed": True, "remaining": max_actions, "window_age": 0}
+    
+    window_age = row[3] or 0
+    
+    # Reset window if expired
+    if window_age > window_seconds:
+        await conn.execute(
+            "UPDATE rate_limits SET action_count = 0, window_start = NOW() WHERE skill = $1",
+            skill
+        )
+        return {"allowed": True, "remaining": max_actions, "window_age": 0}
+    
+    count = row[1] or 0
+    remaining = max(0, max_actions - count)
+    return {
+        "allowed": count < max_actions,
+        "remaining": remaining,
+        "window_age": window_age,
+        "action_count": count
+    }
+
+
+@app.post("/rate-limits/increment")
+async def increment_rate_limit(request: Request, conn=Depends(get_db)):
+    """Increment rate limit counter for a skill"""
+    data = await request.json()
+    skill = data.get('skill')
+    action_type = data.get('action_type', 'action')
+    
+    if not skill:
+        raise HTTPException(status_code=400, detail="skill is required")
+    
+    if action_type == 'post':
+        await conn.execute(
+            """INSERT INTO rate_limits (skill, last_post, action_count, window_start, updated_at)
+               VALUES ($1, NOW(), 1, NOW(), NOW())
+               ON CONFLICT (skill) DO UPDATE SET
+                   last_post = NOW(),
+                   action_count = rate_limits.action_count + 1,
+                   updated_at = NOW()""",
+            skill
+        )
+    else:
+        await conn.execute(
+            """INSERT INTO rate_limits (skill, last_action, action_count, window_start, updated_at)
+               VALUES ($1, NOW(), 1, NOW(), NOW())
+               ON CONFLICT (skill) DO UPDATE SET
+                   last_action = NOW(),
+                   action_count = rate_limits.action_count + 1,
+                   updated_at = NOW()""",
+            skill
+        )
+    
+    return {"incremented": True, "skill": skill}
+
+
+# ============================================
+# Operations: API Key Rotations
+# ============================================
+@app.get("/api-key-rotations")
+async def get_api_key_rotations(
+    limit: int = 50,
+    service: Optional[str] = None,
+    conn=Depends(get_db)
+):
+    """Get API key rotation history"""
+    if service:
+        rows = await conn.fetch(
+            """SELECT id, service, rotated_at, reason, rotated_by, metadata
+               FROM api_key_rotations
+               WHERE service = $1
+               ORDER BY rotated_at DESC
+               LIMIT $2""",
+            service, limit
+        )
+    else:
+        rows = await conn.fetch(
+            """SELECT id, service, rotated_at, reason, rotated_by, metadata
+               FROM api_key_rotations
+               ORDER BY rotated_at DESC
+               LIMIT $1""",
+            limit
+        )
+    
+    return {
+        "rotations": [
+            {
+                "id": str(r[0]),
+                "service": r[1],
+                "rotated_at": r[2].isoformat() if r[2] else None,
+                "reason": r[3],
+                "rotated_by": r[4],
+                "metadata": r[5] or {},
+            }
+            for r in rows
+        ],
+        "count": len(rows)
+    }
+
+
+@app.post("/api-key-rotations")
+async def log_api_key_rotation(request: Request, conn=Depends(get_db)):
+    """Log an API key rotation event"""
+    import uuid
+    import json as json_lib
+    data = await request.json()
+    new_id = uuid.uuid4()
+    metadata = data.get('metadata', {})
+    
+    await conn.execute(
+        """INSERT INTO api_key_rotations 
+           (id, service, reason, rotated_by, metadata, rotated_at)
+           VALUES ($1, $2, $3, $4, $5::jsonb, NOW())""",
+        new_id,
+        data.get('service'),
+        data.get('reason'),
+        data.get('rotated_by', 'system'),
+        json_lib.dumps(metadata) if isinstance(metadata, dict) else metadata
+    )
+    return {"id": str(new_id), "created": True}
+
+
 @app.get("/thoughts")
 async def api_thoughts(limit: int = 20, conn=Depends(get_db)):
     rows = await conn.fetch(

@@ -1,13 +1,59 @@
 # aria_skills/base.py
 """
 Base classes for Aria skills.
+
+Enhanced with:
+- Retry logic via tenacity
+- Metrics collection for observability
+- Structured logging support
 """
 import logging
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from functools import wraps
+from typing import Any, Callable, Optional, TypeVar
+
+# Optional imports for enhanced features
+try:
+    from tenacity import retry, stop_after_attempt, wait_exponential, RetryError
+    HAS_TENACITY = True
+except ImportError:
+    HAS_TENACITY = False
+
+try:
+    import structlog
+    HAS_STRUCTLOG = True
+except ImportError:
+    HAS_STRUCTLOG = False
+
+try:
+    from prometheus_client import Counter, Histogram, Gauge
+    HAS_PROMETHEUS = True
+    
+    # Prometheus metrics for skills
+    SKILL_CALLS = Counter(
+        'aria_skill_calls_total',
+        'Total skill invocations',
+        ['skill', 'function', 'status']
+    )
+    SKILL_LATENCY = Histogram(
+        'aria_skill_latency_seconds',
+        'Skill execution latency',
+        ['skill', 'function'],
+        buckets=[0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0]
+    )
+    SKILL_ERRORS = Counter(
+        'aria_skill_errors_total',
+        'Total skill errors',
+        ['skill', 'error_type']
+    )
+except ImportError:
+    HAS_PROMETHEUS = False
+
+T = TypeVar('T')
 
 
 class SkillStatus(Enum):
@@ -150,4 +196,166 @@ class BaseSkill(ABC):
             "use_count": self._use_count,
             "error_count": self._error_count,
             "error_rate": self._error_count / max(self._use_count, 1),
+            "avg_latency_ms": getattr(self, '_avg_latency_ms', 0),
         }
+    
+    async def execute_with_retry(
+        self, 
+        func: Callable[..., T], 
+        *args, 
+        max_attempts: int = 3,
+        **kwargs
+    ) -> T:
+        """
+        Execute a function with automatic retry on transient failures.
+        
+        Args:
+            func: The async function to execute
+            *args: Positional arguments for func
+            max_attempts: Maximum retry attempts (default: 3)
+            **kwargs: Keyword arguments for func
+            
+        Returns:
+            Result from func
+            
+        Raises:
+            Exception: If all retries fail
+        """
+        if HAS_TENACITY:
+            @retry(
+                stop=stop_after_attempt(max_attempts),
+                wait=wait_exponential(multiplier=1, min=1, max=10),
+                reraise=True
+            )
+            async def _retry_wrapper():
+                return await func(*args, **kwargs)
+            
+            return await _retry_wrapper()
+        else:
+            # Fallback without tenacity
+            last_error = None
+            for attempt in range(max_attempts):
+                try:
+                    return await func(*args, **kwargs)
+                except Exception as e:
+                    last_error = e
+                    if attempt < max_attempts - 1:
+                        import asyncio
+                        await asyncio.sleep(2 ** attempt)  # Exponential backoff
+            raise last_error
+    
+    async def execute_with_metrics(
+        self, 
+        func: Callable[..., T], 
+        operation_name: str,
+        *args, 
+        **kwargs
+    ) -> T:
+        """
+        Execute a function while collecting metrics.
+        
+        Args:
+            func: The async function to execute
+            operation_name: Name for metrics labeling
+            *args: Positional arguments for func
+            **kwargs: Keyword arguments for func
+            
+        Returns:
+            Result from func
+        """
+        start_time = time.time()
+        success = False
+        error_type = None
+        
+        try:
+            result = await func(*args, **kwargs)
+            success = True
+            return result
+        except Exception as e:
+            error_type = type(e).__name__
+            raise
+        finally:
+            latency = time.time() - start_time
+            latency_ms = latency * 1000
+            
+            # Update internal metrics
+            self._use_count += 1
+            self._last_used = datetime.utcnow()
+            if not success:
+                self._error_count += 1
+            
+            # Update rolling average latency
+            if not hasattr(self, '_avg_latency_ms'):
+                self._avg_latency_ms = 0
+            self._avg_latency_ms = (
+                (self._avg_latency_ms * (self._use_count - 1) + latency_ms) 
+                / self._use_count
+            )
+            
+            # Prometheus metrics
+            if HAS_PROMETHEUS:
+                SKILL_CALLS.labels(
+                    skill=self.name,
+                    function=operation_name,
+                    status='success' if success else 'error'
+                ).inc()
+                SKILL_LATENCY.labels(
+                    skill=self.name,
+                    function=operation_name
+                ).observe(latency)
+                if error_type:
+                    SKILL_ERRORS.labels(
+                        skill=self.name,
+                        error_type=error_type
+                    ).inc()
+            
+            # Structured logging
+            log_data = {
+                "skill": self.name,
+                "operation": operation_name,
+                "success": success,
+                "latency_ms": round(latency_ms, 2),
+            }
+            if error_type:
+                log_data["error_type"] = error_type
+            
+            if HAS_STRUCTLOG:
+                structlog.get_logger().info("skill_execution", **log_data)
+            else:
+                self.logger.info(f"skill_execution: {log_data}")
+    
+    async def safe_execute(
+        self,
+        func: Callable[..., T],
+        operation_name: str,
+        *args,
+        with_retry: bool = True,
+        max_attempts: int = 3,
+        **kwargs
+    ) -> T:
+        """
+        Execute a function with both retry logic and metrics collection.
+        
+        This is the recommended way to call external services.
+        
+        Args:
+            func: The async function to execute
+            operation_name: Name for metrics/logging
+            *args: Positional arguments for func
+            with_retry: Whether to use retry logic (default: True)
+            max_attempts: Max retry attempts if retry enabled
+            **kwargs: Keyword arguments for func
+            
+        Returns:
+            Result from func
+        """
+        async def _wrapped():
+            if with_retry:
+                return await self.execute_with_retry(
+                    func, *args, max_attempts=max_attempts, **kwargs
+                )
+            else:
+                return await func(*args, **kwargs)
+        
+        return await self.execute_with_metrics(_wrapped, operation_name)
+

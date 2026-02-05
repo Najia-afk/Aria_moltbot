@@ -106,6 +106,29 @@ def create_app():
     def security():
         return render_template('security.html')
 
+    # ============================================
+    # Aria Operations Routes
+    # ============================================
+    @app.route('/operations')
+    def operations():
+        return render_template('operations.html')
+
+    @app.route('/sessions')
+    def sessions():
+        return render_template('sessions.html')
+
+    @app.route('/model-usage')
+    def model_usage():
+        return render_template('model_usage.html')
+
+    @app.route('/rate-limits')
+    def rate_limits():
+        return render_template('rate_limits.html')
+
+    @app.route('/api-key-rotations')
+    def api_key_rotations():
+        return render_template('api_key_rotations.html')
+
     # Flask remains UI-only. All data access goes through the FastAPI service.
 
     return app

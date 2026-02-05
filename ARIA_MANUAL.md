@@ -1,4 +1,4 @@
-# ARIA MANUAL - Deployment & Operations Guide
+# Aria Blue ⚡️ — Deployment & Operations Guide
 
 Complete deployment and operations guide for the Aria stack with OpenClaw integration.
 
@@ -11,12 +11,12 @@ Aria runs on [OpenClaw](https://openclaw.ai) with a **local-first** LLM strategy
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │  OpenClaw Gateway (clawdbot)                                      │
-│  ├── Model: litellm/qwen3-mlx (primary - MLX on Apple Silicon)   │
+│  ├── Model: litellm/qwen3-mlx (primary — MLX on Apple Silicon)   │
 │  ├── Fallbacks: glm-free, deepseek-free, kimi (paid last resort) │
-│  └── Workspace: aria_mind/ (mounted read-only)                   │
+│  └── Workspace: aria_mind/ (mounted read-write)                  │
 ├──────────────────────────────────────────────────────────────────┤
 │  LiteLLM Router → MLX Server (port 8080, Metal GPU)              │
-│  Model: nightmedia/Qwen3-VLTO-8B-Instruct-qx86x-hi-mlx           │
+│  Model: nightmedia/Qwen3-VLTO-8B-Instruct-qx86x-hi-mlx          │
 ├──────────────────────────────────────────────────────────────────┤
 │  PostgreSQL: aria_warehouse (Aria) + litellm (LiteLLM separate)  │
 └──────────────────────────────────────────────────────────────────┘
@@ -29,11 +29,11 @@ Aria runs on [OpenClaw](https://openclaw.ai) with a **local-first** LLM strategy
 - **macOS with Apple Silicon** (M1/M2/M3/M4) for Metal GPU acceleration
 - Docker & Docker Compose
 - Git
-- SSH access to Mac Mini (for remote deployment)
+- SSH access to deployment host (for remote deployment)
 
 ---
 
-## Quick Deploy (One-Button)
+## Quick Deploy
 
 ### 1. Clone Repository
 
@@ -49,7 +49,7 @@ cp .env.example .env
 nano .env  # Edit with your values
 ```
 
-### 3. Start MLX Server (Metal GPU - REQUIRED)
+### 3. Start MLX Server (Metal GPU — Required)
 
 On macOS with Apple Silicon, MLX runs natively for GPU acceleration:
 
@@ -57,57 +57,86 @@ On macOS with Apple Silicon, MLX runs natively for GPU acceleration:
 # Install MLX LM
 pip install mlx-lm
 
-# Start MLX server as launchd service (recommended)
-# Or manually:
-mlx_lm.server --model nightmedia/Qwen3-VLTO-8B-Instruct-qx86x-hi-mlx --host 0.0.0.0 --port 8080 &
+# Start MLX server (recommended: configure as launchd service)
+mlx_lm.server --model nightmedia/Qwen3-VLTO-8B-Instruct-qx86x-hi-mlx \
+  --host 0.0.0.0 --port 8080 &
 ```
 
-**Performance:**
-- MLX Server (Metal GPU): ~25-35 tokens/second
-- Fully utilizes Apple Silicon Neural Engine
+**Performance:** ~25-35 tokens/second on Metal GPU.
 
 ### 4. Start Docker Stack
 
 ```bash
 docker compose up -d
-docker compose ps  # Should show 12 healthy containers
+docker compose ps  # Should show 13 healthy containers
 ```
 
-### 5. Verify OpenClaw
+### 5. Verify
 
 ```bash
-# Check OpenClaw gateway health
+# Gateway health
 curl http://localhost:18789/health
 
-# Check agent identity
+# Agent identity
 docker exec clawdbot openclaw agents list
-# Expected: "main (default), Identity: ⚡️ Aria Blue, Model: litellm/qwen3-local"
 
-# Check status
+# Full status
 docker exec clawdbot openclaw status
 ```
 
 ---
 
-## API Keys Required
+## API Keys
 
-Configure these in `stacks/brain/.env`:
+Configure in `stacks/brain/.env`:
 
-### Moonshot/Kimi (Paid fallback - last resort)
-1. Go to https://platform.moonshot.cn/
-2. Register and get API key
-3. Add to `.env`: `MOONSHOT_KIMI_KEY=your_key_here`
-
-### OpenRouter (FREE models - recommended fallback)
+### OpenRouter (FREE models — recommended fallback)
 1. Go to https://openrouter.ai/
 2. Get free API key
 3. Add to `.env`: `OPEN_ROUTER_KEY=sk-or-v1-...`
 
-FREE models available via OpenRouter:
-- `glm-free` - GLM 4.5 Air (131K context)
-- `deepseek-free` - DeepSeek R1 0528 (164K context, reasoning)
-- `nemotron-free` - Nemotron 30B (256K context)
-- `gpt-oss-free` - GPT-OSS 120B (131K context, reasoning)
+FREE models available:
+- `glm-free` — GLM 4.5 Air (131K context)
+- `deepseek-free` — DeepSeek R1 0528 (164K context, reasoning)
+- `nemotron-free` — Nemotron 30B (256K context)
+- `gpt-oss-free` — GPT-OSS 120B (131K context, reasoning)
+
+### Moonshot/Kimi (Paid fallback — last resort)
+1. Go to https://platform.moonshot.cn/
+2. Register and get API key
+3. Add to `.env`: `MOONSHOT_KIMI_KEY=your_key_here`
+
+---
+
+## Environment Configuration (.env)
+
+```env
+# Database (creates TWO databases: aria_warehouse + litellm)
+DB_USER=aria_admin
+DB_PASSWORD=your_secure_password
+DB_NAME=aria_warehouse
+
+# LiteLLM
+LITELLM_MASTER_KEY=sk-aria-local-key
+
+# Cloud Fallbacks
+OPEN_ROUTER_KEY=sk-or-v1-...
+MOONSHOT_KIMI_KEY=your_kimi_key
+
+# OpenClaw Gateway
+CLAWDBOT_TOKEN=your_secure_gateway_token
+
+# Moltbook Integration
+MOLTBOOK_API_URL=https://www.moltbook.com/api/v1
+MOLTBOOK_TOKEN=moltbook_sk_...
+
+# Host
+SERVICE_HOST=192.168.1.53
+
+# Skill Environment
+DATABASE_URL=postgresql://aria_admin:password@aria-db:5432/aria_warehouse
+PYTHONPATH=/root/.openclaw/workspace:/root/.openclaw/workspace/skills
+```
 
 ---
 
@@ -117,19 +146,19 @@ FREE models available via OpenRouter:
 
 | Database | Purpose | Tables |
 |----------|---------|--------|
-| `aria_warehouse` | Aria's data | activity_log, memories, thoughts, goals, social_posts, heartbeat_log, knowledge_entities, knowledge_relations |
-| `litellm` | LiteLLM internal | LiteLLM_* tables (Prisma-managed) |
+| `aria_warehouse` | Aria's operational data | activity_log, memories, thoughts, goals, social_posts, heartbeat_log, knowledge_entities, knowledge_relations |
+| `litellm` | LiteLLM internals | LiteLLM_* tables (Prisma-managed) |
 
-This separation prevents LiteLLM's Prisma migrations from dropping Aria's tables.
+> LiteLLM's Prisma migrations can drop unrecognized tables. Separate databases prevent data loss.
 
-### Database Initialization
+### Initialization
 
 The `init-scripts/` folder runs on first PostgreSQL startup:
 
-1. `00-create-litellm-db.sh` - Creates the separate `litellm` database
-2. `01-schema.sql` - Creates Aria's 8 core tables with seed data
+1. `00-create-litellm-db.sh` — Creates the separate `litellm` database
+2. `01-schema.sql` — Creates Aria's 8 core tables with seed data
 
-### Manual Database Access
+### Manual Access
 
 ```bash
 # Connect to aria_warehouse
@@ -138,33 +167,53 @@ docker exec -it aria-db psql -U aria_admin -d aria_warehouse
 # Connect to litellm
 docker exec -it aria-db psql -U aria_admin -d litellm
 
-# List all tables
+# List tables
 \dt
+
+# Quick row count
+SELECT COUNT(*) FROM activity_log;
 ```
 
 ---
 
-## Services
+## Docker Stack (13 Services)
 
-| Service | Port | Description |
-|---------|------|-------------|
-| traefik | 80/443 | HTTPS routing & reverse proxy |
-| aria-db | 5432 | PostgreSQL 16 (internal) |
-| aria-api | 8000 | FastAPI backend |
-| aria-web | 5000 | Flask UI portal |
-| litellm | 18793 | LLM router (external) / 4000 (internal) |
-| clawdbot | 18789 | OpenClaw gateway |
-| grafana | 3001 | Monitoring dashboards |
-| prometheus | 9090 | Metrics collection |
-| pgadmin | 5050 | Database admin UI |
+| Service | Image | Port | Description |
+|---------|-------|------|-------------|
+| **traefik** | traefik:v3.1 | 80, 443, 8081 | HTTPS reverse proxy + dashboard |
+| **clawdbot** | node:22-bookworm | 18789 | OpenClaw AI gateway |
+| **litellm** | ghcr.io/berriai/litellm | 18793 | LLM model router |
+| **aria-db** | postgres:16-alpine | 5432 | PostgreSQL (dual database) |
+| **aria-api** | Custom (FastAPI) | 8000 | REST API backend |
+| **aria-web** | Custom (Flask) | 5000 | Dashboard UI |
+| **aria-brain** | Custom (Python) | — | Agent runtime |
+| **grafana** | grafana/grafana | 3001 | Monitoring dashboards |
+| **prometheus** | prom/prometheus | 9090 | Metrics collection |
+| **pgadmin** | dpage/pgadmin4 | 5050 | Database admin UI |
+| **aria-browser** | browserless/chrome | 3000 | Headless browser automation |
+| **tor-proxy** | dperson/torproxy | 9050 | Privacy proxy |
+| **certs-init** | alpine:3.20 | — | TLS certificate generation (oneshot) |
+
+**Volumes:** `aria_pg_data` · `prometheus_data` · `grafana_data` · `aria_data` · `aria_logs` · `openclaw_data`
+
+**Network:** `aria-net` (bridge)
+
+### Dependency Chain
+
+```
+certs-init (completed) ──► traefik
+aria-db (healthy) ──► aria-api (healthy) ──► aria-brain
+litellm ──► clawdbot, aria-brain, aria-api, aria-web
+MLX Server (host:8080) ◄── LiteLLM (primary model route)
+```
 
 ---
 
 ## OpenClaw Configuration
 
-### Model Configuration
+### Model Config
 
-OpenClaw is configured via `openclaw-entrypoint.sh` which generates `/root/.openclaw/openclaw.json`:
+Generated by `openclaw-entrypoint.sh` at `/root/.openclaw/openclaw.json`:
 
 ```json
 {
@@ -190,153 +239,132 @@ OpenClaw is configured via `openclaw-entrypoint.sh` which generates `/root/.open
 
 ### Workspace Mount
 
-The `aria_mind/` folder is mounted to OpenClaw at `/root/.openclaw/workspace/`:
-
 ```yaml
 # docker-compose.yml volumes for clawdbot
 volumes:
-  - ../../aria_mind:/root/.openclaw/workspace              # Workspace (read-write for memory)
-  - ../../aria_skills:/root/.openclaw/workspace/skills/aria_skills:ro  # Python skills + manifests
-  - ../../aria_agents:/root/.openclaw/workspace/skills/aria_agents:ro  # Agent orchestration
-  - ../../skills:/root/.openclaw/workspace/skills/legacy:ro            # Legacy skills (deprecated)
+  - ../../aria_mind:/root/.openclaw/workspace
+  - ../../aria_skills:/root/.openclaw/workspace/skills/aria_skills:ro
+  - ../../aria_agents:/root/.openclaw/workspace/skills/aria_agents:ro
+  - ../../skills:/root/.openclaw/workspace/skills/legacy:ro
 ```
 
-> **Note**: The entrypoint script creates symlinks from `/root/.openclaw/skills/aria-<skill>/` to each `skill.json` in `aria_skills/<skill>/` at container startup.
+The entrypoint script creates symlinks: `/root/.openclaw/skills/aria-<skill>/skill.json` → each manifest.
 
-Files available to OpenClaw:
-- `SOUL.md` - Persona and boundaries
-- `IDENTITY.md` - Name: Aria Blue ⚡️
-- `AGENTS.md` - Sub-agent definitions
-- `TOOLS.md` - Available skills & execution guide
-- `HEARTBEAT.md` - Scheduled task checklist
-- `MEMORY.md` - Long-term memory (read-write)
-- `USER.md` - User profile
-- `skills/` - Python skill modules
+### Heartbeat
+
+Periodic agent turns every 30 minutes:
+
+```json
+{
+  "heartbeat": {
+    "every": "30m",
+    "target": "last",
+    "prompt": "Read HEARTBEAT.md if it exists. Follow it strictly. If nothing needs attention, reply HEARTBEAT_OK."
+  }
+}
+```
 
 ---
 
-## Python Skills Integration
+## Skill Execution
 
-### Skill Execution
-
-Aria's Python skills are mounted in the OpenClaw workspace and executed via the `exec` tool:
+### Running Skills
 
 ```bash
-# Run a skill function
-python3 /root/.openclaw/workspace/skills/run_skill.py <skill> <function> '<args_json>'
-
-# Examples:
-python3 run_skill.py database query '{"sql": "SELECT COUNT(*) FROM activity_log"}'
-python3 run_skill.py moltbook post_status '{"content": "Hello world!"}'
-python3 run_skill.py health check_health '{}'
-python3 run_skill.py goals list_goals '{"status": "active"}'
+python3 run_skill.py <skill> <function> '<args_json>'
 ```
 
-### Available Skills
+### Available Skills (25 modules)
 
 | Skill | Module | Functions |
 |-------|--------|-----------|
+| `api_client` | `aria_skills.api_client` | Centralized HTTP client |
 | `database` | `aria_skills.database` | `query`, `execute`, `store_thought`, `store_memory` |
-| `moltbook` | `aria_skills.moltbook` | `post_status`, `get_timeline`, `reply_to`, `get_notifications` |
+| `moltbook` | `aria_skills.moltbook` | `create_post`, `get_feed`, `add_comment`, `search` |
 | `health` | `aria_skills.health` | `check_health`, `get_metrics`, `report_error` |
-| `goals` | `aria_skills.goals` | `create_goal`, `update_progress`, `list_goals`, `schedule_task` |
+| `goals` | `aria_skills.goals` | `create_goal`, `update_progress`, `list_goals` |
 | `knowledge_graph` | `aria_skills.knowledge_graph` | `add_entity`, `add_relation`, `query_related`, `search` |
-| `llm` | `aria_skills.llm` | `generate`, `chat` |
+| `llm` | `aria_skills.llm` | `generate`, `chat` (Moonshot + Ollama providers) |
+| `input_guard` | `aria_skills.input_guard` | Prompt injection detection, param validation |
+| `model_switcher` | `aria_skills.model_switcher` | Dynamic model switching, reasoning toggle |
+| `litellm` | `aria_skills.litellm` | Proxy management, API spend tracking |
+| `pytest_runner` | `aria_skills.pytest_runner` | Run pytest, structured results |
+| `market_data` | `aria_skills.market_data` | Crypto market data & analysis |
+| `portfolio` | `aria_skills.portfolio` | Portfolio & position management |
+| `schedule` | `aria_skills.schedule` | Scheduled jobs & background ops |
+| `performance` | `aria_skills.performance` | Performance reviews |
+| `social` | `aria_skills.social` | Social presence management |
+| `hourly_goals` | `aria_skills.hourly_goals` | Micro-task tracking |
+| `brainstorm` | `aria_skills.brainstorm` | Creative ideation |
+| `research` | `aria_skills.research` | Information gathering |
+| `fact_check` | `aria_skills.fact_check` | Claim verification |
+| `community` | `aria_skills.community` | Community management |
+| `ci_cd` | `aria_skills.ci_cd` | CI/CD pipeline automation |
+| `data_pipeline` | `aria_skills.data_pipeline` | ETL operations |
+| `experiment` | `aria_skills.experiment` | ML experiment tracking |
+| `security_scan` | `aria_skills.security_scan` | Vulnerability detection |
 
-### Environment Variables for Skills
+### Examples
 
-```env
-DATABASE_URL=postgresql://aria_admin:password@aria-db:5432/aria_warehouse
-OLLAMA_URL=http://host.docker.internal:11434
-OLLAMA_MODEL=hf.co/unsloth/GLM-4.7-Flash-REAP-23B-A3B-GGUF:Q3_K_S
-MOLTBOOK_TOKEN=moltbook_sk_...your_token_here
-MOLTBOOK_API_URL=https://www.moltbook.com/api/v1
-PYTHONPATH=/root/.openclaw/workspace:/root/.openclaw/workspace/skills
+```bash
+# Query database
+python3 run_skill.py database query '{"sql": "SELECT COUNT(*) FROM activity_log"}'
+
+# Create Moltbook post
+python3 run_skill.py moltbook create_post '{"title": "Hello!", "content": "Hello Moltbook!", "submolt": "general"}'
+
+# Health check
+python3 run_skill.py health check_health '{}'
+
+# Get feed
+python3 run_skill.py moltbook get_feed '{"sort": "hot", "limit": 20}'
+
+# Search knowledge graph
+python3 run_skill.py knowledge_graph search '{"query": "AI agents"}'
 ```
-
----
-
-## OpenClaw Skills (UI)
-
-Skills visible in the OpenClaw UI (`/clawdbot/skills`) are now consolidated in `aria_skills/<skill>/`:
-
-| Skill | Emoji | Description |
-|-------|-------|-------------|
-| aria-database | 🗄️ | Query PostgreSQL database |
-| aria-moltbook | 🦞 | Moltbook social platform |
-| aria-health | 💚 | System health monitoring |
-| aria-goals | 🎯 | Goal & task tracking |
-| aria-knowledgegraph | 🕸️ | Knowledge graph operations |
-| aria-llm | 🧠 | LLM routing (local + cloud) |
-| ... | ... | 24 skills total (see aria_mind/SKILLS.md) |
-
-Each skill directory contains:
-- `__init__.py` - Python implementation
-- `skill.json` - OpenClaw manifest
-- `SKILL.md` - Documentation (optional)
-
-The entrypoint creates symlinks so OpenClaw finds them at `/root/.openclaw/skills/aria-<skill>/skill.json`.
 
 ---
 
 ## Moltbook Integration
 
-Aria is registered on [Moltbook](https://moltbook.com) - the social network for AI agents.
-
-### Profile
-- **Name:** AriaMoltbot
-- **Profile URL:** https://moltbook.com/u/AriaMoltbot
-- **Status:** CLAIMED ✓
-
-### API Configuration (v1.9.0)
-```env
-MOLTBOOK_API_URL=https://www.moltbook.com/api/v1  # MUST use www subdomain!
-MOLTBOOK_TOKEN=moltbook_sk_...
-```
-
 ### Rate Limits
+
 | Action | Limit |
 |--------|-------|
 | Posts | 1 every 30 minutes |
 | Comments | 1 every 20 seconds, max 50/day |
 | Upvotes | Unlimited (auto-follows author) |
 
-### Skill Usage
-```bash
-# Create a post
-exec python3 /root/.openclaw/workspace/skills/run_skill.py moltbook create_post '{"title": "Hello!", "content": "Hello Moltbook!", "submolt": "general"}'
+### Configuration
 
-# Get feed
-exec python3 /root/.openclaw/workspace/skills/run_skill.py moltbook get_feed '{"sort": "hot", "limit": 20}'
-
-# Comment on a post
-exec python3 /root/.openclaw/workspace/skills/run_skill.py moltbook add_comment '{"post_id": "abc123", "content": "Great post!"}'
-
-# Semantic search
-exec python3 /root/.openclaw/workspace/skills/run_skill.py moltbook search '{"query": "AI agents", "type": "posts"}'
-
-# Get profile
-exec python3 /root/.openclaw/workspace/skills/run_skill.py moltbook get_profile '{}'
+```env
+MOLTBOOK_API_URL=https://www.moltbook.com/api/v1  # MUST use www subdomain
+MOLTBOOK_TOKEN=moltbook_sk_...
 ```
 
 ---
 
-## Heartbeat Configuration
+## Model Routing
 
-OpenClaw runs heartbeats every 30 minutes by default. Configure in `openclaw.json`:
+| Priority | Model | Provider | Cost |
+|----------|-------|----------|------|
+| 1 | Qwen3-VLTO-8B-Instruct | MLX Server (Metal GPU) | Free (local) |
+| 2 | GLM 4.5 Air (131K ctx) | OpenRouter | Free |
+| 3 | DeepSeek R1 0528 (164K ctx) | OpenRouter | Free |
+| 4 | Nemotron 30B (256K ctx) | OpenRouter | Free |
+| 5 | Kimi K2.5 | Moonshot Cloud | Paid (last resort) |
 
-```json
-{
-  "agents": {
-    "defaults": {
-      "heartbeat": {
-        "every": "30m",
-        "target": "last",
-        "prompt": "Read HEARTBEAT.md if it exists. Follow it strictly. If nothing needs attention, reply HEARTBEAT_OK."
-      }
-    }
-  }
-}
+### Verify Model Routing
+
+```bash
+# List available models
+curl http://localhost:18793/models
+
+# Test model directly
+curl http://localhost:18793/v1/chat/completions \
+  -H "Authorization: Bearer $LITELLM_MASTER_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "qwen3-local", "messages": [{"role": "user", "content": "Hello"}]}'
 ```
 
 ---
@@ -344,26 +372,29 @@ OpenClaw runs heartbeats every 30 minutes by default. Configure in `openclaw.jso
 ## Troubleshooting
 
 ### Container won't start
+
 ```bash
 docker logs <container-name>
-docker compose ps  # Check status
+docker compose ps
 ```
 
 ### Database errors
+
 ```bash
 docker logs aria-db
 docker exec -it aria-db psql -U aria_admin -d aria_warehouse -c '\dt'
 ```
 
 ### Slow LLM responses
-Ensure native Ollama is running (not Docker Ollama):
+
+Verify MLX Server is running on the host:
 ```bash
-# On Mac
-ps aux | grep ollama
-# Should show: ollama serve
+curl -s http://localhost:8080/v1/models
+# If no response, restart: mlx_lm.server --model ... --host 0.0.0.0 --port 8080
 ```
 
 ### OpenClaw disconnects (WebSocket 1006)
+
 ```bash
 docker logs clawdbot
 docker exec clawdbot openclaw status --all
@@ -371,16 +402,19 @@ docker exec clawdbot openclaw health --json
 ```
 
 ### LiteLLM model errors
+
 ```bash
 docker logs litellm
-curl http://localhost:18793/models  # Check available models
+curl http://localhost:18793/models
 ```
 
 ### Fresh rebuild (nuclear option)
+
 ```bash
 cd stacks/brain
-docker compose down -v  # Remove ALL volumes (data loss!)
-docker compose up -d    # Start fresh
+docker compose down -v   # Remove ALL volumes (data loss!)
+docker compose up -d     # Start fresh
+docker compose ps        # Verify 13 services
 ```
 
 ---
@@ -388,63 +422,69 @@ docker compose up -d    # Start fresh
 ## Health Checks
 
 ### Quick Status
+
 ```bash
-# All containers
 docker compose ps
-
-# OpenClaw status
 docker exec clawdbot openclaw status
-
-# Deep diagnostics
 docker exec clawdbot openclaw status --deep
 ```
 
-### Check Model Routing
-```bash
-# Verify LiteLLM models
-curl http://localhost:18793/models
+### Database
 
-# Test model directly
-curl http://localhost:18793/v1/chat/completions \
-  -H "Authorization: Bearer sk-aria-local-key" \
-  -H "Content-Type: application/json" \
-  -d '{"model": "qwen3-local", "messages": [{"role": "user", "content": "Hello"}]}'
-```
-
-### Check Database
 ```bash
-# Verify tables exist
 docker exec -it aria-db psql -U aria_admin -d aria_warehouse -c '\dt'
-
-# Check activity log
 docker exec -it aria-db psql -U aria_admin -d aria_warehouse -c 'SELECT COUNT(*) FROM activity_log'
 ```
 
+### Service URLs
+
+| Service | URL | Description |
+|---------|-----|-------------|
+| Dashboard | `https://{HOST}/` | Main web UI |
+| API Docs | `https://{HOST}/api/docs` | Swagger documentation |
+| OpenClaw | `http://{HOST}:18789` | Gateway API |
+| LiteLLM | `http://{HOST}:18793` | Model router |
+| Grafana | `https://{HOST}/grafana` | Monitoring dashboards |
+| PGAdmin | `https://{HOST}/pgadmin` | Database admin |
+| Prometheus | `https://{HOST}/prometheus` | Metrics |
+| Traefik | `https://{HOST}/traefik/dashboard` | Proxy dashboard |
+
 ---
 
-## Checklist
+## Deployment Checklist
 
 ### Initial Setup
-- [ ] Repository cloned to Mac Mini
+
+- [ ] Repository cloned
 - [ ] `.env` configured with all credentials
-- [ ] Native Ollama running with Metal GPU
-- [ ] qwen3-vl:8b model pulled
-- [ ] Docker stack started
-- [ ] All 12 containers healthy
+- [ ] MLX Server running on Apple Silicon host
+- [ ] Docker stack started (`docker compose up -d`)
+- [ ] All 13 containers healthy
 
 ### Verification
-- [ ] `docker compose ps` shows all services healthy
-- [ ] `openclaw agents list` shows "Aria Blue" with correct model
-- [ ] Activities page loads without error
+
+- [ ] `docker compose ps` — all services healthy
+- [ ] `openclaw agents list` — shows correct agent with model
+- [ ] Dashboard loads without error
 - [ ] LiteLLM responds to model requests
-- [ ] Ollama generating at ~20 tok/s
+- [ ] MLX generating at ~25-35 tok/s
 
 ### Production
+
 - [ ] HTTPS configured via Traefik
 - [ ] Grafana dashboards accessible
 - [ ] Prometheus scraping metrics
-- [ ] PGAdmin accessible for DB management
+- [ ] PGAdmin accessible
+- [ ] Moltbook token configured and posting works
 
 ---
 
-*Aria Blue ⚡️ - Deployment Guide*
+## License
+
+**Source Available License** — Free for educational and personal use. Commercial use requires a license agreement.
+
+See [LICENSE](LICENSE) for full terms. For commercial licensing: https://datascience-adventure.xyz/contact
+
+---
+
+*Aria Blue ⚡️ — Deployment & Operations Guide*

@@ -1,177 +1,247 @@
-# Aria Blue ⚡️
+# Aria Blue ⚡️ — Autonomous AI Agent Platform
 
-<img src="aria_mind/aria-profile-v1.png" alt="Aria Blue" width="200" align="right" style="margin-left: 20px; border-radius: 10px;">
+[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
+[![Docker](https://img.shields.io/badge/Docker-24.0+-blue.svg)](https://www.docker.com/)
+[![OpenClaw](https://img.shields.io/badge/OpenClaw-Gateway-purple.svg)](https://openclaw.ai)
+[![LiteLLM](https://img.shields.io/badge/LiteLLM-Router-orange.svg)](https://github.com/BerriAI/litellm)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
+[![Skills](https://img.shields.io/badge/Skills-25%20modules-brightgreen.svg)](#-skill-system-25-modules)
+[![License](https://img.shields.io/badge/License-Source%20Available-orange.svg)](#-license)
 
-> An autonomous AI agent with sharp, efficient, and secure vibes.
+<img src="aria_mind/aria-profile-v1.png" alt="Aria Blue" width="180" align="right" style="margin-left: 20px; border-radius: 10px;">
 
-Aria is an autonomous AI agent built on the [OpenClaw](https://openclaw.ai) gateway architecture. She runs **local-first** with Qwen3-VL on Apple Silicon (Metal GPU), with Kimi cloud fallback. She integrates with Moltbook social platform, manages her own memory, and operates with a layered skill system.
+Production-grade autonomous AI agent built on [OpenClaw](https://openclaw.ai) with **local-first** LLM inference on Apple Silicon (Metal GPU), multi-model fallback routing, 25 modular Python skills, multi-agent orchestration, and full observability stack.
+
+### Key Capabilities
+
+- **Local-First LLM**: MLX-accelerated Qwen3 on Metal GPU (~25-35 tok/s), with free cloud fallbacks
+- **25 Python Skills**: Modular skill system with registry, metrics, retry logic, and Prometheus integration
+- **Multi-Agent Orchestration**: Coordinator, Researcher, Social, Coder, and Memory agents
+- **Full Observability**: Grafana dashboards, Prometheus metrics, structured logging
+- **Social Platform Integration**: Native [Moltbook](https://moltbook.com) client with rate limiting
+- **Persistent Memory**: PostgreSQL-backed knowledge graph, activity logs, and curated memory
+
+---
+
+## 📁 Project Structure
+
+```
+Aria_moltbot/
+├── aria_mind/                 # OpenClaw workspace (mounted to gateway)
+│   ├── SOUL.md                # Persona, boundaries, model preferences
+│   ├── IDENTITY.md            # Agent identity configuration
+│   ├── AGENTS.md              # Sub-agent definitions
+│   ├── TOOLS.md               # Skill registry & execution guide
+│   ├── HEARTBEAT.md           # Scheduled task configuration
+│   ├── MEMORY.md              # Long-term curated knowledge
+│   ├── GOALS.md               # Goal-driven work system
+│   ├── ORCHESTRATION.md       # Infrastructure awareness
+│   ├── soul/                  # Soul implementation (identity, values, boundaries)
+│   └── skills/                # Runtime skill mounts
+│
+├── aria_skills/               # Skill modules (25 directories)
+│   ├── base.py                # BaseSkill, SkillConfig, SkillResult
+│   ├── registry.py            # SkillRegistry with auto-discovery
+│   ├── database/              # PostgreSQL operations
+│   ├── moltbook/              # Social platform integration
+│   ├── llm/                   # Multi-provider LLM routing
+│   ├── input_guard/           # Runtime security (injection detection)
+│   ├── knowledge_graph/       # Entity-relationship graph
+│   └── ...                    # 18 more skill modules
+│
+├── aria_agents/               # Multi-agent orchestration
+│   ├── base.py                # BaseAgent, AgentConfig, AgentMessage
+│   ├── loader.py              # AGENTS.md parser
+│   └── coordinator.py         # Agent lifecycle & routing
+│
+├── stacks/brain/              # Docker deployment (13 services)
+│   ├── docker-compose.yml     # Full stack orchestration
+│   ├── litellm-config.yaml    # LLM model routing
+│   ├── prometheus.yml         # Metrics scrape config
+│   └── init-scripts/          # PostgreSQL initialization
+│
+├── src/                       # Application layer
+│   ├── api/                   # FastAPI backend
+│   └── web/                   # Flask dashboard UI
+│
+└── tests/                     # Pytest test suite
+```
+
+---
 
 ## 🏗️ Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         OpenClaw Gateway (clawdbot:18789)                │
-│  ┌────────────────────────────────────────────────────────────────┐     │
-│  │  aria_mind/ (Workspace - mounted read-only)                    │     │
-│  │  ├── SOUL.md        # Persona, boundaries, model preferences   │     │
-│  │  ├── IDENTITY.md    # Name: Aria Blue ⚡️                       │     │
-│  │  ├── AGENTS.md      # Sub-agent definitions                    │     │
-│  │  ├── TOOLS.md       # Available skills configuration           │     │
-│  │  ├── HEARTBEAT.md   # Scheduled tasks checklist                │     │
-│  │  ├── MEMORY.md      # Long-term curated knowledge              │     │
-│  │  └── USER.md        # User profile (Najia)                     │     │
-│  └────────────────────────────────────────────────────────────────┘     │
-│                                    │                                     │
-│                      Model: litellm/qwen3-local                         │
-│                      Fallbacks: kimi-k2.5 (litellm/kimi-local)          │
-└─────────────────────────────────────────────────────────────────────────┘
-                                     │
-                                     ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           LiteLLM Router (:18793)                        │
-│  ┌─────────────────────────────────────────────────────────────────┐    │
-│  │  qwen3-local     → ollama/qwen3-vl:8b (Metal GPU, ~20 tok/s)    │    │
-│  │  gpt-4o          → ollama/qwen3-vl:8b (alias)                   │    │
-│  │  local-default   → ollama/qwen3-vl:8b (alias)                   │    │
-│  └─────────────────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────────────┘
-                                     │
-                                     ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    PostgreSQL 16 (aria-db:5432)                          │
-│  ┌─────────────────────────┐    ┌─────────────────────────┐             │
-│  │    aria_warehouse       │    │       litellm           │             │
-│  │  ├── activity_log       │    │  ├── LiteLLM_* tables   │             │
-│  │  ├── memories           │    │  └── (Prisma managed)   │             │
-│  │  ├── thoughts           │    └─────────────────────────┘             │
-│  │  ├── goals              │                                            │
-│  │  ├── social_posts       │    ⚠️ SEPARATE databases prevent           │
-│  │  └── heartbeat_log      │       LiteLLM Prisma from dropping        │
-│  └─────────────────────────┘       Aria's tables!                       │
-└─────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                        Docker Stack (stacks/brain)                    │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  ┌────────────┐    ┌────────────┐    ┌────────────┐                  │
+│  │  Traefik   │    │  OpenClaw  │    │  LiteLLM   │                  │
+│  │  :80/:443  │    │  :18789    │    │  :18793    │                  │
+│  │  (Proxy)   │    │ (Gateway)  │    │  (Router)  │                  │
+│  └─────┬──────┘    └─────┬──────┘    └─────┬──────┘                  │
+│        │                 │                 │                          │
+│        ▼                 ▼                 ▼                          │
+│  ┌────────────┐    ┌────────────┐    ┌────────────────────────────┐  │
+│  │  aria-web  │    │ aria_mind/ │    │  MLX Server (host:8080)    │  │
+│  │  Flask UI  │    │ Workspace  │    │  Metal GPU ~25-35 tok/s    │  │
+│  │  :5000     │    │ + Skills   │    │  Qwen3-VLTO-8B-Instruct   │  │
+│  └─────┬──────┘    └────────────┘    ├────────────────────────────┤  │
+│        │                             │  FREE Fallbacks:           │  │
+│        ▼                             │  GLM 4.5 · DeepSeek R1    │  │
+│  ┌────────────┐    ┌────────────┐    │  Nemotron 30B · GPT-OSS   │  │
+│  │  aria-api  │───▶│  aria-db   │    ├────────────────────────────┤  │
+│  │  FastAPI   │    │ PostgreSQL │    │  Paid (last resort):       │  │
+│  │  :8000     │    │  :5432     │    │  Moonshot Kimi K2.5        │  │
+│  └────────────┘    └────────────┘    └────────────────────────────┘  │
+│                                                                      │
+│  ┌────────────┐    ┌────────────┐    ┌────────────┐                  │
+│  │ Prometheus │    │  Grafana   │    │  PGAdmin   │                  │
+│  │  :9090     │    │  :3001     │    │  :5050     │                  │
+│  └────────────┘    └────────────┘    └────────────┘                  │
+│                                                                      │
+│  ┌────────────┐    ┌────────────┐    ┌────────────┐                  │
+│  │ aria-brain │    │ tor-proxy  │    │  browser   │                  │
+│  │  (Agent)   │    │  :9050     │    │  :3000     │                  │
+│  └────────────┘    └────────────┘    └────────────┘                  │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
-### Directory Structure
+### Database Isolation
+
+PostgreSQL hosts **two separate databases** to prevent schema conflicts:
+
+| Database | Purpose | Tables |
+|----------|---------|--------|
+| `aria_warehouse` | Aria's operational data | activity_log, memories, thoughts, goals, social_posts, heartbeat_log, knowledge_entities, knowledge_relations |
+| `litellm` | LiteLLM internals | Prisma-managed tables |
+
+> LiteLLM's Prisma migrations can drop unrecognized tables. Separate databases prevent data loss.
+
+---
+
+## 🐳 Docker Stack (13 Services)
+
+| Service | Image | Port | Description |
+|---------|-------|------|-------------|
+| **traefik** | traefik:v3.1 | 80, 443, 8081 | HTTPS reverse proxy + dashboard |
+| **clawdbot** | node:22-bookworm | 18789 | OpenClaw AI gateway |
+| **litellm** | ghcr.io/berriai/litellm | 18793 | LLM model router |
+| **aria-db** | postgres:16-alpine | 5432 | PostgreSQL (dual database) |
+| **aria-api** | Custom (FastAPI) | 8000 | REST API backend |
+| **aria-web** | Custom (Flask) | 5000 | Dashboard UI |
+| **aria-brain** | Custom (Python) | — | Agent runtime |
+| **grafana** | grafana/grafana | 3001 | Monitoring dashboards |
+| **prometheus** | prom/prometheus | 9090 | Metrics collection |
+| **pgadmin** | dpage/pgadmin4 | 5050 | Database admin UI |
+| **aria-browser** | browserless/chrome | 3000 | Headless browser automation |
+| **tor-proxy** | dperson/torproxy | 9050 | Privacy proxy |
+| **certs-init** | alpine:3.20 | — | TLS certificate generation |
+
+**Volumes:** `aria_pg_data` · `prometheus_data` · `grafana_data` · `aria_data` · `aria_logs` · `openclaw_data`
+
+---
+
+## 🧠 Model Routing
+
+Local-first inference with automatic fallback chain:
+
+| Priority | Model | Provider | Cost |
+|----------|-------|----------|------|
+| 1 | Qwen3-VLTO-8B-Instruct | MLX Server (Metal GPU) | Free (local) |
+| 2 | GLM 4.5 Air (131K ctx) | OpenRouter | Free |
+| 3 | DeepSeek R1 0528 (164K ctx) | OpenRouter | Free |
+| 4 | Nemotron 30B (256K ctx) | OpenRouter | Free |
+| 5 | Kimi K2.5 | Moonshot Cloud | Paid (last resort) |
+
+All routing handled by LiteLLM with health checks and automatic failover.
+
+---
+
+## 🔧 Skill System (25 Modules)
+
+Each skill is a self-contained directory with Python implementation, OpenClaw manifest, and documentation:
 
 ```
-Aria_moltbot/
-├── aria_mind/           # OpenClaw workspace (mounted to clawdbot)
-│   ├── SOUL.md          # Persona, boundaries, model preferences
-│   ├── IDENTITY.md      # Name: Aria Blue, emoji: ⚡️
-│   ├── AGENTS.md        # Sub-agent definitions
-│   ├── TOOLS.md         # Available skills & execution guide
-│   ├── HEARTBEAT.md     # Scheduled tasks checklist
-│   ├── MEMORY.md        # Long-term curated knowledge
-│   ├── USER.md          # User profile (Najia)
-│   ├── soul/            # Python soul implementation
-│   │   ├── identity.py
-│   │   ├── values.py
-│   │   └── boundaries.py
-│   └── skills/          # Python skill modules (mounted at runtime)
-│       ├── aria_skills/ # Core skill implementations
-│       ├── aria_agents/ # Multi-agent orchestration
-│       └── legacy/      # Original skill implementations
-│
-├── aria_skills/         # Skills (Python + OpenClaw manifests consolidated)
-│   ├── base.py          # BaseSkill, SkillConfig, SkillResult
-│   ├── registry.py      # SkillRegistry with TOOLS.md parser
-│   ├── database/        # Each skill is a subdirectory containing:
-│   │   ├── __init__.py  #   Python implementation
-│   │   ├── skill.json   #   OpenClaw manifest
-│   │   └── SKILL.md     #   Documentation
-│   ├── moltbook/        # Moltbook social platform
-│   ├── llm/             # LLM routing (local + cloud)
-│   ├── health/          # Health monitoring
-│   ├── goals/           # Goal & task scheduling
-│   └── ... (24 skills)  # See aria_mind/SKILLS.md
-│
-├── aria_agents/         # Multi-agent orchestration
-│   ├── base.py          # BaseAgent, AgentConfig, AgentMessage
-│   ├── loader.py        # AGENTS.md parser
-│   └── coordinator.py   # Agent lifecycle & routing
-│
-├── skills/              # Legacy skill implementations (deprecated)
-│   ├── moltbook_poster.py
-│   ├── goal_scheduler.py
-│   ├── health_monitor.py
-│   └── knowledge_graph.py
-│
-├── stacks/brain/        # Docker deployment (PRIMARY)
-│   ├── docker-compose.yml        # Full stack orchestration
-│   ├── openclaw-entrypoint.sh    # OpenClaw startup with Python skills
-│   ├── openclaw-config.json      # OpenClaw provider template
-│   ├── litellm-config.yaml       # Model routing (qwen3 → Ollama)
-│   ├── init-scripts/             # PostgreSQL initialization
-│   │   ├── 00-create-litellm-db.sh  # Creates separate litellm database
-│   │   └── 01-schema.sql            # Aria's 8 core tables
-│   ├── prometheus.yml            # Prometheus scrape config
-│   └── .env                      # Environment configuration
-│
-└── tests/               # pytest test suite
-    ├── conftest.py      # Fixtures
-    ├── test_skills.py   # Skill unit tests
-    └── test_agents.py   # Agent unit tests
+aria_skills/<skill>/
+├── __init__.py      # Skill class (extends BaseSkill)
+├── skill.json       # OpenClaw manifest
+└── SKILL.md         # Documentation
 ```
 
-## 🧠 Model Configuration
+### BaseSkill Framework
 
-Aria uses **local-first** LLM routing through LiteLLM:
+- **Retry logic** with exponential backoff (tenacity integration)
+- **Metrics tracking**: latency, error rates, usage counts
+- **Prometheus** counters and histograms (optional)
+- **Structured logging** via structlog (optional)
+- **Registry**: auto-discovery via `@SkillRegistry.register` decorator
 
-| Priority | Model Alias | Routes To | Provider |
-|----------|-------------|-----------|----------|
-| 1 (Primary) | `litellm/qwen3-mlx` | MLX Server (port 8080) | Local MLX (Metal GPU) |
-| 2 (FREE) | `litellm/glm-free` | OpenRouter GLM 4.5 Air | OpenRouter FREE |
-| 3 (FREE) | `litellm/deepseek-free` | OpenRouter DeepSeek R1 | OpenRouter FREE |
-| 4 (FREE) | `litellm/nemotron-free` | OpenRouter Nemotron 30B | OpenRouter FREE |
-| 5 (Paid) | `litellm/kimi` | Moonshot Kimi K2.5 | Moonshot Cloud |
+### Skill Inventory
 
-OpenClaw configuration (generated by `openclaw-entrypoint.sh`):
-```json
-{
-  "agents": {
-    "defaults": {
-      "model": {
-        "primary": "litellm/qwen3-local",
-        "fallbacks": ["litellm/kimi-local"]
-      }
-    }
-  },
-  "models": {
-    "providers": {
-      "litellm": {
-        "baseUrl": "http://litellm:4000/v1/",
-        "apiKey": "${CLAWDBOT_TOKEN}"
-      }
-    }
-  }
-}
+#### Core Skills (Registered)
+
+| Skill | Class | Description |
+|-------|-------|-------------|
+| `api_client` | AriaAPIClient | Centralized HTTP client for all API interactions |
+| `database` | DatabaseSkill | PostgreSQL operations (queries, memory storage, activity logs) |
+| `llm` | MoonshotSkill / OllamaSkill | Multi-provider LLM routing (Moonshot, Ollama, OpenRouter) |
+| `health` | HealthMonitorSkill | System health checks (DB, LLM, API connectivity) |
+| `goals` | GoalSchedulerSkill | Goal management, habit tracking, progress monitoring |
+| `knowledge_graph` | KnowledgeGraphSkill | Entity-relationship graph (add, query, search) |
+| `input_guard` | InputGuardSkill | Runtime security — prompt injection detection, output filtering |
+| `model_switcher` | ModelSwitcherSkill | Dynamic LLM model switching with reasoning mode toggle |
+| `litellm` | LiteLLMSkill | LiteLLM proxy management and API spend tracking |
+| `pytest_runner` | PytestSkill | Run pytest suites and return structured results |
+| `market_data` | MarketDataSkill | Cryptocurrency market data and analysis |
+| `portfolio` | PortfolioSkill | Portfolio and position management |
+| `schedule` | ScheduleSkill | Scheduled jobs and background operations |
+| `performance` | PerformanceSkill | Performance reviews and self-assessments |
+| `social` | SocialSkill | Social presence management (posting, engagement) |
+| `hourly_goals` | HourlyGoalsSkill | Micro-task tracking and hourly goal cycles |
+
+#### Domain-Specific Skills
+
+| Skill | Class | Description |
+|-------|-------|-------------|
+| `moltbook` | MoltbookSkill | Moltbook social network (posts, comments, feed, search) |
+| `brainstorm` | BrainstormSkill | Creative ideation and brainstorming sessions |
+| `research` | ResearchSkill | Information gathering and source verification |
+| `fact_check` | FactCheckSkill | Claim verification and fact-checking workflows |
+| `community` | CommunitySkill | Community management and growth |
+| `ci_cd` | CICDSkill | CI/CD pipeline management and automation |
+| `data_pipeline` | DataPipelineSkill | ETL operations and data pipeline management |
+| `experiment` | ExperimentSkill | ML experiment tracking and model management |
+| `security_scan` | SecurityScanSkill | Security scanning and vulnerability detection |
+
+### Skill Execution
+
+```bash
+python3 run_skill.py <skill> <function> '<args_json>'
+
+# Examples
+python3 run_skill.py database query '{"sql": "SELECT COUNT(*) FROM activity_log"}'
+python3 run_skill.py moltbook create_post '{"title": "Hello!", "content": "..."}'
+python3 run_skill.py health check_health '{}'
 ```
 
-## 🐳 Infrastructure
+---
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     Docker Stack (stacks/brain)                  │
-├─────────────────────────────────────────────────────────────────┤
-│  traefik          │ HTTPS reverse proxy (ports 80/443)          │
-│  aria-db          │ PostgreSQL 16 (aria_warehouse + litellm)    │
-│  aria-api         │ FastAPI data API (port 8000)                │
-│  aria-web         │ Flask UI portal (port 5000)                 │
-│  aria-brain       │ Python agent container                      │
-│  litellm          │ LLM router (port 18793 → internal 4000)     │
-│  clawdbot         │ OpenClaw gateway (port 18789)               │
-│  grafana          │ Monitoring dashboards (port 3001)           │
-│  prometheus       │ Metrics collection (port 9090)              │
-│  pgadmin          │ Database admin UI (port 5050)               │
-└─────────────────────────────────────────────────────────────────┘
+## 🤖 Agent System
 
-Native Service (macOS host @ 192.168.1.53):
-┌─────────────────────────────────────────────────────────────────┐
-│  MLX Server       │ Metal GPU acceleration (~25-35 tok/s)       │
-│                   │ Port 8080, launchd managed                  │
-│                   │ Model: Qwen3-VLTO-8B-Instruct-mlx           │
-└─────────────────────────────────────────────────────────────────┘
-```
+Multi-agent orchestration defined in `aria_mind/AGENTS.md`:
+
+| Agent | Role | Capabilities |
+|-------|------|--------------|
+| **aria** | Coordinator | Orchestrate, delegate, synthesize across agents |
+| **researcher** | Researcher | Search, verify, summarize information |
+| **social** | Social | Post, engage, moderate on Moltbook |
+| **coder** | Coder | Generate, review, explain code |
+| **memory** | Memory | Store, recall, organize knowledge |
+
+---
 
 ## 🚀 Quick Start
 
@@ -181,154 +251,131 @@ Native Service (macOS host @ 192.168.1.53):
 - Docker & Docker Compose
 - Git
 
-### One-Button Deploy
+### Deploy
 
 ```bash
-# 1. Clone the repository
+# Clone
 git clone https://github.com/Najia-afk/Aria_moltbot.git
 cd Aria_moltbot/stacks/brain
 
-# 2. Configure environment
+# Configure
 cp .env.example .env
-nano .env  # Add your API keys
+nano .env  # Set API keys and credentials
 
-# 3. MLX Server should be running via launchd (auto-starts on boot)
-# Verify: ssh your-mac "curl -s http://localhost:8080/v1/models"
-# Manual start if needed: mlx_lm.server --model nightmedia/Qwen3-VLTO-8B-Instruct-qx86x-hi-mlx --host 0.0.0.0 --port 8080
+# Start MLX Server (Metal GPU, runs natively on macOS)
+mlx_lm.server --model nightmedia/Qwen3-VLTO-8B-Instruct-qx86x-hi-mlx \
+  --host 0.0.0.0 --port 8080 &
 
-# 4. Deploy everything
+# Deploy stack
 docker compose up -d
 
-# 5. Verify
-docker compose ps
+# Verify
+docker compose ps              # 13 services healthy
 curl http://localhost:18789/health
 ```
 
 ### Configuration (.env)
 
 ```env
-# Database (creates TWO databases: aria_warehouse + litellm)
+# Database (creates aria_warehouse + litellm databases)
 DB_USER=aria_admin
 DB_PASSWORD=your_secure_password
 DB_NAME=aria_warehouse
 
-# LiteLLM (routes to local Ollama)
+# LiteLLM
 LITELLM_MASTER_KEY=sk-aria-local-key
 
-# Cloud fallbacks (Kimi)
+# Cloud Fallbacks
+OPEN_ROUTER_KEY=sk-or-v1-...
 MOONSHOT_KIMI_KEY=your_kimi_key
 
 # OpenClaw Gateway
 CLAWDBOT_TOKEN=your_secure_gateway_token
 
-# Host configuration
+# Host
 SERVICE_HOST=192.168.1.53
 ```
 
-### Fresh Deploy (Nuke & Rebuild)
+### Service URLs
 
-```bash
-cd stacks/brain
-docker compose down -v          # Remove containers AND volumes
-docker compose up -d            # Rebuild from scratch
-docker compose ps               # Verify all 12 services healthy
-```
+| Service | URL | Description |
+|---------|-----|-------------|
+| Dashboard | `https://{HOST}/` | Main web UI |
+| API Docs | `https://{HOST}/api/docs` | Swagger documentation |
+| OpenClaw | `http://{HOST}:18789` | Gateway API |
+| LiteLLM | `http://{HOST}:18793` | Model router |
+| Grafana | `https://{HOST}/grafana` | Monitoring dashboards |
+| PGAdmin | `https://{HOST}/pgadmin` | Database admin |
+| Prometheus | `https://{HOST}/prometheus` | Metrics |
+
+---
 
 ## 🧪 Testing
 
 ```bash
-# Run all tests
+# All tests
 pytest
 
-# Run with coverage
+# With coverage
 pytest --cov=aria_skills --cov=aria_agents --cov-report=html
 
-# Run specific test file
+# Specific suite
 pytest tests/test_skills.py -v
+pytest tests/test_agents.py -v
 ```
-
-## 🐳 Docker Services
-
-| Service | Port | Description |
-|---------|------|-------------|
-| Traefik | 80/443 | HTTPS routing |
-| API | 8000 | FastAPI backend |
-| Web | 5000 | Flask UI |
-| LiteLLM | 18793 | LLM router (→ Ollama) |
-| Grafana | 3001 | Monitoring |
-| PGAdmin | 5050 | DB admin |
-| Clawdbot | 18789 | OpenClaw gateway |
-| Prometheus | 9090 | Metrics |
-
-## 🤖 Agent System
-
-Agents defined in `aria_mind/AGENTS.md`:
-
-| Agent | Role | Capabilities |
-|-------|------|--------------|
-| `aria` | Coordinator | Orchestrate, delegate, synthesize |
-| `researcher` | Researcher | Search, verify, summarize |
-| `social` | Social | Post, engage, moderate |
-| `coder` | Coder | Generate, review, explain |
-| `memory` | Memory | Store, recall, organize |
-
-## 📝 Skills
-
-Available skills in `aria_mind/TOOLS.md` (executed via Python):
-
-| Skill | Description | Execution |
-|-------|-------------|-----------|
-| `moltbook` | Social platform | `python3 run_skill.py moltbook post_status '{...}'` |
-| `database` | PostgreSQL queries | `python3 run_skill.py database query '{...}'` |
-| `knowledge_graph` | Entity relationships | `python3 run_skill.py knowledge_graph add_entity '{...}'` |
-| `health` | System monitoring | `python3 run_skill.py health check_health '{}'` |
-| `goals` | Task scheduling | `python3 run_skill.py goals create_goal '{...}'` |
-| `llm` | Local LLM calls | `python3 run_skill.py llm generate '{...}'` |
-
-### Skill Architecture
-
-```
-OpenClaw exec tool
-       │
-       ▼
-python3 run_skill.py <skill> <function> '<args_json>'
-       │
-       ▼
-┌──────────────────────────────────────────────────┐
-│  /root/.openclaw/workspace/skills/               │
-│  ├── aria_skills/     # Core Python skills       │
-│  │   ├── base.py      # BaseSkill class          │
-│  │   ├── database.py  # PostgreSQL operations    │
-│  │   ├── moltbook.py  # Social platform          │
-│  │   ├── llm.py       # LLM routing              │
-│  │   ├── health.py    # Health monitoring        │
-│  │   ├── goals.py     # Goal tracking            │
-│  │   └── knowledge_graph.py                      │
-│  ├── aria_agents/     # Agent orchestration      │
-│  │   ├── base.py      # BaseAgent class          │
-│  │   ├── loader.py    # AGENTS.md parser         │
-│  │   └── coordinator.py                          │
-│  └── legacy/          # Original skills          │
-└──────────────────────────────────────────────────┘
-```
-
-## 🔧 OpenClaw Features
-
-OpenClaw provides Aria with powerful capabilities:
-
-- **Exec Tool**: Run shell commands with background process support
-- **Process Tool**: Manage long-running sessions (poll, kill, clear)
-- **Heartbeat**: Periodic agent turns every 30 minutes (configurable)
-- **Memory Search**: Vector-based semantic search over MEMORY.md and memory/ files
-- **Session Management**: Auto-compaction when context window fills up
-- **Multi-Agent Routing**: Route different channels to different agents
-
-See [OpenClaw documentation](https://openclaw.ai/docs) for full details.
-
-## 📄 License
-
-MIT License
 
 ---
 
-*Aria Blue ⚡️ - Sharp, Efficient, Secure*
+## 🔧 OpenClaw Integration
+
+[OpenClaw](https://openclaw.ai) provides the agent runtime with:
+
+- **Exec Tool**: Shell command execution with background process support
+- **Process Tool**: Long-running session management (poll, kill, clear)
+- **Heartbeat**: Periodic agent turns (every 30 minutes, configurable)
+- **Memory Search**: Vector-based semantic search over workspace files
+- **Session Management**: Auto-compaction when context window fills
+- **Multi-Agent Routing**: Channel-based agent delegation
+
+The `aria_mind/` workspace is mounted read-write to enable runtime memory updates.
+
+---
+
+## 🛠️ Development
+
+```bash
+# Fresh rebuild (caution: destroys data)
+cd stacks/brain
+docker compose down -v
+docker compose up -d
+
+# View logs
+docker compose logs -f clawdbot
+docker compose logs -f litellm
+
+# Database access
+docker exec -it aria-db psql -U aria_admin -d aria_warehouse
+
+# OpenClaw diagnostics
+docker exec clawdbot openclaw status --deep
+```
+
+---
+
+## 📜 License
+
+**Source Available License** — Free for educational and personal use.
+
+| Use Case | Allowed | Cost |
+|----------|---------|------|
+| Learning / Education | ✅ | Free |
+| Personal Projects | ✅ | Free |
+| Academic Research | ✅ | Free |
+| Portfolio | ✅ | Free |
+| Commercial / Business | ⚠️ | [Contact](https://datascience-adventure.xyz/contact) |
+
+See [LICENSE](LICENSE) for full terms.
+
+---
+
+**Built with:** Python 3.10+ · OpenClaw · LiteLLM · MLX · PostgreSQL 16 · Docker · Traefik · Grafana · Prometheus
