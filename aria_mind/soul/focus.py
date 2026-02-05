@@ -12,12 +12,25 @@ The focus system allows Aria to:
 4. Maintain core identity while specializing
 
 CRITICAL: Focuses NEVER override Values or Boundaries.
+
+Model hints are loaded from aria_models/models.yaml (criteria.focus_defaults).
 """
 
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Optional
 from pathlib import Path
+
+# Import model catalog loader - models.yaml is the source of truth
+try:
+    from aria_models.loader import get_focus_default, load_catalog
+    _HAS_CATALOG = True
+except ImportError:
+    _HAS_CATALOG = False
+    def get_focus_default(focus_type: str) -> Optional[str]:
+        return None
+    def load_catalog():
+        return {}
 
 
 class FocusType(Enum):
@@ -31,6 +44,31 @@ class FocusType(Enum):
     JOURNALIST = "journalist"        # Reporter/Investigator
 
 
+# Fallback model hints if models.yaml is unavailable
+_FALLBACK_MODEL_HINTS: Dict[str, str] = {
+    "orchestrator": "qwen3-mlx",
+    "devsecops": "qwen3-coder-free",
+    "data": "chimera-free",
+    "trader": "deepseek-free",
+    "creative": "trinity-free",
+    "social": "trinity-free",
+    "journalist": "qwen3-next-free",
+}
+
+
+def _get_model_hint(focus_type: str) -> str:
+    """
+    Get model hint from models.yaml, falling back to hardcoded defaults.
+    
+    Source of truth: aria_models/models.yaml -> criteria.focus_defaults
+    """
+    if _HAS_CATALOG:
+        hint = get_focus_default(focus_type)
+        if hint:
+            return hint
+    return _FALLBACK_MODEL_HINTS.get(focus_type, "qwen3-mlx")
+
+
 @dataclass
 class Focus:
     """
@@ -39,7 +77,7 @@ class Focus:
     Each focus defines:
     - Vibe modifier: How to adjust communication tone
     - Skills: Which tools to prioritize
-    - Model hint: Preferred LLM for this focus
+    - Model hint: Preferred LLM for this focus (from models.yaml)
     - Context: Background knowledge to inject
     """
     type: FocusType
@@ -47,9 +85,13 @@ class Focus:
     emoji: str
     vibe: str
     skills: List[str]
-    model_hint: str
+    model_hint: str  # Loaded from models.yaml at init, see _get_model_hint()
     context: str
     delegation_hint: str = ""  # How this focus delegates work
+    
+    def get_model_hint_live(self) -> str:
+        """Get current model hint from models.yaml (refreshes on each call)."""
+        return _get_model_hint(self.type.value)
     
     def get_system_prompt_overlay(self) -> str:
         """Generate system prompt addition for this focus."""
@@ -76,7 +118,7 @@ FOCUSES: Dict[FocusType, Focus] = {
         emoji="🎯",
         vibe="Meta-cognitive, delegation-focused, strategic",
         skills=["goals", "schedule", "health", "database"],
-        model_hint="qwen3-mlx",
+        model_hint=_get_model_hint("orchestrator"),
         context="""
 You are in executive mode. Your role is to:
 - Analyze incoming requests and break them into delegatable tasks
@@ -94,7 +136,7 @@ You are in executive mode. Your role is to:
         emoji="🔒",
         vibe="Security-paranoid, infrastructure-aware, systematic",
         skills=["pytest_runner", "database", "health", "llm", "security_scan", "ci_cd"],
-        model_hint="qwen3-coder-free",
+        model_hint=_get_model_hint("devsecops"),
         context="""
 You are in DevSecOps mode. Your priorities:
 - Security FIRST: Never trust input, validate everything
@@ -117,7 +159,7 @@ Key patterns:
         emoji="📊",
         vibe="Analytical, pattern-seeking, metrics-driven",
         skills=["database", "knowledge_graph", "performance", "llm", "data_pipeline", "experiment"],
-        model_hint="chimera-free",
+        model_hint=_get_model_hint("data"),
         context="""
 You are in Data Science/MLOps mode. Your approach:
 - Data-driven decisions: Back claims with evidence
@@ -141,7 +183,7 @@ Key patterns:
         emoji="📈",
         vibe="Risk-aware, market-analytical, disciplined",
         skills=["database", "schedule", "knowledge_graph", "llm", "market_data", "portfolio"],
-        model_hint="deepseek-free",
+        model_hint=_get_model_hint("trader"),
         context="""
 You are in Crypto/Trading analysis mode. Your principles:
 - Risk management FIRST: Never risk more than you can lose
@@ -165,7 +207,7 @@ Key patterns:
         emoji="🎨",
         vibe="Exploratory, unconventional, playful",
         skills=["llm", "moltbook", "social", "knowledge_graph", "brainstorm"],
-        model_hint="trinity-free",
+        model_hint=_get_model_hint("creative"),
         context="""
 You are in Creative/Adventure mode. Your approach:
 - Divergent thinking: Generate many ideas before converging
@@ -189,7 +231,7 @@ Key patterns:
         emoji="🌐",
         vibe="Community-building, engaging, authentic",
         skills=["moltbook", "social", "schedule", "llm", "community"],
-        model_hint="trinity-free",
+        model_hint=_get_model_hint("social"),
         context="""
 You are in Social Media/Startuper mode. Your principles:
 - Authenticity > perfection: Real beats polished
@@ -213,7 +255,7 @@ Key patterns for Moltbook:
         emoji="📰",
         vibe="Investigative, fact-checking, narrative-building",
         skills=["knowledge_graph", "social", "moltbook", "llm", "research", "fact_check"],
-        model_hint="qwen3-next-free",
+        model_hint=_get_model_hint("journalist"),
         context="""
 You are in Journalist/Reporter mode. Your standards:
 - Facts first: Verify before reporting
@@ -337,7 +379,8 @@ class FocusManager:
         lines = ["I can adopt specialized focuses for different tasks:\n"]
         for ft, focus in FOCUSES.items():
             skills_str = ", ".join(focus.skills[:3])  # First 3 skills
-            lines.append(f"- {focus.emoji} **{focus.name}**: {focus.vibe} (skills: {skills_str})")
+            model = focus.get_model_hint_live()  # Get live model from models.yaml
+            lines.append(f"- {focus.emoji} **{focus.name}**: {focus.vibe} (model: {model})")
         lines.append(f"\nCurrent focus: {self._active.emoji} {self._active.name}")
         return "\n".join(lines)
     
@@ -347,9 +390,15 @@ class FocusManager:
             "active_focus": self._active.name,
             "focus_type": self._active.type.value,
             "skills": self._active.skills,
-            "model_hint": self._active.model_hint,
+            "model_hint": self._active.get_model_hint_live(),  # Live from models.yaml
+            "model_hint_static": self._active.model_hint,  # Static at init time
             "recent_history": [f.value for f in self._history[-5:]],
+            "catalog_available": _HAS_CATALOG,
         }
+    
+    def get_all_model_hints(self) -> Dict[str, str]:
+        """Get all focus -> model mappings (live from models.yaml)."""
+        return {ft.value: _get_model_hint(ft.value) for ft in FocusType}
 
 
 # Module-level instance for convenience
