@@ -35,7 +35,7 @@ http:
         - secure-headers
 
     api-http:
-      rule: "PathPrefix(`/api`)"
+      rule: "PathPrefix(`/api/`) || Path(`/api`)"
       priority: 100
       entryPoints:
         - web
@@ -99,14 +99,14 @@ http:
       middlewares:
         - ollama-strip
 
-    litellm-http:
-      rule: "PathPrefix(`/litellm`)"
+    litellm-proxy-http:
+      rule: "PathPrefix(`/litellm-proxy`)"
       priority: 80
       entryPoints:
         - web
       service: litellm
       middlewares:
-        - litellm-strip
+        - litellm-proxy-strip
 
     traefik-dashboard-http:
       rule: "PathPrefix(`/traefik`)"
@@ -142,7 +142,7 @@ http:
       tls: {}
 
     api:
-      rule: "PathPrefix(`/api`)"
+      rule: "PathPrefix(`/api/`) || Path(`/api`)"
       priority: 100
       entryPoints:
         - websecure
@@ -212,14 +212,14 @@ http:
         - ollama-strip
       tls: {}
 
-    litellm:
-      rule: "PathPrefix(`/litellm`)"
+    litellm-proxy:
+      rule: "PathPrefix(`/litellm-proxy`)"
       priority: 80
       entryPoints:
         - websecure
       service: litellm
       middlewares:
-        - litellm-strip
+        - litellm-proxy-strip
       tls: {}
 
     traefik-dashboard:
@@ -290,10 +290,10 @@ http:
       stripPrefix:
         prefixes:
           - /ollama
-    litellm-strip:
+    litellm-proxy-strip:
       stripPrefix:
         prefixes:
-          - /litellm
+          - /litellm-proxy
     traefik-strip:
       stripPrefix:
         prefixes:

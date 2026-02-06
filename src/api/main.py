@@ -1484,6 +1484,7 @@ async def api_stats_extended(conn=Depends(get_db)):
 async def api_records(table: str = "activities", limit: int = 25, page: int = 1, conn=Depends(get_db)):
     table_map = {
         "activities": "activity_log",
+        "activity_log": "activity_log",
         "thoughts": "thoughts",
         "memories": "memories",
         "goals": "goals",
@@ -1494,6 +1495,13 @@ async def api_records(table: str = "activities", limit: int = 25, page: int = 1,
         "hourly_goals": "hourly_goals",
         "performance_log": "performance_log",
         "pending_complex_tasks": "pending_complex_tasks",
+        "security_events": "security_events",
+        "agent_sessions": "agent_sessions",
+        "model_usage": "model_usage",
+        "rate_limits": "rate_limits",
+        "api_key_rotations": "api_key_rotations",
+        "scheduled_jobs": "scheduled_jobs",
+        "schedule_tick": "schedule_tick",
     }
     # Different tables have different timestamp column names
     order_col_map = {
@@ -1508,6 +1516,13 @@ async def api_records(table: str = "activities", limit: int = 25, page: int = 1,
         "hourly_goals": "created_at",
         "performance_log": "created_at",
         "pending_complex_tasks": "created_at",
+        "security_events": "created_at",
+        "agent_sessions": "started_at",
+        "model_usage": "created_at",
+        "rate_limits": "window_start",
+        "api_key_rotations": "rotated_at",
+        "scheduled_jobs": "created_at",
+        "schedule_tick": "tick_time",
     }
     if table not in table_map:
         raise HTTPException(status_code=400, detail="Invalid table")
@@ -1526,6 +1541,7 @@ async def api_records(table: str = "activities", limit: int = 25, page: int = 1,
 async def api_export(table: str = "activities", conn=Depends(get_db)):
     table_map = {
         "activities": "activity_log",
+        "activity_log": "activity_log",
         "thoughts": "thoughts",
         "memories": "memories",
         "goals": "goals",
@@ -1536,6 +1552,13 @@ async def api_export(table: str = "activities", conn=Depends(get_db)):
         "hourly_goals": "hourly_goals",
         "performance_log": "performance_log",
         "pending_complex_tasks": "pending_complex_tasks",
+        "security_events": "security_events",
+        "agent_sessions": "agent_sessions",
+        "model_usage": "model_usage",
+        "rate_limits": "rate_limits",
+        "api_key_rotations": "api_key_rotations",
+        "scheduled_jobs": "scheduled_jobs",
+        "schedule_tick": "schedule_tick",
     }
     order_col_map = {
         "activity_log": "created_at",
@@ -1549,6 +1572,13 @@ async def api_export(table: str = "activities", conn=Depends(get_db)):
         "hourly_goals": "created_at",
         "performance_log": "created_at",
         "pending_complex_tasks": "created_at",
+        "security_events": "created_at",
+        "agent_sessions": "started_at",
+        "model_usage": "created_at",
+        "rate_limits": "window_start",
+        "api_key_rotations": "rotated_at",
+        "scheduled_jobs": "created_at",
+        "schedule_tick": "tick_time",
     }
     if table not in table_map:
         raise HTTPException(status_code=400, detail="Invalid table")
@@ -2129,23 +2159,23 @@ async def get_activity(limit: int = 10, conn=Depends(get_db)):
     """Get recent activity across all types"""
     activities = []
     
+    # Recent activity log entries
+    logs = await conn.fetch(
+        "SELECT 'activity' as type, action || COALESCE(': ' || skill, '') as message, created_at FROM activity_log ORDER BY created_at DESC LIMIT 3"
+    )
+    activities.extend([dict(r) for r in logs])
+    
     # Recent thoughts
     thoughts = await conn.fetch(
-        "SELECT 'thought' as type, content as message, created_at FROM thought ORDER BY created_at DESC LIMIT 3"
+        "SELECT 'thought' as type, content as message, created_at FROM thoughts ORDER BY created_at DESC LIMIT 3"
     )
     activities.extend([dict(r) for r in thoughts])
     
     # Recent goals
     goals = await conn.fetch(
-        "SELECT 'goal' as type, title as message, created_at FROM goal ORDER BY created_at DESC LIMIT 3"
+        "SELECT 'goal' as type, title as message, created_at FROM goals ORDER BY created_at DESC LIMIT 3"
     )
     activities.extend([dict(r) for r in goals])
-    
-    # Recent API calls
-    calls = await conn.fetch(
-        "SELECT 'api' as type, agent_name as message, called_at as created_at FROM agent_call ORDER BY called_at DESC LIMIT 3"
-    )
-    activities.extend([dict(r) for r in calls])
     
     # Sort by time
     activities.sort(key=lambda x: x['created_at'], reverse=True)
