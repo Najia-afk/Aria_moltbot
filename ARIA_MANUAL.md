@@ -117,7 +117,7 @@ DB_PASSWORD=your_secure_password
 DB_NAME=aria_warehouse
 
 # LiteLLM
-LITELLM_MASTER_KEY=sk-aria-local-key
+LITELLM_MASTER_KEY=your_litellm_master_key
 
 # Cloud Fallbacks
 OPEN_ROUTER_KEY=sk-or-v1-...

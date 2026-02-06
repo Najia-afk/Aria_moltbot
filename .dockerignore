@@ -1,0 +1,49 @@
+# Docker build context exclusions
+.git
+.gitignore
+.venv
+venv
+__pycache__
+*.pyc
+*.pyo
+*.env
+.env
+.env.*
+*.backup
+*.bak
+
+# Secrets
+*.pem
+*.key
+secrets/
+.aria_secrets/
+stacks/brain/.env
+stacks/brain/.env.backup
+
+# Memory / user data
+aria_memory/
+aria_memories/logs/
+aria_memories/drafts/
+
+# IDE
+.vscode/
+.idea/
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Images
+images/
+*.png
+*.jpg

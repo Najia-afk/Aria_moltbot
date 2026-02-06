@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Test LiteLLM proxy"""
+import os
 import requests
 import json
 import sys
 
-LITELLM = "http://192.168.1.53:18793"
-API_KEY = "sk-aria-local-key"
+LITELLM = os.environ.get("LITELLM_URL", "http://localhost:18793")
+API_KEY = os.environ.get("LITELLM_MASTER_KEY", "sk-change-me")
 
 headers = {
     "Authorization": f"Bearer {API_KEY}",

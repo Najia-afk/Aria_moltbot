@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy project files
-COPY pyproject.toml README.md ./
+COPY pyproject.toml README.md LICENSE ./
 COPY aria_mind/ ./aria_mind/
 COPY aria_skills/ ./aria_skills/
 COPY aria_agents/ ./aria_agents/

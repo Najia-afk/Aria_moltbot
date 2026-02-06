@@ -24,6 +24,9 @@ secrets/
 .aria_secrets/
 **/credentials.py
 **/secrets.py
+*.env.backup
+stacks/brain/.env
+stacks/**/.env
 
 # aria_memory - Contains user data, NEVER COMMIT
 aria_memory/

@@ -12,10 +12,10 @@ if ! command -v envsubst >/dev/null 2>&1; then
     apk add --no-cache gettext >/dev/null 2>&1
 fi
 
-# Check required environment variable
+# Use default token if not provided
 if [ -z "$CLAWDBOT_TOKEN" ]; then
-    echo "ERROR: CLAWDBOT_TOKEN environment variable is required"
-    exit 1
+    echo "WARNING: CLAWDBOT_TOKEN not set, using default-clawdbot-token"
+    export CLAWDBOT_TOKEN="default-clawdbot-token"
 fi
 
 # Generate dynamic config from template using envsubst

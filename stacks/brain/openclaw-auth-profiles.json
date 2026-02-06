@@ -2,12 +2,12 @@
   "profiles": {
     "openai:litellm": {
       "provider": "openai",
-      "apiKey": "sk-aria-local-key",
+      "apiKey": "${LITELLM_MASTER_KEY}",
       "baseUrl": "http://litellm:4000/v1"
     },
     "anthropic:litellm": {
       "provider": "openai",
-      "apiKey": "sk-aria-local-key",
+      "apiKey": "${LITELLM_MASTER_KEY}",
       "baseUrl": "http://litellm:4000/v1"
     },
     "openai:openrouter": {

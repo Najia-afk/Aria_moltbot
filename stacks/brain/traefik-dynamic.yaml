@@ -237,7 +237,7 @@ http:
     clawdbot-auth:
       headers:
         customRequestHeaders:
-          Authorization: "Bearer 94d4c6ed4bb619fe5f5824cc127a158bd23f67dd8363f8c8"
+          Authorization: "Bearer default-clawdbot-token"
 
     # Strip X-Forwarded-For so OpenClaw sees Traefik's Docker IP (trusted proxy)
     # This fixes 'device identity required' errors from external forwarded IPs

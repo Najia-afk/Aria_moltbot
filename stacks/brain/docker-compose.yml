@@ -5,9 +5,9 @@ services:
     container_name: aria-db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${DB_USER?DB_USER is required}
-      POSTGRES_PASSWORD: ${DB_PASSWORD?DB_PASSWORD is required}
-      POSTGRES_DB: ${DB_NAME?DB_NAME is required}
+      POSTGRES_USER: ${DB_USER:-admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-admin}
+      POSTGRES_DB: ${DB_NAME:-aria_warehouse}
       # Create litellm database on init
       POSTGRES_MULTIPLE_DATABASES: litellm
     volumes:
@@ -22,8 +22,8 @@ services:
       retries: 5
     networks:
       - aria-net
-    mem_limit: ${POSTGRES_MEM_LIMIT?POSTGRES_MEM_LIMIT is required}
-    cpus: ${POSTGRES_CPU_LIMIT?POSTGRES_CPU_LIMIT is required}
+    mem_limit: ${POSTGRES_MEM_LIMIT:-512m}
+    cpus: ${POSTGRES_CPU_LIMIT:-1.0}
 
   # Headless Chrome for browser automation
   aria-browser:
@@ -33,7 +33,7 @@ services:
     environment:
       MAX_CONCURRENT_SESSIONS: 5
       CONNECTION_TIMEOUT: 60000
-      TOKEN: ${BROWSERLESS_TOKEN}
+      TOKEN: ${BROWSERLESS_TOKEN:-}
     ports:
       - "3000:3000"
     networks:
@@ -52,21 +52,21 @@ services:
       OPENCLAW_CONFIG_PATH: "/root/.openclaw/openclaw.json"
       OPENCLAW_WORKSPACE: "/root/.openclaw/workspace"
       OPENCLAW_GATEWAY_PORT: "18789"
-      OPENCLAW_GATEWAY_TOKEN: ${CLAWDBOT_TOKEN?CLAWDBOT_TOKEN is required}
+      OPENCLAW_GATEWAY_TOKEN: ${CLAWDBOT_TOKEN:-default-clawdbot-token}
       OPENCLAW_NO_ONBOARD: "1"
       OPENCLAW_NO_PROMPT: "1"
       # LiteLLM credentials for local model routing
-      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-change-me}
       # Cloud fallbacks
-      MOONSHOT_KIMI_KEY: ${MOONSHOT_KIMI_KEY}
+      MOONSHOT_KIMI_KEY: ${MOONSHOT_KIMI_KEY:-}
       # Database connection for Python skills
-      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@aria-db:5432/${DB_NAME}
+      DATABASE_URL: postgresql://${DB_USER:-admin}:${DB_PASSWORD:-admin}@aria-db:5432/${DB_NAME:-aria_warehouse}
       # Ollama for local LLM
       OLLAMA_URL: http://host.docker.internal:11434
       OLLAMA_MODEL: hf.co/unsloth/GLM-4.7-Flash-REAP-23B-A3B-GGUF:Q3_K_S
       # Moltbook credentials
-      MOLTBOOK_TOKEN: ${MOLTBOOK_TOKEN}
-      MOLTBOOK_API_URL: ${MOLTBOOK_API_URL}
+      MOLTBOOK_TOKEN: ${MOLTBOOK_TOKEN:-}
+      MOLTBOOK_API_URL: ${MOLTBOOK_API_URL:-https://moltbook.com/api}
       # Python path for Aria modules
       PYTHONPATH: /root/.openclaw/workspace:/root/.openclaw/workspace/skills:/root/repo
     volumes:
@@ -101,8 +101,8 @@ services:
     command: ["bash", "/openclaw-entrypoint.sh"]
     networks:
       - aria-net
-    mem_limit: ${CLAWDBOT_MEM_LIMIT?CLAWDBOT_MEM_LIMIT is required}
-    cpus: ${CLAWDBOT_CPU_LIMIT?CLAWDBOT_CPU_LIMIT is required}
+    mem_limit: ${CLAWDBOT_MEM_LIMIT:-1g}
+    cpus: ${CLAWDBOT_CPU_LIMIT:-1.0}
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
@@ -148,7 +148,7 @@ services:
       - "--entrypoints.websecure.address=:443"
       - "--metrics.prometheus=true"
     environment:
-      CLAWDBOT_TOKEN: ${CLAWDBOT_TOKEN?CLAWDBOT_TOKEN is required}
+      CLAWDBOT_TOKEN: ${CLAWDBOT_TOKEN:-default-clawdbot-token}
     ports:
       - "0.0.0.0:80:80"
       - "0.0.0.0:443:443"
@@ -179,11 +179,11 @@ services:
     container_name: litellm
     restart: unless-stopped
     environment:
-      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY?LITELLM_MASTER_KEY is required}
-      MOONSHOT_KIMI_KEY: ${MOONSHOT_KIMI_KEY}
-      OPEN_ROUTER_KEY: ${OPEN_ROUTER_KEY}
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-change-me}
+      MOONSHOT_KIMI_KEY: ${MOONSHOT_KIMI_KEY:-}
+      OPEN_ROUTER_KEY: ${OPEN_ROUTER_KEY:-}
       # Use separate database for LiteLLM to prevent schema conflicts with Aria tables
-      LITELLM_DATABASE_URL: postgresql://${DB_USER?DB_USER is required}:${DB_PASSWORD?DB_PASSWORD is required}@aria-db:5432/litellm
+      LITELLM_DATABASE_URL: postgresql://${DB_USER:-admin}:${DB_PASSWORD:-admin}@aria-db:5432/litellm
       STORE_MODEL_IN_DB: "False"
       OLLAMA_API_BASE: http://host.docker.internal:11434
     volumes:
@@ -193,8 +193,8 @@ services:
     command: ["--config", "/app/config.yaml", "--detailed_debug"]
     networks:
       - aria-net
-    mem_limit: ${LITELLM_MEM_LIMIT?LITELLM_MEM_LIMIT is required}
-    cpus: ${LITELLM_CPU_LIMIT?LITELLM_CPU_LIMIT is required}
+    mem_limit: ${LITELLM_MEM_LIMIT:-1024m}
+    cpus: ${LITELLM_CPU_LIMIT:-1.0}
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
@@ -227,7 +227,7 @@ services:
     container_name: grafana
     restart: unless-stopped
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD?GRAFANA_PASSWORD is required}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_SERVER_ROOT_URL: "%(protocol)s://%(domain)s/grafana/"
       GF_SERVER_SERVE_FROM_SUB_PATH: "true"
@@ -250,20 +250,20 @@ services:
     restart: unless-stopped
     environment:
       # Database
-      DATABASE_URL: postgresql://${DB_USER?DB_USER is required}:${DB_PASSWORD?DB_PASSWORD is required}@aria-db:5432/${DB_NAME?DB_NAME is required}
+      DATABASE_URL: postgresql://${DB_USER:-admin}:${DB_PASSWORD:-admin}@aria-db:5432/${DB_NAME:-aria_warehouse}
       # Local LLM (Ollama - native on host)
       OLLAMA_URL: http://host.docker.internal:11434
       OLLAMA_MODEL: hf.co/unsloth/GLM-4.7-Flash-REAP-23B-A3B-GGUF:Q3_K_S
       # LLM APIs (fallback)
-      MOONSHOT_API_KEY: ${MOONSHOT_KIMI_KEY}
+      MOONSHOT_API_KEY: ${MOONSHOT_KIMI_KEY:-}
       # Moltbook
-      MOLTBOOK_TOKEN: ${MOLTBOOK_TOKEN}
-      MOLTBOOK_API_URL: ${MOLTBOOK_API_URL?MOLTBOOK_API_URL is required}
+      MOLTBOOK_TOKEN: ${MOLTBOOK_TOKEN:-}
+      MOLTBOOK_API_URL: ${MOLTBOOK_API_URL:-https://moltbook.com/api}
       # LiteLLM (internal)
       LITELLM_URL: http://litellm:4000
       # Aria Email
-      ARIA_EMAIL: ${ARIA_EMAIL}
-      ARIA_EMAIL_PASSWORD: ${ARIA_EMAIL_PASSWORD}
+      ARIA_EMAIL: ${ARIA_EMAIL:-}
+      ARIA_EMAIL_PASSWORD: ${ARIA_EMAIL_PASSWORD:-}
     volumes:
       - aria_data:/app/data
       - aria_logs:/app/logs
@@ -279,8 +279,8 @@ services:
     # Keep running for interactive mode
     tty: true
     stdin_open: true
-    mem_limit: ${ARIA_BRAIN_MEM_LIMIT?ARIA_BRAIN_MEM_LIMIT is required}
-    cpus: ${ARIA_BRAIN_CPU_LIMIT?ARIA_BRAIN_CPU_LIMIT is required}
+    mem_limit: ${ARIA_BRAIN_MEM_LIMIT:-512m}
+    cpus: ${ARIA_BRAIN_CPU_LIMIT:-1.0}
 
   # PgAdmin for database management
   pgadmin:
@@ -288,8 +288,8 @@ services:
     container_name: aria-pgadmin
     restart: unless-stopped
     environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL?PGADMIN_EMAIL is required}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD?PGADMIN_PASSWORD is required}
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@aria.dev}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
       SCRIPT_NAME: /pgadmin
     ports:
       - "5050:80"
@@ -306,16 +306,16 @@ services:
     container_name: aria-web
     restart: unless-stopped
     environment:
-      SECRET_KEY: ${WEB_SECRET_KEY?WEB_SECRET_KEY is required}
-      SERVICE_HOST: ${SERVICE_HOST?SERVICE_HOST is required}
-      API_BASE_URL: ${API_BASE_URL?API_BASE_URL is required}
-      CLAWDBOT_PUBLIC_URL: ${CLAWDBOT_PUBLIC_URL?CLAWDBOT_PUBLIC_URL is required}
+      SECRET_KEY: ${WEB_SECRET_KEY:-aria-dev-secret-key}
+      SERVICE_HOST: ${SERVICE_HOST:-localhost}
+      API_BASE_URL: ${API_BASE_URL:-/api}
+      CLAWDBOT_PUBLIC_URL: ${CLAWDBOT_PUBLIC_URL:-https://localhost/clawdbot/}
       GRAFANA_URL: http://grafana:3000
       PROMETHEUS_URL: http://prometheus:9090
       OLLAMA_URL: http://host.docker.internal:11434
       LITELLM_URL: http://litellm:4000
       CLAWDBOT_URL: http://clawdbot:18789
-      CLAWDBOT_TOKEN: ${CLAWDBOT_TOKEN?CLAWDBOT_TOKEN is required}
+      CLAWDBOT_TOKEN: ${CLAWDBOT_TOKEN:-default-clawdbot-token}
     volumes:
       # Mount templates for live reload during development
       - ../../src/web/templates:/app/templates:ro
@@ -327,8 +327,8 @@ services:
         condition: service_healthy
     networks:
       - aria-net
-    mem_limit: ${ARIA_WEB_MEM_LIMIT?ARIA_WEB_MEM_LIMIT is required}
-    cpus: ${ARIA_WEB_CPU_LIMIT?ARIA_WEB_CPU_LIMIT is required}
+    mem_limit: ${ARIA_WEB_MEM_LIMIT:-256m}
+    cpus: ${ARIA_WEB_CPU_LIMIT:-0.5}
 
   # Aria API - FastAPI backend (data routes)
   aria-api:
@@ -338,7 +338,7 @@ services:
     container_name: aria-api
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://${DB_USER?DB_USER is required}:${DB_PASSWORD?DB_PASSWORD is required}@aria-db:5432/${DB_NAME?DB_NAME is required}
+      DATABASE_URL: postgresql://${DB_USER:-admin}:${DB_PASSWORD:-admin}@aria-db:5432/${DB_NAME:-aria_warehouse}
       GRAFANA_URL: http://grafana:3000
       PROMETHEUS_URL: http://prometheus:9090
       OLLAMA_URL: http://host.docker.internal:11434
@@ -346,30 +346,30 @@ services:
       LITELLM_URL: http://litellm:4000
       CLAWDBOT_URL: http://clawdbot:18789
       PGADMIN_URL: http://aria-pgadmin:80
-      API_BASE_URL: ${API_BASE_URL?API_BASE_URL is required}
+      API_BASE_URL: ${API_BASE_URL:-/api}
       # API keys for provider balance checks
-      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
-      MOONSHOT_KIMI_KEY: ${MOONSHOT_KIMI_KEY}
-      OPEN_ROUTER_KEY: ${OPEN_ROUTER_KEY}
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-change-me}
+      MOONSHOT_KIMI_KEY: ${MOONSHOT_KIMI_KEY:-}
+      OPEN_ROUTER_KEY: ${OPEN_ROUTER_KEY:-}
       # Service control (admin)
-      ARIA_SERVICE_CONTROL_ENABLED: ${ARIA_SERVICE_CONTROL_ENABLED}
-      ARIA_ADMIN_TOKEN: ${ARIA_ADMIN_TOKEN}
-      ARIA_SERVICE_CMD_LITELLM_RESTART: ${ARIA_SERVICE_CMD_LITELLM_RESTART}
-      ARIA_SERVICE_CMD_LITELLM_STOP: ${ARIA_SERVICE_CMD_LITELLM_STOP}
-      ARIA_SERVICE_CMD_OLLAMA_RESTART: ${ARIA_SERVICE_CMD_OLLAMA_RESTART}
-      ARIA_SERVICE_CMD_OLLAMA_STOP: ${ARIA_SERVICE_CMD_OLLAMA_STOP}
-      ARIA_SERVICE_CMD_MLX_RESTART: ${ARIA_SERVICE_CMD_MLX_RESTART}
-      ARIA_SERVICE_CMD_MLX_STOP: ${ARIA_SERVICE_CMD_MLX_STOP}
-      ARIA_SERVICE_CMD_ARIA_API_RESTART: ${ARIA_SERVICE_CMD_ARIA_API_RESTART}
-      ARIA_SERVICE_CMD_ARIA_API_STOP: ${ARIA_SERVICE_CMD_ARIA_API_STOP}
-      ARIA_SERVICE_CMD_ARIA_WEB_RESTART: ${ARIA_SERVICE_CMD_ARIA_WEB_RESTART}
-      ARIA_SERVICE_CMD_ARIA_WEB_STOP: ${ARIA_SERVICE_CMD_ARIA_WEB_STOP}
-      ARIA_SERVICE_CMD_CLAWDBOT_RESTART: ${ARIA_SERVICE_CMD_CLAWDBOT_RESTART}
-      ARIA_SERVICE_CMD_CLAWDBOT_STOP: ${ARIA_SERVICE_CMD_CLAWDBOT_STOP}
-      ARIA_SERVICE_CMD_GRAFANA_RESTART: ${ARIA_SERVICE_CMD_GRAFANA_RESTART}
-      ARIA_SERVICE_CMD_GRAFANA_STOP: ${ARIA_SERVICE_CMD_GRAFANA_STOP}
-      ARIA_SERVICE_CMD_PROMETHEUS_RESTART: ${ARIA_SERVICE_CMD_PROMETHEUS_RESTART}
-      ARIA_SERVICE_CMD_PROMETHEUS_STOP: ${ARIA_SERVICE_CMD_PROMETHEUS_STOP}
+      ARIA_SERVICE_CONTROL_ENABLED: ${ARIA_SERVICE_CONTROL_ENABLED:-false}
+      ARIA_ADMIN_TOKEN: ${ARIA_ADMIN_TOKEN:-}
+      ARIA_SERVICE_CMD_LITELLM_RESTART: ${ARIA_SERVICE_CMD_LITELLM_RESTART:-docker restart litellm}
+      ARIA_SERVICE_CMD_LITELLM_STOP: ${ARIA_SERVICE_CMD_LITELLM_STOP:-docker stop litellm}
+      ARIA_SERVICE_CMD_OLLAMA_RESTART: ${ARIA_SERVICE_CMD_OLLAMA_RESTART:-}
+      ARIA_SERVICE_CMD_OLLAMA_STOP: ${ARIA_SERVICE_CMD_OLLAMA_STOP:-}
+      ARIA_SERVICE_CMD_MLX_RESTART: ${ARIA_SERVICE_CMD_MLX_RESTART:-}
+      ARIA_SERVICE_CMD_MLX_STOP: ${ARIA_SERVICE_CMD_MLX_STOP:-}
+      ARIA_SERVICE_CMD_ARIA_API_RESTART: ${ARIA_SERVICE_CMD_ARIA_API_RESTART:-docker restart aria-api}
+      ARIA_SERVICE_CMD_ARIA_API_STOP: ${ARIA_SERVICE_CMD_ARIA_API_STOP:-docker stop aria-api}
+      ARIA_SERVICE_CMD_ARIA_WEB_RESTART: ${ARIA_SERVICE_CMD_ARIA_WEB_RESTART:-docker restart aria-web}
+      ARIA_SERVICE_CMD_ARIA_WEB_STOP: ${ARIA_SERVICE_CMD_ARIA_WEB_STOP:-docker stop aria-web}
+      ARIA_SERVICE_CMD_CLAWDBOT_RESTART: ${ARIA_SERVICE_CMD_CLAWDBOT_RESTART:-docker restart clawdbot}
+      ARIA_SERVICE_CMD_CLAWDBOT_STOP: ${ARIA_SERVICE_CMD_CLAWDBOT_STOP:-docker stop clawdbot}
+      ARIA_SERVICE_CMD_GRAFANA_RESTART: ${ARIA_SERVICE_CMD_GRAFANA_RESTART:-docker restart grafana}
+      ARIA_SERVICE_CMD_GRAFANA_STOP: ${ARIA_SERVICE_CMD_GRAFANA_STOP:-docker stop grafana}
+      ARIA_SERVICE_CMD_PROMETHEUS_RESTART: ${ARIA_SERVICE_CMD_PROMETHEUS_RESTART:-docker restart prometheus}
+      ARIA_SERVICE_CMD_PROMETHEUS_STOP: ${ARIA_SERVICE_CMD_PROMETHEUS_STOP:-docker stop prometheus}
       # Path to OpenClaw cron jobs file (mounted volume)
       OPENCLAW_JOBS_PATH: /openclaw/cron/jobs.json
     volumes:
@@ -391,8 +391,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-    mem_limit: ${ARIA_API_MEM_LIMIT?ARIA_API_MEM_LIMIT is required}
-    cpus: ${ARIA_API_CPU_LIMIT?ARIA_API_CPU_LIMIT is required}
+    mem_limit: ${ARIA_API_MEM_LIMIT:-256m}
+    cpus: ${ARIA_API_CPU_LIMIT:-0.5}
     extra_hosts:
       - "host.docker.internal:host-gateway"
 

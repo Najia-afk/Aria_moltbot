@@ -358,6 +358,12 @@ if [ -n "$OPENCLAW_GATEWAY_TOKEN" ]; then
   jq --arg token "$OPENCLAW_GATEWAY_TOKEN" '.gateway.auth.token = $token' "$OPENCLAW_CONFIG" > "${OPENCLAW_CONFIG}.tmp" && mv "${OPENCLAW_CONFIG}.tmp" "$OPENCLAW_CONFIG"
 fi
 
+# Inject LiteLLM master key into provider config
+if [ -n "$LITELLM_MASTER_KEY" ]; then
+  echo "=== Injecting LiteLLM API key from LITELLM_MASTER_KEY ==="
+  jq --arg key "$LITELLM_MASTER_KEY" '.models.providers.litellm.apiKey = $key' "$OPENCLAW_CONFIG" > "${OPENCLAW_CONFIG}.tmp" && mv "${OPENCLAW_CONFIG}.tmp" "$OPENCLAW_CONFIG"
+fi
+
 echo "=== Generated openclaw.json ==="
 cat "$OPENCLAW_CONFIG"
 
