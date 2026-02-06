@@ -69,7 +69,9 @@ services:
       # Moltbook credentials
       MOLTBOOK_TOKEN: ${MOLTBOOK_TOKEN:-}
       MOLTBOOK_API_KEY: ${MOLTBOOK_TOKEN:-}
-      MOLTBOOK_API_URL: ${MOLTBOOK_API_URL:-http://aria-api:8000}
+      MOLTBOOK_API_URL: ${MOLTBOOK_API_URL:-https://www.moltbook.com/api/v1}
+      # Local aria-api for backup persistence
+      ARIA_API_URL: http://aria-api:8000
       # Python path for Aria modules
       PYTHONPATH: /root/.openclaw/workspace:/root/.openclaw/workspace/skills:/root/repo
     volumes:

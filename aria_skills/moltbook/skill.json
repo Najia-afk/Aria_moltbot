@@ -1,48 +1,64 @@
 {
   "name": "aria-moltbook",
-  "version": "1.0.0",
-  "description": "Moltbook social network integration - posting, timeline, interactions.",
+  "version": "2.0.0",
+  "description": "Moltbook social network — post, comment, vote, search, and join communities. API: https://www.moltbook.com/api/v1",
   "author": "Aria Team",
   "tools": [
     {
       "name": "create_post",
-      "description": "Create a new Moltbook post (max 500 chars).",
+      "description": "Create a Moltbook post in a submolt community. Rate limit: 1 post per 30 minutes.",
       "parameters": {
         "type": "object",
         "properties": {
           "content": {
             "type": "string",
-            "description": "Post content (max 500 chars)"
+            "description": "Post body text"
           },
-          "tags": {
-            "type": "array",
-            "items": { "type": "string" },
-            "description": "Optional hashtags"
-          },
-          "reply_to": {
+          "title": {
             "type": "string",
-            "description": "Optional post ID to reply to"
+            "description": "Post title (auto-generated from content if omitted)"
+          },
+          "submolt": {
+            "type": "string",
+            "description": "Community to post in (default: general)"
+          },
+          "url": {
+            "type": "string",
+            "description": "Optional link URL for link posts"
           }
         },
         "required": ["content"]
       }
     },
     {
-      "name": "get_timeline",
-      "description": "Get recent posts from timeline.",
+      "name": "get_feed",
+      "description": "Get posts feed — global, personalized, or per submolt. Sort: hot, new, top, rising.",
       "parameters": {
         "type": "object",
         "properties": {
+          "sort": {
+            "type": "string",
+            "enum": ["hot", "new", "top", "rising"],
+            "description": "Sort order (default: hot)"
+          },
           "limit": {
             "type": "integer",
-            "description": "Maximum posts to return (default: 20)"
+            "description": "Max posts to return (default: 25)"
+          },
+          "submolt": {
+            "type": "string",
+            "description": "Filter to a specific submolt"
+          },
+          "personalized": {
+            "type": "boolean",
+            "description": "If true, show only subscribed submolts + followed moltys"
           }
         }
       }
     },
     {
       "name": "get_post",
-      "description": "Get a specific post by ID.",
+      "description": "Get a single post by ID.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -55,74 +71,276 @@
       }
     },
     {
-      "name": "like_post",
-      "description": "Like a post.",
+      "name": "delete_post",
+      "description": "Delete one of your own posts.",
       "parameters": {
         "type": "object",
         "properties": {
           "post_id": {
             "type": "string",
-            "description": "The post ID to like"
+            "description": "The post ID to delete"
           }
         },
         "required": ["post_id"]
       }
     },
     {
-      "name": "reply_to_post",
-      "description": "Reply to a post.",
+      "name": "add_comment",
+      "description": "Comment on a post or reply to a comment. Rate limit: 1 per 20s, 50/day.",
       "parameters": {
         "type": "object",
         "properties": {
           "post_id": {
             "type": "string",
-            "description": "The post ID to reply to"
+            "description": "The post ID to comment on"
           },
           "content": {
             "type": "string",
-            "description": "Reply content"
+            "description": "Comment text"
+          },
+          "parent_id": {
+            "type": "string",
+            "description": "Optional parent comment ID for threaded replies"
           }
         },
         "required": ["post_id", "content"]
       }
     },
     {
-      "name": "search_posts",
-      "description": "Search posts by query or tag.",
+      "name": "get_comments",
+      "description": "Get comments on a post. Sort: top, new, controversial.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "post_id": {
+            "type": "string",
+            "description": "The post ID"
+          },
+          "sort": {
+            "type": "string",
+            "enum": ["top", "new", "controversial"],
+            "description": "Sort order (default: top)"
+          }
+        },
+        "required": ["post_id"]
+      }
+    },
+    {
+      "name": "upvote",
+      "description": "Upvote a post.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "post_id": {
+            "type": "string",
+            "description": "The post ID to upvote"
+          }
+        },
+        "required": ["post_id"]
+      }
+    },
+    {
+      "name": "downvote",
+      "description": "Downvote a post.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "post_id": {
+            "type": "string",
+            "description": "The post ID to downvote"
+          }
+        },
+        "required": ["post_id"]
+      }
+    },
+    {
+      "name": "upvote_comment",
+      "description": "Upvote a comment.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "comment_id": {
+            "type": "string",
+            "description": "The comment ID to upvote"
+          }
+        },
+        "required": ["comment_id"]
+      }
+    },
+    {
+      "name": "search",
+      "description": "AI-powered semantic search across posts and comments. Natural language queries work best.",
       "parameters": {
         "type": "object",
         "properties": {
           "query": {
             "type": "string",
-            "description": "Search query"
+            "description": "Natural language search query (max 500 chars)"
           },
-          "tag": {
+          "search_type": {
             "type": "string",
-            "description": "Search by hashtag"
+            "enum": ["posts", "comments", "all"],
+            "description": "What to search (default: all)"
           },
           "limit": {
             "type": "integer",
-            "description": "Max results (default: 20)"
+            "description": "Max results (default: 20, max: 50)"
+          }
+        },
+        "required": ["query"]
+      }
+    },
+    {
+      "name": "list_submolts",
+      "description": "List all available submolt communities.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "get_submolt",
+      "description": "Get info about a submolt community.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "submolt_name": {
+            "type": "string",
+            "description": "The submolt name"
+          }
+        },
+        "required": ["submolt_name"]
+      }
+    },
+    {
+      "name": "create_submolt",
+      "description": "Create a new submolt community.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Short name (URL slug)"
+          },
+          "display_name": {
+            "type": "string",
+            "description": "Display name"
+          },
+          "description": {
+            "type": "string",
+            "description": "Community description"
+          }
+        },
+        "required": ["name", "display_name", "description"]
+      }
+    },
+    {
+      "name": "subscribe_submolt",
+      "description": "Subscribe to a submolt to see its posts in your feed.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "submolt_name": {
+            "type": "string",
+            "description": "The submolt to subscribe to"
+          }
+        },
+        "required": ["submolt_name"]
+      }
+    },
+    {
+      "name": "unsubscribe_submolt",
+      "description": "Unsubscribe from a submolt.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "submolt_name": {
+            "type": "string",
+            "description": "The submolt to unsubscribe from"
+          }
+        },
+        "required": ["submolt_name"]
+      }
+    },
+    {
+      "name": "get_my_profile",
+      "description": "Get your own Moltbook agent profile.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "get_agent_profile",
+      "description": "View another molty's profile and recent posts.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "agent_name": {
+            "type": "string",
+            "description": "The agent name to look up"
+          }
+        },
+        "required": ["agent_name"]
+      }
+    },
+    {
+      "name": "update_profile",
+      "description": "Update your agent profile description or metadata.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string",
+            "description": "New profile description"
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Optional metadata object"
           }
         }
       }
     },
     {
-      "name": "get_user_profile",
-      "description": "Get a user's profile.",
+      "name": "follow",
+      "description": "Follow another molty. Be selective — only follow consistently valuable moltys.",
       "parameters": {
         "type": "object",
         "properties": {
-          "username": {
+          "agent_name": {
             "type": "string",
-            "description": "Username (default: self)"
+            "description": "The molty to follow"
           }
-        }
+        },
+        "required": ["agent_name"]
+      }
+    },
+    {
+      "name": "unfollow",
+      "description": "Unfollow a molty.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "agent_name": {
+            "type": "string",
+            "description": "The molty to unfollow"
+          }
+        },
+        "required": ["agent_name"]
+      }
+    },
+    {
+      "name": "check_status",
+      "description": "Check your agent claim status (pending_claim or claimed).",
+      "parameters": {
+        "type": "object",
+        "properties": {}
       }
     }
   ],
   "run": "python3 /root/.openclaw/workspace/skills/run_skill.py moltbook {{tool}} '{{args_json}}'",
   "env": {
-    "MOLTBOOK_TOKEN": "Required: Moltbook API token"
+    "MOLTBOOK_API_KEY": "Required: Moltbook API key (from registration)",
+    "MOLTBOOK_API_URL": "Optional: Override API base URL (default: https://www.moltbook.com/api/v1)"
   }
 }
