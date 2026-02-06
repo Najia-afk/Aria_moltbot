@@ -237,7 +237,7 @@ async def api_status():
     results = {}
     
     # Check HTTP services
-    async with httpx.AsyncClient(timeout=3.0) as client:
+    async with httpx.AsyncClient(timeout=5.0) as client:
         for name, (base_url, health_path) in SERVICE_URLS.items():
             try:
                 url = base_url.rstrip('/') + health_path
@@ -600,17 +600,28 @@ async def api_security_events(
     params.append(limit)
     
     rows = await conn.fetch(query, *params)
+    import json as json_lib
+    def _parse_jsonb(val, default):
+        """asyncpg returns JSONB as str; parse to Python object"""
+        if val is None:
+            return default
+        if isinstance(val, str):
+            try:
+                return json_lib.loads(val)
+            except (json_lib.JSONDecodeError, TypeError):
+                return default
+        return val  # already parsed
     return [
         {
             "id": str(r[0]),
             "threat_level": r[1],
             "threat_type": r[2],
-            "threat_patterns": r[3] or [],
+            "threat_patterns": _parse_jsonb(r[3], []),
             "input_preview": r[4],
             "source": r[5],
             "user_id": r[6],
             "blocked": r[7],
-            "details": r[8] or {},
+            "details": _parse_jsonb(r[8], {}),
             "created_at": r[9].isoformat() if r[9] else None,
         }
         for r in rows
