@@ -11,7 +11,10 @@
         <string>-m</string>
         <string>mlx_lm.server</string>
         <string>--model</string>
-        <string>nightmedia/Qwen3-VLTO-8B-Instruct-qx86x-hi-mlx</string>
+        <!-- ACTIVE: Qwen3-4B (2.1GB RAM, fast orchestrator) -->
+        <string>mlx-community/Qwen3-4B-Instruct-2507-4bit</string>
+        <!-- SWITCH: uncomment below + comment above for 8B (5GB RAM, vision+instruct) -->
+        <!-- <string>nightmedia/Qwen3-VLTO-8B-Instruct-qx86x-hi-mlx</string> -->
         <string>--host</string>
         <string>0.0.0.0</string>
         <string>--port</string>

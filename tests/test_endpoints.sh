@@ -1,7 +1,7 @@
 #!/bin/bash
 # Test all endpoints from Mac
-HOST="http://192.168.1.53"
-HOST_S="https://192.168.1.53"
+HOST="http://localhost"
+HOST_S="https://localhost"
 
 endpoints=(
     "/ Portal"
@@ -41,6 +41,6 @@ for entry in "${endpoints[@]}"; do
 done
 
 echo ""
-echo "=== Testing from external IP perspective (Windows: 192.168.1.x) ==="
+echo "=== Testing from external IP perspective ==="
 echo "Checking Traefik entrypoints binding..."
 curl -sk http://localhost:8081/api/entrypoints 2>/dev/null | python3 -m json.tool 2>/dev/null | head -30 || echo "Traefik API not reachable on 8081"

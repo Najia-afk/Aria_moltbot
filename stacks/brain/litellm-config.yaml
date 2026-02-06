@@ -1,15 +1,31 @@
 model_list:
-  # Qwen3-VLTO 8B via MLX (Primary - Native Apple Silicon)
+  # =============================================
+  # LOCAL MLX Models (Apple Silicon)
+  # To switch: comment one, uncomment the other
+  # =============================================
+
+  # Qwen3-4B-Instruct via MLX (ACTIVE - 2.1GB, fast orchestrator)
   - model_name: qwen3-mlx
     litellm_params:
-      model: openai/nightmedia/Qwen3-VLTO-8B-Instruct-qx86x-hi-mlx
+      model: openai/mlx-community/Qwen3-4B-Instruct-2507-4bit
       api_base: http://host.docker.internal:8080/v1
       api_key: not-needed
-      stop: ["<|im_end|>", "<|endoftext|>", "<|im_start|>"]
     model_info:
       max_tokens: 32768
       input_cost_per_token: 0
       output_cost_per_token: 0
+
+  # Qwen3-VLTO 8B via MLX (INACTIVE - 5GB, vision+instruct, swap back if needed)
+  # - model_name: qwen3-mlx
+  #   litellm_params:
+  #     model: openai/nightmedia/Qwen3-VLTO-8B-Instruct-qx86x-hi-mlx
+  #     api_base: http://host.docker.internal:8080/v1
+  #     api_key: not-needed
+  #     stop: ["<|im_end|>", "<|endoftext|>", "<|im_start|>"]
+  #   model_info:
+  #     max_tokens: 32768
+  #     input_cost_per_token: 0
+  #     output_cost_per_token: 0
 
   # ============================================
   # OpenRouter FREE Models (Updated Feb 2026)
