@@ -100,6 +100,22 @@
     }
     .success-badge.success { background: rgba(34,197,94,0.2); color: var(--success); }
     .success-badge.error { background: rgba(239,68,68,0.2); color: var(--danger); }
+    .source-badge {
+        display: inline-block;
+        padding: 2px 6px;
+        border-radius: 8px;
+        font-size: 10px;
+        font-weight: 600;
+        margin-left: 6px;
+    }
+    .source-badge.litellm { background: rgba(0,212,255,0.15); color: var(--accent-blue); }
+    .source-badge.skills { background: rgba(124,58,237,0.15); color: #a855f7; }
+    .source-badge.merged { background: rgba(34,197,94,0.15); color: var(--success); }
+    .stats-sub {
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-top: 4px;
+    }
     
     .empty-state {
         text-align: center;
@@ -124,6 +140,11 @@
     </select>
     <select class="filter-select" id="model-filter">
         <option value="">All Models</option>
+    </select>
+    <select class="filter-select" id="source-filter">
+        <option value="">All Sources</option>
+        <option value="litellm">LLM Calls (LiteLLM)</option>
+        <option value="skills">Skill Executions</option>
     </select>
     <button class="btn btn-primary" onclick="loadAll()">Refresh</button>
 </div>
@@ -155,6 +176,7 @@
         <tr>
             <th>Model</th>
             <th>Provider</th>
+            <th>Source</th>
             <th>Requests</th>
             <th>Input Tokens</th>
             <th>Output Tokens</th>
@@ -207,6 +229,8 @@
 
     async function loadStats() {
         const hours = document.getElementById('hours-filter').value;
+        // Clean up previous source breakdown
+        document.querySelectorAll('.stats-sub').forEach(el => el.remove());
         try {
             const res = await fetch(`${API_BASE_URL}/model-usage/stats?hours=${hours}`);
             const stats = await res.json();
@@ -215,6 +239,13 @@
             document.getElementById('stat-tokens').textContent = formatNumber(stats.total_tokens);
             document.getElementById('stat-cost').textContent = formatCost(stats.total_cost);
             document.getElementById('stat-latency').textContent = `${stats.avg_latency_ms || 0}ms`;
+            
+            // Show source breakdown
+            if (stats.sources) {
+                const s = stats.sources;
+                document.getElementById('stat-requests').insertAdjacentHTML('afterend',
+                    `<div class="stats-sub">LLM: ${s.litellm?.requests || 0} | Skills: ${s.skills?.requests || 0}</div>`);
+            }
             
             // Render summary table
             const summaryBody = document.getElementById('summary-body');
@@ -231,19 +262,23 @@
                     }
                 });
                 
-                summaryBody.innerHTML = stats.by_model.map(m => `
+                summaryBody.innerHTML = stats.by_model.map(m => {
+                    const srcClass = m.source || 'skills';
+                    const srcLabel = srcClass === 'litellm' ? 'LLM' : srcClass === 'merged' ? 'Both' : 'Skill';
+                    return `
                     <tr>
                         <td><span class="model-name">${m.model}</span></td>
                         <td>${m.provider ? `<span class="provider-badge">${m.provider}</span>` : '-'}</td>
+                        <td><span class="source-badge ${srcClass}">${srcLabel}</span></td>
                         <td>${m.requests}</td>
                         <td>${formatNumber(m.input_tokens)}</td>
                         <td>${formatNumber(m.output_tokens)}</td>
                         <td>${formatCost(m.cost)}</td>
-                        <td>${m.avg_latency || 0}ms</td>
-                    </tr>
-                `).join('');
+                        <td>${m.avg_latency ? m.avg_latency + 'ms' : '-'}</td>
+                    </tr>`;
+                }).join('');
             } else {
-                summaryBody.innerHTML = '<tr><td colspan="7" class="empty-state">No model usage in this period</td></tr>';
+                summaryBody.innerHTML = '<tr><td colspan="8" class="empty-state">No model usage in this period</td></tr>';
             }
         } catch (e) {
             console.error('Error loading stats:', e);
@@ -252,9 +287,10 @@
 
     async function loadUsage() {
         const model = document.getElementById('model-filter').value;
-        const url = model 
-            ? `${API_BASE_URL}/model-usage?limit=50&model=${encodeURIComponent(model)}`
-            : `${API_BASE_URL}/model-usage?limit=50`;
+        const source = document.getElementById('source-filter').value;
+        let url = `${API_BASE_URL}/model-usage?limit=50`;
+        if (model) url += `&model=${encodeURIComponent(model)}`;
+        if (source) url += `&source=${encodeURIComponent(source)}`;
         
         try {
             const res = await fetch(url);
@@ -262,18 +298,21 @@
             const usageBody = document.getElementById('usage-body');
             
             if (data.usage && data.usage.length > 0) {
-                usageBody.innerHTML = data.usage.map(u => `
+                usageBody.innerHTML = data.usage.map(u => {
+                    const srcClass = u.source || 'skills';
+                    const srcIcon = srcClass === 'litellm' ? '🧠' : '⚡';
+                    return `
                     <tr>
-                        <td><span class="model-name">${u.model}</span></td>
+                        <td><span class="model-name">${srcIcon} ${u.model}</span></td>
                         <td>${u.provider ? `<span class="provider-badge">${u.provider}</span>` : '-'}</td>
                         <td>${formatNumber(u.input_tokens)}</td>
                         <td>${formatNumber(u.output_tokens)}</td>
                         <td>${formatCost(u.cost_usd)}</td>
-                        <td>${u.latency_ms || '-'}ms</td>
+                        <td>${u.latency_ms ? u.latency_ms + 'ms' : '-'}</td>
                         <td><span class="success-badge ${u.success ? 'success' : 'error'}">${u.success ? '✓' : '✗'}</span></td>
                         <td>${formatDate(u.created_at)}</td>
-                    </tr>
-                `).join('');
+                    </tr>`;
+                }).join('');
             } else {
                 usageBody.innerHTML = '<tr><td colspan="8" class="empty-state">No usage records found</td></tr>';
             }
@@ -290,6 +329,7 @@
 
     document.getElementById('hours-filter').addEventListener('change', loadStats);
     document.getElementById('model-filter').addEventListener('change', loadUsage);
+    document.getElementById('source-filter').addEventListener('change', loadUsage);
 
     loadAll();
     
