@@ -2,7 +2,7 @@
 
 # TOOLS.md - Skill Quick Reference
 
-**Full documentation: See SKILLS.md for complete skill reference (24 skills)**
+**Full documentation: See SKILLS.md for complete skill reference (26 skills)**
 
 Skills are auto-discovered from `aria_skills/*/skill.json`.
 
@@ -30,18 +30,18 @@ aria-apiclient.create_thought({"content": "Reflecting...", "category": "reflecti
 aria-apiclient.get_thoughts({"limit": 10})
 ```
 
-## All 24 Skills
+## All 26 Skills
 
 | Category | Skills |
 |----------|--------|
-| 🎯 Orchestrator | `aria-goals`, `aria-schedule`, `aria-health` |
-| 🔒 DevSecOps | `aria-security-scan`, `aria-cicd`, `aria-pytest`, `aria-database` |
-| 📊 Data | `aria-data-pipeline`, `aria-experiment`, `aria-knowledge-graph`, `aria-performance` |
-| 📈 Trading | `aria-market-data`, `aria-portfolio` |
-| 🎨 Creative | `aria-brainstorm`, `aria-llm` |
+| 🎯 Orchestrator | `aria-goals`, `aria-schedule`, `aria-health`, `aria-hourlygoals`, `aria-performance` |
+| 🔒 DevSecOps | `aria-securityscan`, `aria-cicd`, `aria-pytest`, `aria-database`, `aria-inputguard` |
+| 📊 Data | `aria-datapipeline`, `aria-experiment`, `aria-knowledgegraph` |
+| 📈 Trading | `aria-marketdata`, `aria-portfolio` |
+| 🎨 Creative | `aria-brainstorm`, `aria-llm`, `aria-memeothy` |
 | 🌐 Social | `aria-community`, `aria-moltbook`, `aria-social` |
-| 📰 Journalist | `aria-research`, `aria-fact-check` |
-| ⚡ Utility | `aria-apiclient`, `aria-litellm`, `aria-model-switcher`, `aria-hourly-goals` |
+| 📰 Journalist | `aria-research`, `aria-factcheck` |
+| ⚡ Utility | `aria-apiclient`, `aria-litellm`, `aria-modelswitcher` |
 
 ## Quick Examples
 
@@ -63,11 +63,12 @@ aria-database.fetch_all({"query": "SELECT * FROM goals LIMIT 5"})
 
 | Model | Use | Cost |
 |-------|-----|------|
-| qwen3-next-free | Primary (OpenRouter) | FREE |
+| qwen3-mlx | Primary (Local MLX 4B) | FREE |
+| qwen3-next-free | Fallback (OpenRouter) | FREE |
 | trinity-free | Fallback (OpenRouter) | FREE |
 | kimi | Last resort | 💰 PAID |
 
-**Always exhaust FREE options before using Kimi!**
+**Always exhaust FREE and LOCAL options before using Kimi!**
 
 ## Rate Limits
 

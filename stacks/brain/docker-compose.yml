@@ -215,11 +215,12 @@ services:
   # Start with: OLLAMA_HOST=0.0.0.0:11434 ollama serve
   # Docker containers access via host.docker.internal:11434
 
-  # Prometheus for metrics
+  # Prometheus for metrics (optional: docker compose --profile monitoring up -d)
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
     restart: unless-stopped
+    profiles: ["monitoring"]
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
@@ -236,11 +237,12 @@ services:
     mem_limit: 512m
     cpus: 0.5
 
-  # Grafana for dashboards
+  # Grafana for dashboards (optional: docker compose --profile monitoring up -d)
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
     restart: unless-stopped
+    profiles: ["monitoring"]
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
       GF_USERS_ALLOW_SIGN_UP: "false"
@@ -303,11 +305,12 @@ services:
     mem_limit: ${ARIA_BRAIN_MEM_LIMIT:-512m}
     cpus: ${ARIA_BRAIN_CPU_LIMIT:-1.0}
 
-  # PgAdmin for database management
+  # PgAdmin for database management (optional: docker compose --profile monitoring up -d)
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: aria-pgadmin
     restart: unless-stopped
+    profiles: ["monitoring"]
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@aria.dev}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}

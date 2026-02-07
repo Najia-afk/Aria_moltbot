@@ -9,10 +9,10 @@
     }
   },
   "routing": {
-    "primary": "litellm/kimi",
+    "primary": "litellm/qwen3-mlx",
     "timeout": 300,
     "retries": 2,
-    "fallbacks": ["litellm/qwen3-mlx", "litellm/qwen3-next-free", "litellm/trinity-free", "litellm/chimera-free", "litellm/deepseek-free"]
+    "fallbacks": ["litellm/qwen3-next-free", "litellm/trinity-free", "litellm/chimera-free", "litellm/deepseek-free", "litellm/kimi"]
   },
   "agent_aliases": {
     "litellm/qwen3-mlx": "Qwen3 4B Instruct (MLX Local)",

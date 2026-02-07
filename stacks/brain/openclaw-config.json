@@ -80,13 +80,13 @@
       },
       "memorySearch": { "enabled": false, "fallback": "none" },
       "model": {
-        "primary": "litellm/kimi",
+        "primary": "litellm/qwen3-mlx",
         "fallbacks": [
-          "litellm/qwen3-mlx",
           "litellm/qwen3-next-free",
           "litellm/trinity-free",
           "litellm/chimera-free",
-          "litellm/deepseek-free"
+          "litellm/deepseek-free",
+          "litellm/kimi"
         ]
       }
     },
@@ -149,8 +149,8 @@
         "avatar": "🦞"
       },
       "model": {
-        "primary": "litellm/kimi",
-        "fallbacks": ["litellm/qwen3-mlx"]
+        "primary": "litellm/qwen3-mlx",
+        "fallbacks": ["litellm/trinity-free", "litellm/kimi"]
       },
       "heartbeat": {
         "every": "48h",
