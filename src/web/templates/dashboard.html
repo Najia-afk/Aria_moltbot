@@ -331,34 +331,28 @@
         })
         .catch(() => {});
 
-    // Load recent activities
-    fetch(`${API_BASE}/activities`)
-        .then(r => r.json())
-        .then(data => {
-            if (data.length === 0) {
-                document.getElementById('recent-activity').innerHTML = '<p>No activities yet</p>';
-                return;
-            }
-            let html = '<div style="width:100%">';
-            data.slice(0, 10).forEach(a => {
-                const d = new Date(a.created_at);
-                html += `<div style="padding:10px;border-bottom:1px solid var(--border-color)">
-                    <div style="font-weight:500">${a.type || 'Activity'}</div>
-                    <div style="font-size:13px;color:var(--text-secondary)">${a.description || '-'}</div>
-                    <div style="font-size:11px;color:var(--text-muted)">${d.toLocaleString()}</div>
-                </div>`;
-            });
-            html += '</div>';
-            document.getElementById('recent-activity').innerHTML = html;
-        })
-        .catch(e => {
-            document.getElementById('recent-activity').innerHTML = '<p>Could not load activities</p>';
-        });
-
-    // Activity timeline chart
+    // Load recent activities + activity timeline chart (single fetch)
     fetch(`${API_BASE}/activities?limit=100`)
         .then(r => r.json())
         .then(data => {
+            // ── Recent Activity List (top 10) ──
+            if (!Array.isArray(data) || data.length === 0) {
+                document.getElementById('recent-activity').innerHTML = '<p>No activities yet</p>';
+            } else {
+                let html = '<div style="width:100%">';
+                data.slice(0, 10).forEach(a => {
+                    const d = new Date(a.created_at);
+                    html += `<div style="padding:10px;border-bottom:1px solid var(--border-color)">
+                        <div style="font-weight:500">${a.type || 'Activity'}</div>
+                        <div style="font-size:13px;color:var(--text-secondary)">${a.description || '-'}</div>
+                        <div style="font-size:11px;color:var(--text-muted)">${d.toLocaleString()}</div>
+                    </div>`;
+                });
+                html += '</div>';
+                document.getElementById('recent-activity').innerHTML = html;
+            }
+
+            // ── Activity Timeline Chart (7-day buckets) ──
             const now = new Date();
             const dayBuckets = {};
             for (let i = 6; i >= 0; i--) {
@@ -407,7 +401,8 @@
                 }
             });
         })
-        .catch(() => {
+        .catch(e => {
+            document.getElementById('recent-activity').innerHTML = '<p>Could not load activities</p>';
             document.getElementById('activity-chart').innerHTML = '<p>Could not load activity timeline</p>';
         });
 

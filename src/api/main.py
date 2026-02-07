@@ -95,6 +95,7 @@ from routers.social import router as social_router
 from routers.operations import router as operations_router
 from routers.records import router as records_router
 from routers.admin import router as admin_router
+from routers.models_config import router as models_config_router
 
 app.include_router(health_router)
 app.include_router(activities_router)
@@ -111,6 +112,7 @@ app.include_router(social_router)
 app.include_router(operations_router)
 app.include_router(records_router)
 app.include_router(admin_router)
+app.include_router(models_config_router)
 
 # ── GraphQL ──────────────────────────────────────────────────────────────────
 

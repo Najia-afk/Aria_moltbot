@@ -579,93 +579,8 @@ let timelineChart = null;
 let spendModelChart = null;
 let costBreakdownChart = null;
 
-// Model pricing (per 1M tokens in USD)
-const MODEL_PRICING = {
-    // Free OpenRouter models
-    'google/gemini-2.0-flash-exp:free': { input: 0, output: 0 },
-    'deepseek/deepseek-chat-v3-0324:free': { input: 0, output: 0 },
-    'meta-llama/llama-3.3-70b-instruct:free': { input: 0, output: 0 },
-    'qwen/qwen3-235b-a22b:free': { input: 0, output: 0 },
-    // Kimi models (prices in USD, converted from CNY)
-    'moonshot-v1-8k': { input: 0.24, output: 0.24 },
-    'moonshot-v1-32k': { input: 0.48, output: 0.48 },
-    'moonshot-v1-128k': { input: 1.20, output: 1.20 },
-    'moonshot-v1-auto': { input: 0.24, output: 0.24 },
-    'kimi-latest': { input: 0.24, output: 0.24 },
-    'kimi': { input: 0.24, output: 0.24 },
-    // Local models
-    'local-mlx': { input: 0, output: 0 },
-    'local': { input: 0, output: 0 },
-    'qwen3-mlx': { input: 0, output: 0 },
-    'ollama': { input: 0, output: 0 },
-};
-
-// Calculate cost from log entry
-function calculateLogCost(log) {
-    const model = (log.model || '').toLowerCase();
-    const inputTokens = log.prompt_tokens || 0;
-    const outputTokens = log.completion_tokens || 0;
-    
-    // Find matching pricing
-    let pricing = null;
-    for (const [key, price] of Object.entries(MODEL_PRICING)) {
-        if (model.includes(key.toLowerCase())) {
-            pricing = price;
-            break;
-        }
-    }
-    
-    // Default pricing for unknown models (assume paid OpenRouter)
-    if (!pricing) {
-        // Check if it's a free model (has :free suffix)
-        if (model.includes(':free')) {
-            pricing = { input: 0, output: 0 };
-        } else if (model.includes('local') || model.includes('mlx') || model.includes('ollama')) {
-            pricing = { input: 0, output: 0 };
-        } else {
-            // Default to cheap rate for unknown models
-            pricing = { input: 0.5, output: 1.0 };
-        }
-    }
-    
-    const cost = (inputTokens / 1000000) * pricing.input + (outputTokens / 1000000) * pricing.output;
-    return cost;
-}
-
-// Utility functions
-function formatNumber(num) {
-    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
-    if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
-    return num.toString();
-}
-
-function formatMoney(amount) {
-    if (amount === 0) return '$0.00';
-    if (amount < 0.01) return '$' + amount.toFixed(4);
-    return '$' + amount.toFixed(2);
-}
-
-function getProvider(modelId) {
-    const id = modelId.toLowerCase();
-    if (id.includes('moonshot') || id.includes('kimi')) return 'kimi';
-    if (id.includes('local') || id.includes('mlx') || id.includes('ollama')) return 'local';
-    if (id.includes('/')) return 'openrouter';
-    if (id.includes('gpt') || id.includes('o1') || id.includes('o3')) return 'openai';
-    if (id.includes('claude')) return 'anthropic';
-    return 'other';
-}
-
-function getProviderColor(provider) {
-    const colors = {
-        'kimi': '#8b5cf6',
-        'openrouter': '#3b82f6',
-        'local': '#22c55e',
-        'openai': '#10a37f',
-        'anthropic': '#d97757',
-        'other': '#6b7280'
-    };
-    return colors[provider] || colors.other;
-}
+// Pricing, calculateLogCost, formatNumber, formatMoney, getProvider, getProviderColor
+// are all provided by /static/js/pricing.js (loaded in base.html)
 
 // Load wallet balances
 async function loadBalances() {
@@ -907,7 +822,7 @@ function renderModels(filter) {
     
     grid.innerHTML = models.map(model => {
         const provider = getProvider(model.id);
-        const pricing = MODEL_PRICING[model.id] || { input: 0.5, output: 1.0 };
+        const pricing = getModelPricing(model.id);
         const isFree = pricing.input === 0 && pricing.output === 0;
         
         return `
@@ -932,7 +847,7 @@ function renderModels(filter) {
 // Load spend logs
 async function loadSpendLogs() {
     const tbody = document.getElementById('spend-logs-tbody');
-    const limit = document.getElementById('logs-limit')?.value || 20;
+    const limit = document.getElementById('logs-limit')?.value || 25;
     
     try {
         const response = await fetch(`${API_URL}/litellm/spend?limit=${limit}`);
@@ -1296,7 +1211,8 @@ document.querySelectorAll('.filter-tab').forEach(tab => {
 });
 
 // Initialize on load
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    await AriaModels.init();
     loadBalances();
     loadGlobalSpend();
     loadModels();

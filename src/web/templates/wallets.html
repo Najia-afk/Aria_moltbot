@@ -161,11 +161,7 @@
             <div class="input-group">
                 <label>Model</label>
                 <select id="est-model" onchange="calculateEstimate()">
-                    <option value="kimi">Kimi (moonshot-v1-auto)</option>
-                    <option value="gemini-free">Gemini 2.0 Flash (Free)</option>
-                    <option value="deepseek-free">DeepSeek Chat (Free)</option>
-                    <option value="llama-free">Llama 3.3 70B (Free)</option>
-                    <option value="local">Local (MLX/Ollama)</option>
+                    <option value="">Loading models…</option>
                 </select>
             </div>
             <div class="input-group">
@@ -534,65 +530,11 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script data-page-script>
 const API_URL = window.ARIA_API_BASE_URL;
-const CNY_TO_USD = 0.14;
 
 let balanceChart = null;
 
-// Model pricing per 1M tokens (in USD)
-const PRICING = {
-    'kimi': { input: 0.24, output: 0.24 },
-    'moonshot': { input: 0.24, output: 0.24 },
-    'gemini-free': { input: 0, output: 0 },
-    'deepseek-free': { input: 0, output: 0 },
-    'llama-free': { input: 0, output: 0 },
-    'qwen': { input: 0, output: 0 },
-    'local': { input: 0, output: 0 },
-    'mlx': { input: 0, output: 0 },
-    'ollama': { input: 0, output: 0 },
-};
-
-// Calculate cost from a log entry
-function calculateLogCost(log) {
-    const model = (log.model || '').toLowerCase();
-    const inputTokens = log.prompt_tokens || 0;
-    const outputTokens = log.completion_tokens || 0;
-    
-    // Find matching pricing
-    let pricing = null;
-    for (const [key, price] of Object.entries(PRICING)) {
-        if (model.includes(key)) {
-            pricing = price;
-            break;
-        }
-    }
-    
-    // Default for unknown models
-    if (!pricing) {
-        if (model.includes(':free') || model.includes('local') || model.includes('mlx') || model.includes('ollama')) {
-            pricing = { input: 0, output: 0 };
-        } else {
-            pricing = { input: 0.5, output: 1.0 }; // Default paid rate
-        }
-    }
-    
-    const cost = (inputTokens / 1000000) * pricing.input + (outputTokens / 1000000) * pricing.output;
-    // Debug first few logs
-    if (!window._debugCount) window._debugCount = 0;
-    if (window._debugCount < 3) {
-        console.log('calculateLogCost:', { model, inputTokens, outputTokens, pricing, cost });
-        window._debugCount++;
-    }
-    return cost;
-}
-
-function formatMoney(amount, currency = 'USD') {
-    if (currency === 'CNY') {
-        return '¥' + amount.toFixed(2);
-    }
-    if (amount === 0) return '$0.00';
-    if (amount < 0.01) return '$' + amount.toFixed(4);
-    return '$' + amount.toFixed(2);
-}
+// All pricing, calculateLogCost, formatMoney, formatNumber, getProvider, etc.
+// are provided by /static/js/pricing.js (loaded in base.html)
 
 async function loadBalances() {
     try {
@@ -601,19 +543,21 @@ async function loadBalances() {
         
         let totalUSD = 0;
         
-        // Kimi (already in USD)
+        // Kimi — international API (api.moonshot.ai) returns USD
         if (data.kimi) {
             const kimi = data.kimi;
             if (kimi.status === 'ok') {
                 const available = kimi.available || 0;
-                totalUSD += available;
+                const currency = kimi.currency || 'USD';
+                const availableUSD = currency === 'CNY' ? available * CNY_TO_USD : available;
+                totalUSD += availableUSD;
                 
                 document.getElementById('kimi-status').textContent = 'Active';
                 document.getElementById('kimi-status').className = 'wallet-status ok';
-                document.getElementById('kimi-balance').textContent = '$' + available.toFixed(2);
+                document.getElementById('kimi-balance').textContent = formatMoney(available, currency);
                 document.getElementById('kimi-usd').textContent = '';
-                document.getElementById('kimi-cash').textContent = '$' + (kimi.cash || 0).toFixed(2);
-                document.getElementById('kimi-voucher').textContent = '$' + (kimi.voucher || 0).toFixed(2);
+                document.getElementById('kimi-cash').textContent = formatMoney(kimi.cash || 0, currency);
+                document.getElementById('kimi-voucher').textContent = formatMoney(kimi.voucher || 0, currency);
             } else {
                 document.getElementById('kimi-status').textContent = 'Error';
                 document.getElementById('kimi-status').className = 'wallet-status error';
@@ -888,18 +832,13 @@ function calculateEstimate() {
     const outputTokens = parseInt(document.getElementById('est-output').value) || 0;
     const requests = parseInt(document.getElementById('est-requests').value) || 0;
     
-    const pricing = PRICING[model];
+    const pricing = getModelPricing(model);
     if (!pricing) return;
     
-    // Cost per request
+    // Cost per request (pricing is already in USD)
     const inputCost = (inputTokens / 1000000) * pricing.input;
     const outputCost = (outputTokens / 1000000) * pricing.output;
     let totalCost = (inputCost + outputCost) * requests;
-    
-    // Convert CNY to USD if needed
-    if (pricing.currency === 'CNY') {
-        totalCost *= CNY_TO_USD;
-    }
     
     const costEl = document.getElementById('est-cost');
     const noteEl = document.getElementById('est-note');
@@ -951,8 +890,38 @@ function updateCountdown() {
     }
 }
 
+// Populate cost estimator dropdown dynamically from models.yaml
+function populateEstimatorModels() {
+    const select = document.getElementById('est-model');
+    if (!select || !AriaModels._pricing) return;
+
+    // Deduplicate: only keep model_ids (skip aliases/litellm keys)
+    const seen = new Set();
+    const models = [];
+    for (const [key, val] of Object.entries(AriaModels._pricing)) {
+        const id = val.model_id || key;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        const isFree = val.input === 0 && val.output === 0;
+        const label = isFree
+            ? `${id} (Free)`
+            : `${id} ($${val.input}/$${val.output} per 1M)`;
+        models.push({ id, label, tier: val.tier || 'unknown' });
+    }
+
+    // Sort: paid first, then free, then local
+    const tierOrder = { paid: 0, free: 1, local: 2, unknown: 3 };
+    models.sort((a, b) => (tierOrder[a.tier] ?? 3) - (tierOrder[b.tier] ?? 3));
+
+    select.innerHTML = models.map(m =>
+        `<option value="${m.id}">${m.label}</option>`
+    ).join('');
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
+    await AriaModels.init();
+    populateEstimatorModels();
     loadBalances();
     loadSpend();
     await createBalanceChart();

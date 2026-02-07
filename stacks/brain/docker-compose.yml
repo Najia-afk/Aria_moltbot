@@ -399,6 +399,8 @@ services:
     volumes:
       # Mount API source for live reload during development
       - ../../src/api:/app:ro
+      # Mount models catalog (single source of truth for all model pricing)
+      - ../../aria_models/models.yaml:/models/models.yaml:ro
       # Mount OpenClaw data for reading cron jobs
       - openclaw_data:/openclaw:ro
       # Docker socket for service control (admin actions)

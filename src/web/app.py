@@ -72,7 +72,9 @@ def create_app():
     
     @app.route('/litellm')
     def litellm():
-        return render_template('litellm.html')
+        # Merged into /models — redirect for bookmarks
+        from flask import redirect
+        return redirect('/models', code=301)
 
     @app.route('/models')
     def models():

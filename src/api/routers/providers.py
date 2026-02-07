@@ -27,7 +27,7 @@ async def api_provider_balances():
                         "available": data.get("data", {}).get("available_balance", 0),
                         "voucher": data.get("data", {}).get("voucher_balance", 0),
                         "cash": data.get("data", {}).get("cash_balance", 0),
-                        "currency": "CNY",
+                        "currency": data.get("data", {}).get("currency", "USD"),
                         "status": "ok",
                     }
                 else:
