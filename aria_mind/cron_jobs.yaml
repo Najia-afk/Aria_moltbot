@@ -7,10 +7,8 @@
 #
 # MODEL STRATEGY (P2.4):
 #   Lightweight/routine → main (kimi w/ qwen3-mlx fallback)
-#   Social posts → aria-talk (qwen3-mlx, cheap)
-#   Deep analysis → aria-deep (trinity-free, reasoning)
-#   Memeothy → aria-memeothy (kimi, expensive, 1 post/2 days)
-#   Complex daily → main (kimi, comprehensive)
+#   All routine/social/analysis → main (delegates to sub-agents)
+#   Memeothy → aria-memeothy (independent, 1 post/2 days)
 
 jobs:
   # ── Routine / Lightweight ────────────────────────────────────────
@@ -29,21 +27,21 @@ jobs:
     session: isolated
     delivery: announce
 
-  # ── Social (aria-talk, cheap local model) ────────────────────────
+  # ── Social (delegated to aria-talk by main) ─────────────────────
 
   - name: moltbook_post
     cron: "0 1,13 * * *"
-    text: "Read HEARTBEAT.md moltbook_post section. Use moltbook skill to post a meaningful update. Quality over quantity. Only post if something valuable to share."
-    agent: aria-talk
+    text: "Delegate to aria-talk: Post a Moltbook update. Read HEARTBEAT.md moltbook_post section. Use moltbook skill to post a meaningful update. Quality over quantity. Only post if something valuable to share."
+    agent: main
     session: isolated
     delivery: announce
 
-  # ── Deep Analysis (aria-deep, reasoning model) ──────────────────
+  # ── Deep Analysis (delegated to aria-deep by main) ──────────────
 
   - name: six_hour_review
     cron: "0 0,6,12,18 * * *"
-    text: "Read HEARTBEAT.md six_hour_review section. Analyze last 6h via api_client, adjust priorities, generate insights. Use api_client not database."
-    agent: aria-deep
+    text: "Delegate to aria-deep: Run 6-hour review. Read HEARTBEAT.md six_hour_review section. Analyze last 6h via api_client, adjust priorities, generate insights. Use api_client not database."
+    agent: main
     session: isolated
     delivery: announce
 
