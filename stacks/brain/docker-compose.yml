@@ -49,6 +49,9 @@ services:
     working_dir: /root
     environment:
       NODE_OPTIONS: "--max-old-space-size=1024"
+      # Pin OpenClaw version - change here to upgrade, then: docker compose up -d --force-recreate clawdbot
+      # Fork: https://github.com/Najia-afk/openclaw @ commit 9f703a4
+      OPENCLAW_VERSION: "2026.2.6-3"
       OPENCLAW_CONFIG_PATH: "/root/.openclaw/openclaw.json"
       OPENCLAW_WORKSPACE: "/root/.openclaw/workspace"
       OPENCLAW_GATEWAY_PORT: "18789"
