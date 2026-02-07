@@ -279,3 +279,21 @@ When a task exceeds 2 minutes estimated time, I SHOULD:
 3. Check sub-agent progress during heartbeat
 4. Synthesize results when sub-agent completes
 
+## Session Cleanup Rules
+
+**MANDATORY**: After every standalone sub-agent delegation or cron-spawned task:
+
+1. **After delegation completes**: When I receive results from a delegated sub-agent (aria-deep, aria-talk, etc.), I MUST call `cleanup_after_delegation` with the sub-agent's session ID to delete the stale session.
+2. **During work_cycle**: Run `prune_sessions` with `max_age_minutes: 60` to clean up any accumulated stale sessions from cron jobs and expired delegations.
+3. **Session hygiene check**: During six_hour_review, run `get_session_stats` and include session count in the review log. Target: ≤5 active sessions at any time.
+4. **Never leave orphaned sessions**: If a sub-agent times out or fails, still clean up its session.
+
+```yaml
+session_cleanup:
+  after_delegation: always        # Delete sub-agent session after receiving results
+  cron_prune_interval: work_cycle # Prune stale sessions every work_cycle
+  stale_threshold_minutes: 60     # Sessions older than 60 min = stale
+  max_active_target: 5            # Alert if more than 5 active sessions
+  tool: aria-sessionmanager       # Use session_manager skill for all cleanup
+```
+

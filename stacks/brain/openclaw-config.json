@@ -33,7 +33,8 @@
       "aria-securityscan": { "enabled": true },
       "aria-social": { "enabled": true },
       "aria-inputguard": { "enabled": true },
-      "aria-memeothy": { "enabled": true }
+      "aria-memeothy": { "enabled": true },
+      "aria-sessionmanager": { "enabled": true }
     }
   },
   "gateway": {

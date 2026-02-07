@@ -1,0 +1,72 @@
+{
+  "name": "aria-sessionmanager",
+  "version": "1.0.0",
+  "description": "Manage OpenClaw sessions — list, prune stale sessions, delete by ID, and clean up after sub-agent delegations.",
+  "author": "Aria Team",
+  "tools": [
+    {
+      "name": "list_sessions",
+      "description": "List all active OpenClaw sessions with metadata (agent, timestamps, IDs).",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "delete_session",
+      "description": "Delete a specific session by its ID.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "description": "The session ID to delete"
+          }
+        },
+        "required": ["session_id"]
+      }
+    },
+    {
+      "name": "prune_sessions",
+      "description": "Prune stale sessions older than a threshold. Use dry_run=true to preview what would be deleted.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "max_age_minutes": {
+            "type": "integer",
+            "description": "Delete sessions older than this many minutes (default: 60)",
+            "default": 60
+          },
+          "dry_run": {
+            "type": "boolean",
+            "description": "If true, list what would be deleted without actually deleting",
+            "default": false
+          }
+        }
+      }
+    },
+    {
+      "name": "get_session_stats",
+      "description": "Get summary statistics about current sessions: counts by agent, stale vs active.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "cleanup_after_delegation",
+      "description": "Clean up a session after a standalone sub-agent delegation completes. Call this after receiving results from a delegated task.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "description": "The session ID of the completed delegation to clean up"
+          }
+        },
+        "required": ["session_id"]
+      }
+    }
+  ],
+  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py session_manager {{tool}} '{{args_json}}'"
+}

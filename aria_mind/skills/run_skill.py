@@ -144,6 +144,11 @@ SKILL_REGISTRY = {
         'llm_url': os.environ.get('OLLAMA_URL')
     }),
 
+    # === Session Management ===
+    'session_manager': ('aria_skills.session_manager', 'SessionManagerSkill', lambda: {
+        'stale_threshold_minutes': int(os.environ.get('SESSION_STALE_MINUTES', '60')),
+    }),
+
     # === Raw Database — LAST on purpose: prefer api_client for data ops ===
     'database': ('aria_skills.database', 'DatabaseSkill', lambda: {'dsn': os.environ.get('DATABASE_URL')}),
 }
