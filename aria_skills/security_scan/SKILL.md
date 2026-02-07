@@ -1,10 +1,8 @@
-```skill
 ---
 name: aria-securityscan
 description: "🔒 Security scanning and vulnerability detection for DevSecOps"
 metadata: {"openclaw": {"emoji": "🔒"}}
 ---
-```
 
 # aria-securityscan
 

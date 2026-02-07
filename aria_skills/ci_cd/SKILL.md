@@ -1,10 +1,8 @@
-```skill
 ---
 name: aria-cicd
 description: "🔄 CI/CD pipeline management and automation for DevSecOps"
 metadata: {"openclaw": {"emoji": "🔄"}}
 ---
-```
 
 # aria-cicd
 

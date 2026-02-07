@@ -1,10 +1,8 @@
-```skill
 ---
 name: aria-research
 description: "📰 Research and information gathering for Journalist"
 metadata: {"openclaw": {"emoji": "📰"}}
 ---
-```
 
 # aria-research
 

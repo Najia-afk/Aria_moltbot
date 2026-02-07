@@ -1,10 +1,8 @@
-```skill
 ---
 name: aria-experiment
 description: "🧪 ML experiment tracking and model management for Data Architect"
 metadata: {"openclaw": {"emoji": "🧪"}}
 ---
-```
 
 # aria-experiment
 

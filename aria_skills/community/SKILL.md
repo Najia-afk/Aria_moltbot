@@ -1,10 +1,8 @@
-```skill
 ---
 name: aria-community
 description: "🌐 Community management and growth for Social Architect"
 metadata: {"openclaw": {"emoji": "🌐"}}
 ---
-```
 
 # aria-community
 

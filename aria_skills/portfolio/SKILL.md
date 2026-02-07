@@ -1,10 +1,8 @@
-```skill
 ---
 name: aria-portfolio
 description: "💼 Portfolio and position management for Crypto Trader"
 metadata: {"openclaw": {"emoji": "💼"}}
 ---
-```
 
 # aria-portfolio
 

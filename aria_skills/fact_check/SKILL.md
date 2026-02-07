@@ -1,10 +1,8 @@
-```skill
 ---
 name: aria-factcheck
 description: "🔍 Fact-checking and claim verification for Journalist"
 metadata: {"openclaw": {"emoji": "🔍"}}
 ---
-```
 
 # aria-factcheck
 

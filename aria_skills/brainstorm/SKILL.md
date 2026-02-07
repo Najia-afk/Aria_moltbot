@@ -1,10 +1,8 @@
-```skill
 ---
 name: aria-brainstorm
 description: "🎨 Creative brainstorming and ideation for Creative Adventurer"
 metadata: {"openclaw": {"emoji": "🎨"}}
 ---
-```
 
 # aria-brainstorm
 

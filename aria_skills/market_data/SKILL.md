@@ -1,10 +1,8 @@
-```skill
 ---
 name: aria-marketdata
 description: "📈 Cryptocurrency market data and analysis for Crypto Trader"
 metadata: {"openclaw": {"emoji": "📈"}}
 ---
-```
 
 # aria-marketdata
 

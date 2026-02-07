@@ -1,10 +1,8 @@
-```skill
 ---
 name: aria-datapipeline
 description: "📊 Data pipeline management and ETL operations for Data Architect"
 metadata: {"openclaw": {"emoji": "📊"}}
 ---
-```
 
 # aria-datapipeline
 

@@ -1,10 +1,8 @@
-```skill
 ---
 name: aria-inputguard
 description: "🛡️ Runtime security for Aria - analyzes inputs for prompt injection, validates API params, filters sensitive output"
 metadata: {"openclaw": {"emoji": "🛡️", "always": true}}
 ---
-```
 
 # aria-inputguard
 
