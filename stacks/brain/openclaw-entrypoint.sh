@@ -212,6 +212,18 @@ if [ -n "$LITELLM_MASTER_KEY" ]; then
   jq --arg key "$LITELLM_MASTER_KEY" '.models.providers.litellm.apiKey = $key' "$OPENCLAW_CONFIG" > "${OPENCLAW_CONFIG}.tmp" && mv "${OPENCLAW_CONFIG}.tmp" "$OPENCLAW_CONFIG"
 fi
 
+# SECURITY: Remove any direct OpenRouter/cloud provider access from OpenClaw config.
+# All model routing MUST go through LiteLLM — OpenClaw should never talk to OpenRouter directly.
+echo "=== Stripping non-litellm providers from openclaw.json ==="
+jq 'if .models.providers then .models.providers = {litellm: .models.providers.litellm} else . end' "$OPENCLAW_CONFIG" > "${OPENCLAW_CONFIG}.tmp" && mv "${OPENCLAW_CONFIG}.tmp" "$OPENCLAW_CONFIG"
+
+# Also remove any stale auth profiles that reference direct cloud providers
+AUTH_PROFILES="/root/.openclaw/auth-profiles.json"
+if [ -f "$AUTH_PROFILES" ]; then
+  echo "=== Cleaning auth-profiles: keeping only litellm profiles ==="
+  jq '{profiles: (.profiles // {} | with_entries(select(.key | test("litellm"))))}' "$AUTH_PROFILES" > "${AUTH_PROFILES}.tmp" && mv "${AUTH_PROFILES}.tmp" "$AUTH_PROFILES"
+fi
+
 # Inject remote browser profile pointing to aria-browser container (browserless/chrome)
 if [ -n "$BROWSER_CDP_URL" ]; then
   echo "=== Injecting remote browser profile (sandbox -> $BROWSER_CDP_URL) ==="

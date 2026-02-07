@@ -9,11 +9,6 @@
       "provider": "openai",
       "apiKey": "${LITELLM_MASTER_KEY}",
       "baseUrl": "http://litellm:4000/v1"
-    },
-    "openai:openrouter": {
-      "provider": "openai",
-      "apiKey": "${OPENROUTER_API_KEY}",
-      "baseUrl": "https://openrouter.ai/api/v1"
     }
   }
 }
