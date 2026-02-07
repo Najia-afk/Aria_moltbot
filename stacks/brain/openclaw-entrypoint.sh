@@ -3,6 +3,14 @@ set -e
 
 echo "=== Aria/OpenClaw Entrypoint ==="
 
+# ── OpenClaw version pinning ────────────────────────────────────────
+# Pin to a known-good version to prevent random updates from breaking Aria.
+# To upgrade: change OPENCLAW_VERSION in docker-compose.yml, then recreate.
+# Fork backup: https://github.com/Najia-afk/openclaw (commit 9f703a4)
+# Current pin: 2026.2.6-3 (frozen 2026-02-07)
+OPENCLAW_PIN="${OPENCLAW_VERSION:-2026.2.6-3}"
+echo "OpenClaw target version: $OPENCLAW_PIN"
+
 # Clean up any stale lock files from previous runs (prevents lock issues after container restart)
 echo "Cleaning up stale lock files..."
 find /root/.openclaw/agents -name "*.lock" -type f 2>/dev/null | while read lock; do
@@ -10,12 +18,36 @@ find /root/.openclaw/agents -name "*.lock" -type f 2>/dev/null | while read lock
 done
 
 # Install system dependencies
-apt-get update && apt-get install -y curl jq python3 python3-pip python3-venv
+apt-get update && apt-get install -y curl git jq python3 python3-pip python3-venv
 
-# Install OpenClaw if not present
-if [ ! -e /usr/local/bin/openclaw ]; then
-    echo "Installing OpenClaw..."
-    curl -fsSL https://openclaw.ai/install.sh | bash -s -- --no-onboard --no-prompt
+# Install OpenClaw at pinned version (skip if already correct version)
+# Uses npm directly instead of install.sh to prevent pulling unexpected versions.
+# If npm registry is ever unavailable, build from fork:
+#   git clone https://github.com/Najia-afk/openclaw.git /tmp/oc && cd /tmp/oc
+#   git checkout 9f703a44dc954349d4c9571cba2f16b7fb3d2adc
+#   npm install -g pnpm && pnpm install && pnpm build && npm install -g .
+INSTALLED_VERSION=$(openclaw --version 2>/dev/null || echo "none")
+if [ "$INSTALLED_VERSION" = "$OPENCLAW_PIN" ]; then
+    echo "OpenClaw $OPENCLAW_PIN already installed, skipping."
+else
+    echo "Installing OpenClaw $OPENCLAW_PIN (was: $INSTALLED_VERSION)..."
+    npm install -g "openclaw@$OPENCLAW_PIN" --no-fund --no-audit 2>&1
+    INSTALLED_VERSION=$(openclaw --version 2>/dev/null || echo "failed")
+    if [ "$INSTALLED_VERSION" != "$OPENCLAW_PIN" ]; then
+        echo "WARNING: npm install got $INSTALLED_VERSION instead of $OPENCLAW_PIN"
+        echo "Attempting install from fork..."
+        git clone --depth 1 https://github.com/Najia-afk/openclaw.git /tmp/openclaw-fork
+        cd /tmp/openclaw-fork
+        git fetch --depth 1 origin 9f703a44dc954349d4c9571cba2f16b7fb3d2adc
+        git checkout 9f703a44dc954349d4c9571cba2f16b7fb3d2adc
+        npm install -g pnpm
+        pnpm install --frozen-lockfile
+        pnpm build
+        npm install -g .
+        cd /root
+        rm -rf /tmp/openclaw-fork
+    fi
+    echo "OpenClaw installed: $(openclaw --version 2>/dev/null)"
 fi
 
 # Create directories
@@ -403,13 +435,13 @@ with open(cron_yaml) as f:
 
 for job in data.get('jobs', []):
     name = job['name']
-    # OpenClaw 2026.2.3+ uses 'text' instead of 'message'
+    # OpenClaw 2026.2.6+ uses --message (not --text)
     text = job.get('text') or job.get('message', '')
     agent = job.get('agent', 'main')
     session = job.get('session', 'isolated')
     delivery = job.get('delivery', 'announce')
     
-    # Build command - use --text for 2026.2.3+ compatibility
+    # Build command - use --message for 2026.2.6+ CLI
     cmd = ['openclaw', 'cron', 'add', '--name', name]
     
     if 'every' in job:
@@ -417,11 +449,13 @@ for job in data.get('jobs', []):
     elif 'cron' in job:
         cmd.extend(['--cron', job['cron']])
     
-    cmd.extend(['--text', text, '--agent', agent, '--session', session])
+    cmd.extend(['--message', text, '--agent', agent, '--session', session])
     
-    # Add delivery mode if supported
-    if delivery:
-        cmd.extend(['--delivery', delivery])
+    # Add delivery mode: --announce flag (2026.2.6+ replaces --delivery)
+    if delivery == 'announce':
+        cmd.append('--announce')
+    elif delivery == 'none':
+        cmd.append('--no-deliver')
     
     # Check if job already exists
     check = subprocess.run(['openclaw', 'cron', 'list'], capture_output=True, text=True)
@@ -432,16 +466,16 @@ for job in data.get('jobs', []):
     # Create job
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode == 0:
-        print(f"  ✓ Created cron job: {name}")
+        print(f"  Created cron job: {name}")
     else:
-        # Fallback: try with --message for older versions
-        cmd_fallback = [c if c != '--text' else '--message' for c in cmd]
-        cmd_fallback = [c for c in cmd_fallback if c not in ('--delivery', delivery)]
+        print(f"  FAILED {name}: rc={result.returncode} err={result.stderr.strip()}")
+        # Fallback: try without --announce for minimal compatibility
+        cmd_fallback = [c for c in cmd if c not in ('--announce', '--no-deliver')]
         result2 = subprocess.run(cmd_fallback, capture_output=True, text=True)
         if result2.returncode == 0:
-            print(f"  ✓ Created cron job (legacy): {name}")
+            print(f"  Created cron job (fallback): {name}")
         else:
-            print(f"  ✗ Failed to create {name}: {result.stderr.strip()}")
+            print(f"  FAILED to create {name}: {result2.stderr.strip()}")
 PYINJECT
     
     touch "$CRON_MARKER"
