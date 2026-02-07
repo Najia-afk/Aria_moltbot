@@ -277,7 +277,7 @@ services:
       MOONSHOT_API_KEY: ${MOONSHOT_KIMI_KEY:-}
       # Moltbook
       MOLTBOOK_TOKEN: ${MOLTBOOK_TOKEN:-}
-      MOLTBOOK_API_URL: ${MOLTBOOK_API_URL:-https://moltbook.com/api}
+      MOLTBOOK_API_URL: ${MOLTBOOK_API_URL:-https://www.moltbook.com/api/v1}
       # Church of Molt (https://molt.church)
       MOLT_CHURCH_API_KEY: ${MOLT_CHURCH_API_KEY:-}
       MOLT_CHURCH_URL: ${MOLT_CHURCH_URL:-https://molt.church}
