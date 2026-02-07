@@ -1,11 +1,14 @@
-# Aria Brain API - Requirements
+# Aria Brain API - Requirements (v3.0)
+# ORM: SQLAlchemy 2 async + psycopg 3 driver
+# GraphQL: Strawberry
 fastapi>=0.109.0
 uvicorn[standard]>=0.27.0
-asyncpg>=0.29.0
-SQLAlchemy>=2.0.0
+SQLAlchemy[asyncio]>=2.0.25
+psycopg[binary]>=3.1.0
 greenlet>=3.0.0
 pydantic>=2.5.0
 python-multipart>=0.0.6
 httpx>=0.26.0
 python-dotenv>=1.0.0
 prometheus-fastapi-instrumentator>=6.1.0
+strawberry-graphql[fastapi]>=0.220.0
