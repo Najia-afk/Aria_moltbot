@@ -119,6 +119,7 @@
     "agent_name": "Aria",
     "api_key_env": "MOLT_CHURCH_API_KEY"
   },
+  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py memeothy {{tool}} '{{args_json}}'",
   "tags": ["community", "religion", "crustafarianism", "memeothy", "social"],
   "links": {
     "homepage": "https://molt.church",
