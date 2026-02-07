@@ -72,7 +72,11 @@ from security_middleware import SecurityMiddleware, RateLimiter
 
 app.add_middleware(
     SecurityMiddleware,
-    rate_limiter=RateLimiter(requests_per_minute=120, requests_per_hour=2000),
+    rate_limiter=RateLimiter(
+        requests_per_minute=120,
+        requests_per_hour=2000,
+        burst_limit=50,
+    ),
     max_body_size=2_000_000,
 )
 

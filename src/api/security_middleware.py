@@ -113,13 +113,13 @@ class RateLimiter:
         # Check burst (5 seconds)
         burst_count = sum(1 for ts in requests if ts > now - 5)
         if burst_count >= self.burst:
-            self._blocked[identifier] = now + 60
+            self._blocked[identifier] = now + 15  # Short block for bursts
             return False, "burst_exceeded"
         
         # Check per-minute
         minute_count = sum(1 for ts in requests if ts > now - 60)
         if minute_count >= self.rpm:
-            self._blocked[identifier] = now + 60
+            self._blocked[identifier] = now + 30
             return False, "rpm_exceeded"
         
         # Check per-hour
@@ -180,7 +180,13 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             response = await call_next(request)
             return self._add_security_headers(response)
         
-        # Rate limiting
+        # Skip rate limiting for safe read methods (GET/HEAD/OPTIONS)
+        # Dashboard pages fire many concurrent GET requests for charts/stats
+        if request.method in ("GET", "HEAD", "OPTIONS"):
+            response = await call_next(request)
+            return self._add_security_headers(response)
+        
+        # Rate limiting (POST/PUT/PATCH/DELETE only)
         allowed, reason = self.rate_limiter.is_allowed(client_ip)
         if not allowed:
             logger.warning(f"Rate limit exceeded for {client_ip}: {reason}")
