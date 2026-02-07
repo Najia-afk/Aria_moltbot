@@ -66,14 +66,20 @@ def build_litellm_models(catalog: Optional[Dict[str, Any]] = None) -> list[dict[
     for model_id, entry in models.items():
         if entry.get("provider") != "litellm":
             continue
+        # maxTokens MUST be a positive integer — OpenClaw UI sends NaN for
+        # empty fields, and Zod's z.coerce.number().positive() rejects NaN
+        # which blocks config.set entirely (breaking cron display + model save).
+        # Providing an explicit value prevents NaN round-trips.
+        ctx = entry.get("contextWindow", 8192)
+        max_tok = entry.get("maxTokens") or min(8192, ctx)
         result.append({
             "id": model_id,
             "name": entry.get("name", model_id),
             "reasoning": entry.get("reasoning", False),
             "input": entry.get("input", ["text"]),
             "cost": entry.get("cost", {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0}),
-            "contextWindow": entry.get("contextWindow", 0),
-            "maxTokens": entry.get("maxTokens", 0),
+            "contextWindow": ctx,
+            "maxTokens": max_tok,
         })
     return result
 
@@ -135,7 +141,10 @@ def build_litellm_config_entries(catalog: Optional[Dict[str, Any]] = None) -> li
         item: dict[str, Any] = {
             "model_name": model_id,
             "litellm_params": dict(litellm_params),  # copy
-            "model_info": {"max_tokens": entry.get("contextWindow", 0)},
+            "model_info": {
+                # max_tokens = output token cap, NOT context window
+                "max_tokens": entry.get("maxTokens") or min(8192, entry.get("contextWindow", 8192)),
+            },
         }
         cost = entry.get("cost", {})
         if cost.get("input", 0) == 0 and cost.get("output", 0) == 0:
