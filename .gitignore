@@ -11,9 +11,7 @@ aria_vault/
 # Generated configs - built at runtime from models.yaml
 stacks/brain/openclaw.json
 
-# Images (except essential)
-*.png
-*.jpg
+# macOS junk
 .DS_Store
 
 
