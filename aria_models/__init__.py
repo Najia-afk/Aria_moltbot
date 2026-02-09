@@ -10,6 +10,8 @@ from .loader import (
     list_models_with_reasoning,
     load_catalog,
     normalize_model_id,
+    reload_models,
+    validate_models,
 )
 
 __all__ = [
@@ -24,4 +26,6 @@ __all__ = [
     "list_models_with_reasoning",
     "load_catalog",
     "normalize_model_id",
+    "reload_models",
+    "validate_models",
 ]

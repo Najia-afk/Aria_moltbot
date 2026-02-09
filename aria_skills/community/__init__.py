@@ -7,8 +7,9 @@ Handles community metrics, engagement tracking, and growth strategies.
 """
 import random
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
+import warnings
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
 from aria_skills.registry import SkillRegistry
@@ -67,6 +68,11 @@ class CommunitySkill(BaseSkill):
     
     async def initialize(self) -> bool:
         """Initialize community skill."""
+        warnings.warn(
+            "community skill is deprecated, use social skill instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._members: dict[str, CommunityMember] = {}
         self._campaigns: dict[str, Campaign] = {}
         self._events: list[dict] = []
@@ -104,7 +110,7 @@ class CommunitySkill(BaseSkill):
                 member = CommunityMember(
                     id=member_id,
                     username=username,
-                    joined_at=datetime.utcnow(),
+                    joined_at=datetime.now(timezone.utc),
                     tags=tags or []
                 )
                 self._members[member_id] = member
@@ -168,7 +174,7 @@ class CommunitySkill(BaseSkill):
                 "type": engagement_type,
                 "member": username,
                 "content_id": content_id,
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             })
             
             return SkillResult.ok({
@@ -304,14 +310,14 @@ class CommunitySkill(BaseSkill):
             SkillResult with campaign details
         """
         try:
-            campaign_id = f"camp_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+            campaign_id = f"camp_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
             
             campaign = Campaign(
                 id=campaign_id,
                 name=name,
                 goal=goal,
-                start_date=datetime.utcnow(),
-                end_date=datetime.utcnow() + timedelta(days=duration_days),
+                start_date=datetime.now(timezone.utc),
+                end_date=datetime.now(timezone.utc) + timedelta(days=duration_days),
                 status="active"
             )
             
@@ -411,7 +417,7 @@ class CommunitySkill(BaseSkill):
             ]
             
             calendar = []
-            start_date = datetime.utcnow()
+            start_date = datetime.now(timezone.utc)
             
             for day in range(days):
                 date = start_date + timedelta(days=day)

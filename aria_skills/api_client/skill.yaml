@@ -1,0 +1,6 @@
+name: api_client
+layer: 1
+version: "1.0"
+status: active
+description: "Centralized HTTP client — sole DB gateway for all aria-api interactions"
+dependencies: []

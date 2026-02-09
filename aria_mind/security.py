@@ -22,7 +22,7 @@ import re
 import time
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from functools import wraps
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TypeVar, Union
@@ -646,7 +646,7 @@ class SecurityAuditLog:
     ):
         """Log a security event."""
         event = SecurityEvent(
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             event_type=event_type,
             severity=severity,
             source=source,
@@ -701,7 +701,7 @@ class SecurityAuditLog:
     
     def get_summary(self, hours: int = 24) -> Dict[str, Any]:
         """Get summary of recent security events."""
-        cutoff = datetime.utcnow() - timedelta(hours=hours)
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
         recent = [e for e in self._events if e.timestamp >= cutoff]
         
         by_severity = defaultdict(int)

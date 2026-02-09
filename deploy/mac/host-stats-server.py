@@ -8,7 +8,7 @@ Run via launchd for persistent monitoring
 import json
 import subprocess
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 def get_memory_stats():
@@ -117,7 +117,7 @@ class StatsHandler(BaseHTTPRequestHandler):
                 "swap": get_swap_stats(),
                 "disk": get_disk_stats(),
                 "smart": get_smart_status(),
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "hostname": subprocess.check_output(['hostname']).decode().strip()
             }
             

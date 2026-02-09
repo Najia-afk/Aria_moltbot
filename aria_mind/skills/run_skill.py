@@ -154,79 +154,98 @@ SKILL_REGISTRY = {
 }
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# P2.1 Agent Session Tracking — logs every skill invocation to agent_sessions
-# P2.2 Model Usage Tracking — logs token/cost estimates to model_usage
-# P2.3 Rate Limit Tracking — logs 429 / rate-limit events to rate_limits
-# ──────────────────────────────────────────────────────────────────────────────
-
-_DB_URL = os.environ.get('DATABASE_URL', '')
-
-async def _get_db_conn():
-    """Get a raw asyncpg connection for lightweight tracking (fire-and-forget)."""
+def _merge_registries():
+    """Sync decorator-registered skills into SKILL_REGISTRY."""
     try:
-        import asyncpg
-        return await asyncpg.connect(_DB_URL, timeout=5)
+        from aria_skills.registry import SkillRegistry
+        for name, skill_cls in SkillRegistry._skill_classes.items():
+            if name not in SKILL_REGISTRY:
+                mod = skill_cls.__module__
+                SKILL_REGISTRY[name] = (mod, skill_cls.__name__, lambda: {})
     except Exception:
-        return None
+        pass  # registry may not be importable in all environments
+
+_merge_registries()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# P2.1 Agent Session Tracking — logs every skill invocation via aria-api
+# P2.2 Model Usage Tracking — logs token/cost estimates via aria-api
+# Architecture: Skills → api_client (httpx) → aria-api → SQLAlchemy → DB
+# ──────────────────────────────────────────────────────────────────────────────
+
+_API_BASE = os.environ.get('ARIA_API_URL', 'http://aria-api:8000/api').rstrip('/')
+
+try:
+    import httpx
+    _HAS_HTTPX = True
+except ImportError:
+    _HAS_HTTPX = False
+
+import logging as _logging
+_tracker_log = _logging.getLogger('aria.skill_tracker')
+
+
+async def _api_post(endpoint: str, payload: dict) -> bool:
+    """Fire-and-forget POST to aria-api. Returns True on success."""
+    if not _HAS_HTTPX:
+        _tracker_log.debug('httpx not installed — skipping tracking POST')
+        return False
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.post(f'{_API_BASE}{endpoint}', json=payload)
+            resp.raise_for_status()
+            return True
+    except Exception as exc:
+        _tracker_log.debug('Tracking POST %s failed: %s', endpoint, exc)
+        return False
+
+
+def _log_locally(event_type: str, data: dict):
+    """Fallback: log tracking data locally when the API is unreachable."""
+    _tracker_log.warning('API unreachable — logging %s locally: %s', event_type, json.dumps(data, default=str))
 
 
 async def _log_session(skill_name: str, function_name: str, duration_ms: float,
                        success: bool, error_msg: str = None):
-    """P2.1 — Log skill invocation to agent_sessions table (matches seed schema)."""
-    conn = await _get_db_conn()
-    if not conn:
-        return
-    try:
-        now = datetime.now(timezone.utc)
-        await conn.execute(
-            """INSERT INTO agent_sessions
-               (agent_id, session_type, started_at, ended_at, status, metadata)
-               VALUES ($1, $2, $3, $4, $5, $6::jsonb)""",
-            os.environ.get('OPENCLAW_AGENT_ID', 'main'),
-            'skill_exec',
-            now,
-            now,                                       # ended_at ≈ started_at for single invocations
-            'completed' if success else 'error',
-            json.dumps({
-                'skill': skill_name,
-                'function': function_name,
-                'duration_ms': round(duration_ms, 2),
-                'success': success,
-                'error': error_msg,
-            }),
-        )
-    except Exception:
-        pass  # tracking is best-effort
-    finally:
-        await conn.close()
+    """P2.1 — Log skill invocation to agent_sessions via aria-api."""
+    payload = {
+        'agent_id': os.environ.get('OPENCLAW_AGENT_ID', 'main'),
+        'session_type': 'skill_exec',
+        'status': 'completed' if success else 'error',
+        'metadata': {
+            'skill': skill_name,
+            'function': function_name,
+            'duration_ms': round(duration_ms, 2),
+            'success': success,
+            'error': error_msg,
+        },
+    }
+    ok = await _api_post('/sessions', payload)
+    if not ok:
+        _log_locally('session', payload)
 
 
 async def _log_model_usage(skill_name: str, function_name: str, duration_ms: float):
-    """P2.2 — Log approximate model usage to model_usage table (matches seed schema)."""
-    conn = await _get_db_conn()
-    if not conn:
-        return
-    try:
-        await conn.execute(
-            """INSERT INTO model_usage
-               (model, provider, latency_ms, success, created_at)
-               VALUES ($1, $2, $3, $4, $5)""",
-            f'skill:{skill_name}:{function_name}',
-            'skill-exec',
-            int(duration_ms),
-            True,
-            datetime.now(timezone.utc),
-        )
-    except Exception:
-        pass
-    finally:
-        await conn.close()
+    """P2.2 — Log approximate model usage via aria-api."""
+    payload = {
+        'model': f'skill:{skill_name}:{function_name}',
+        'provider': 'skill-exec',
+        'latency_ms': int(duration_ms),
+        'success': True,
+    }
+    ok = await _api_post('/model-usage', payload)
+    if not ok:
+        _log_locally('model_usage', payload)
 
 async def run_skill(skill_name: str, function_name: str, args: dict):
     """Run a skill function with the given arguments. Logs session + usage."""
     t0 = time.monotonic()
     try:
+        # Normalize canonical "aria-*" names to python underscore names
+        if skill_name.startswith("aria-"):
+            skill_name = skill_name[5:].replace("-", "_")
+
         if skill_name not in SKILL_REGISTRY:
             available = ', '.join(sorted(SKILL_REGISTRY.keys()))
             return {'error': f'Unknown skill: {skill_name}. Available: {available}'}
@@ -289,20 +308,84 @@ async def run_skill(skill_name: str, function_name: str, args: dict):
         return {'error': str(e), 'traceback': traceback.format_exc()}
 
 if __name__ == '__main__':
-    if len(sys.argv) < 3:
+    import argparse
+    import importlib
+    from pathlib import Path
+
+    # Parse known args first to not break positional interface
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--list-skills", action="store_true")
+    parser.add_argument("--health-check-all", action="store_true")
+    parser.add_argument("--export-catalog", action="store_true")
+    cli_args, remaining = parser.parse_known_args()
+
+    if cli_args.list_skills:
+        print(f"{'Name':<22} {'Canonical':<24} {'Module':<40} {'skill.json'}")
+        print("-" * 100)
+        for name, (mod, cls, _) in sorted(SKILL_REGISTRY.items()):
+            canonical = f"aria-{name.replace('_', '-')}"
+            has_json = Path(f"aria_skills/{name}/skill.json").exists()
+            print(f"{name:<22} {canonical:<24} {mod:<40} {'YES' if has_json else 'no'}")
+        sys.exit(0)
+
+    if cli_args.export_catalog:
+        catalog = {
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "skills": []
+        }
+        for name, (mod, cls_name, _) in sorted(SKILL_REGISTRY.items()):
+            try:
+                module = importlib.import_module(mod)
+                skill_cls = getattr(module, cls_name)
+                methods = [m for m in dir(skill_cls)
+                           if not m.startswith('_') and callable(getattr(skill_cls, m, None))
+                           and m not in ('initialize', 'health_check', 'name', 'canonical_name', 'close', 'is_available', 'status')]
+                catalog["skills"].append({
+                    "name": name,
+                    "canonical_name": f"aria-{name.replace('_', '-')}",
+                    "module": mod,
+                    "class": cls_name,
+                    "methods": methods
+                })
+            except Exception as e:
+                catalog["skills"].append({"name": name, "module": mod, "error": str(e)})
+        Path("aria_memories/exports").mkdir(parents=True, exist_ok=True)
+        Path("aria_memories/exports/skill_catalog.json").write_text(json.dumps(catalog, indent=2))
+        print(f"Catalog written: {len(catalog['skills'])} skills -> aria_memories/exports/skill_catalog.json")
+        sys.exit(0)
+
+    if cli_args.health_check_all:
+        async def _check_all():
+            for name, (mod, cls_name, config_fn) in sorted(SKILL_REGISTRY.items()):
+                try:
+                    module = importlib.import_module(mod)
+                    skill_cls = getattr(module, cls_name)
+                    from aria_skills.base import SkillConfig
+                    config = SkillConfig(name=name, config=config_fn())
+                    skill = skill_cls(config=config)
+                    ok = await skill.initialize()
+                    status = (await skill.health_check()).value if ok else "INIT_FAILED"
+                    print(f"{name:<22} {status}")
+                except Exception as e:
+                    print(f"{name:<22} ERROR: {e}")
+        asyncio.run(_check_all())
+        sys.exit(0)
+
+    # Original positional argument interface
+    if len(remaining) < 2:
         print(json.dumps({
             'error': 'Usage: run_skill.py <skill_name> <function_name> [args_json]',
             'available_skills': sorted(SKILL_REGISTRY.keys())
         }))
         sys.exit(1)
     
-    skill_name = sys.argv[1]
-    function_name = sys.argv[2]
+    skill_name = remaining[0]
+    function_name = remaining[1]
     
     # Defensive JSON parsing - handle malformed tool call args from OpenClaw
     args = {}
-    if len(sys.argv) > 3:
-        raw = sys.argv[3]
+    if len(remaining) > 2:
+        raw = remaining[2]
         try:
             args = json.loads(raw)
         except json.JSONDecodeError:

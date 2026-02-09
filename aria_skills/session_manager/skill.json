@@ -1,5 +1,5 @@
 {
-  "name": "aria-sessionmanager",
+  "name": "aria-session-manager",
   "version": "1.0.0",
   "description": "Manage OpenClaw sessions — list, prune stale sessions, delete by ID, and clean up after sub-agent delegations.",
   "author": "Aria Team",

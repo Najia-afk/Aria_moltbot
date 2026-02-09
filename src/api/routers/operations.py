@@ -7,7 +7,7 @@ import json
 import json as json_lib
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -71,7 +71,7 @@ async def check_rate_limit(request: Request, db: AsyncSession = Depends(get_db))
     if not rl:
         return {"allowed": True, "remaining": max_actions, "window_age": 0}
 
-    window_age = (datetime.utcnow() - rl.window_start).total_seconds() if rl.window_start else 0
+    window_age = (datetime.now(timezone.utc) - rl.window_start).total_seconds() if rl.window_start else 0
     if window_age > window_seconds:
         rl.action_count = 0
         await db.commit()
@@ -331,7 +331,7 @@ async def manual_tick(db: AsyncSession = Depends(get_db)):
         "ljn": last_job_name, "ljs": last_job_status, "nja": next_job_at,
     })
     await db.commit()
-    return {"ticked": True, "at": datetime.utcnow().isoformat(), "jobs_total": jobs_total}
+    return {"ticked": True, "at": datetime.now(timezone.utc).isoformat(), "jobs_total": jobs_total}
 
 
 # ──────────────────────────────────────────────────────────────────────────────

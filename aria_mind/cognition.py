@@ -162,16 +162,12 @@ class Cognition:
         """
         Fallback processing without agents.
         
-        Respects SOUL.md model hierarchy:
-        1. ollama (qwen3-vl:8b) - Local, free, private, vision (DEFAULT per SOUL.md)
-        2. moonshot - Cloud fallback for creative/long tasks
+        Respects models.yaml priority: local → free → paid.
+        Uses litellm router which handles model selection internally.
         """
         if self._skills:
-            # SOUL.md says: local first (qwen/ollama), then cloud fallback
-            llm = (
-                self._skills.get("ollama") or  # Local first (Aria's preference)
-                self._skills.get("moonshot")   # Alternative cloud
-            )
+            # Use LiteLLM router (handles model priority per models.yaml)
+            llm = self._skills.get("litellm") or self._skills.get("llm")
             if llm and llm.is_available:
                 result = await llm.generate(
                     prompt=prompt,

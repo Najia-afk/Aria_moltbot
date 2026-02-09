@@ -8,7 +8,7 @@ Handles data transformations, validations, and ETL workflows.
 import json
 import os
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Optional
 
@@ -51,6 +51,9 @@ class DataPipelineSkill(BaseSkill):
     
     async def initialize(self) -> bool:
         """Initialize data pipeline skill."""
+        # TODO: TICKET-12 - stub requires API endpoint for pipeline persistence.
+        # Currently in-memory only. Needs POST/GET /api/pipelines endpoints.
+        self.logger.warning("data_pipeline skill is in-memory only — API endpoint not yet available")
         self._pipelines: dict[str, list[PipelineStep]] = {}
         self._status = SkillStatus.AVAILABLE
         self.logger.info("📊 Data pipeline skill initialized")
@@ -91,7 +94,7 @@ class DataPipelineSkill(BaseSkill):
                 "pipeline": name,
                 "steps": len(pipeline_steps),
                 "step_names": [s.name for s in pipeline_steps],
-                "defined_at": datetime.utcnow().isoformat()
+                "defined_at": datetime.now(timezone.utc).isoformat()
             })
             
         except Exception as e:
@@ -148,7 +151,7 @@ class DataPipelineSkill(BaseSkill):
                 "records_checked": len(data),
                 "errors": errors,
                 "warnings": warnings,
-                "validated_at": datetime.utcnow().isoformat()
+                "validated_at": datetime.now(timezone.utc).isoformat()
             })
             
         except Exception as e:
@@ -208,7 +211,7 @@ class DataPipelineSkill(BaseSkill):
                 },
                 "records_analyzed": len(data),
                 "fields_found": len(inferred_fields),
-                "inferred_at": datetime.utcnow().isoformat()
+                "inferred_at": datetime.now(timezone.utc).isoformat()
             })
             
         except Exception as e:
@@ -275,7 +278,7 @@ class DataPipelineSkill(BaseSkill):
                 "input_count": len(data),
                 "output_count": len(result),
                 "transformations_applied": len(transformations),
-                "transformed_at": datetime.utcnow().isoformat()
+                "transformed_at": datetime.now(timezone.utc).isoformat()
             })
             
         except Exception as e:
@@ -334,7 +337,7 @@ class DataPipelineSkill(BaseSkill):
                 "duplicate_records": duplicates,
                 "overall_completeness": round(avg_completeness, 3),
                 "quality_score": round(avg_completeness * (1 - duplicates / total_records), 3),
-                "analyzed_at": datetime.utcnow().isoformat()
+                "analyzed_at": datetime.now(timezone.utc).isoformat()
             })
             
         except Exception as e:

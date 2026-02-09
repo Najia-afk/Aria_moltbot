@@ -1,0 +1,6 @@
+name: health
+layer: 2
+version: "1.0"
+status: active
+description: "System health monitoring — checks Python, memory, disk, network, environment"
+dependencies: []

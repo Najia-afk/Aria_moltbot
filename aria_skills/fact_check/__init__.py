@@ -8,8 +8,9 @@ Handles claim analysis, source verification, and evidence gathering.
 import hashlib
 import random
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
+import warnings
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
 from aria_skills.registry import SkillRegistry
@@ -22,7 +23,7 @@ class Claim:
     statement: str
     source: Optional[str] = None
     context: Optional[str] = None
-    submitted_at: datetime = field(default_factory=datetime.utcnow)
+    submitted_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 @dataclass
@@ -43,7 +44,7 @@ class FactCheckResult:
     confidence: float
     evidence: list[Evidence]
     explanation: str
-    checked_at: datetime = field(default_factory=datetime.utcnow)
+    checked_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 @SkillRegistry.register
@@ -86,6 +87,11 @@ class FactCheckSkill(BaseSkill):
     
     async def initialize(self) -> bool:
         """Initialize fact-checking skill."""
+        warnings.warn(
+            "fact_check skill is deprecated, use research skill instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._claims: dict[str, Claim] = {}
         self._results: dict[str, FactCheckResult] = {}
         self._status = SkillStatus.AVAILABLE

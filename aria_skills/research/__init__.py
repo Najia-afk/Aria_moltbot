@@ -4,13 +4,17 @@
 
 Provides research capabilities for Aria's Journalist persona.
 Handles source discovery, article synthesis, and research workflows.
+Persists via REST API (TICKET-12: eliminate in-memory stubs).
 """
 import hashlib
+import os
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 
-from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
+import httpx
+
+from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
 from aria_skills.registry import SkillRegistry
 
 
@@ -22,7 +26,7 @@ class Source:
     title: str
     source_type: str  # article, paper, social, official
     credibility: float = 0.5
-    accessed_at: datetime = field(default_factory=datetime.utcnow)
+    accessed_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     notes: str = ""
 
 
@@ -36,7 +40,7 @@ class ResearchProject:
     findings: list[str] = field(default_factory=list)
     questions: list[str] = field(default_factory=list)
     status: str = "active"  # active, completed, archived
-    started_at: datetime = field(default_factory=datetime.utcnow)
+    started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 @SkillRegistry.register
@@ -69,15 +73,26 @@ class ResearchSkill(BaseSkill):
     
     async def initialize(self) -> bool:
         """Initialize research skill."""
-        self._projects: dict[str, ResearchProject] = {}
+        self._projects: dict[str, ResearchProject] = {}  # fallback cache
+        self._api_url = os.environ.get('ARIA_API_URL', 'http://aria-api:8000/api')
+        self._client: Optional[httpx.AsyncClient] = httpx.AsyncClient(
+            base_url=self._api_url, timeout=30.0
+        )
         self._status = SkillStatus.AVAILABLE
-        self.logger.info("📚 Research skill initialized")
+        self.logger.info("📚 Research skill initialized (API-backed)")
         return True
+    
+    async def close(self):
+        """Close the httpx client."""
+        if self._client:
+            await self._client.aclose()
+            self._client = None
     
     async def health_check(self) -> SkillStatus:
         """Check research skill availability."""
         return self._status
     
+    @logged_method()
     async def start_project(
         self,
         topic: str,
@@ -94,7 +109,7 @@ class ResearchSkill(BaseSkill):
             SkillResult with project details
         """
         try:
-            project_hash = hashlib.md5(f"{topic}{datetime.utcnow().isoformat()}".encode()).hexdigest()[:8]
+            project_hash = hashlib.md5(f"{topic}{datetime.now(timezone.utc).isoformat()}".encode()).hexdigest()[:8]
             project_id = f"research_{project_hash}"
             
             project = ResearchProject(
@@ -104,6 +119,9 @@ class ResearchSkill(BaseSkill):
             )
             
             self._projects[project_id] = project
+            
+            # Persist to API
+            await self._save_project_to_api(project)
             
             return SkillResult.ok({
                 "project_id": project_id,
@@ -160,6 +178,9 @@ class ResearchSkill(BaseSkill):
             
             project.sources.append(source)
             
+            # Persist to API
+            await self._save_project_to_api(project)
+            
             return SkillResult.ok({
                 "source_id": source.id,
                 "title": title,
@@ -201,6 +222,9 @@ class ResearchSkill(BaseSkill):
             
             project.findings.append(finding)
             
+            # Persist to API
+            await self._save_project_to_api(project)
+            
             return SkillResult.ok({
                 "finding": finding,
                 "total_findings": len(project.findings),
@@ -227,6 +251,9 @@ class ResearchSkill(BaseSkill):
             
             project = self._projects[project_id]
             project.thesis = thesis
+            
+            # Persist to API
+            await self._save_project_to_api(project)
             
             return SkillResult.ok({
                 "project_id": project_id,
@@ -336,6 +363,7 @@ class ResearchSkill(BaseSkill):
         except Exception as e:
             return SkillResult.fail(f"Synthesis failed: {str(e)}")
     
+    @logged_method()
     async def complete_project(
         self,
         project_id: str,
@@ -358,6 +386,9 @@ class ResearchSkill(BaseSkill):
             project = self._projects[project_id]
             project.status = "completed"
             
+            # Persist to API
+            await self._save_project_to_api(project)
+            
             return SkillResult.ok({
                 "project_id": project_id,
                 "topic": project.topic,
@@ -367,9 +398,9 @@ class ResearchSkill(BaseSkill):
                 "stats": {
                     "sources": len(project.sources),
                     "findings": len(project.findings),
-                    "duration_hours": round((datetime.utcnow() - project.started_at).total_seconds() / 3600, 1)
+                    "duration_hours": round((datetime.now(timezone.utc) - project.started_at).total_seconds() / 3600, 1)
                 },
-                "completed_at": datetime.utcnow().isoformat()
+                "completed_at": datetime.now(timezone.utc).isoformat()
             })
             
         except Exception as e:
@@ -386,32 +417,87 @@ class ResearchSkill(BaseSkill):
             SkillResult with project list
         """
         try:
+            # Try API first
+            params = {"type": "research"}
+            if status:
+                params["status"] = status
+            resp = await self._client.get("/memories", params=params)
+            resp.raise_for_status()
+            api_data = resp.json()
+            memories = api_data if isinstance(api_data, list) else api_data.get("memories", [])
             projects = []
-            
-            for project in self._projects.values():
-                if status and project.status != status:
-                    continue
-                
+            for mem in memories:
+                data = mem.get("data", mem)
                 projects.append({
-                    "id": project.id,
-                    "topic": project.topic,
-                    "thesis": project.thesis,
-                    "status": project.status,
-                    "sources": len(project.sources),
-                    "findings": len(project.findings),
-                    "started_at": project.started_at.isoformat()
+                    "id": data.get("id", mem.get("id", "")),
+                    "topic": data.get("topic", ""),
+                    "thesis": data.get("thesis"),
+                    "status": data.get("status", "active"),
+                    "sources": len(data.get("sources", [])),
+                    "findings": len(data.get("findings", [])),
+                    "started_at": data.get("started_at", ""),
                 })
-            
-            return SkillResult.ok({
-                "projects": projects,
-                "total": len(projects),
-                "filter": status
-            })
-            
+            if status:
+                projects = [p for p in projects if p["status"] == status]
+            return SkillResult.ok({"projects": projects, "total": len(projects), "filter": status})
         except Exception as e:
-            return SkillResult.fail(f"Project listing failed: {str(e)}")
+            self.logger.warning(f"API list_projects failed, using fallback: {e}")
+            # Fallback to in-memory
+            try:
+                projects = []
+                for project in self._projects.values():
+                    if status and project.status != status:
+                        continue
+                    projects.append({
+                        "id": project.id,
+                        "topic": project.topic,
+                        "thesis": project.thesis,
+                        "status": project.status,
+                        "sources": len(project.sources),
+                        "findings": len(project.findings),
+                        "started_at": project.started_at.isoformat()
+                    })
+                return SkillResult.ok({"projects": projects, "total": len(projects), "filter": status})
+            except Exception as e2:
+                return SkillResult.fail(f"Project listing failed: {str(e2)}")
     
     # === Private Helper Methods ===
+    
+    async def _save_project_to_api(self, project: ResearchProject) -> None:
+        """Persist a research project to the API as a memory entry."""
+        try:
+            memory_data = {
+                "type": "research",
+                "key": project.id,
+                "data": self._serialize_project(project),
+            }
+            await self._client.post("/memories", json=memory_data)
+        except Exception as e:
+            self.logger.warning(f"API _save_project_to_api failed: {e}")
+    
+    def _serialize_project(self, project: ResearchProject) -> dict:
+        """Serialize a ResearchProject to a JSON-safe dict."""
+        return {
+            "id": project.id,
+            "topic": project.topic,
+            "thesis": project.thesis,
+            "status": project.status,
+            "started_at": project.started_at.isoformat(),
+            "questions": project.questions,
+            "findings": project.findings,
+            "sources": [
+                {
+                    "id": s.id,
+                    "url": s.url,
+                    "title": s.title,
+                    "source_type": s.source_type,
+                    "credibility": s.credibility,
+                    "accessed_at": s.accessed_at.isoformat(),
+                    "notes": s.notes,
+                }
+                for s in project.sources
+            ],
+        }
     
     def _generate_research_questions(self, topic: str) -> list[str]:
         """Generate initial research questions for a topic."""

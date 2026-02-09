@@ -36,7 +36,9 @@ def _as_psycopg_url(url: str) -> str:
 async_engine = create_async_engine(
     _as_psycopg_url(DATABASE_URL),
     pool_size=10,
-    max_overflow=5,
+    max_overflow=20,
+    pool_timeout=30,
+    pool_recycle=3600,
     pool_pre_ping=True,
     echo=False,
 )

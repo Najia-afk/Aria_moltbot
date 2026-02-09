@@ -7,10 +7,10 @@ Checks Aria's internal systems and reports health status.
 import asyncio
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
+from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
 from aria_skills.registry import SkillRegistry
 
 
@@ -41,6 +41,7 @@ class HealthMonitorSkill(BaseSkill):
         """Check own health (meta!)."""
         return self._status
     
+    @logged_method()
     async def check_system(self) -> SkillResult:
         """
         Run comprehensive system health check.
@@ -56,7 +57,7 @@ class HealthMonitorSkill(BaseSkill):
             "environment": await self._check_environment(),
         }
         
-        self._last_check = datetime.utcnow()
+        self._last_check = datetime.now(timezone.utc)
         self._check_results = checks
         
         # Determine overall health

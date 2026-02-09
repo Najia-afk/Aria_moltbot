@@ -8,11 +8,18 @@ Modular API with:
   • Prometheus instrumentation
 """
 
+import uuid as _uuid
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
+
+try:
+    from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+    HAS_PROMETHEUS = True
+except ImportError:
+    HAS_PROMETHEUS = False
 
 from config import API_VERSION
 from db import async_engine, ensure_schema
@@ -81,6 +88,25 @@ app.add_middleware(
 )
 
 Instrumentator().instrument(app).expose(app)
+
+
+@app.middleware("http")
+async def correlation_middleware(request, call_next):
+    from aria_mind.logging_config import correlation_id_var
+    cid = request.headers.get("X-Correlation-ID", str(_uuid.uuid4())[:8])
+    correlation_id_var.set(cid)
+    response = await call_next(request)
+    response.headers["X-Correlation-ID"] = cid
+    return response
+
+
+@app.get("/api/metrics")
+async def metrics():
+    if HAS_PROMETHEUS:
+        from starlette.responses import Response
+        return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+    return {"error": "prometheus_client not installed"}
+
 
 # ── REST routers ─────────────────────────────────────────────────────────────
 

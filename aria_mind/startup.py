@@ -11,7 +11,7 @@ import asyncio
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 logging.basicConfig(
     level=logging.INFO,
@@ -22,6 +22,9 @@ logger = logging.getLogger("aria.startup")
 
 async def run_startup():
     """Execute Aria's startup sequence."""
+    from aria_mind.logging_config import configure_logging
+    configure_logging()
+
     print("=" * 60)
     print("⚡️ ARIA BLUE - AWAKENING SEQUENCE")
     print("=" * 60)
@@ -46,7 +49,7 @@ async def run_startup():
     
     # Initialize each skill
     skills_status = {}
-    for skill_name in ["database", "moonshot", "moltbook"]:
+    for skill_name in ["database", "litellm", "moltbook"]:
         skill = registry.get(skill_name)
         if skill:
             try:
@@ -120,7 +123,7 @@ async def run_startup():
                 """,
                 "startup",
                 "system",
-                json.dumps({"skills": skills_status, "timestamp": datetime.utcnow().isoformat()}),
+                json.dumps({"skills": skills_status, "timestamp": datetime.now(timezone.utc).isoformat()}),
                 True,
             )
             print("   ✓ Startup logged to activity_log")
@@ -131,7 +134,7 @@ async def run_startup():
                 INSERT INTO thoughts (content, category)
                 VALUES ($1, $2)
                 """,
-                f"Awakened at {datetime.utcnow().isoformat()}. Systems online. Ready to serve. ⚡️",
+                f"Awakened at {datetime.now(timezone.utc).isoformat()}. Systems online. Ready to serve. ⚡️",
                 "awakening",
             )
             print("   ✓ Awakening thought logged")
@@ -239,7 +242,7 @@ async def run_forever():
                         heartbeat_count,
                         "alive",
                         json.dumps({
-                            "timestamp": datetime.utcnow().isoformat(),
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
                             "mind_alive": mind.is_alive,
                             "soul": mind.soul.name if mind.soul else None,
                         }),
@@ -265,7 +268,7 @@ async def run_forever():
                     """,
                     "shutdown",
                     "system",
-                    json.dumps({"heartbeats": heartbeat_count, "timestamp": datetime.utcnow().isoformat()}),
+                    json.dumps({"heartbeats": heartbeat_count, "timestamp": datetime.now(timezone.utc).isoformat()}),
                     True,
                 )
             except Exception:

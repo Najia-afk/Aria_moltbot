@@ -29,6 +29,7 @@ class SkillRegistry:
     def __init__(self):
         self._skills: Dict[str, BaseSkill] = {}
         self._configs: Dict[str, SkillConfig] = {}
+        self._aliases: Dict[str, str] = {}
         # Backward-compatible alias for tests
         self._registered_classes = self._skill_classes
     
@@ -46,7 +47,10 @@ class SkillRegistry:
         dummy_config = SkillConfig(name="dummy")
         instance = skill_class(dummy_config)
         cls._skill_classes[instance.name] = skill_class
-        logger.debug(f"Registered skill class: {instance.name}")
+        # Also register under canonical name for cross-system lookup
+        canonical = f"aria-{instance.name.replace('_', '-')}"
+        cls._skill_classes[canonical] = skill_class
+        logger.debug(f"Registered skill class: {instance.name} (canonical: {canonical})")
         return skill_class
     
     async def load_from_config(self, config_path: str) -> int:
@@ -75,8 +79,9 @@ class SkillRegistry:
                 skill = skill_class(config)
                 if await skill.initialize():
                     self._skills[config.name] = skill
+                    self._skills[skill.canonical_name] = skill  # canonical alias
                     loaded += 1
-                    logger.info(f"Loaded skill: {config.name}")
+                    logger.info(f"Loaded skill: {config.name} (canonical: {skill.canonical_name})")
                 else:
                     logger.warning(f"Failed to initialize skill: {config.name}")
         
@@ -90,8 +95,8 @@ class SkillRegistry:
         """
         configs = []
         
-        # Find all yaml code blocks
-        pattern = r"```yaml\s*\n(.*?)```"
+        # Find all yaml/tool code blocks
+        pattern = r"```(?:yaml|tool)\s*\n(.*?)```"
         matches = re.findall(pattern, content, re.DOTALL)
         
         for match in matches:
@@ -165,8 +170,14 @@ class SkillRegistry:
         return result
     
     def get(self, name: str) -> Optional[BaseSkill]:
-        """Get a skill by name."""
-        return self._skills.get(name)
+        """Get a skill by name (supports both python name and canonical name)."""
+        skill = self._skills.get(name)
+        if skill is None:
+            # Try normalizing from canonical to python name
+            if name.startswith("aria-"):
+                python_name = name[5:].replace("-", "_")
+                skill = self._skills.get(python_name)
+        return skill
     
     def list_available(self) -> List[str]:
         """List all available (loaded) skill names."""

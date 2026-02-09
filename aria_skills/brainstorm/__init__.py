@@ -7,8 +7,9 @@ Handles idea generation, concept exploration, and creative problem-solving.
 """
 import random
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
+import warnings
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
 from aria_skills.registry import SkillRegistry
@@ -23,7 +24,7 @@ class Idea:
     category: str
     tags: list[str] = field(default_factory=list)
     score: float = 0.0  # Relevance/quality score
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 @dataclass
@@ -33,7 +34,7 @@ class BrainstormSession:
     topic: str
     ideas: list[Idea] = field(default_factory=list)
     constraints: list[str] = field(default_factory=list)
-    started_at: datetime = field(default_factory=datetime.utcnow)
+    started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 @SkillRegistry.register
@@ -131,6 +132,11 @@ class BrainstormSkill(BaseSkill):
     
     async def initialize(self) -> bool:
         """Initialize brainstorming skill."""
+        warnings.warn(
+            "brainstorm skill is deprecated, use research skill instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._sessions: dict[str, BrainstormSession] = {}
         self._idea_counter = 0
         self._status = SkillStatus.AVAILABLE
@@ -157,7 +163,7 @@ class BrainstormSkill(BaseSkill):
             SkillResult with session ID and initial prompts
         """
         try:
-            session_id = f"bs_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+            session_id = f"bs_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
             
             session = BrainstormSession(
                 id=session_id,
@@ -476,7 +482,7 @@ class BrainstormSkill(BaseSkill):
                     }
                     for i in session.ideas
                 ],
-                "duration_minutes": round((datetime.utcnow() - session.started_at).total_seconds() / 60, 1),
+                "duration_minutes": round((datetime.now(timezone.utc) - session.started_at).total_seconds() / 60, 1),
                 "next_steps": [
                     "Evaluate ideas if not done",
                     "Find connections between top ideas",

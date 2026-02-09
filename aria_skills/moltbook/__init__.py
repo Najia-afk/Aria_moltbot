@@ -10,7 +10,7 @@ API docs: https://www.moltbook.com/skill.md
 """
 import os
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, List, Optional
 from urllib.parse import quote
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
@@ -46,6 +46,16 @@ class MoltbookSkill(BaseSkill):
         api_url: Moltbook API base URL (default: https://www.moltbook.com/api/v1)
         api_key: MOLTBOOK_API_KEY or MOLTBOOK_TOKEN
     """
+
+    platform_name = "moltbook"
+
+    def __init__(self, config: SkillConfig):
+        super().__init__(config)
+        self._client: Optional["httpx.AsyncClient"] = None
+        self._local_client: Optional["httpx.AsyncClient"] = None
+        self._api_url = MOLTBOOK_DEFAULT_URL
+        self._api_key = ""
+        self._local_api_url = "http://aria-api:8000"
 
     @property
     def name(self) -> str:
@@ -536,3 +546,15 @@ class MoltbookSkill(BaseSkill):
             return SkillResult.fail(f"Status check failed ({resp.status_code})")
         except Exception as e:
             return SkillResult.fail(f"Status check failed: {e}")
+
+    # ------------------------------------------------------------------
+    # SocialPlatform protocol aliases
+    # ------------------------------------------------------------------
+
+    async def post(self, content: str, tags: Optional[List[str]] = None) -> SkillResult:
+        """SocialPlatform.post() implementation."""
+        return await self.create_post(content=content)
+
+    async def get_posts(self, limit: int = 10) -> SkillResult:
+        """SocialPlatform.get_posts() implementation."""
+        return await self.get_feed(limit=limit)

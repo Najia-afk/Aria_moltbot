@@ -100,78 +100,96 @@ class TestMoltbookSkill:
     """Tests for MoltbookSkill."""
     
     @pytest.mark.asyncio
-    async def test_post_status_rate_limit(self, mock_env):
-        """Test rate limiting on posts."""
+    async def test_create_post_no_client(self, mock_env):
+        """Test that create_post fails gracefully without API client."""
         from aria_skills.moltbook import MoltbookSkill
         
         config = SkillConfig(
             name="moltbook",
             config={
                 "api_url": "https://test.api",
-                "auth": "test-token",
             },
-            rate_limit={"posts_per_hour": 2, "posts_per_day": 5},
         )
         
         skill = MoltbookSkill(config)
-        skill._status = SkillStatus.AVAILABLE
-        skill._token = "test-token"
+        # Don't initialize (no httpx client)
         
-        # Simulate hitting rate limit
-        from datetime import datetime
-        skill._post_times = [datetime.utcnow(), datetime.utcnow()]
-        
-        assert skill._check_rate_limit() is False
+        result = await skill.create_post(content="Hello world")
+        assert not result.success
     
     @pytest.mark.asyncio
-    async def test_content_truncation(self, mock_env):
-        """Test content truncation to 500 chars."""
+    async def test_create_post_empty_content(self, mock_env):
+        """Test that empty content is rejected."""
         from aria_skills.moltbook import MoltbookSkill
         
         config = SkillConfig(
             name="moltbook",
-            config={"auth": "test-token"},
+            config={"api_key": "test-token"},
         )
         
         skill = MoltbookSkill(config)
+        await skill.initialize()
         
-        # Content over 500 chars would be truncated
-        long_content = "x" * 600
-        assert len(long_content) > 500
+        result = await skill.create_post(content="")
+        assert not result.success
+    
+    def test_skill_name(self, mock_env):
+        """Test MoltbookSkill has correct name."""
+        from aria_skills.moltbook import MoltbookSkill
+        
+        config = SkillConfig(name="moltbook", config={})
+        skill = MoltbookSkill(config)
+        assert skill.name == "moltbook"
 
 
 class TestDatabaseSkill:
     """Tests for DatabaseSkill."""
     
-    def test_unavailable_without_asyncpg(self):
-        """Test skill is unavailable without asyncpg."""
-        from aria_skills.database import DatabaseSkill, HAS_ASYNCPG
+    def test_unavailable_without_sqlalchemy(self):
+        """Test skill starts as unavailable before initialization."""
+        from aria_skills.database import DatabaseSkill, HAS_SQLALCHEMY
         
         config = SkillConfig(name="database", config={"dsn": "test"})
         skill = DatabaseSkill(config)
         
-        # Status depends on asyncpg availability
+        # Before initialize(), skill is always UNAVAILABLE
         assert skill._status == SkillStatus.UNAVAILABLE
+    
+    def test_skill_name(self):
+        """Test DatabaseSkill has correct name."""
+        from aria_skills.database import DatabaseSkill
+        
+        config = SkillConfig(name="database", config={"dsn": "test"})
+        skill = DatabaseSkill(config)
+        assert skill.name == "database"
 
 
 class TestLLMSkills:
     """Tests for LLM skills."""
     
-    def test_moonshot_models_list(self):
-        """Test Moonshot/Kimi models are defined."""
+    def test_moonshot_skill_has_name(self):
+        """Test MoonshotSkill has correct name."""
         from aria_skills.llm import MoonshotSkill
         
-        # Current Kimi models (Feb 2026)
-        assert "kimi-k2.5" in MoonshotSkill.MODELS
-        assert "kimi-k2-thinking" in MoonshotSkill.MODELS
+        config = SkillConfig(name="llm", config={})
+        skill = MoonshotSkill(config)
+        assert skill.name == "llm"
+    
+    def test_moonshot_skill_has_chat_method(self):
+        """Test MoonshotSkill has chat method."""
+        from aria_skills.llm import MoonshotSkill
+        
+        assert hasattr(MoonshotSkill, "chat")
+        assert hasattr(MoonshotSkill, "initialize")
+        assert hasattr(MoonshotSkill, "health_check")
 
 
 class TestHealthMonitorSkill:
     """Tests for HealthMonitorSkill."""
     
     @pytest.mark.asyncio
-    async def test_check_all_skills(self, skill_registry, mock_moltbook_skill):
-        """Test checking all skills."""
+    async def test_check_system(self):
+        """Test system health check."""
         from aria_skills.health import HealthMonitorSkill
         
         config = SkillConfig(
@@ -180,68 +198,73 @@ class TestHealthMonitorSkill:
         )
         
         monitor = HealthMonitorSkill(config)
-        skill_registry._skills["moltbook"] = mock_moltbook_skill
-        monitor.set_registry(skill_registry)
-        
         await monitor.initialize()
-        result = await monitor.check_all_skills()
         
+        result = await monitor.check_system()
         assert result.success
-        assert "moltbook" in result.data["skills"]
+        assert "overall_status" in result.data
+        assert "checks" in result.data
+    
+    @pytest.mark.asyncio
+    async def test_health_monitor_name(self):
+        """Test HealthMonitorSkill has correct name."""
+        from aria_skills.health import HealthMonitorSkill
+        
+        config = SkillConfig(name="health_monitor", config={})
+        monitor = HealthMonitorSkill(config)
+        assert monitor.name == "health"
 
 
 class TestGoalSchedulerSkill:
     """Tests for GoalSchedulerSkill."""
     
     @pytest.mark.asyncio
-    async def test_add_goal(self):
-        """Test adding a goal."""
-        from aria_skills.goals import GoalSchedulerSkill, TaskPriority
-        
-        mock_client = AsyncMock()
-        mock_client.health_check = AsyncMock(return_value=SkillStatus.AVAILABLE)
-        mock_client.get_goals = AsyncMock(return_value=SkillResult.ok([]))
-        mock_client.create_goal = AsyncMock(return_value=SkillResult.ok({"created": True}))
-
-        with patch("aria_skills.goals.get_api_client", AsyncMock(return_value=mock_client)):
-            config = SkillConfig(name="goal_scheduler")
-            scheduler = GoalSchedulerSkill(config)
-            await scheduler.initialize()
-        
-            result = await scheduler.add_goal(
-                goal_id="test_goal",
-                title="Test Goal",
-                description="A test goal",
-                priority=TaskPriority.HIGH,
-            )
-        
-            assert result.success
-            assert result.data["goal_id"] == "test_goal"
-    
-    @pytest.mark.asyncio
-    async def test_add_task(self):
-        """Test adding a scheduled task."""
+    async def test_create_goal(self, mock_env):
+        """Test creating a goal (fallback mode)."""
         from aria_skills.goals import GoalSchedulerSkill
         
-        mock_client = AsyncMock()
-        mock_client.health_check = AsyncMock(return_value=SkillStatus.AVAILABLE)
-        mock_client.get_goals = AsyncMock(return_value=SkillResult.ok([]))
-
-        with patch("aria_skills.goals.get_api_client", AsyncMock(return_value=mock_client)):
-            config = SkillConfig(name="goal_scheduler")
-            scheduler = GoalSchedulerSkill(config)
-            await scheduler.initialize()
+        config = SkillConfig(name="goal_scheduler")
+        scheduler = GoalSchedulerSkill(config)
+        await scheduler.initialize()
         
-            result = await scheduler.add_task(
-                task_id="test_task",
-                name="Test Task",
-                handler="test.handler",
-                interval_seconds=3600,
-            )
+        result = await scheduler.create_goal(
+            title="Test Goal",
+            description="A test goal",
+            priority=1,
+        )
         
-            assert result.success
-            assert result.data["task_id"] == "test_task"
-            assert result.data["next_run"] is not None
+        assert result.success
+        assert result.data["title"] == "Test Goal"
+    
+    @pytest.mark.asyncio
+    async def test_update_goal(self, mock_env):
+        """Test updating a goal (fallback mode)."""
+        from aria_skills.goals import GoalSchedulerSkill
+        
+        config = SkillConfig(name="goal_scheduler")
+        scheduler = GoalSchedulerSkill(config)
+        await scheduler.initialize()
+        
+        # Create first
+        create_result = await scheduler.create_goal(
+            title="Update Test",
+            description="Will be updated",
+        )
+        assert create_result.success
+        goal_id = create_result.data["id"]
+        
+        # Update progress
+        update_result = await scheduler.update_goal(goal_id, progress=50)
+        assert update_result.success
+    
+    @pytest.mark.asyncio
+    async def test_goal_scheduler_name(self, mock_env):
+        """Test GoalSchedulerSkill has correct name."""
+        from aria_skills.goals import GoalSchedulerSkill
+        
+        config = SkillConfig(name="goal_scheduler")
+        scheduler = GoalSchedulerSkill(config)
+        assert scheduler.name == "goals"
 
 
 class TestAriaAPIClient:
@@ -257,8 +280,6 @@ class TestAriaAPIClient:
         })
         client = AriaAPIClient(config)
         
-        # Without httpx available, should fail gracefully
-        # In real environment with httpx, would succeed
         assert client.name == "api_client"
     
     @pytest.mark.asyncio

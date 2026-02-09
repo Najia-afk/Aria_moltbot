@@ -1,0 +1,6 @@
+name: litellm
+layer: 2
+version: "1.0"
+status: active
+description: "LiteLLM proxy management for multi-model support"
+dependencies: []

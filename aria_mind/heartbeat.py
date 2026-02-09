@@ -6,7 +6,7 @@ Manages scheduled tasks, health checks, and system status.
 """
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -43,7 +43,7 @@ class Heartbeat:
             return False
         
         # Unhealthy if no beat in 2x interval
-        elapsed = (datetime.utcnow() - self._last_beat).total_seconds()
+        elapsed = (datetime.now(timezone.utc) - self._last_beat).total_seconds()
         return elapsed < (self._interval * 2)
     
     async def start(self):
@@ -80,7 +80,7 @@ class Heartbeat:
     
     async def _beat(self):
         """Single heartbeat cycle."""
-        self._last_beat = datetime.utcnow()
+        self._last_beat = datetime.now(timezone.utc)
         self._beat_count += 1
         
         # Collect health status

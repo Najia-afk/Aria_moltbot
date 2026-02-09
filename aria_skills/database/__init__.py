@@ -2,6 +2,10 @@
 """
 PostgreSQL database skill — SQLAlchemy 2.0 + psycopg 3.
 
+⚠️  DEPRECATED: This skill is deprecated as of Aria Blue v1.1.
+    All new code should use ``aria_skills.api_client`` (AriaAPIClient)
+    for database operations via the REST API layer.
+
 Provides ORM-based CRUD for all Aria tables plus generic
 execute/fetch helpers that accept raw SQL when needed.
 
@@ -11,9 +15,16 @@ Migration note (v3.0):
   - Connection pooling handled by SQLAlchemy create_async_engine
 """
 import os
+import warnings
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, AsyncGenerator, Dict, List, Optional, Sequence
+
+warnings.warn(
+    "aria_skills.database is deprecated — use api_client skill for all DB access",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
 from aria_skills.registry import SkillRegistry
@@ -170,10 +181,16 @@ class DatabaseSkill(BaseSkill):
     async def execute(self, query: str, *args, **kwargs) -> SkillResult:
         """Execute a raw SQL statement (INSERT/UPDATE/DELETE).
 
+        .. deprecated:: 1.1
+            Use ``api_client`` skill for all DB access instead.
+
         Accepts either positional ``$1`` placeholders (asyncpg compat)
         or named ``:param`` placeholders.  Positional args are re-written
         to named params automatically for SQLAlchemy.
         """
+        self.logger.warning(
+            "DatabaseSkill.execute() is deprecated — migrate to api_client"
+        )
         if not self.is_available:
             return SkillResult.fail("Database not available")
         try:
@@ -332,7 +349,7 @@ class DatabaseSkill(BaseSkill):
                     from sqlalchemy.dialects.postgresql import insert as pg_insert
                     stmt = pg_insert(Memory).values(
                         key=key, value=value, category=category,
-                        updated_at=datetime.utcnow(),
+                        updated_at=datetime.now(timezone.utc),
                     )
                     stmt = stmt.on_conflict_do_update(
                         index_elements=["key"],
@@ -651,7 +668,7 @@ class DatabaseSkill(BaseSkill):
         """Set a key-value pair with optional TTL."""
         expires_at = None
         if ttl_seconds:
-            expires_at = datetime.utcnow() + timedelta(seconds=ttl_seconds)
+            expires_at = datetime.now(timezone.utc) + timedelta(seconds=ttl_seconds)
         return await self.execute(
             "INSERT INTO key_value_memory (key, value, category, ttl_seconds, expires_at, updated_at) "
             "VALUES (:k, :v, :cat, :ttl, :exp, NOW()) "

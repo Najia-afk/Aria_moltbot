@@ -8,7 +8,7 @@ Handles vulnerability detection, dependency scanning, and code analysis.
 import hashlib
 import re
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
@@ -36,7 +36,7 @@ class ScanResult:
     scan_type: str
     target: str
     vulnerabilities: list[Vulnerability] = field(default_factory=list)
-    started_at: datetime = field(default_factory=datetime.utcnow)
+    started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     completed_at: Optional[datetime] = None
 
 
@@ -116,7 +116,7 @@ class SecurityScanSkill(BaseSkill):
             SkillResult with vulnerabilities found
         """
         try:
-            scan_id = f"scan_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+            scan_id = f"scan_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
             
             vulnerabilities = []
             lines = code.split('\n')
@@ -160,7 +160,7 @@ class SecurityScanSkill(BaseSkill):
                 scan_type="code",
                 target=file_name or "inline_code",
                 vulnerabilities=vulnerabilities,
-                completed_at=datetime.utcnow()
+                completed_at=datetime.now(timezone.utc)
             )
             
             self._scans[scan_id] = scan_result
@@ -238,7 +238,7 @@ class SecurityScanSkill(BaseSkill):
             SkillResult with config security analysis
         """
         try:
-            scan_id = f"config_scan_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+            scan_id = f"config_scan_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
             vulnerabilities = []
             
             # Common config issues
@@ -292,7 +292,7 @@ class SecurityScanSkill(BaseSkill):
                     }
                     for v in vulnerabilities
                 ],
-                "scanned_at": datetime.utcnow().isoformat()
+                "scanned_at": datetime.now(timezone.utc).isoformat()
             })
             
         except Exception as e:
@@ -348,7 +348,7 @@ class SecurityScanSkill(BaseSkill):
                 "packages_checked": len(dependencies),
                 "vulnerable_packages": len(findings),
                 "findings": findings,
-                "checked_at": datetime.utcnow().isoformat(),
+                "checked_at": datetime.now(timezone.utc).isoformat(),
                 "note": "This is a simulated check. Production should use actual vulnerability databases."
             })
             

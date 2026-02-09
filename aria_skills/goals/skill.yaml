@@ -1,0 +1,7 @@
+name: goals
+layer: 4
+version: "1.0"
+status: active
+description: "Goal and task scheduling with priority management"
+dependencies:
+  - api_client

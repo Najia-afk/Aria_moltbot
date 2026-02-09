@@ -6,8 +6,9 @@ Allows Aria to switch between different LLM backends at runtime.
 Supports thinking mode toggle for reasoning models.
 """
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+import warnings
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
 from aria_skills.registry import SkillRegistry
@@ -40,6 +41,11 @@ class ModelSwitcherSkill(BaseSkill):
     
     async def initialize(self) -> bool:
         """Initialize model switcher."""
+        warnings.warn(
+            "model_switcher skill is deprecated, use litellm skill instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         # Load available models from config
         models = self.config.config.get("available_models", [])
         
@@ -106,7 +112,7 @@ class ModelSwitcherSkill(BaseSkill):
             "from": previous,
             "to": model_id,
             "reason": reason,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         })
         
         # Keep history manageable
@@ -232,7 +238,7 @@ class ModelSwitcherSkill(BaseSkill):
             "from": "thinking" if previous else "no_think",
             "to": mode_name,
             "reason": reason,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         })
         
         self.logger.info(f"Thinking mode changed to {mode_name}: {reason}")

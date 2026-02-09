@@ -55,6 +55,23 @@ def skill_registry() -> SkillRegistry:
     return SkillRegistry()
 
 
+@pytest.fixture
+def mock_registry() -> SkillRegistry:
+    """Create a SkillRegistry with a test skill registered."""
+    registry = SkillRegistry()
+
+    class _TestSkill:
+        name = "test_skill"
+        is_available = True
+        async def health_check(self):
+            return SkillStatus.AVAILABLE
+        async def initialize(self):
+            return True
+
+    registry._skills["test_skill"] = _TestSkill()
+    return registry
+
+
 @pytest_asyncio.fixture
 async def mock_moltbook_skill() -> AsyncMock:
     """Create a mock Moltbook skill."""

@@ -8,7 +8,7 @@ Handles experiment lifecycle, metrics, and comparisons.
 import hashlib
 import json
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
@@ -21,7 +21,7 @@ class Metric:
     name: str
     value: float
     step: int = 0
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 @dataclass
@@ -34,7 +34,7 @@ class Experiment:
     metrics: list[Metric] = field(default_factory=list)
     artifacts: list[str] = field(default_factory=list)
     status: str = "running"  # running, completed, failed
-    started_at: datetime = field(default_factory=datetime.utcnow)
+    started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     ended_at: Optional[datetime] = None
     tags: list[str] = field(default_factory=list)
 
@@ -57,6 +57,9 @@ class ExperimentSkill(BaseSkill):
     
     async def initialize(self) -> bool:
         """Initialize experiment skill."""
+        # TODO: TICKET-12 - stub requires API endpoint for experiment persistence.
+        # Currently in-memory only. Needs POST/GET /api/experiments endpoints.
+        self.logger.warning("experiment skill is in-memory only — API endpoint not yet available")
         self._experiments: dict[str, Experiment] = {}
         self._status = SkillStatus.AVAILABLE
         self.logger.info("🧪 Experiment skill initialized")
@@ -87,7 +90,7 @@ class ExperimentSkill(BaseSkill):
         """
         try:
             # Generate unique ID from name and timestamp
-            exp_hash = hashlib.md5(f"{name}{datetime.utcnow().isoformat()}".encode()).hexdigest()[:8]
+            exp_hash = hashlib.md5(f"{name}{datetime.now(timezone.utc).isoformat()}".encode()).hexdigest()[:8]
             exp_id = f"exp_{exp_hash}"
             
             experiment = Experiment(
@@ -247,7 +250,7 @@ class ExperimentSkill(BaseSkill):
             
             exp = self._experiments[experiment_id]
             exp.status = status
-            exp.ended_at = datetime.utcnow()
+            exp.ended_at = datetime.now(timezone.utc)
             
             # Calculate metric summaries
             metric_names = set(m.name for m in exp.metrics)

@@ -9,7 +9,7 @@ import json
 import os
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
@@ -145,7 +145,7 @@ class CICDSkill(BaseSkill):
                 "valid": len(issues) == 0,
                 "issues": issues,
                 "warnings": warnings,
-                "validated_at": datetime.utcnow().isoformat()
+                "validated_at": datetime.now(timezone.utc).isoformat()
             })
             
         except Exception as e:
@@ -254,7 +254,7 @@ class CICDSkill(BaseSkill):
                 "services": services,
                 "service_count": len(services),
                 "warnings": warnings,
-                "analyzed_at": datetime.utcnow().isoformat()
+                "analyzed_at": datetime.now(timezone.utc).isoformat()
             })
             
         except Exception as e:

@@ -1,0 +1,80 @@
+{
+  "name": "aria-telegram",
+  "version": "1.0.0",
+  "description": "Telegram Bot API integration — send messages, receive updates, and reply to conversations via the Telegram Bot HTTP API.",
+  "author": "Aria Team",
+  "tools": [
+    {
+      "name": "send_message",
+      "description": "Send a message to a Telegram chat.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "The message text to send"
+          },
+          "chat_id": {
+            "type": "string",
+            "description": "Target chat ID. Falls back to TELEGRAM_CHAT_ID env var if not provided."
+          },
+          "parse_mode": {
+            "type": "string",
+            "enum": ["Markdown", "HTML", "MarkdownV2"],
+            "description": "Message formatting mode (default: Markdown)",
+            "default": "Markdown"
+          }
+        },
+        "required": ["text"]
+      }
+    },
+    {
+      "name": "get_updates",
+      "description": "Get incoming updates (messages) from Telegram.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "offset": {
+            "type": "integer",
+            "description": "Identifier of the first update to be returned. Use to acknowledge previously received updates."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Maximum number of updates to retrieve (default: 100, max: 100)",
+            "default": 100
+          }
+        }
+      }
+    },
+    {
+      "name": "reply_to_message",
+      "description": "Reply to a specific message in a Telegram chat.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "chat_id": {
+            "type": "string",
+            "description": "The chat ID containing the message to reply to"
+          },
+          "message_id": {
+            "type": "integer",
+            "description": "The ID of the message to reply to"
+          },
+          "text": {
+            "type": "string",
+            "description": "The reply text"
+          }
+        },
+        "required": ["chat_id", "message_id", "text"]
+      }
+    },
+    {
+      "name": "get_me",
+      "description": "Get information about the bot (username, id, name).",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  ]
+}

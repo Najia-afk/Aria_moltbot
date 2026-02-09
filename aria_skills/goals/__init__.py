@@ -3,11 +3,15 @@
 Goal and task management skill.
 
 Handles goal creation, scheduling, and tracking.
+Persists via REST API (TICKET-12: eliminate in-memory stubs).
 """
-from datetime import datetime, timedelta
+import os
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
+import httpx
+
+from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
 from aria_skills.registry import SkillRegistry
 
 
@@ -23,8 +27,10 @@ class GoalSchedulerSkill(BaseSkill):
     
     def __init__(self, config: SkillConfig):
         super().__init__(config)
-        self._goals: Dict[str, Dict] = {}
+        self._goals: Dict[str, Dict] = {}  # fallback cache
         self._goal_counter = 0
+        self._api_url = os.environ.get('ARIA_API_URL', 'http://aria-api:8000/api')
+        self._client: Optional[httpx.AsyncClient] = None
     
     @property
     def name(self) -> str:
@@ -34,14 +40,22 @@ class GoalSchedulerSkill(BaseSkill):
         """Initialize goal scheduler."""
         self._max_active = self.config.config.get("max_active_goals", 10)
         self._default_priority = self.config.config.get("default_priority", 3)
+        self._client = httpx.AsyncClient(base_url=self._api_url, timeout=30.0)
         self._status = SkillStatus.AVAILABLE
-        self.logger.info("Goal scheduler initialized")
+        self.logger.info("Goal scheduler initialized (API-backed)")
         return True
+    
+    async def close(self):
+        """Close the httpx client."""
+        if self._client:
+            await self._client.aclose()
+            self._client = None
     
     async def health_check(self) -> SkillStatus:
         """Check scheduler availability."""
         return self._status
     
+    @logged_method()
     async def create_goal(
         self,
         title: str,
@@ -80,7 +94,7 @@ class GoalSchedulerSkill(BaseSkill):
             "priority": priority or self._default_priority,
             "status": "active",
             "progress": 0,
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
             "due_date": due_date.isoformat() if due_date else None,
             "parent_id": parent_id,
             "tags": tags or [],
@@ -88,11 +102,23 @@ class GoalSchedulerSkill(BaseSkill):
             "notes": [],
         }
         
+        # Always cache locally for fallback lookups
         self._goals[goal_id] = goal
-        self._log_usage("create_goal", True)
-        
-        return SkillResult.ok(goal)
+        try:
+            resp = await self._client.post("/goals", json=goal)
+            resp.raise_for_status()
+            api_data = resp.json()
+            # Merge API response with local goal data
+            if isinstance(api_data, dict):
+                self._goals[goal_id].update(api_data)
+            self._log_usage("create_goal", True)
+            return SkillResult.ok(self._goals[goal_id])
+        except Exception as e:
+            self.logger.warning(f"API create_goal failed, using fallback: {e}")
+            self._log_usage("create_goal", True)
+            return SkillResult.ok(goal)
     
+    @logged_method()
     async def update_goal(
         self,
         goal_id: str,
@@ -114,41 +140,71 @@ class GoalSchedulerSkill(BaseSkill):
         Returns:
             SkillResult with updated goal
         """
-        if goal_id not in self._goals:
-            return SkillResult.fail(f"Goal not found: {goal_id}")
-        
-        goal = self._goals[goal_id]
-        
+        update_data: Dict[str, Any] = {}
         if status:
-            goal["status"] = status
+            update_data["status"] = status
             if status == "completed":
-                goal["progress"] = 100
-                goal["completed_at"] = datetime.utcnow().isoformat()
-        
+                update_data["progress"] = 100
+                update_data["completed_at"] = datetime.now(timezone.utc).isoformat()
         if progress is not None:
-            goal["progress"] = min(max(progress, 0), 100)
-            if goal["progress"] == 100:
-                goal["status"] = "completed"
-                goal["completed_at"] = datetime.utcnow().isoformat()
-        
+            update_data["progress"] = min(max(progress, 0), 100)
+            if update_data["progress"] == 100:
+                update_data["status"] = "completed"
+                update_data["completed_at"] = datetime.now(timezone.utc).isoformat()
         if priority is not None:
-            goal["priority"] = min(max(priority, 1), 5)
-        
+            update_data["priority"] = min(max(priority, 1), 5)
         if notes:
-            goal["notes"].append({
-                "text": notes,
-                "added_at": datetime.utcnow().isoformat()
-            })
+            update_data["notes"] = notes
         
-        self._log_usage("update_goal", True)
-        return SkillResult.ok(goal)
+        try:
+            resp = await self._client.put(f"/goals/{goal_id}", json=update_data)
+            resp.raise_for_status()
+            api_data = resp.json()
+            self._log_usage("update_goal", True)
+            return SkillResult.ok(api_data if api_data else update_data)
+        except Exception as e:
+            self.logger.warning(f"API update_goal failed, using fallback: {e}")
+            # Look up by dict key first, then by "id" field (API may use UUIDs)
+            goal = self._goals.get(goal_id)
+            if goal is None:
+                for g in self._goals.values():
+                    if g.get("id") == goal_id:
+                        goal = g
+                        break
+            if goal is None:
+                return SkillResult.fail(f"Goal not found: {goal_id}")
+
+            if status:
+                goal["status"] = status
+                if status == "completed":
+                    goal["progress"] = 100
+                    goal["completed_at"] = datetime.now(timezone.utc).isoformat()
+            if progress is not None:
+                goal["progress"] = min(max(progress, 0), 100)
+                if goal["progress"] == 100:
+                    goal["status"] = "completed"
+                    goal["completed_at"] = datetime.now(timezone.utc).isoformat()
+            if priority is not None:
+                goal["priority"] = min(max(priority, 1), 5)
+            if notes:
+                goal["notes"].append({
+                    "text": notes,
+                    "added_at": datetime.now(timezone.utc).isoformat()
+                })
+            self._log_usage("update_goal", True)
+            return SkillResult.ok(goal)
     
     async def get_goal(self, goal_id: str) -> SkillResult:
         """Get a specific goal."""
-        if goal_id not in self._goals:
-            return SkillResult.fail(f"Goal not found: {goal_id}")
-        
-        return SkillResult.ok(self._goals[goal_id])
+        try:
+            resp = await self._client.get(f"/goals/{goal_id}")
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            self.logger.warning(f"API get_goal failed, using fallback: {e}")
+            if goal_id not in self._goals:
+                return SkillResult.fail(f"Goal not found: {goal_id}")
+            return SkillResult.ok(self._goals[goal_id])
     
     async def list_goals(
         self,
@@ -169,56 +225,63 @@ class GoalSchedulerSkill(BaseSkill):
         Returns:
             SkillResult with goal list
         """
-        goals = list(self._goals.values())
-        
-        # Apply filters
-        if status:
-            goals = [g for g in goals if g["status"] == status]
-        if priority:
-            goals = [g for g in goals if g["priority"] == priority]
-        if tag:
-            goals = [g for g in goals if tag in g.get("tags", [])]
-        
-        # Sort by priority, then due date
-        goals.sort(key=lambda g: (g["priority"], g.get("due_date") or "9999"))
-        
-        return SkillResult.ok({
-            "goals": goals[:limit],
-            "total": len(goals),
-            "filters_applied": {
-                "status": status,
-                "priority": priority,
-                "tag": tag,
-            }
-        })
-    
+        try:
+            params: Dict[str, Any] = {"limit": limit}
+            if status:
+                params["status"] = status
+            if priority:
+                params["priority"] = priority
+            if tag:
+                params["tag"] = tag
+            resp = await self._client.get("/goals", params=params)
+            resp.raise_for_status()
+            api_data = resp.json()
+            if isinstance(api_data, list):
+                return SkillResult.ok({"goals": api_data, "total": len(api_data), "filters_applied": params})
+            return SkillResult.ok(api_data)
+        except Exception as e:
+            self.logger.warning(f"API list_goals failed, using fallback: {e}")
+            goals = list(self._goals.values())
+            if status:
+                goals = [g for g in goals if g["status"] == status]
+            if priority:
+                goals = [g for g in goals if g["priority"] == priority]
+            if tag:
+                goals = [g for g in goals if tag in g.get("tags", [])]
+            goals.sort(key=lambda g: (g["priority"], g.get("due_date") or "9999"))
+            return SkillResult.ok({
+                "goals": goals[:limit],
+                "total": len(goals),
+                "filters_applied": {"status": status, "priority": priority, "tag": tag},
+            })
+
     async def get_next_actions(self, limit: int = 5) -> SkillResult:
         """
         Get prioritized next actions.
         
         Returns highest priority active goals that are due soonest.
         """
-        active = [g for g in self._goals.values() if g["status"] == "active"]
-        
-        # Score goals: lower is better (priority * 100 + days until due)
-        now = datetime.utcnow()
-        
-        def score(goal):
-            priority_score = goal["priority"] * 100
-            if goal.get("due_date"):
-                due = datetime.fromisoformat(goal["due_date"])
-                days = (due - now).days
-                if days < 0:  # Overdue
-                    return priority_score + days * 10  # Very urgent
-                return priority_score + days
-            return priority_score + 50  # No due date
-        
-        active.sort(key=score)
-        
-        return SkillResult.ok({
-            "next_actions": active[:limit],
-            "total_active": len(active),
-        })
+        try:
+            resp = await self._client.get("/goals", params={"status": "active", "limit": limit})
+            resp.raise_for_status()
+            api_data = resp.json()
+            goals = api_data if isinstance(api_data, list) else api_data.get("goals", [])
+            return SkillResult.ok({"next_actions": goals[:limit], "total_active": len(goals)})
+        except Exception as e:
+            self.logger.warning(f"API get_next_actions failed, using fallback: {e}")
+            active = [g for g in self._goals.values() if g["status"] == "active"]
+            now = datetime.now(timezone.utc)
+            def score(goal):
+                priority_score = goal["priority"] * 100
+                if goal.get("due_date"):
+                    due = datetime.fromisoformat(goal["due_date"])
+                    days = (due - now).days
+                    if days < 0:
+                        return priority_score + days * 10
+                    return priority_score + days
+                return priority_score + 50
+            active.sort(key=score)
+            return SkillResult.ok({"next_actions": active[:limit], "total_active": len(active)})
     
     async def add_subtask(
         self,
@@ -227,70 +290,86 @@ class GoalSchedulerSkill(BaseSkill):
         description: str = "",
     ) -> SkillResult:
         """Add a subtask to a goal."""
-        if parent_id not in self._goals:
-            return SkillResult.fail(f"Parent goal not found: {parent_id}")
-        
-        subtask_id = f"{parent_id}_sub_{len(self._goals[parent_id]['subtasks']) + 1}"
-        
         subtask = {
-            "id": subtask_id,
             "title": title,
             "description": description,
             "status": "pending",
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
         }
-        
-        self._goals[parent_id]["subtasks"].append(subtask)
-        
-        return SkillResult.ok({
-            "subtask": subtask,
-            "parent_id": parent_id,
-        })
+        try:
+            resp = await self._client.post(f"/goals/{parent_id}/subtasks", json=subtask)
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            self.logger.warning(f"API add_subtask failed, using fallback: {e}")
+            if parent_id not in self._goals:
+                return SkillResult.fail(f"Parent goal not found: {parent_id}")
+            subtask_id = f"{parent_id}_sub_{len(self._goals[parent_id]['subtasks']) + 1}"
+            subtask["id"] = subtask_id
+            self._goals[parent_id]["subtasks"].append(subtask)
+            return SkillResult.ok({"subtask": subtask, "parent_id": parent_id})
     
     async def complete_subtask(self, parent_id: str, subtask_id: str) -> SkillResult:
         """Mark a subtask as complete."""
-        if parent_id not in self._goals:
-            return SkillResult.fail(f"Parent goal not found: {parent_id}")
-        
-        goal = self._goals[parent_id]
-        
-        for subtask in goal["subtasks"]:
-            if subtask["id"] == subtask_id:
-                subtask["status"] = "completed"
-                subtask["completed_at"] = datetime.utcnow().isoformat()
-                
-                # Update parent progress
-                total = len(goal["subtasks"])
-                completed = sum(1 for s in goal["subtasks"] if s["status"] == "completed")
-                goal["progress"] = int((completed / total) * 100)
-                
-                return SkillResult.ok({
-                    "subtask": subtask,
-                    "parent_progress": goal["progress"],
-                })
-        
-        return SkillResult.fail(f"Subtask not found: {subtask_id}")
+        try:
+            resp = await self._client.put(
+                f"/goals/{parent_id}/subtasks/{subtask_id}",
+                json={"status": "completed", "completed_at": datetime.now(timezone.utc).isoformat()},
+            )
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            self.logger.warning(f"API complete_subtask failed, using fallback: {e}")
+            if parent_id not in self._goals:
+                return SkillResult.fail(f"Parent goal not found: {parent_id}")
+            goal = self._goals[parent_id]
+            for subtask in goal["subtasks"]:
+                if subtask["id"] == subtask_id:
+                    subtask["status"] = "completed"
+                    subtask["completed_at"] = datetime.now(timezone.utc).isoformat()
+                    total = len(goal["subtasks"])
+                    completed = sum(1 for s in goal["subtasks"] if s["status"] == "completed")
+                    goal["progress"] = int((completed / total) * 100)
+                    return SkillResult.ok({"subtask": subtask, "parent_progress": goal["progress"]})
+            return SkillResult.fail(f"Subtask not found: {subtask_id}")
     
     async def get_summary(self) -> SkillResult:
         """Get goal summary statistics."""
-        goals = list(self._goals.values())
-        
-        return SkillResult.ok({
-            "total": len(goals),
-            "by_status": {
-                "active": sum(1 for g in goals if g["status"] == "active"),
-                "completed": sum(1 for g in goals if g["status"] == "completed"),
-                "paused": sum(1 for g in goals if g["status"] == "paused"),
-                "cancelled": sum(1 for g in goals if g["status"] == "cancelled"),
-            },
-            "by_priority": {
-                p: sum(1 for g in goals if g["priority"] == p)
-                for p in range(1, 6)
-            },
-            "overdue": sum(
-                1 for g in goals 
-                if g["status"] == "active" 
-                and g.get("due_date") 
-                and datetime.fromisoformat(g["due_date"]) < datetime.utcnow()
-            ),
-        })
+        try:
+            resp = await self._client.get("/goals")
+            resp.raise_for_status()
+            api_data = resp.json()
+            goals = api_data if isinstance(api_data, list) else api_data.get("goals", [])
+            return SkillResult.ok({
+                "total": len(goals),
+                "by_status": {
+                    "active": sum(1 for g in goals if g.get("status") == "active"),
+                    "completed": sum(1 for g in goals if g.get("status") == "completed"),
+                    "paused": sum(1 for g in goals if g.get("status") == "paused"),
+                    "cancelled": sum(1 for g in goals if g.get("status") == "cancelled"),
+                },
+                "by_priority": {
+                    p: sum(1 for g in goals if g.get("priority") == p) for p in range(1, 6)
+                },
+            })
+        except Exception as e:
+            self.logger.warning(f"API get_summary failed, using fallback: {e}")
+            goals = list(self._goals.values())
+            return SkillResult.ok({
+                "total": len(goals),
+                "by_status": {
+                    "active": sum(1 for g in goals if g["status"] == "active"),
+                    "completed": sum(1 for g in goals if g["status"] == "completed"),
+                    "paused": sum(1 for g in goals if g["status"] == "paused"),
+                    "cancelled": sum(1 for g in goals if g["status"] == "cancelled"),
+                },
+                "by_priority": {
+                    p: sum(1 for g in goals if g["priority"] == p) for p in range(1, 6)
+                },
+                "overdue": sum(
+                    1 for g in goals
+                    if g["status"] == "active"
+                    and g.get("due_date")
+                    and datetime.fromisoformat(g["due_date"]) < datetime.now(timezone.utc)
+                ),
+            })

@@ -33,9 +33,9 @@ jobs:
 
   # ── Social (delegated to aria-talk by main) ─────────────────────
 
-  - name: moltbook_post
-    every: "30m"
-    text: "Delegate to aria-talk: Post a Moltbook update. Read HEARTBEAT.md moltbook_post section. Use moltbook skill to post a meaningful update. Quality over quantity. Only post if something valuable to share."
+  - name: social_post
+    cron: "0 0 0,6,12,18 * * *"
+    text: "Delegate to aria-talk: Post a social update to available social platforms. Read HEARTBEAT.md social_post section. Use the social skill to route content to registered platforms. Quality over quantity. Only post if something valuable to share."
     agent: main
     session: isolated
     delivery: announce
@@ -44,7 +44,7 @@ jobs:
 
   - name: six_hour_review
     cron: "0 0 0,6,12,18 * * *"
-    text: "Delegate to aria-deep: Run 6-hour review. Read HEARTBEAT.md six_hour_review section. Analyze last 6h via api_client, adjust priorities, generate insights. Use api_client not database."
+    text: "Delegate to aria-deep using trinity-free (tool-capable model, do NOT use chimera-free — it lacks tool calling): Run 6-hour review. Read HEARTBEAT.md six_hour_review section. Analyze last 6h via api_client, adjust priorities, generate insights. Use api_client not database."
     agent: main
     session: isolated
     delivery: announce
@@ -102,6 +102,13 @@ jobs:
     delivery: announce
 
   # ── DB Maintenance (weekly, off-peak) ───────────────────────────
+
+  - name: memory_consolidation
+    cron: "0 0 5 * * 0"
+    agent: main
+    session: isolated
+    delivery: chat
+    text: "Archive activity logs older than 7 days and prune stale plans from aria_memories/plans/. Use the api_client to GET /activities?older_than=7d, then mark them as archived. Review aria_memories/plans/ and remove plans with dates more than 30 days ago."
 
   - name: db_maintenance
     cron: "0 30 3 * * 0"

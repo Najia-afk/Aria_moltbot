@@ -11,7 +11,7 @@ import logging
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from functools import wraps
 from typing import Any, Callable, Optional, TypeVar
@@ -88,7 +88,7 @@ class SkillResult:
     success: bool
     data: Any = None
     error: Optional[str] = None
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     
     @classmethod
     def ok(cls, data: Any = None) -> "SkillResult":
@@ -125,6 +125,11 @@ class BaseSkill(ABC):
     def name(self) -> str:
         """Unique skill identifier."""
         pass
+
+    @property
+    def canonical_name(self) -> str:
+        """Kebab-case canonical name with aria- prefix for cross-system lookup."""
+        return f"aria-{self.name.replace('_', '-')}"
     
     @abstractmethod
     async def initialize(self) -> bool:
@@ -157,17 +162,26 @@ class BaseSkill(ABC):
         """Current skill status."""
         return self._status
     
-    def _log_usage(self, operation: str, success: bool):
-        """Log skill usage for metrics."""
-        self._last_used = datetime.utcnow()
+    def _log_usage(self, operation: str, success: bool, **kwargs):
+        """Log skill usage with structured data."""
+        self._last_used = datetime.now(timezone.utc)
         self._use_count += 1
         if not success:
             self._error_count += 1
         
-        self.logger.info(
-            f"{operation}: {'success' if success else 'failed'} "
-            f"(total: {self._use_count}, errors: {self._error_count})"
-        )
+        log_data = {
+            "skill": self.name,
+            "operation": operation,
+            "success": success,
+            "use_count": self._use_count,
+            "error_count": self._error_count,
+            **kwargs
+        }
+        
+        if success:
+            self.logger.info(f"Skill {self.name}.{operation} completed", extra=log_data)
+        else:
+            self.logger.warning(f"Skill {self.name}.{operation} failed", extra=log_data)
     
     def _get_env_value(self, key: str) -> Optional[str]:
         """
@@ -280,7 +294,7 @@ class BaseSkill(ABC):
             
             # Update internal metrics
             self._use_count += 1
-            self._last_used = datetime.utcnow()
+            self._last_used = datetime.now(timezone.utc)
             if not success:
                 self._error_count += 1
             
@@ -359,3 +373,107 @@ class BaseSkill(ABC):
         
         return await self.execute_with_metrics(_wrapped, operation_name)
 
+    async def _log_activity(self, action: str, details: str = "", success: bool = True):
+        """Log activity to database via fire-and-forget. Non-blocking."""
+        try:
+            import asyncio
+            # Use create_task for fire-and-forget
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.ensure_future(self._write_activity_log(action, details, success))
+        except Exception:
+            pass  # Never block skill execution for logging
+
+    async def _write_activity_log(self, action: str, details: str, success: bool):
+        """Actually write to activity log. Called as background task."""
+        try:
+            from aria_skills.registry import SkillRegistry
+            registry = SkillRegistry()
+            api_client = registry.get("api_client")
+            if api_client:
+                await api_client.execute(action="post", params={
+                    "endpoint": "/activity",
+                    "data": {
+                        "action": action,
+                        "details": details,
+                        "success": success,
+                        "skill": self.name,
+                    }
+                })
+        except Exception as e:
+            self.logger.debug(f"Activity log write failed (non-critical): {e}")
+
+
+# ── Activity Logging Decorator ──────────────────────────────────────────
+import functools
+import time as _time
+
+def logged_method(action_name: str = None):
+    """
+    Decorator that logs skill method calls to activity_log via aria-api.
+    
+    Usage:
+        @logged_method()
+        async def my_method(self, ...):
+            ...
+        
+        @logged_method("custom.action.name")
+        async def my_method(self, ...):
+            ...
+    
+    The decorator:
+    - Records start/end time, duration_ms
+    - POSTs to /activities endpoint via httpx (fire-and-forget)
+    - Skips logging for api_client skill (recursion guard)
+    - Never blocks or breaks the wrapped method
+    """
+    def decorator(func):
+        @functools.wraps(func)
+        async def wrapper(self, *args, **kwargs):
+            op_name = action_name or f"{self.name}.{func.__name__}"
+            start = _time.monotonic()
+            try:
+                result = await func(self, *args, **kwargs)
+                duration_ms = int((_time.monotonic() - start) * 1000)
+                if self.name != "api_client":
+                    import asyncio
+                    asyncio.ensure_future(_post_activity(
+                        action=op_name, skill=self.name,
+                        details={"method": func.__name__, "duration_ms": duration_ms},
+                        success=True,
+                    ))
+                return result
+            except Exception as e:
+                duration_ms = int((_time.monotonic() - start) * 1000)
+                if self.name != "api_client":
+                    import asyncio
+                    asyncio.ensure_future(_post_activity(
+                        action=op_name, skill=self.name,
+                        details={"method": func.__name__, "duration_ms": duration_ms},
+                        success=False, error_message=str(e)[:500],
+                    ))
+                raise
+        return wrapper
+    return decorator
+
+
+_activity_client = None
+
+async def _post_activity(action, skill, details, success, error_message=None):
+    """Fire-and-forget POST to /activities. Never raises."""
+    global _activity_client
+    try:
+        import httpx
+        import os
+        if _activity_client is None:
+            api_url = os.environ.get("ARIA_API_URL", "http://aria-api:8000")
+            _activity_client = httpx.AsyncClient(base_url=api_url, timeout=5.0)
+        await _activity_client.post("/activities", json={
+            "action": action,
+            "skill": skill,
+            "details": details,
+            "success": success,
+            "error_message": error_message,
+        })
+    except Exception:
+        pass  # Never let logging break the skill

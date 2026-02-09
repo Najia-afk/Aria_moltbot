@@ -36,7 +36,7 @@ class MoonshotSkill(BaseSkill):
     
     @property
     def name(self) -> str:
-        return "moonshot"
+        return "llm"
     
     async def initialize(self) -> bool:
         """Initialize Moonshot client."""

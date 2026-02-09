@@ -2,7 +2,7 @@
 Health, status, and stats endpoints.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import httpx
@@ -39,7 +39,7 @@ class StatsResponse(BaseModel):
 
 @router.get("/health", response_model=HealthResponse)
 async def health_check():
-    uptime = (datetime.utcnow() - STARTUP_TIME).total_seconds()
+    uptime = (datetime.now(timezone.utc) - STARTUP_TIME).total_seconds()
     return HealthResponse(
         status="healthy",
         uptime_seconds=int(uptime),
@@ -55,7 +55,7 @@ async def host_stats():
         "swap": {"used_gb": 0, "total_gb": 0, "percent": 0},
         "disk": {"used_gb": 0, "total_gb": 500, "percent": 0},
         "smart": {"status": "unknown", "healthy": True},
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "source": "unavailable",
     }
     try:

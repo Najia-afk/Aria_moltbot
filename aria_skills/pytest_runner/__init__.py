@@ -7,7 +7,7 @@ Executes and reports on pytest test runs.
 import asyncio
 import subprocess
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
@@ -30,7 +30,7 @@ class PytestSkill(BaseSkill):
     
     @property
     def name(self) -> str:
-        return "pytest"
+        return "pytest_runner"
     
     async def initialize(self) -> bool:
         """Initialize pytest runner."""
@@ -117,7 +117,7 @@ class PytestSkill(BaseSkill):
                 "errors": errors,
                 "success": proc.returncode == 0,
                 "output": output[-5000:],  # Last 5000 chars
-                "run_at": datetime.utcnow().isoformat(),
+                "run_at": datetime.now(timezone.utc).isoformat(),
             }
             
             return SkillResult.ok(self._last_result)

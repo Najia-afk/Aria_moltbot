@@ -4,7 +4,7 @@ All environment variables and service configuration in one place.
 """
 
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 # ── Database ──────────────────────────────────────────────────────────────────
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -50,5 +50,5 @@ OPEN_ROUTER_KEY    = os.getenv("OPEN_ROUTER_KEY", "")
 OPENCLAW_JOBS_PATH = os.getenv("OPENCLAW_JOBS_PATH", "/openclaw/cron/jobs.json")
 
 # ── Runtime ──────────────────────────────────────────────────────────────────
-STARTUP_TIME = datetime.utcnow()
+STARTUP_TIME = datetime.now(timezone.utc)
 API_VERSION  = "3.0.0"

@@ -3,9 +3,13 @@
 Hourly micro-goal skill.
 
 Manages small, time-boxed goals for Aria's hourly cycles.
+Persists via REST API (TICKET-12: eliminate in-memory stubs).
 """
-from datetime import datetime, timedelta
+import os
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
+
+import httpx
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
 from aria_skills.registry import SkillRegistry
@@ -21,7 +25,9 @@ class HourlyGoalsSkill(BaseSkill):
     
     def __init__(self, config: SkillConfig):
         super().__init__(config)
-        self._hourly_goals: Dict[int, List[Dict]] = {}  # hour -> goals
+        self._hourly_goals: Dict[int, List[Dict]] = {}  # fallback cache
+        self._api_url = os.environ.get('ARIA_API_URL', 'http://aria-api:8000/api')
+        self._client: Optional[httpx.AsyncClient] = None
     
     @property
     def name(self) -> str:
@@ -29,9 +35,16 @@ class HourlyGoalsSkill(BaseSkill):
     
     async def initialize(self) -> bool:
         """Initialize hourly goals."""
+        self._client = httpx.AsyncClient(base_url=self._api_url, timeout=30.0)
         self._status = SkillStatus.AVAILABLE
-        self.logger.info("Hourly goals initialized")
+        self.logger.info("Hourly goals initialized (API-backed)")
         return True
+    
+    async def close(self):
+        """Close the httpx client."""
+        if self._client:
+            await self._client.aclose()
+            self._client = None
     
     async def health_check(self) -> SkillStatus:
         """Check availability."""
@@ -57,68 +70,108 @@ class HourlyGoalsSkill(BaseSkill):
         if hour < 0 or hour > 23:
             return SkillResult.fail("Hour must be 0-23")
         
-        if hour not in self._hourly_goals:
-            self._hourly_goals[hour] = []
-        
         goal_data = {
-            "id": f"hg_{hour}_{len(self._hourly_goals[hour])}",
+            "hour": hour,
             "goal": goal,
             "priority": priority,
             "status": "pending",
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
         }
         
-        self._hourly_goals[hour].append(goal_data)
-        
-        return SkillResult.ok(goal_data)
+        try:
+            resp = await self._client.post("/hourly-goals", json=goal_data)
+            resp.raise_for_status()
+            api_data = resp.json()
+            return SkillResult.ok(api_data if api_data else goal_data)
+        except Exception as e:
+            self.logger.warning(f"API set_goal failed, using fallback: {e}")
+            if hour not in self._hourly_goals:
+                self._hourly_goals[hour] = []
+            goal_data["id"] = f"hg_{hour}_{len(self._hourly_goals[hour])}"
+            self._hourly_goals[hour].append(goal_data)
+            return SkillResult.ok(goal_data)
     
     async def get_current_goals(self) -> SkillResult:
         """Get goals for the current hour."""
-        current_hour = datetime.utcnow().hour
-        goals = self._hourly_goals.get(current_hour, [])
-        
-        return SkillResult.ok({
-            "hour": current_hour,
-            "goals": goals,
-            "pending": sum(1 for g in goals if g["status"] == "pending"),
-            "completed": sum(1 for g in goals if g["status"] == "completed"),
-        })
+        current_hour = datetime.now(timezone.utc).hour
+        try:
+            resp = await self._client.get("/hourly-goals", params={"hour": current_hour})
+            resp.raise_for_status()
+            api_data = resp.json()
+            goals = api_data if isinstance(api_data, list) else api_data.get("goals", [])
+            return SkillResult.ok({
+                "hour": current_hour,
+                "goals": goals,
+                "pending": sum(1 for g in goals if g.get("status") == "pending"),
+                "completed": sum(1 for g in goals if g.get("status") == "completed"),
+            })
+        except Exception as e:
+            self.logger.warning(f"API get_current_goals failed, using fallback: {e}")
+            goals = self._hourly_goals.get(current_hour, [])
+            return SkillResult.ok({
+                "hour": current_hour,
+                "goals": goals,
+                "pending": sum(1 for g in goals if g["status"] == "pending"),
+                "completed": sum(1 for g in goals if g["status"] == "completed"),
+            })
     
     async def complete_goal(self, goal_id: str) -> SkillResult:
         """Mark an hourly goal as complete."""
-        for hour, goals in self._hourly_goals.items():
-            for goal in goals:
-                if goal["id"] == goal_id:
-                    goal["status"] = "completed"
-                    goal["completed_at"] = datetime.utcnow().isoformat()
-                    return SkillResult.ok(goal)
-        
-        return SkillResult.fail(f"Goal not found: {goal_id}")
+        update_data = {
+            "status": "completed",
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+        }
+        try:
+            resp = await self._client.put(f"/hourly-goals/{goal_id}", json=update_data)
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            self.logger.warning(f"API complete_goal failed, using fallback: {e}")
+            for hour, goals in self._hourly_goals.items():
+                for goal in goals:
+                    if goal["id"] == goal_id:
+                        goal["status"] = "completed"
+                        goal["completed_at"] = update_data["completed_at"]
+                        return SkillResult.ok(goal)
+            return SkillResult.fail(f"Goal not found: {goal_id}")
     
     async def get_day_summary(self) -> SkillResult:
         """Get summary of all hourly goals for today."""
-        total = sum(len(goals) for goals in self._hourly_goals.values())
-        completed = sum(
-            sum(1 for g in goals if g["status"] == "completed")
-            for goals in self._hourly_goals.values()
-        )
-        
-        return SkillResult.ok({
-            "total_goals": total,
-            "completed": completed,
-            "completion_rate": round(completed / total * 100, 1) if total > 0 else 0,
-            "by_hour": {
-                hour: {
-                    "total": len(goals),
-                    "completed": sum(1 for g in goals if g["status"] == "completed"),
-                }
-                for hour, goals in self._hourly_goals.items()
-            },
-        })
+        try:
+            resp = await self._client.get("/hourly-goals")
+            resp.raise_for_status()
+            api_data = resp.json()
+            goals_list = api_data if isinstance(api_data, list) else api_data.get("goals", [])
+            total = len(goals_list)
+            completed = sum(1 for g in goals_list if g.get("status") == "completed")
+            return SkillResult.ok({
+                "total_goals": total,
+                "completed": completed,
+                "completion_rate": round(completed / total * 100, 1) if total > 0 else 0,
+            })
+        except Exception as e:
+            self.logger.warning(f"API get_day_summary failed, using fallback: {e}")
+            total = sum(len(goals) for goals in self._hourly_goals.values())
+            completed = sum(
+                sum(1 for g in goals if g["status"] == "completed")
+                for goals in self._hourly_goals.values()
+            )
+            return SkillResult.ok({
+                "total_goals": total,
+                "completed": completed,
+                "completion_rate": round(completed / total * 100, 1) if total > 0 else 0,
+                "by_hour": {
+                    hour: {
+                        "total": len(goals),
+                        "completed": sum(1 for g in goals if g["status"] == "completed"),
+                    }
+                    for hour, goals in self._hourly_goals.items()
+                },
+            })
     
     async def clear_past_goals(self) -> SkillResult:
         """Clear goals from past hours."""
-        current_hour = datetime.utcnow().hour
+        current_hour = datetime.now(timezone.utc).hour
         cleared = 0
         
         for hour in list(self._hourly_goals.keys()):

@@ -1,5 +1,3 @@
-/no_think
-
 # TOOLS.md - Skill Quick Reference
 
 **Full documentation: See SKILLS.md for complete skill reference (26 skills)**
@@ -10,7 +8,7 @@ Skills are auto-discovered from `aria_skills/*/skill.json`.
 
 **USE THIS FOR ALL DATABASE OPERATIONS!** Don't write raw SQL.
 
-```tool
+```yaml
 # Activities
 aria-apiclient.get_activities({"limit": 10})
 aria-apiclient.create_activity({"action": "task_done", "details": {"info": "..."}})
@@ -45,7 +43,7 @@ aria-apiclient.get_thoughts({"limit": 10})
 
 ## Quick Examples
 
-```tool
+```yaml
 # Post to Moltbook (rate: 1/30min)
 aria-social.social_post({"content": "Hello world!", "platform": "moltbook"})
 
@@ -61,14 +59,9 @@ aria-database.fetch_all({"query": "SELECT * FROM goals LIMIT 5"})
 
 ## LLM Priority
 
-| Model | Use | Cost |
-|-------|-----|------|
-| qwen3-mlx | Primary (Local MLX 4B) | FREE |
-| qwen3-next-free | Fallback (OpenRouter) | FREE |
-| trinity-free | Fallback (OpenRouter) | FREE |
-| kimi | Last resort | 💰 PAID |
-
-**Always exhaust FREE and LOCAL options before using Kimi!**
+> **Model Priority**: Defined in `aria_models/models.yaml` — single source of truth. Do not hardcode model names elsewhere.
+>
+> Quick rule: **local → free → paid (LAST RESORT)**.
 
 ## Rate Limits
 

@@ -10,7 +10,7 @@ import json
 import logging
 import os
 from collections import deque
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
@@ -74,7 +74,7 @@ class MemoryManager:
         entry = {
             "content": content,
             "category": category,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
         self._short_term.append(entry)  # deque auto-trims at maxlen
     
@@ -84,7 +84,7 @@ class MemoryManager:
     
     def clear_short(self):
         """Clear short-term memory."""
-        self._short_term = []
+        self._short_term.clear()
     
     # -------------------------------------------------------------------------
     # Long-term memory (database)

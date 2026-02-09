@@ -7,7 +7,7 @@ Defines the interface for all agents in the system.
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
@@ -47,7 +47,7 @@ class AgentMessage:
     role: str  # "user", "assistant", "system", "tool"
     content: str
     agent_id: Optional[str] = None
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     metadata: Dict[str, Any] = field(default_factory=dict)
     
     def to_dict(self) -> Dict[str, Any]:

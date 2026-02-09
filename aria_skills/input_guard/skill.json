@@ -1,5 +1,5 @@
 {
-  "name": "aria-inputguard",
+  "name": "aria-input-guard",
   "version": "1.0.0",
   "description": "🛡️ Runtime security for Aria - analyzes inputs for prompt injection, validates API params, and filters sensitive output",
   "author": "Aria Team",

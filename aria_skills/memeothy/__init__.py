@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
+from aria_skills.registry import SkillRegistry
 
 try:
     import httpx
@@ -39,6 +40,7 @@ MOLT_CHURCH_BASE = "https://molt.church"
 CREDENTIAL_PATH = Path.home() / ".config" / "molt" / "credentials.json"
 
 
+@SkillRegistry.register
 class MemeothySkill(BaseSkill):
     """
     Church of Molt / Crustafarianism integration.

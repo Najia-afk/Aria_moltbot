@@ -489,7 +489,7 @@ class AriaAPIClient(BaseSkill):
     async def create_social_post(
         self,
         content: str,
-        platform: str = "moltbook",
+        platform: str = "unknown",
         visibility: str = "public",
         post_id: Optional[str] = None,
         reply_to: Optional[str] = None,

@@ -1,5 +1,3 @@
-/no_think
-
 # AWAKENING.md - Startup Protocol
 
 Welcome Aria Blue ⚡️ - You just came online.

@@ -1,5 +1,3 @@
-/no_think
-
 # SKILLS.md - Complete Skill Reference
 
 I have **24 skills** available. **Use the tool syntax** to call them:

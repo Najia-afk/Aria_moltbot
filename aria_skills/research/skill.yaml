@@ -1,0 +1,6 @@
+name: research
+layer: 3
+version: "1.0"
+status: active
+description: "Research project management — source tracking, synthesis, credibility scoring"
+dependencies: []

@@ -4,7 +4,7 @@ Portfolio management skill.
 
 Tracks and manages cryptocurrency portfolios.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
@@ -30,6 +30,9 @@ class PortfolioSkill(BaseSkill):
     
     async def initialize(self) -> bool:
         """Initialize portfolio skill."""
+        # TODO: TICKET-12 - stub requires API endpoint for portfolio persistence.
+        # Currently in-memory only. Needs POST/GET /api/portfolio endpoints.
+        self.logger.warning("portfolio skill is in-memory only — API endpoint not yet available")
         self._status = SkillStatus.AVAILABLE
         self.logger.info("Portfolio skill initialized")
         return True
@@ -68,7 +71,7 @@ class PortfolioSkill(BaseSkill):
             
             existing["quantity"] = total_quantity
             existing["entry_price"] = avg_price
-            existing["updated_at"] = datetime.utcnow().isoformat()
+            existing["updated_at"] = datetime.now(timezone.utc).isoformat()
         else:
             # Create new position
             self._positions[symbol] = {
@@ -76,8 +79,8 @@ class PortfolioSkill(BaseSkill):
                 "quantity": quantity,
                 "entry_price": entry_price,
                 "notes": notes,
-                "created_at": datetime.utcnow().isoformat(),
-                "updated_at": datetime.utcnow().isoformat(),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
             }
         
         # Log transaction
@@ -86,7 +89,7 @@ class PortfolioSkill(BaseSkill):
             "symbol": symbol,
             "quantity": quantity,
             "price": entry_price,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         })
         
         return SkillResult.ok(self._positions[symbol])
@@ -133,7 +136,7 @@ class PortfolioSkill(BaseSkill):
             "quantity": remove_qty,
             "price": exit_price,
             "pnl": pnl,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         })
         
         # Update or remove position
@@ -142,7 +145,7 @@ class PortfolioSkill(BaseSkill):
             remaining = 0
         else:
             position["quantity"] -= remove_qty
-            position["updated_at"] = datetime.utcnow().isoformat()
+            position["updated_at"] = datetime.now(timezone.utc).isoformat()
             remaining = position["quantity"]
         
         return SkillResult.ok({

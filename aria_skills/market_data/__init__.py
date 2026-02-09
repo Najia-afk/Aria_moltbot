@@ -5,7 +5,7 @@ Crypto market data skill.
 Fetches and analyzes cryptocurrency market data.
 """
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
@@ -81,7 +81,7 @@ class MarketDataSkill(BaseSkill):
         """Check if cached data is still valid."""
         if key not in self._cache_time:
             return False
-        age = (datetime.utcnow() - self._cache_time[key]).total_seconds()
+        age = (datetime.now(timezone.utc) - self._cache_time[key]).total_seconds()
         return age < self._cache_ttl
     
     async def get_price(
@@ -123,11 +123,11 @@ class MarketDataSkill(BaseSkill):
                 "price": data[coin_id][vs_currencies],
                 "change_24h": data[coin_id].get(f"{vs_currencies}_24h_change"),
                 "market_cap": data[coin_id].get(f"{vs_currencies}_market_cap"),
-                "fetched_at": datetime.utcnow().isoformat(),
+                "fetched_at": datetime.now(timezone.utc).isoformat(),
             }
             
             self._cache[cache_key] = result
-            self._cache_time[cache_key] = datetime.utcnow()
+            self._cache_time[cache_key] = datetime.now(timezone.utc)
             
             return SkillResult.ok(result)
             
@@ -184,11 +184,11 @@ class MarketDataSkill(BaseSkill):
                 "currency": vs_currency,
                 "coins": coins,
                 "total_market_cap": sum(c["market_cap"] or 0 for c in coins),
-                "fetched_at": datetime.utcnow().isoformat(),
+                "fetched_at": datetime.now(timezone.utc).isoformat(),
             }
             
             self._cache[cache_key] = result
-            self._cache_time[cache_key] = datetime.utcnow()
+            self._cache_time[cache_key] = datetime.now(timezone.utc)
             
             return SkillResult.ok(result)
             
@@ -246,11 +246,11 @@ class MarketDataSkill(BaseSkill):
                     "circulating_supply": market_data.get("circulating_supply"),
                     "total_supply": market_data.get("total_supply"),
                 },
-                "fetched_at": datetime.utcnow().isoformat(),
+                "fetched_at": datetime.now(timezone.utc).isoformat(),
             }
             
             self._cache[cache_key] = result
-            self._cache_time[cache_key] = datetime.utcnow()
+            self._cache_time[cache_key] = datetime.now(timezone.utc)
             
             return SkillResult.ok(result)
             

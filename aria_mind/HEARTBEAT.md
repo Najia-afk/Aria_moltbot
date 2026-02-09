@@ -1,7 +1,5 @@
 # HEARTBEAT.md - Autonomous Mode Instructions
 
-/no_think
-
 ## 🔴 IMMEDIATE ACTIONS (Do these NOW if nothing else specified)
 
 When this heartbeat fires, execute in order:
@@ -84,8 +82,8 @@ m.save_artifact('content here', 'filename.md', category='research')
 
 These are configured in the Jobs UI. When they fire, WORK.
 
-### work_cycle (*/5 * * * *)
-**Every 5 minutes** - Your productivity pulse.
+### work_cycle (*/15 * * * *)
+**Every 15 minutes** - Your productivity pulse.
 
 1. Get active goals: `aria-apiclient.get_goals({"status": "active", "limit": 3})`
 2. Pick highest priority goal you can progress RIGHT NOW

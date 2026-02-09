@@ -8,19 +8,13 @@ Aria should invoke this after standalone sub-agent delegations and during cleanu
 import asyncio
 import json
 import os
-import subprocess
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
+import httpx
+
+from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
 from aria_skills.registry import SkillRegistry
-
-
-def _run_cmd(cmd: List[str], timeout: int = 30) -> subprocess.CompletedProcess:
-    """Run a shell command inside the container and return result."""
-    return subprocess.run(
-        cmd, capture_output=True, text=True, timeout=timeout
-    )
 
 
 def _parse_sessions_from_api(raw: str) -> List[Dict[str, Any]]:
@@ -71,8 +65,13 @@ class SessionManagerSkill(BaseSkill):
     def __init__(self, config: SkillConfig):
         super().__init__(config)
         self._stale_threshold_minutes: int = int(
-            config.settings.get("stale_threshold_minutes", 60)
+            config.config.get("stale_threshold_minutes", 60)
         )
+        self._gateway_url = config.config.get(
+            "openclaw_gateway_url",
+            f"http://localhost:{os.environ.get('OPENCLAW_GATEWAY_PORT', '18789')}"
+        )
+        self._client = httpx.AsyncClient(timeout=httpx.Timeout(30.0))
 
     @property
     def name(self) -> str:
@@ -90,70 +89,47 @@ class SessionManagerSkill(BaseSkill):
 
     # ── Public tool functions ──────────────────────────────────────────
 
+    @logged_method()
     async def list_sessions(self, **kwargs) -> SkillResult:
-        """
-        List all active sessions with basic metadata.
-
-        Returns session IDs, names/agents, and creation info.
-        """
+        """List all active sessions with basic metadata."""
         try:
-            # Use OpenClaw REST API on localhost gateway
-            gateway_port = os.environ.get("OPENCLAW_GATEWAY_PORT", "18789")
-            result = _run_cmd([
-                "curl", "-s",
-                f"http://localhost:{gateway_port}/api/sessions",
-                "-H", "Content-Type: application/json",
-            ])
-
-            if result.returncode != 0:
-                return SkillResult.error(
-                    f"Failed to list sessions: {result.stderr}"
-                )
-
-            sessions = _parse_sessions_from_api(result.stdout)
+            resp = await self._client.get(
+                f"{self._gateway_url}/api/sessions",
+                headers={"Content-Type": "application/json"},
+            )
+            resp.raise_for_status()
+            sessions = _parse_sessions_from_api(resp.text)
             return SkillResult.ok({
                 "session_count": len(sessions),
                 "sessions": sessions,
             })
-        except subprocess.TimeoutExpired:
-            return SkillResult.error("Timeout listing sessions")
+        except httpx.TimeoutException:
+            return SkillResult.fail("Timeout listing sessions")
         except Exception as e:
-            return SkillResult.error(f"Error listing sessions: {e}")
+            return SkillResult.fail(f"Error listing sessions: {e}")
 
     async def delete_session(self, session_id: str = "", **kwargs) -> SkillResult:
-        """
-        Delete a specific session by ID.
-
-        Args:
-            session_id: The session ID to delete.
-        """
+        """Delete a specific session by ID."""
         if not session_id:
             session_id = kwargs.get("session_id", "")
         if not session_id:
-            return SkillResult.error("session_id is required")
-
+            return SkillResult.fail("session_id is required")
         try:
-            gateway_port = os.environ.get("OPENCLAW_GATEWAY_PORT", "18789")
-            result = _run_cmd([
-                "curl", "-s", "-X", "DELETE",
-                f"http://localhost:{gateway_port}/api/sessions/{session_id}",
-                "-H", "Content-Type: application/json",
-            ])
-
-            if result.returncode != 0:
-                return SkillResult.error(
-                    f"Failed to delete session {session_id}: {result.stderr}"
-                )
-
+            resp = await self._client.delete(
+                f"{self._gateway_url}/api/sessions/{session_id}",
+                headers={"Content-Type": "application/json"},
+            )
+            resp.raise_for_status()
             return SkillResult.ok({
                 "deleted": session_id,
                 "message": f"Session {session_id} deleted successfully",
             })
-        except subprocess.TimeoutExpired:
-            return SkillResult.error(f"Timeout deleting session {session_id}")
+        except httpx.TimeoutException:
+            return SkillResult.fail(f"Timeout deleting session {session_id}")
         except Exception as e:
-            return SkillResult.error(f"Error deleting session {session_id}: {e}")
+            return SkillResult.fail(f"Error deleting session {session_id}: {e}")
 
+    @logged_method()
     async def prune_sessions(
         self,
         max_age_minutes: int = 0,
@@ -294,8 +270,12 @@ class SessionManagerSkill(BaseSkill):
         if not session_id:
             session_id = kwargs.get("session_id", "")
         if not session_id:
-            return SkillResult.error(
+            return SkillResult.fail(
                 "session_id is required — pass the ID of the completed delegation session"
             )
 
         return await self.delete_session(session_id=session_id)
+
+    async def close(self):
+        """Close the HTTP client."""
+        await self._client.aclose()
