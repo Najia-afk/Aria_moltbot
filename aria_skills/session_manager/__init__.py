@@ -69,7 +69,7 @@ class SessionManagerSkill(BaseSkill):
         )
         self._gateway_url = config.config.get(
             "openclaw_gateway_url",
-            f"http://localhost:{os.environ.get('OPENCLAW_GATEWAY_PORT', '18789')}"
+            os.environ.get("CLAWDBOT_URL", f"http://localhost:{os.environ.get('OPENCLAW_GATEWAY_PORT', '18789')}")
         )
         self._client = httpx.AsyncClient(timeout=httpx.Timeout(30.0))
 

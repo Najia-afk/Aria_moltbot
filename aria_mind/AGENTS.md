@@ -2,16 +2,11 @@
 
 Sub-agents that Aria spawns for specialized work. Each agent maps to a Focus persona.
 
-## Model Strategy (Cost Priority)
+## Model Strategy
 
-1. **Local**: `qwen3-mlx` - FREE, fastest, private (Apple Silicon)
-2. **Free Cloud** (OpenRouter):
-   - `trinity-free` - Creative/agentic (128K)
-   - `qwen3-coder-free` - Code (262K)
-   - `chimera-free` - Reasoning (164K)
-   - `deepseek-free` - Deep reasoning (164K)
-   - `qwen3-next-free` - RAG/tools (262K)
-3. **Paid**: Kimi - last resort only
+**Source of truth**: `aria_models/models.yaml` → `criteria.tiers` and `criteria.focus_defaults`.
+
+Priority: **Local → Free Cloud → Paid**. Never hardcode model names outside `models.yaml`.
 
 ---
 
@@ -141,7 +136,7 @@ timeout: 300s
 ## Coordination Rules
 
 1. **aria** coordinates all sub-agents
-2. Max 3 concurrent sub-agents
+2. Max 5 concurrent sub-agents
 3. Each agent has its own context window
 4. Shared memory via PostgreSQL
 5. **ACT autonomously** - don't ask permission, report results

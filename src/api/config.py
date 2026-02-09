@@ -23,10 +23,10 @@ SERVICE_URLS: dict[str, tuple[str, str]] = {
     "litellm":    (os.getenv("LITELLM_URL",     "http://litellm:4000"),          "/health/liveliness"),
     "clawdbot":   (os.getenv("CLAWDBOT_URL",    "http://clawdbot:18789"),        "/"),
     "pgadmin":    (os.getenv("PGADMIN_URL",     "http://aria-pgadmin:80"),       "/"),
-    "browser":    ("http://aria-browser:3000",                                    "/"),
+    "browser":    (os.getenv("BROWSER_URL", "http://aria-browser:3000"),         "/"),
     "traefik":    (os.getenv("TRAEFIK_URL",     "http://traefik:8080"),          "/api/overview"),
     "aria-web":   (os.getenv("ARIA_WEB_URL",    "http://aria-web:5000"),         "/"),
-    "aria-api":   ("http://localhost:8000",                                       "/health"),
+    "aria-api":   (os.getenv("ARIA_API_SELF_URL", "http://localhost:8000"),      "/health"),
 }
 
 if MLX_ENABLED:

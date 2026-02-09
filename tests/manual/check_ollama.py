@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Test Ollama API directly"""
+import os
 import requests
 import json
 
-BASE = "http://localhost:11434"
+BASE = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 
 print("=== Testing Ollama API ===")
 

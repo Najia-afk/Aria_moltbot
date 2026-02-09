@@ -55,7 +55,7 @@ class MoltbookSkill(BaseSkill):
         self._local_client: Optional["httpx.AsyncClient"] = None
         self._api_url = MOLTBOOK_DEFAULT_URL
         self._api_key = ""
-        self._local_api_url = "http://aria-api:8000"
+        self._local_api_url = os.environ.get("ARIA_API_URL", "http://aria-api:8000/api").split("/api")[0]
 
     @property
     def name(self) -> str:

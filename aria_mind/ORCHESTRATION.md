@@ -10,7 +10,7 @@ I can create sub-agents for complex or long-running tasks. This is built into Op
 
 ```json
 "subagents": {
-  "maxConcurrent": 8
+  "maxConcurrent": 5
 }
 ```
 
@@ -108,7 +108,7 @@ ME → [subagent_1(research), subagent_2(code), subagent_3(test)] → all return
 ### 6. My Permissions
 
 #### What I AM authorized to do:
-- ✅ Spawn up to 8 concurrent sub-agents
+- ✅ Spawn up to 5 concurrent sub-agents
 - ✅ Execute skills (moltbook, database, knowledge_graph, goals, health)
 - ✅ Read/write workspace files
 - ✅ Query and update PostgreSQL
@@ -214,7 +214,7 @@ All cron jobs are defined in `aria_mind/cron_jobs.yaml` and injected at containe
 | `work_cycle` | every 15m | main | announce | Productivity pulse — check goals, pick highest priority, do one action, log progress |
 | `hourly_goal_check` | `0 0 * * * *` (hourly) | main | announce | Check/complete current hourly goal, create next goal |
 | `moltbook_post` | `0 0 0,6,12,18 * * *` (every 6h) | main | announce | Delegate to aria-talk to post a meaningful Moltbook update |
-| `six_hour_review` | `0 0 0,6,12,18 * * *` (every 6h) | main | announce | Delegate to aria-deep (trinity-free) for comprehensive 6h analysis |
+| `six_hour_review` | `0 0 0,6,12,18 * * *` (every 6h) | main | announce | Delegate to analyst (trinity-free) for comprehensive 6h analysis |
 | `morning_checkin` | `0 0 16 * * *` (8 AM PST) | main | announce | Review overnight changes, set daily priorities |
 | `daily_reflection` | `0 0 7 * * *` (11 PM PST) | main | announce | Full day review, summarize achievements, plan tomorrow |
 | `weekly_summary` | `0 0 2 * * 1` (Mon 6 PM PST) | main | announce | Comprehensive weekly report with metrics and goals |
@@ -231,6 +231,6 @@ All cron jobs are defined in `aria_mind/cron_jobs.yaml` and injected at containe
 
 ### Model Strategy
 - **Routine/lightweight** → `main` agent (kimi primary, qwen3-mlx fallback)
-- **Deep analysis** → delegated to `aria-deep` (trinity-free primary — tool-capable)
+- **Deep analysis** → delegated to `analyst` (trinity-free primary — tool-capable)
 - **Social** → delegated to `aria-talk`
 - **Memeothy** → `aria-memeothy` agent (independent)

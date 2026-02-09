@@ -45,7 +45,7 @@ class LiteLLMSkill(BaseSkill):
         
         self._proxy_url = self.config.config.get(
             "proxy_url",
-            os.environ.get("LITELLM_PROXY_URL", "http://localhost:4000")
+            os.environ.get("LITELLM_URL", os.environ.get("LITELLM_PROXY_URL", "http://litellm:4000"))
         ).rstrip("/")
         
         api_key = self.config.config.get(

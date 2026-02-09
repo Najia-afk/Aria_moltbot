@@ -1,6 +1,7 @@
 {
   "schema_version": 2,
   "notes": "SINGLE SOURCE OF TRUTH for all model definitions. To add a new model: (1) add entry here, (2) run loader.build_litellm_config() or manually add to litellm-config.yaml. That's it.",
+  "model_priority_order": "local → free → paid. Use criteria.priority for the exact fallback chain. NEVER duplicate model names in .md or .py files — reference this file.",
   "providers": {
     "litellm": {
       "baseUrl": "http://litellm:4000/v1",

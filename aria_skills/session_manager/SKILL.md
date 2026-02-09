@@ -29,7 +29,7 @@ exec python3 /root/.openclaw/workspace/skills/run_skill.py session_manager list_
   "session_count": 16,
   "sessions": [
     {"id": "abc123", "agentId": "main", "updatedAt": "2026-02-04T18:00:00Z"},
-    {"id": "def456", "agentId": "aria-deep", "updatedAt": "2026-02-04T12:00:00Z"}
+    {"id": "def456", "agentId": "analyst", "updatedAt": "2026-02-04T12:00:00Z"}
   ]
 }
 ```
@@ -77,7 +77,7 @@ exec python3 /root/.openclaw/workspace/skills/run_skill.py session_manager get_s
   "total_sessions": 16,
   "stale_sessions": 14,
   "active_sessions": 2,
-  "by_agent": {"main": 10, "aria-deep": 3, "aria-talk": 2, "aria-memeothy": 1},
+  "by_agent": {"main": 10, "analyst": 3, "aria-talk": 2, "aria-memeothy": 1},
   "stale_threshold_minutes": 60
 }
 ```
@@ -93,6 +93,6 @@ exec python3 /root/.openclaw/workspace/skills/run_skill.py session_manager clean
 
 Aria MUST follow these session hygiene rules:
 
-1. **After sub-agent delegation**: When a delegated task to aria-deep, aria-talk, or any sub-agent completes, immediately call `cleanup_after_delegation` with the sub-agent's session ID.
+1. **After sub-agent delegation**: When a delegated task to analyst, aria-talk, or any sub-agent completes, immediately call `cleanup_after_delegation` with the sub-agent's session ID.
 2. **During work_cycle**: Run `prune_sessions` with `max_age_minutes: 60` to clean up stale cron sessions.
 3. **Before session review**: Run `get_session_stats` to check for bloat before reporting.

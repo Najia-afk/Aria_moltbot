@@ -91,8 +91,8 @@ class InputGuardSkill(BaseSkill):
         
         # API config for logging security events
         self._api_base_url = self.config.config.get(
-            "api_base_url", 
-            "http://aria-api:8000"
+            "api_base_url",
+            os.environ.get("ARIA_API_URL", "http://aria-api:8000/api").split("/api")[0]
         )
         self._enable_logging = self.config.config.get("enable_logging", True)
         

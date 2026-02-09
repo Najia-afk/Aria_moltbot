@@ -40,11 +40,11 @@ jobs:
     session: isolated
     delivery: announce
 
-  # ── Deep Analysis (delegated to aria-deep by main) ──────────────
+  # ── Deep Analysis (delegated to analyst by main) ────────────────
 
   - name: six_hour_review
     cron: "0 0 0,6,12,18 * * *"
-    text: "Delegate to aria-deep using trinity-free (tool-capable model, do NOT use chimera-free — it lacks tool calling): Run 6-hour review. Read HEARTBEAT.md six_hour_review section. Analyze last 6h via api_client, adjust priorities, generate insights. Use api_client not database."
+    text: "Delegate to analyst using trinity-free (tool-capable model, do NOT use chimera-free — it lacks tool calling): Run 6-hour review. Read HEARTBEAT.md six_hour_review section. Analyze last 6h via api_client, adjust priorities, generate insights. Use api_client not database."
     agent: main
     session: isolated
     delivery: announce

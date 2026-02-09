@@ -363,3 +363,23 @@ class ApiKeyRotation(Base):
     reason: Mapped[str | None] = mapped_column(Text)
     rotated_by: Mapped[str] = mapped_column(String(100), server_default=text("'system'"))
     metadata_json: Mapped[dict] = mapped_column("metadata", JSONB, server_default=text("'{}'::jsonb"))
+
+
+# ── Agent Performance (pheromone scoring) ─────────────────────────────────
+
+class AgentPerformance(Base):
+    __tablename__ = "agent_performance"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    agent_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    task_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    success: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    duration_ms: Mapped[int | None] = mapped_column(Integer)
+    token_cost: Mapped[float | None] = mapped_column(Numeric(10, 6))
+    pheromone_score: Mapped[float] = mapped_column(Numeric(5, 3), server_default=text("0.500"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
+
+
+Index("idx_agent_perf_agent", AgentPerformance.agent_id)
+Index("idx_agent_perf_task", AgentPerformance.task_type)
+Index("idx_agent_perf_created", AgentPerformance.created_at.desc())

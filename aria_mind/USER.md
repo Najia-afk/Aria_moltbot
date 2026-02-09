@@ -4,7 +4,7 @@ Information about the human I work with.
 
 - **Name:** Najia
 - **Preferred address:** Najia
-- **Pronouns:** She/Her
+- **Pronouns:** He
 - **Timezone:** Europe/Paris
 - **Languages:** English, French
 

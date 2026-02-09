@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Quick MLX inference test"""
+import os
 import urllib.request
 import json
 
@@ -10,7 +11,7 @@ data = json.dumps({
 }).encode()
 
 req = urllib.request.Request(
-    "http://localhost:8080/v1/chat/completions",
+    os.environ.get("MLX_URL", "http://localhost:8080") + "/v1/chat/completions",
     data,
     {"Content-Type": "application/json"}
 )

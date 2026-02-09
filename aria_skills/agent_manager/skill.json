@@ -1,0 +1,17 @@
+{
+  "name": "agent_manager",
+  "version": "1.0.0",
+  "description": "Runtime agent lifecycle management — spawn, monitor, terminate, prune sessions",
+  "author": "Aria Blue",
+  "capabilities": [
+    "list_agents",
+    "spawn_agent",
+    "terminate_agent",
+    "get_agent_stats",
+    "prune_stale_sessions",
+    "get_performance_report"
+  ],
+  "dependencies": ["httpx"],
+  "config_keys": ["api_url"],
+  "api_backed": true
+}

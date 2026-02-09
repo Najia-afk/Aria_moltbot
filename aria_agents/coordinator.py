@@ -9,9 +9,12 @@ cross-focus collaboration via roundtable discussions.
 import asyncio
 import logging
 import re
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from aria_agents.base import AgentConfig, AgentMessage, AgentRole, BaseAgent
+from aria_agents.context import AgentContext, AgentResult
+from aria_agents.scoring import compute_pheromone, select_best_agent, COLD_START_SCORE
 
 # Keywords that trigger cross-focus collaboration
 ROUNDTABLE_TRIGGERS = re.compile(
@@ -24,6 +27,8 @@ from aria_models.loader import get_route_skill, normalize_model_id
 
 if TYPE_CHECKING:
     from aria_skills import SkillRegistry
+
+MAX_CONCURRENT_AGENTS = 5
 
 
 class LLMAgent(BaseAgent):
@@ -354,3 +359,116 @@ class AgentCoordinator:
             "hierarchy": self._hierarchy,
             "skill_registry": self._skill_registry is not None,
         }
+
+    # ── Explorer / Worker / Validator cycle ──────────────────────────────
+
+    async def explore(self, ctx: AgentContext) -> list[str]:
+        """Generate candidate approaches for a task.
+
+        Returns a list of approach strings (ideally 3). Falls back to the
+        full LLM response as a single approach if parsing fails.
+        """
+        agent = self._agents.get(ctx.agent_id) or self.get_main_agent()
+        if not agent:
+            return [ctx.task]
+
+        prompt = (
+            f"List 3 distinct approaches to accomplish this task. "
+            f"Return each approach on its own numbered line (1. 2. 3.).\n\n"
+            f"Task: {ctx.task}"
+        )
+        response = await agent.process(prompt)
+        text = response.content
+
+        # Try to parse numbered lines
+        import re as _re
+        approaches = _re.findall(r"^\s*\d+[\.\)\-]\s*(.+)", text, _re.MULTILINE)
+        if approaches:
+            return [a.strip() for a in approaches if a.strip()]
+        # Fallback: return full response as single approach
+        return [text.strip()] if text.strip() else [ctx.task]
+
+    async def work(self, ctx: AgentContext, approach: str) -> AgentResult:
+        """Implement a selected approach."""
+        agent = self._agents.get(ctx.agent_id) or self.get_main_agent()
+        agent_id = agent.id if agent else ctx.agent_id or "unknown"
+
+        if not agent:
+            return AgentResult(agent_id=agent_id, success=False, output="No agent available")
+
+        start = datetime.now(timezone.utc)
+        prompt = (
+            f"Implement the following approach for the task.\n\n"
+            f"Task: {ctx.task}\nApproach: {approach}"
+        )
+        response = await agent.process(prompt)
+        elapsed = int((datetime.now(timezone.utc) - start).total_seconds() * 1000)
+
+        return AgentResult(
+            agent_id=agent_id,
+            success=True,
+            output=response.content,
+            duration_ms=elapsed,
+        )
+
+    async def validate(self, ctx: AgentContext, result: AgentResult) -> AgentResult:
+        """Validate a work result against task constraints."""
+        agent = self._agents.get(ctx.agent_id) or self.get_main_agent()
+        agent_id = agent.id if agent else ctx.agent_id or "unknown"
+
+        if not agent:
+            return AgentResult(agent_id=agent_id, success=False, output="No agent available")
+
+        constraint_text = ", ".join(ctx.constraints) if ctx.constraints else "none"
+        prompt = (
+            f"Validate this output against the constraints.\n\n"
+            f"Task: {ctx.task}\nConstraints: {constraint_text}\n"
+            f"Output to validate:\n{result.output}"
+        )
+        response = await agent.process(prompt)
+
+        return AgentResult(
+            agent_id=agent_id,
+            success=True,
+            output=response.content,
+        )
+
+    async def spawn_parallel(self, tasks: list[AgentContext]) -> list[AgentResult]:
+        """Run multiple tasks concurrently with a semaphore."""
+        if not tasks:
+            return []
+
+        sem = asyncio.Semaphore(MAX_CONCURRENT_AGENTS)
+
+        async def _limited(t: AgentContext) -> AgentResult:
+            async with sem:
+                return await self._process_task(t)
+
+        return list(await asyncio.gather(*[_limited(t) for t in tasks]))
+
+    async def _process_task(self, ctx: AgentContext) -> AgentResult:
+        """Internal: run a single task and record timing."""
+        agent = self._agents.get(ctx.agent_id) or self.get_main_agent()
+        agent_id = agent.id if agent else ctx.agent_id or "unknown"
+
+        if not agent:
+            return AgentResult(agent_id=agent_id, success=False, output="No agent available")
+
+        start = datetime.now(timezone.utc)
+        try:
+            response = await agent.process(ctx.task)
+            elapsed = int((datetime.now(timezone.utc) - start).total_seconds() * 1000)
+            return AgentResult(
+                agent_id=agent_id,
+                success=True,
+                output=response.content,
+                duration_ms=elapsed,
+            )
+        except Exception as exc:
+            elapsed = int((datetime.now(timezone.utc) - start).total_seconds() * 1000)
+            return AgentResult(
+                agent_id=agent_id,
+                success=False,
+                output=str(exc),
+                duration_ms=elapsed,
+            )

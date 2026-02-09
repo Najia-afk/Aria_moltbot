@@ -98,7 +98,7 @@ class AgentLoader:
                 id=agent_id,
                 name=props.get("name", agent_id),
                 role=role,
-                model=props.get("model", "qwen3-vl:8b"),
+                model=props.get("model", "qwen3-mlx"),
                 parent=props.get("parent"),
                 capabilities=props.get("capabilities", []),
                 skills=props.get("skills", []),

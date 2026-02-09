@@ -1,0 +1,12 @@
+{
+  "name": "sandbox",
+  "version": "1.0.0",
+  "description": "Safe code execution in isolated Docker container with resource limits",
+  "author": "Aria Blue",
+  "capabilities": ["run_code", "write_file", "read_file", "run_tests", "reset"],
+  "dependencies": ["httpx"],
+  "config_keys": ["sandbox_url"],
+  "api_backed": false,
+  "network_required": true,
+  "notes": "Requires aria-sandbox Docker container on aria-net"
+}

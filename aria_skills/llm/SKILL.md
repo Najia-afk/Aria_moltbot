@@ -8,26 +8,11 @@ metadata: {"openclaw": {"emoji": "🧠", "requires": {"anyEnv": ["MOONSHOT_KIMI_
 
 Access multiple LLM providers via LiteLLM routing for text generation and chat.
 
-## Model Priority (Feb 2026)
+## Model Priority
 
-1. **Local MLX** (`qwen3-mlx`) - FREE, fastest, no rate limits
-2. **OpenRouter FREE** - No cost, may have rate limits
-3. **Kimi (paid)** - Last resort, costs money!
+**Source of truth**: `aria_models/models.yaml` → `criteria.priority` and `criteria.tiers`.
 
-## Available Models
-
-| Model | Provider | Context | Best For |
-|-------|----------|---------|----------|
-| `qwen3-mlx` | Local MLX | 32K | **Primary** - Fast local |
-| `trinity-free` | OpenRouter | 128K | Agentic, creative |
-| `qwen3-coder-free` | OpenRouter | 262K | Code generation |
-| `chimera-free` | OpenRouter | 164K | Reasoning (fast) |
-| `qwen3-next-free` | OpenRouter | 262K | RAG, tools |
-| `glm-free` | OpenRouter | 131K | Agent-focused |
-| `deepseek-free` | OpenRouter | 164K | Deep reasoning |
-| `nemotron-free` | OpenRouter | 256K | Long context |
-| `gpt-oss-free` | OpenRouter | 131K | Function calling |
-| `kimi` | Moonshot | 256K | **PAID** - Avoid! |
+Order: **Local → Free Cloud → Paid**. Never hardcode model names outside `models.yaml`.
 
 ## Usage
 
@@ -58,20 +43,11 @@ Analyze text for sentiment, topics, or custom analysis.
 exec python3 /root/.openclaw/workspace/skills/run_skill.py llm analyze '{"text": "I had a great day today!", "analysis_type": "sentiment"}'
 ```
 
-## Model Selection Guide
+## Model Selection
 
-```
-IF task = code_generation OR code_review:
-    USE qwen3-coder-free (262K context, optimized for code)
-ELIF task = complex_reasoning:
-    USE chimera-free (fast reasoning) OR deepseek-free (deep reasoning)
-ELIF task = creative_writing OR roleplay:
-    USE trinity-free (best for creative)
-ELIF task = long_context OR RAG:
-    USE qwen3-next-free (262K) OR nemotron-free (256K)
-ELSE:
-    USE qwen3-mlx (default local, fastest)
-```
+See `aria_models/models.yaml` → `criteria.use_cases` for model-to-task mapping.
+
+When in doubt, use the `routing.primary` model defined in `models.yaml`.
 
 ## API Configuration
 
