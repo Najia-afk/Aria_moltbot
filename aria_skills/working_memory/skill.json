@@ -1,0 +1,73 @@
+{
+  "name": "aria-working-memory",
+  "version": "1.0.0",
+  "description": "Persistent working memory that survives restarts. Stores key/value items with importance scoring, weighted context retrieval, and checkpoint/restore for session continuity.",
+  "author": "Aria Team",
+  "tools": [
+    {
+      "name": "remember",
+      "description": "Store or upsert a working memory item with category, importance, and optional TTL.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "key": { "type": "string", "description": "Unique key within category" },
+          "value": { "type": "object", "description": "JSON-serializable value" },
+          "category": { "type": "string", "description": "Category (default: general)" },
+          "importance": { "type": "number", "description": "Importance 0.0-1.0 (default: 0.5)" },
+          "ttl_hours": { "type": "integer", "description": "Time-to-live in hours (null = forever)" },
+          "source": { "type": "string", "description": "Origin of this memory (e.g. cognition, user)" }
+        },
+        "required": ["key", "value"]
+      }
+    },
+    {
+      "name": "recall",
+      "description": "Retrieve working memory items filtered by key and/or category.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "key": { "type": "string", "description": "Filter by key" },
+          "category": { "type": "string", "description": "Filter by category" },
+          "limit": { "type": "integer", "description": "Max items to return (default: 50)" }
+        }
+      }
+    },
+    {
+      "name": "get_context",
+      "description": "Weighted-ranked retrieval of working memory for LLM context injection.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "limit": { "type": "integer", "description": "Max items (default: 20)" },
+          "weight_recency": { "type": "number", "description": "Weight for recency (default: 0.4)" },
+          "weight_importance": { "type": "number", "description": "Weight for importance (default: 0.4)" },
+          "weight_access": { "type": "number", "description": "Weight for access frequency (default: 0.2)" },
+          "category": { "type": "string", "description": "Optional category filter" }
+        }
+      }
+    },
+    {
+      "name": "checkpoint",
+      "description": "Snapshot current working memory state for later restoration."
+    },
+    {
+      "name": "restore_checkpoint",
+      "description": "Retrieve items from the most recent checkpoint."
+    },
+    {
+      "name": "forget",
+      "description": "Delete a working memory item by its UUID.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "item_id": { "type": "string", "description": "UUID of the item to delete" }
+        },
+        "required": ["item_id"]
+      }
+    },
+    {
+      "name": "reflect",
+      "description": "Produce a human-readable summary of current working memory grouped by category."
+    }
+  ]
+}

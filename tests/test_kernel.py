@@ -5,6 +5,8 @@ import pathlib
 import pytest
 import yaml
 
+pytestmark = pytest.mark.unit
+
 
 @pytest.fixture(autouse=True)
 def reset_kernel():

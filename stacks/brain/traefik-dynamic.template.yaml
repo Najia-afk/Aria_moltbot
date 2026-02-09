@@ -376,6 +376,13 @@ http:
           Connection: "keep-alive"
           Keep-Alive: "timeout=5, max=1000"
 
+  serversTransports:
+    clawdbot-transport:
+      forwardingTimeouts:
+        dialTimeout: "30s"
+        responseHeaderTimeout: "120s"
+        idleConnTimeout: "300s"
+
   services:
     portal:
       loadBalancer:
@@ -387,6 +394,7 @@ http:
           - url: "http://aria-api:8000"
     clawdbot:
       loadBalancer:
+        serversTransport: clawdbot-transport@file
         servers:
           - url: "http://clawdbot:18789"
     grafana:

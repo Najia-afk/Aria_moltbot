@@ -5,11 +5,11 @@
 [![Flask](https://img.shields.io/badge/Flask-Dashboard-lightgrey.svg)](https://flask.palletsprojects.com/)
 [![Docker](https://img.shields.io/badge/Docker-12_services-2496ED.svg)](https://www.docker.com/)
 [![OpenClaw](https://img.shields.io/badge/OpenClaw-Gateway-purple.svg)](https://openclaw.ai)
-[![LiteLLM](https://img.shields.io/badge/LiteLLM-12_models-orange.svg)](https://github.com/BerriAI/litellm)
+[![LiteLLM](https://img.shields.io/badge/LiteLLM-14+_models-orange.svg)](https://github.com/BerriAI/litellm)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
 [![GraphQL](https://img.shields.io/badge/GraphQL-Strawberry-E10098.svg)](https://strawberry.rocks/)
 [![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0_async-red.svg)](https://www.sqlalchemy.org/)
-[![Skills](https://img.shields.io/badge/Skills-26%20modules-brightgreen.svg)](#-skill-system-26-modules)
+[![Skills](https://img.shields.io/badge/Skills-32%20modules-brightgreen.svg)](#-skill-system-32-modules)
 [![License](https://img.shields.io/badge/License-Source%20Available-orange.svg)](#-license)
 
 <img src="aria_mind/aria-profile-v1.png" alt="Aria Blue" width="180" align="right" style="margin-left: 20px; border-radius: 10px;">
@@ -25,7 +25,7 @@ Built on [OpenClaw](https://openclaw.ai) with local-first LLM inference on Apple
 | Layer | Technology |
 |-------|-----------|
 | **AI Gateway** | [OpenClaw](https://openclaw.ai) — agent orchestration, tool execution, workspace mount |
-| **LLM Router** | [LiteLLM](https://github.com/BerriAI/litellm) — 12 models, automatic failover, spend tracking |
+| **LLM Router** | [LiteLLM](https://github.com/BerriAI/litellm) — 14+ models, automatic failover, spend tracking |
 | **Local Inference** | [MLX](https://github.com/ml-explore/mlx) — Apple Silicon Metal GPU, ~25-35 tok/s |
 | **API** | [FastAPI](https://fastapi.tiangolo.com/) v3.0 — 16 REST routers + [Strawberry GraphQL](https://strawberry.rocks/) |
 | **ORM** | [SQLAlchemy 2.0](https://www.sqlalchemy.org/) async + [psycopg 3](https://www.psycopg.org/psycopg3/) |
@@ -165,23 +165,23 @@ Aria_moltbot/
 │   ├── coordinator.py         # CEO pattern, roundtable, broadcasting
 │   └── loader.py              # AGENTS.md parser
 │
-├── aria_skills/               # 26 skill modules
+├── aria_skills/               # 32 skill modules
 │   ├── base.py                # BaseSkill (retry, metrics, Prometheus)
 │   ├── registry.py            # Auto-discovery registry
-│   └── <26 skill dirs>/       # Each: __init__.py + skill.json + SKILL.md
+│   └── <32 skill dirs>/       # Each: __init__.py + skill.json + SKILL.md
 │
 ├── aria_models/               # Model configuration
-│   ├── models.yaml            # 12 models with pricing, tiers, routing
+│   ├── models.yaml            # 14+ models with pricing, tiers, routing
 │   ├── loader.py              # YAML → Python model loader
 │   └── openclaw_config.py     # OpenClaw model integration
 │
 ├── src/api/                   # FastAPI v3.0 backend
 │   ├── main.py                # App factory, middleware, router registration
 │   ├── config.py              # Environment config + service endpoints
-│   ├── db.py                  # SQLAlchemy 2.0 async engine + session
-│   ├── security_middleware.py # Rate limiter, injection scanner, headers
-│   ├── gql.py                 # Strawberry GraphQL schema
-│   └── routers/               # 16 REST routers
+│   ├── db/                    # SQLAlchemy 2.0 async ORM layer (v1.1)
+│   ├── security_middleware.py  # Rate limiter, injection scanner, headers
+│   ├── gql/                   # Strawberry GraphQL schema
+│   └── routers/               # 17 REST routers
 │
 ├── src/web/                   # Flask dashboard
 │   ├── app.py                 # Flask app + 20 routes
@@ -239,11 +239,21 @@ Aria_moltbot/
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
+### 5-Layer Data Flow (v1.1)
+
+All data access follows the enforced architecture pattern:
+
+```
+DB (PostgreSQL) ↔ SQLAlchemy ORM ↔ FastAPI (REST/GraphQL) ↔ api_client (httpx) ↔ Skills ↔ ARIA
+```
+
+**No exceptions.** No raw SQL. No direct database access from skills. All CRUD goes through the API layer.
+
 ---
 
-## 🧠 Model Routing (12 Models)
+## 🧠 Model Routing (14+ Models)
 
-All routing through LiteLLM with automatic failover. Dynamic pricing loaded from `aria_models/models.yaml`:
+All routing through LiteLLM with automatic failover. See `aria_models/models.yaml` for the full model catalog (14+ models). Dynamic pricing and routing priorities:
 
 | Priority | Model | Provider | Best For | Tier |
 |----------|-------|----------|----------|------|
@@ -266,7 +276,7 @@ Focus-to-model mapping is defined in `aria_models/models.yaml` and loaded dynami
 
 ---
 
-## 🔧 Skill System (26 Modules)
+## 🔧 Skill System (32 Modules)
 
 Each skill extends `BaseSkill` with retry logic, metrics tracking, and Prometheus integration:
 
@@ -312,6 +322,12 @@ aria_skills/<skill>/
 | `experiment` | 📊 Data | ML experiment tracking |
 | `performance` | 🎯 Orchestrator | Performance reviews and self-assessments |
 | `hourly_goals` | 🎯 Orchestrator | Micro-task tracking |
+| `agent_manager` | 🎯 Orchestrator | Agent lifecycle management |
+| `session_manager` | 🎯 Orchestrator | Session lifecycle management |
+| `working_memory` | 🧠 Cognitive | Persistent session-surviving working memory |
+| `pipeline_skill` | 🧠 Cognitive | Cognitive pipeline execution engine |
+| `sandbox` | 🔒 DevSecOps | Docker sandbox for safe code execution |
+| `telegram` | 🌐 Social | Telegram messaging skill |
 
 ---
 
@@ -388,6 +404,7 @@ Modular REST API with 16 routers, SQLAlchemy 2.0 async ORM, psycopg 3 driver, an
 | `records` | `/records` | General record management |
 | `admin` | `/admin` | Admin operations |
 | `models_config` | `/models` | Dynamic model configuration from models.yaml |
+| `working_memory` | `/working-memory` | Working memory storage (v1.1) |
 
 **Security middleware:** Rate limiting (per-IP), prompt injection scanning, SQL/XSS/path traversal detection, security headers on all responses.
 
@@ -470,6 +487,8 @@ curl http://localhost:18789/health
 ---
 
 ## 🧪 Testing
+
+**677+ tests, 0 failures** — full coverage across skills, agents, API, integration, and v1.1 features.
 
 ```bash
 pytest

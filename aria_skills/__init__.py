@@ -68,6 +68,9 @@ from aria_skills.fact_check import FactCheckSkill
 from aria_skills.community import CommunitySkill
 from aria_skills.model_switcher import ModelSwitcherSkill
 
+# Pipeline Engine (v1.4.0) — Cognitive multi-step workflows
+from aria_skills.pipeline_skill import PipelineSkill
+
 __all__ = [
     # Base classes
     "BaseSkill",
@@ -105,4 +108,6 @@ __all__ = [
     # API Client
     "AriaAPIClient",
     "get_api_client",
+    # Pipeline Engine (v1.4.0)
+    "PipelineSkill",
 ]

@@ -2,6 +2,8 @@
 """Test that all core modules can be imported."""
 import pytest
 
+pytestmark = pytest.mark.unit
+
 
 def test_import_security():
     """Test aria_mind.security imports."""

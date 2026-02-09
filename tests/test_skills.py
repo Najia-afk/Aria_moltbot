@@ -8,6 +8,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
 from aria_skills.registry import SkillRegistry
 
+pytestmark = pytest.mark.unit
+
 
 class TestSkillResult:
     """Tests for SkillResult."""

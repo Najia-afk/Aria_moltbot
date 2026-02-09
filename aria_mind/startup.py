@@ -107,6 +107,42 @@ async def run_startup():
         print(f"   ⚠ Agents: {e}")
     
     # =========================================================================
+    # Phase 3.5: Restore Working Memory
+    # =========================================================================
+    print()
+    print("🧩 Phase 3.5: Restoring Working Memory...")
+
+    wm_skill = registry.get("working_memory")
+    if not wm_skill:
+        # Try to instantiate directly if not loaded via TOOLS.md
+        try:
+            from aria_skills.working_memory import WorkingMemorySkill
+            from aria_skills.base import SkillConfig as _SC
+            wm_skill = WorkingMemorySkill(_SC(name="working_memory"))
+            await wm_skill.initialize()
+            registry._skills["working_memory"] = wm_skill
+            registry._skills[wm_skill.canonical_name] = wm_skill
+        except Exception as e:
+            logger.debug(f"Could not init working_memory skill: {e}")
+
+    if wm_skill and wm_skill.is_available:
+        try:
+            ckpt = await wm_skill.restore_checkpoint()
+            if ckpt.success and ckpt.data and ckpt.data.get("count", 0) > 0:
+                print(f"   ✓ Restored checkpoint: {ckpt.data['checkpoint_id']} ({ckpt.data['count']} items)")
+                # Reflect on restored context
+                ref = await wm_skill.reflect()
+                if ref.success:
+                    print(f"   ✓ Context summary: {ref.data.get('summary', '')[:120]}...")
+            else:
+                print("   ℹ Fresh start — no previous checkpoint found")
+        except Exception as e:
+            logger.warning(f"Working memory restore failed: {e}")
+            print(f"   ⚠ Working memory: {e}")
+    else:
+        print("   ⚠ Working memory skill not available — skipping restore")
+    
+    # =========================================================================
     # Phase 4: Log to Database
     # =========================================================================
     print()
@@ -259,6 +295,17 @@ async def run_forever():
         print("\n⚠️ Shutdown signal received...")
     finally:
         print("💔 Aria shutting down...")
+        # Checkpoint working memory before shutdown
+        wm = registry.get("working_memory")
+        if wm and wm.is_available:
+            try:
+                ckpt_result = await wm.checkpoint()
+                if ckpt_result.success:
+                    print(f"   ✓ Working memory checkpointed: {ckpt_result.data.get('checkpoint_id', '?')}")
+                else:
+                    print(f"   ⚠ Working memory checkpoint failed: {ckpt_result.error}")
+            except Exception as e:
+                logger.debug(f"WM checkpoint on shutdown failed: {e}")
         if db and db.is_available:
             try:
                 await db.execute(

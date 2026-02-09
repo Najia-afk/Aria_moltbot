@@ -4,6 +4,8 @@ import pytest
 from collections import deque
 from datetime import datetime, timezone
 
+pytestmark = pytest.mark.unit
+
 
 class TestDequePreservation:
     """Test that clear_short() preserves deque maxlen."""

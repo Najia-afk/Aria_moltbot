@@ -10,9 +10,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from aria_skills import SkillRegistry, SkillStatus
 from aria_agents import AgentCoordinator
 
+pytestmark = pytest.mark.integration
+
 
 @pytest.mark.docker
-@pytest.mark.integration
 class TestFlaskRoutes:
     """Tests for Flask web routes (requires Docker stack)."""
     

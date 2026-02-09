@@ -3,6 +3,8 @@ import asyncio
 import pytest
 from aria_skills.base import SkillConfig, SkillResult
 
+pytestmark = pytest.mark.unit
+
 
 # ── Protocol existence & runtime_checkable ────────────────────────
 

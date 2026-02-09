@@ -11,6 +11,8 @@ import pytest
 import requests
 from typing import Dict, Any
 
+pytestmark = pytest.mark.integration
+
 # Configuration
 API_BASE = os.getenv("ARIA_API_BASE", "http://aria-api:8000/api")
 WEB_BASE = os.getenv("ARIA_WEB_BASE", "http://aria-web:5000")

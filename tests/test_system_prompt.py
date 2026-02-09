@@ -14,6 +14,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.unit
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ARIA_MIND = PROJECT_ROOT / "aria_mind"
 ARIA_MEMORIES = PROJECT_ROOT / "aria_memories"

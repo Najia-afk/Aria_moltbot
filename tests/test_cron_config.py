@@ -5,6 +5,8 @@ import pathlib
 import yaml
 import pytest
 
+pytestmark = pytest.mark.unit
+
 CRON_YAML = pathlib.Path(__file__).resolve().parent.parent / "aria_mind" / "cron_jobs.yaml"
 
 REQUIRED_FIELDS = {"agent", "session", "text"}

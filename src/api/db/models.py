@@ -12,7 +12,7 @@ from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import (
-    Boolean, DateTime, Integer, Numeric, String, Text, Index, text,
+    Boolean, DateTime, Float, Integer, Numeric, String, Text, Index, text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -383,3 +383,28 @@ class AgentPerformance(Base):
 Index("idx_agent_perf_agent", AgentPerformance.agent_id)
 Index("idx_agent_perf_task", AgentPerformance.task_type)
 Index("idx_agent_perf_created", AgentPerformance.created_at.desc())
+
+
+# ── Working Memory ───────────────────────────────────────────────────────────
+
+class WorkingMemory(Base):
+    __tablename__ = "working_memory"
+
+    id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
+    category: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    key: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
+    value: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    importance: Mapped[float] = mapped_column(Float, server_default=text("0.5"))
+    ttl_hours: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source: Mapped[str | None] = mapped_column(String(100))
+    checkpoint_id: Mapped[str | None] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    accessed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    access_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+
+
+Index("idx_wm_category", WorkingMemory.category)
+Index("idx_wm_key", WorkingMemory.key)
+Index("idx_wm_importance", WorkingMemory.importance.desc())
+Index("idx_wm_checkpoint", WorkingMemory.checkpoint_id)

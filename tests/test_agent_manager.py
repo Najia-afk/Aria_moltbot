@@ -6,6 +6,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from aria_skills.base import SkillConfig, SkillResult, SkillStatus
 
+pytestmark = pytest.mark.unit
+
 
 @pytest.fixture
 def skill_config():

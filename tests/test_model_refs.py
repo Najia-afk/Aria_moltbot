@@ -2,6 +2,8 @@
 import pytest
 from pathlib import Path
 
+pytestmark = pytest.mark.unit
+
 
 def test_cognition_no_stale_model_skills():
     """Ensure cognition.py doesn't reference removed skill names."""

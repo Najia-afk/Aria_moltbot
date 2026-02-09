@@ -6,8 +6,10 @@ RUN apk add --no-cache git bash curl jq && \
 
 WORKDIR /sandbox
 
-COPY entrypoint.py /sandbox/entrypoint.py
+COPY server.py /sandbox/server.py
+COPY entrypoint.sh /sandbox/entrypoint.sh
+RUN chmod +x /sandbox/entrypoint.sh
 
 EXPOSE 9999
 
-CMD ["python", "/sandbox/entrypoint.py"]
+ENTRYPOINT ["/sandbox/entrypoint.sh"]

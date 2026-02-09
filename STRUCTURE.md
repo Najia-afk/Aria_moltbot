@@ -32,6 +32,12 @@ Aria_moltbot/
 │   ├── security.py               # Security implementation
 │   ├── startup.py                # Startup routines
 │   ├── cron_jobs.yaml            # Cron schedule definitions
+│   ├── kernel/                   # Kernel layer — read-only core (v1.1)
+│   │   ├── __init__.py
+│   │   ├── constitution.yaml     # Core constitution
+│   │   ├── identity.yaml         # Identity definition
+│   │   ├── safety_constraints.yaml # Safety constraints
+│   │   └── values.yaml           # Core values (YAML)
 │   ├── soul/                     # Soul implementation
 │   │   ├── __init__.py
 │   │   ├── identity.py           # Identity module
@@ -39,6 +45,7 @@ Aria_moltbot/
 │   │   ├── boundaries.py         # Operational boundaries
 │   │   └── focus.py              # Focus management
 │   ├── skills/                   # Runtime skill mounts (populated at deploy)
+│   │   ├── run_skill.py          # Skill runner script
 │   │   ├── aria_skills/          # ← mounted from ../../aria_skills
 │   │   ├── aria_agents/          # ← mounted from ../../aria_agents
 │   │   └── legacy/               # ← mounted from ../../skills (deprecated)
@@ -46,83 +53,138 @@ Aria_moltbot/
 │   ├── hooks/                    # Behavioral hooks
 │   └── tests/                    # Mind-specific tests
 │
-├── aria_skills/                  # Skill modules (26 directories)
-│   ├── __init__.py               # Package exports (v2.0.0)
-│   ├── base.py                   # BaseSkill, SkillConfig, SkillResult (362 lines)
-│   ├── registry.py               # SkillRegistry with auto-discovery (171 lines)
-│   ├── api_client/               # Centralized HTTP client
-│   ├── brainstorm/               # Creative ideation
-│   ├── ci_cd/                    # CI/CD pipeline management
-│   ├── community/                # Community management
+├── aria_skills/                  # Skill modules (32 skills + pipeline definitions)
+│   ├── __init__.py               # Package exports
+│   ├── base.py                   # BaseSkill, SkillConfig, SkillResult
+│   ├── registry.py               # SkillRegistry with auto-discovery
+│   ├── pipeline.py               # Pipeline definition engine
+│   ├── pipeline_executor.py      # Pipeline execution runtime
+│   ├── SKILL_STANDARD.md         # Skill development standard
+│   ├── AUDIT.md                  # Skill audit report
+│   ├── agent_manager/            # Agent lifecycle management (v1.1)
+│   ├── api_client/               # Centralized HTTP client for aria-api
+│   ├── brainstorm/               # Creative ideation (SCAMPER, Six Hats)
+│   ├── ci_cd/                    # CI/CD pipeline automation
+│   ├── community/                # Community management & growth
 │   ├── data_pipeline/            # ETL & data pipeline operations
-│   ├── database/                 # PostgreSQL operations
+│   ├── database/                 # PostgreSQL operations (via api_client)
 │   ├── experiment/               # ML experiment tracking
-│   ├── fact_check/               # Claim verification
+│   ├── fact_check/               # Claim verification workflows
 │   ├── goals/                    # Goal & habit tracking
-│   ├── health/                   # System health monitoring
+│   ├── health/                   # System health & self-diagnostic (v1.1)
+│   │   ├── __init__.py           # Health skill class
+│   │   ├── diagnostics.py        # Self-diagnostic engine
+│   │   ├── patterns.py           # Failure pattern recognition
+│   │   ├── playbooks.py          # Recovery playbooks
+│   │   ├── recovery.py           # Auto-recovery logic
+│   │   └── skill.json
 │   ├── hourly_goals/             # Micro-task tracking
 │   ├── input_guard/              # Runtime security (injection detection)
 │   ├── knowledge_graph/          # Entity-relationship graph
 │   ├── litellm/                  # LiteLLM proxy management
-│   ├── llm/                      # Multi-provider LLM routing (2 classes)
+│   ├── llm/                      # Multi-provider LLM routing
 │   ├── market_data/              # Cryptocurrency market data
 │   ├── memeothy/                 # Meme generation & content
 │   ├── model_switcher/           # Dynamic LLM model switching
 │   ├── moltbook/                 # Moltbook social platform
 │   ├── performance/              # Performance reviews
+│   ├── pipeline_skill/           # Cognitive pipeline execution (v1.1)
+│   ├── pipelines/                # Pipeline YAML definitions
+│   │   ├── daily_research.yaml
+│   │   ├── health_and_report.yaml
+│   │   └── social_engagement.yaml
 │   ├── portfolio/                # Portfolio management
 │   ├── pytest_runner/            # Pytest execution
 │   ├── research/                 # Information gathering
+│   ├── sandbox/                  # Docker sandbox execution (v1.1)
 │   ├── schedule/                 # Scheduled jobs
 │   ├── security_scan/            # Vulnerability detection
-│   └── social/                   # Social presence management
+│   ├── session_manager/          # Session lifecycle management (v1.1)
+│   ├── social/                   # Cross-platform social presence
+│   ├── telegram/                 # Telegram messaging skill (v1.1)
+│   └── working_memory/           # Persistent working memory (v1.1)
 │
 ├── aria_agents/                  # Multi-agent orchestration
 │   ├── __init__.py
 │   ├── base.py                   # BaseAgent, AgentConfig, AgentMessage
+│   ├── context.py                # Agent context management
 │   ├── loader.py                 # AGENTS.md parser
+│   ├── scoring.py                # Agent scoring & evaluation
 │   └── coordinator.py            # Agent lifecycle & routing
 │
 ├── aria_models/                  # Model configuration
 │   ├── __init__.py
 │   ├── loader.py                 # Model loader
-│   ├── models.yaml               # Model definitions
-│   └── openclaw_config.py        # OpenClaw model config
+│   ├── models.yaml               # Model catalog (14+ models)
+│   ├── openclaw_config.py        # OpenClaw model config
+│   └── README.md                 # Model documentation
 │
 ├── aria_memories/                # Persistent memory storage
+│   ├── README.md
 │   ├── drafts/                   # Draft content
 │   ├── exports/                  # Exported data
 │   ├── income_ops/               # Operational income data
 │   ├── knowledge/                # Knowledge base files
 │   ├── logs/                     # Activity & heartbeat logs
 │   ├── plans/                    # Planning documents
+│   │   ├── sprint/               # v1.1 sprint tickets & tracking
+│   │   └── plans/                # ⚠️ Nested duplication — needs cleanup
 │   └── research/                 # Research archives
 │
-├── stacks/brain/                 # Docker deployment (12 services)
-│   ├── docker-compose.yml        # Full stack orchestration
-│   ├── .env                      # Environment configuration
-│   ├── .env.example              # Template for .env
-│   ├── openclaw-entrypoint.sh    # OpenClaw startup with Python + skills
-│   ├── openclaw-config.json      # OpenClaw provider template
-│   ├── litellm-config.yaml       # LLM model routing
-│   ├── prometheus.yml            # Prometheus scrape config
-│   ├── init-scripts/             # PostgreSQL initialization
-│   │   ├── 00-create-litellm-db.sh  # Creates separate litellm database
-│   │   └── 01-schema.sql            # Core tables + seed data
-│   └── grafana/                  # Grafana provisioning
-│       └── provisioning/
-│           └── datasources/
-│               └── datasources.yml
+├── stacks/
+│   ├── brain/                    # Docker deployment (12 services)
+│   │   ├── docker-compose.yml    # Full stack orchestration
+│   │   ├── .env                  # Environment configuration (DO NOT COMMIT)
+│   │   ├── .env.example          # Template for .env
+│   │   ├── openclaw-entrypoint.sh    # OpenClaw startup with Python + skills
+│   │   ├── openclaw-config.json      # OpenClaw provider template
+│   │   ├── openclaw-auth-profiles.json # Auth profile configs
+│   │   ├── litellm-config.yaml       # LLM model routing
+│   │   ├── prometheus.yml            # Prometheus scrape config
+│   │   ├── traefik-dynamic.yaml      # Traefik dynamic routing config
+│   │   ├── traefik-entrypoint.sh     # Traefik startup script
+│   │   ├── certs/                    # TLS certificates
+│   │   ├── init-scripts/             # PostgreSQL initialization
+│   │   │   ├── 00-create-litellm-db.sh  # Creates separate litellm database
+│   │   │   ├── 01-schema.sql            # Core tables + seed data
+│   │   │   └── 02-migrations.sql        # Schema migrations (v1.1)
+│   │   └── grafana/                  # Grafana provisioning
+│   │       └── provisioning/
+│   │           ├── dashboards/
+│   │           │   └── json/         # Dashboard JSON definitions
+│   │           └── datasources/
+│   │               └── datasources.yml
+│   └── sandbox/                  # Docker sandbox for code execution (v1.1)
+│       ├── Dockerfile
+│       ├── entrypoint.py
+│       ├── entrypoint.sh
+│       ├── server.py
+│       └── README.md
 │
 ├── src/                          # Application source
 │   ├── api/                      # FastAPI v3.0 backend
-│   │   ├── main.py               # App factory, middleware, 16 routers
+│   │   ├── main.py               # App factory, middleware, 17 routers
+│   │   ├── main_legacy.py        # Legacy main (pre-refactor)
 │   │   ├── config.py             # Environment config + service endpoints
-│   │   ├── db.py                 # SQLAlchemy 2.0 async + psycopg 3
-│   │   ├── gql.py                # Strawberry GraphQL schema
+│   │   ├── deps.py               # Dependency injection
+│   │   ├── schema.py             # Pydantic schemas
 │   │   ├── security_middleware.py # Rate limiter, injection scanner, headers
 │   │   ├── requirements.txt
-│   │   └── routers/              # 16 REST routers
+│   │   ├── alembic/              # Database migrations (v1.1)
+│   │   │   ├── env.py
+│   │   │   ├── script.py.mako
+│   │   │   └── versions/
+│   │   ├── db/                   # SQLAlchemy 2.0 ORM layer (v1.1)
+│   │   │   ├── __init__.py
+│   │   │   ├── models.py         # 20+ ORM models
+│   │   │   ├── session.py        # Async engine + sessionmaker
+│   │   │   └── MODELS.md         # Model documentation
+│   │   ├── gql/                  # Strawberry GraphQL (v1.1)
+│   │   │   ├── __init__.py
+│   │   │   ├── schema.py         # GraphQL schema
+│   │   │   ├── types.py          # GraphQL type definitions
+│   │   │   └── resolvers.py      # Query resolvers
+│   │   └── routers/              # 17 REST routers
 │   │       ├── activities.py     # Activity log CRUD + stats
 │   │       ├── admin.py          # Admin operations
 │   │       ├── goals.py          # Goal tracking + progress
@@ -138,34 +200,37 @@ Aria_moltbot/
 │   │       ├── security.py       # Security audit log + threats
 │   │       ├── sessions.py       # Session management + analytics
 │   │       ├── social.py         # Social posts + community
-│   │       └── thoughts.py       # Thought stream + analysis
+│   │       ├── thoughts.py       # Thought stream + analysis
+│   │       └── working_memory.py # Working memory API (v1.1)
 │   ├── database/                 # Database utilities
+│   │   └── models.py
 │   └── web/                      # Flask dashboard (22 pages)
 │       ├── app.py                # Flask app + 20 routes
-│       ├── static/               # CSS, JS (pricing.js, helpers)
-│       └── templates/            # Jinja2 templates + Chart.js
-│           ├── base.html         # Layout with nav, API_BASE_URL
-│           ├── dashboard.html    # Overview + host stats
-│           ├── model_usage.html  # 3 tabs, 6 charts, cost tracking
-│           ├── sessions.html     # 3 tabs, agent breakdown
-│           ├── performance.html  # 2 tabs, reviews + tasks
-│           ├── rate_limits.html  # Progress bars, action counts
-│           ├── wallets.html      # Wallet balances + transactions
-│           ├── heartbeat.html    # Health indicators
-│           └── ...               # 14 more page templates
+│       ├── static/               # CSS, JS
+│       │   ├── css/              # Component styles (base, layout, variables)
+│       │   └── js/
+│       │       └── pricing.js    # Shared pricing helpers
+│       └── templates/            # 22 Jinja2 templates + Chart.js
 │
 ├── scripts/                      # Utility scripts
+│   ├── analyze_logs.py           # Log analysis tool (v1.1)
+│   ├── aria_backup.sh            # Backup script
+│   ├── backup.sh                 # Alternative backup
+│   ├── benchmark_models.py       # Model benchmarking (v1.1)
+│   ├── check_architecture.py     # Architecture validation (v1.1)
+│   ├── check_db.sh               # Database health check
 │   ├── export_tables.sh          # Database export
+│   ├── generate_litellm_config.py # LiteLLM config generator
+│   ├── health_check.sh           # System health check
 │   ├── mac_backup.sh             # macOS backup script
-│   └── service_control_setup.py  # Service configuration
+│   ├── retrieve_logs.ps1         # Windows log retrieval
+│   ├── retrieve_logs.sh          # Linux log retrieval
+│   ├── service_control_setup.py  # Service configuration
+│   └── test_mlx.py              # MLX inference testing
 │
 ├── prompts/                      # Prompt templates
 │   ├── agent-workflow.md
 │   └── ARIA_COMPLETE_REFERENCE.md
-│
-├── plans/                        # Project planning
-│   ├── aria_action_plan_2026-02-05.md
-│   └── improve_aria_plan.md
 │
 ├── deploy/                       # Deployment utilities
 │   └── mac/                      # macOS-specific deployment
@@ -177,15 +242,39 @@ Aria_moltbot/
 ├── tasks/                        # Task documentation
 │   └── lessons.md
 │
-└── tests/                        # Pytest test suite
+└── tests/                        # Pytest test suite (677+ tests)
     ├── __init__.py
     ├── conftest.py               # Fixtures & configuration
+    ├── test_activity_logging.py  # @logged_method tests (v1.1)
     ├── test_agents.py            # Agent unit tests
+    ├── test_agent_manager.py     # Agent manager tests (v1.1)
+    ├── test_cron_config.py       # Cron configuration tests
+    ├── test_diagnostics.py       # Self-diagnostic tests (v1.1)
     ├── test_endpoints.py         # API endpoint tests
     ├── test_imports.py           # Import validation
     ├── test_integration.py       # Integration tests
+    ├── test_kernel.py            # Kernel layer tests (v1.1)
+    ├── test_logging.py           # Logging tests (v1.1)
+    ├── test_log_analysis.py      # Log analysis tests (v1.1)
+    ├── test_memory_deque.py      # Memory deque tests (v1.1)
+    ├── test_model_loader.py      # Model loader tests
+    ├── test_model_naming.py      # Model naming tests (v1.1)
+    ├── test_model_profiles.py    # Model profile tests
+    ├── test_model_refs.py        # Model reference tests (v1.1)
+    ├── test_pipeline.py          # Pipeline tests (v1.1)
+    ├── test_run_skill_catalog.py # Skill catalog tests (v1.1)
+    ├── test_sandbox.py           # Sandbox tests (v1.1)
+    ├── test_sandbox_skill.py     # Sandbox skill tests (v1.1)
     ├── test_security.py          # Security tests
+    ├── test_self_diagnostic.py   # Self-diagnostic tests (v1.1)
+    ├── test_session_manager.py   # Session manager tests (v1.1)
     ├── test_skills.py            # Skill unit tests
+    ├── test_skill_naming.py      # Skill naming tests (v1.1)
+    ├── test_skill_persistence.py # Skill persistence tests (v1.1)
+    ├── test_social_platform.py   # Social platform tests
+    ├── test_system_prompt.py     # System prompt tests (v1.1)
+    ├── test_telegram_skill.py    # Telegram skill tests (v1.1)
+    ├── test_working_memory.py    # Working memory tests (v1.1)
     └── manual/                   # Manual test procedures
 ```
 
@@ -235,7 +324,7 @@ init-scripts/
 
 ### Skill Module Structure
 
-Each of the 25 skill directories follows the same pattern:
+Each of the 32 skill directories follows the same pattern:
 
 ```
 aria_skills/<skill>/

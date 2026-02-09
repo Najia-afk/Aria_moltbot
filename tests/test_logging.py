@@ -1,6 +1,10 @@
 """Tests for Aria structured logging and observability (TICKET-17)."""
 import logging
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
 
 def test_configure_logging_with_structlog():
     """configure_logging() should not crash when structlog is available."""

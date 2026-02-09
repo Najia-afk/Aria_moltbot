@@ -5,6 +5,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+pytestmark = pytest.mark.unit
+
 from aria_skills.base import SkillConfig, SkillResult
 from aria_skills.session_manager import SessionManagerSkill, _parse_sessions_from_api
 

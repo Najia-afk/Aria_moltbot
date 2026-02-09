@@ -9,6 +9,8 @@ import pytest
 import time
 from datetime import datetime, timedelta
 
+pytestmark = pytest.mark.unit
+
 
 class TestPromptGuard:
     """Test prompt injection detection."""

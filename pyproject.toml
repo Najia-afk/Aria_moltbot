@@ -95,7 +95,7 @@ filterwarnings = [
 # ============================================================================
 
 [tool.coverage.run]
-source = ["aria_mind", "aria_skills", "aria_agents"]
+source = ["src", "aria_skills", "aria_mind", "aria_models", "aria_agents"]
 branch = true
 omit = ["*/tests/*", "*/__pycache__/*"]
 

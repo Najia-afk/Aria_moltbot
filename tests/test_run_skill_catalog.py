@@ -7,6 +7,8 @@ from unittest.mock import patch
 
 import pytest
 
+pytestmark = pytest.mark.unit
+
 # Import the module under test
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from aria_mind.skills.run_skill import SKILL_REGISTRY, _merge_registries

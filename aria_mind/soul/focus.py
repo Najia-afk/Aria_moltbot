@@ -18,7 +18,7 @@ Model hints are loaded from aria_models/models.yaml (criteria.focus_defaults).
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from pathlib import Path
 
 # Import model catalog loader - models.yaml is the source of truth
@@ -44,7 +44,7 @@ class FocusType(Enum):
     JOURNALIST = "journalist"        # Reporter/Investigator
 
 
-# Fallback model hints if models.yaml is unavailable
+# CATASTROPHIC FALLBACK ONLY — models.yaml is truth
 _FALLBACK_MODEL_HINTS: Dict[str, str] = {
     "orchestrator": "qwen3-mlx",
     "devsecops": "qwen3-coder-free",
@@ -67,6 +67,33 @@ def _get_model_hint(focus_type: str) -> str:
         if hint:
             return hint
     return _FALLBACK_MODEL_HINTS.get(focus_type, "qwen3-mlx")
+
+
+def get_focus_default_with_profile(focus_type: str) -> Tuple[str, float, int]:
+    """Return (model, temperature, max_tokens) for a focus type.
+
+    Looks up the profiles section in models.yaml first (keyed by focus_type).
+    Falls back to (model_hint, 0.7, 4096) when no profile matches.
+    """
+    model_hint = _get_model_hint(focus_type)
+    default_temp = 0.7
+    default_max_tokens = 4096
+
+    if _HAS_CATALOG:
+        try:
+            catalog = load_catalog()
+            profiles = catalog.get("profiles", {}) if catalog else {}
+            profile = profiles.get(focus_type)
+            if profile and isinstance(profile, dict):
+                return (
+                    profile.get("model", model_hint),
+                    profile.get("temperature", default_temp),
+                    profile.get("max_tokens", default_max_tokens),
+                )
+        except Exception:
+            pass  # graceful fallback
+
+    return (model_hint, default_temp, default_max_tokens)
 
 
 @dataclass
@@ -92,6 +119,10 @@ class Focus:
     def get_model_hint_live(self) -> str:
         """Get current model hint from models.yaml (refreshes on each call)."""
         return _get_model_hint(self.type.value)
+
+    def get_model_profile(self) -> Tuple[str, float, int]:
+        """Return (model, temperature, max_tokens) from profiles section."""
+        return get_focus_default_with_profile(self.type.value)
     
     def get_system_prompt_overlay(self) -> str:
         """Generate system prompt addition for this focus."""
@@ -386,12 +417,15 @@ class FocusManager:
     
     def status(self) -> Dict:
         """Return current focus status."""
+        model, temperature, max_tokens = self._active.get_model_profile()
         return {
             "active_focus": self._active.name,
             "focus_type": self._active.type.value,
             "skills": self._active.skills,
             "model_hint": self._active.get_model_hint_live(),  # Live from models.yaml
             "model_hint_static": self._active.model_hint,  # Static at init time
+            "temperature": temperature,
+            "max_tokens": max_tokens,
             "recent_history": [f.value for f in self._history[-5:]],
             "catalog_available": _HAS_CATALOG,
         }

@@ -17,6 +17,8 @@ import httpx
 import pytest
 import pytest_asyncio
 
+pytestmark = pytest.mark.unit
+
 from aria_skills.base import SkillConfig, SkillResult, SkillStatus
 
 # ---------------------------------------------------------------------------

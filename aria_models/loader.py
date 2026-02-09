@@ -188,7 +188,7 @@ def build_agent_routing(catalog: Optional[Dict[str, Any]] = None) -> Dict[str, A
 
 
 def list_all_model_ids(catalog: Optional[Dict[str, Any]] = None) -> list[str]:
-    """Return all model IDs from the catalog (including aliases)."""
+    """Return sorted list of all model IDs from the catalog (including aliases)."""
     catalog = catalog or load_catalog()
     models = catalog.get("models", {}) if catalog else {}
     ids: list[str] = []
@@ -196,7 +196,7 @@ def list_all_model_ids(catalog: Optional[Dict[str, Any]] = None) -> list[str]:
         ids.append(model_id)
         for alias in entry.get("aliases", []):
             ids.append(alias)
-    return ids
+    return sorted(ids)
 
 
 def list_models_with_reasoning(catalog: Optional[Dict[str, Any]] = None) -> list[str]:
@@ -252,3 +252,93 @@ def get_timeout_seconds(catalog: Optional[Dict[str, Any]] = None) -> int:
     catalog = catalog or load_catalog()
     routing = catalog.get("routing", {}) if catalog else {}
     return routing.get("timeout", 600)  # Default 600s per OpenClaw docs
+
+
+def validate_catalog(path: Optional[Path] = None) -> list[str]:
+    """Validate models.yaml against its own validation.required_fields.
+
+    Returns a list of error strings (empty list = valid catalog).
+    Uses the ``validation.required_fields`` section from models.yaml itself.
+    """
+    errors: list[str] = []
+    catalog_path = path or CATALOG_PATH
+
+    if not catalog_path.exists():
+        errors.append(f"models.yaml not found at {catalog_path}")
+        return errors
+
+    try:
+        catalog = _load_yaml_or_json(catalog_path)
+    except Exception as exc:
+        errors.append(f"Failed to parse models.yaml: {exc}")
+        return errors
+
+    if "validation" not in catalog:
+        errors.append("Missing 'validation' section")
+        return errors
+
+    if "models" not in catalog:
+        errors.append("Missing 'models' section")
+        return errors
+
+    required = catalog["validation"].get("required_fields", [])
+    # Map canonical field names to the actual keys used in models.yaml
+    field_map = {
+        "id": None,  # id is the dict key, checked separately
+        "name": "name",
+        "provider": "provider",
+        "tier": "tier",
+        "context_window": "contextWindow",
+    }
+
+    models = catalog["models"]
+    if not isinstance(models, dict):
+        errors.append("'models' must be a dict")
+        return errors
+
+    for model_id, entry in models.items():
+        if not isinstance(entry, dict):
+            errors.append(f"Model '{model_id}': entry must be a dict")
+            continue
+        for req_field in required:
+            actual_key = field_map.get(req_field, req_field)
+            if actual_key is None:
+                continue  # 'id' is the dict key itself
+            if actual_key not in entry:
+                errors.append(f"Model '{model_id}': missing required field '{req_field}'")
+
+    return errors
+
+
+def build_litellm_config_yaml(catalog: Optional[Dict[str, Any]] = None) -> str:
+    """Generate a complete litellm-config.yaml from models.yaml.
+
+    Returns a YAML-formatted string (actually JSON written as YAML-compatible)
+    with an ``# AUTO-GENERATED`` header.  The output is suitable for writing
+    directly to ``stacks/brain/litellm-config.yaml``.
+    """
+    try:
+        import yaml as _yaml  # type: ignore
+        _has_yaml = True
+    except ImportError:
+        _has_yaml = False
+
+    entries = build_litellm_config_entries(catalog)
+
+    config: Dict[str, Any] = {
+        "model_list": entries,
+        "litellm_settings": {
+            "drop_params": True,
+            "disable_streaming": True,
+            "set_verbose": False,
+        },
+    }
+
+    header = "# AUTO-GENERATED from aria_models/models.yaml — do not edit manually\n# Regenerate: python scripts/generate_configs.py\n"
+
+    if _has_yaml:
+        body = _yaml.dump(config, default_flow_style=False, sort_keys=False)
+    else:
+        body = json.dumps(config, indent=2)
+
+    return header + body

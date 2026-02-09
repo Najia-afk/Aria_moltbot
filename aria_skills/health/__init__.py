@@ -1,8 +1,9 @@
-# aria_skills/health.py
+# aria_skills/health/__init__.py
 """
 System health monitoring skill.
 
 Checks Aria's internal systems and reports health status.
+Includes self-diagnostic & auto-recovery (TICKET-36).
 """
 import asyncio
 import os
@@ -12,6 +13,43 @@ from typing import Any, Dict, List, Optional
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
 from aria_skills.registry import SkillRegistry
+
+# TICKET-36: Self-diagnostic & auto-recovery exports
+from aria_skills.health.diagnostics import HealthSignal, HealthLedger, Severity
+from aria_skills.health.playbooks import (
+    Playbook,
+    RESTART_SERVICE,
+    CLEAR_CACHE,
+    REDUCE_LOAD,
+    MODEL_FALLBACK,
+    DATABASE_RECOVERY,
+    ALL_PLAYBOOKS,
+)
+from aria_skills.health.recovery import RecoveryExecutor, RecoveryAction
+from aria_skills.health.patterns import FailurePatternStore, FailureRecord
+
+__all__ = [
+    # Existing
+    "HealthMonitorSkill",
+    # TICKET-36: Diagnostics
+    "HealthSignal",
+    "HealthLedger",
+    "Severity",
+    # TICKET-36: Playbooks
+    "Playbook",
+    "RESTART_SERVICE",
+    "CLEAR_CACHE",
+    "REDUCE_LOAD",
+    "MODEL_FALLBACK",
+    "DATABASE_RECOVERY",
+    "ALL_PLAYBOOKS",
+    # TICKET-36: Recovery
+    "RecoveryExecutor",
+    "RecoveryAction",
+    # TICKET-36: Patterns
+    "FailurePatternStore",
+    "FailureRecord",
+]
 
 
 @SkillRegistry.register

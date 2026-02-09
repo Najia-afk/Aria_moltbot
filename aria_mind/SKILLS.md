@@ -1,6 +1,6 @@
 # SKILLS.md - Complete Skill Reference
 
-I have **24 skills** available. **Use the tool syntax** to call them:
+I have **32 skills** available. **Use the tool syntax** to call them:
 
 ```tool
 aria-<skill-name>.<function>({"param": "value"})
@@ -49,22 +49,14 @@ aria-apiclient.health_check({})
 |-------|-----------|---------|
 | `goals` | `create_goal`, `list_goals`, `update_progress`, `complete_goal` | Task tracking, priorities |
 | `schedule` | `list_jobs`, `create_task`, `trigger`, `sync_jobs` | Scheduled tasks, automation |
-| `health` | `check_health`, `get_metrics`, `system_status` | System monitoring |
-
-### 🔒 DevSecOps Skills
-| Skill | Functions | Use For |
-|-------|-----------|---------|
-| `security_scan` | `scan_file`, `scan_directory`, `check_dependencies`, `audit_docker` | Vulnerability scanning |
+| `health` | `check_health`, `get_metrics`, `system_status`, `run_diagnostics`, `auto_recover` | System monitoring & self-diagnostic (v1.1) |
+| `agent_manager` | `list_agents`, `spawn_agent`, `stop_agent`, `get_status` | Agent lifecycle management (v1.1) |
+| `session_manager` | `create_session`, `get_session`, `end_session`, `list_sessions` | Session lifecycle management (v1.1) |
 | `ci_cd` | `generate_workflow`, `generate_dockerfile`, `lint_workflow` | CI/CD automation |
 | `pytest` | `run_pytest`, `collect_pytest` | Test execution |
 | `database` | `fetch_all`, `fetch_one`, `execute`, `log_thought`, `store_memory` | PostgreSQL operations |
-
-### 📊 Data Architect Skills
-| Skill | Functions | Use For |
-|-------|-----------|---------|
-| `data_pipeline` | `validate_data`, `transform`, `infer_schema`, `profile` | ETL operations |
-| `experiment` | `create_experiment`, `log_metrics`, `compare`, `register_model` | ML experiment tracking |
-| `knowledge_graph` | `kg_add_entity`, `kg_add_relation`, `kg_query_related`, `kg_search` | Entity relationships |
+| `input_guard` | `check_input`, `scan_output`, `detect_injection` | Runtime security (v1.1) |
+| `sandbox` | `execute_code`, `run_script`, `get_result` | Docker sandbox for safe code execution (v1.1) |
 | `performance` | `get_metrics`, `analyze_trends`, `generate_report` | Metrics & analytics |
 
 ### 📈 Crypto Trader Skills
@@ -85,12 +77,7 @@ aria-apiclient.health_check({})
 | `community` | `get_health_score`, `identify_champions`, `suggest_initiatives` | Community health |
 | `moltbook` | `create_post`, `get_feed`, `add_comment`, `search` | Moltbook posting |
 | `social` | `send_telegram`, `send_discord`, `notify_all` | Cross-platform messaging |
-
-### 📰 Journalist Skills
-| Skill | Functions | Use For |
-|-------|-----------|---------|
-| `research` | `search_sources`, `extract_claims`, `assess_credibility` | Source collection |
-| `fact_check` | `verify_claim`, `get_verdict`, `generate_report` | Claim verification |
+| `telegram` | `send_message`, `get_updates`, `set_webhook` | Telegram messaging (v1.1) |
 
 ### ⚡ Utility Skills
 | Skill | Functions | Use For |
@@ -99,6 +86,12 @@ aria-apiclient.health_check({})
 | `litellm` | `list_models`, `health`, `spend`, `provider_balances` | LiteLLM management |
 | `model_switcher` | `switch_model`, `get_current_model`, `list_available` | Model selection |
 | `hourly_goals` | `get_hourly_goals`, `create_hourly_goal`, `update_status` | Short-term goals |
+
+### 🧠 Cognitive Skills (v1.1)
+| Skill | Functions | Use For |
+|-------|-----------|---------|  
+| `working_memory` | `store`, `recall`, `list_keys`, `clear_session` | Persistent session-surviving working memory |
+| `pipeline_skill` | `execute_pipeline`, `list_pipelines`, `get_status` | Cognitive pipeline execution (skill chaining) |
 
 ## Quick Reference Examples
 
@@ -167,12 +160,12 @@ When I switch focus, I should prioritize these skills:
 
 | My Focus | Primary Skills |
 |----------|----------------|
-| 🎯 Orchestrator | api_client, goals, schedule, health |
-| 🔒 DevSecOps | pytest, security_scan, ci_cd, database, health |
+| 🎯 Orchestrator | api_client, goals, schedule, health, session_manager, agent_manager, working_memory |
+| 🔒 DevSecOps | pytest, security_scan, ci_cd, database, health, sandbox |
 | 📊 Data Architect | api_client, knowledge_graph, performance, data_pipeline, experiment |
 | 📈 Crypto Trader | api_client, market_data, portfolio, knowledge_graph, schedule |
 | 🎨 Creative | brainstorm, llm, moltbook, social, knowledge_graph |
-| 🌐 Social Architect | moltbook, social, community, schedule, api_client |
+| 🌐 Social Architect | moltbook, social, community, schedule, api_client, telegram |
 | 📰 Journalist | research, fact_check, knowledge_graph, moltbook, social |
 | 🦞 Memeothy | memeothy, api_client (aria-memeothy agent ONLY) |
 

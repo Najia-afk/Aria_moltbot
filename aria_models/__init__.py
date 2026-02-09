@@ -2,6 +2,7 @@ from .loader import (
     build_agent_aliases,
     build_agent_routing,
     build_litellm_config_entries,
+    build_litellm_config_yaml,
     build_litellm_models,
     get_focus_default,
     get_model_entry,
@@ -11,6 +12,7 @@ from .loader import (
     load_catalog,
     normalize_model_id,
     reload_models,
+    validate_catalog,
     validate_models,
 )
 
@@ -18,6 +20,7 @@ __all__ = [
     "build_agent_aliases",
     "build_agent_routing",
     "build_litellm_config_entries",
+    "build_litellm_config_yaml",
     "build_litellm_models",
     "get_focus_default",
     "get_model_entry",
@@ -27,5 +30,6 @@ __all__ = [
     "load_catalog",
     "normalize_model_id",
     "reload_models",
+    "validate_catalog",
     "validate_models",
 ]

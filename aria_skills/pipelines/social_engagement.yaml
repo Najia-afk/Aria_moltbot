@@ -1,0 +1,43 @@
+# social_engagement.yaml — Social media engagement workflow
+name: social_engagement
+description: Fetch social feed, analyze trends, draft a post, and publish it.
+
+steps:
+  - name: get_feed
+    skill: social
+    method: get_feed
+    params:
+      limit: 50
+    on_failure: stop
+    timeout_seconds: 60
+
+  - name: analyze_trends
+    skill: research
+    method: analyze_trends
+    params:
+      posts: "{{context.get_feed.posts}}"
+    depends_on:
+      - get_feed
+    on_failure: skip
+    timeout_seconds: 90
+
+  - name: draft_post
+    skill: brainstorm
+    method: generate_post
+    params:
+      trends: "{{context.analyze_trends.trends}}"
+      tone: "informative"
+    depends_on:
+      - analyze_trends
+    on_failure: "fallback:brainstorm.generate_simple_post"
+    timeout_seconds: 60
+
+  - name: publish
+    skill: social
+    method: publish_post
+    params:
+      content: "{{context.draft_post.content}}"
+    depends_on:
+      - draft_post
+    on_failure: "retry:3"
+    timeout_seconds: 30

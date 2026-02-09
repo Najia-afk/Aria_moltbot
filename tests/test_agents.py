@@ -6,6 +6,8 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 
 from aria_agents.base import AgentConfig, AgentMessage, AgentRole, BaseAgent
+
+pytestmark = pytest.mark.unit
 from aria_agents.context import AgentContext, AgentResult
 from aria_agents.loader import AgentLoader
 from aria_agents.coordinator import AgentCoordinator, LLMAgent, MAX_CONCURRENT_AGENTS

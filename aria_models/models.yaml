@@ -1,7 +1,11 @@
 {
-  "schema_version": 2,
-  "notes": "SINGLE SOURCE OF TRUTH for all model definitions. To add a new model: (1) add entry here, (2) run loader.build_litellm_config() or manually add to litellm-config.yaml. That's it.",
+  "schema_version": 3,
+  "notes": "SINGLE SOURCE OF TRUTH for all model definitions. To add a new model: (1) add entry here, (2) run scripts/generate_configs.py to regenerate litellm-config.yaml. That's it.",
   "model_priority_order": "local → free → paid. Use criteria.priority for the exact fallback chain. NEVER duplicate model names in .md or .py files — reference this file.",
+  "validation": {
+    "schema_version": 3,
+    "required_fields": ["id", "name", "provider", "tier", "context_window"]
+  },
   "providers": {
     "litellm": {
       "baseUrl": "http://litellm:4000/v1",
@@ -13,7 +17,7 @@
     "primary": "litellm/qwen3-mlx",
     "timeout": 300,
     "retries": 2,
-    "fallbacks": ["litellm/qwen3-next-free", "litellm/trinity-free", "litellm/chimera-free", "litellm/deepseek-free", "litellm/kimi"]
+    "fallbacks": ["litellm/qwen3-next-free", "litellm/qwen-cpu-fallback", "litellm/trinity-free", "litellm/chimera-free", "litellm/deepseek-free", "litellm/kimi"]
   },
   "agent_aliases": {
     "litellm/qwen3-mlx": "Qwen3 4B Instruct (MLX Local)",
@@ -214,12 +218,27 @@
         "api_base": "https://api.moonshot.ai/v1"
       },
       "aliases": ["kimi-k2-thinking-turbo"]
+    },
+    "qwen-cpu-fallback": {
+      "provider": "litellm",
+      "name": "Qwen 2.5 3B (Ollama CPU Fallback)",
+      "reasoning": false,
+      "input": ["text"],
+      "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+      "contextWindow": 32768,
+      "maxTokens": 4096,
+      "tier": "local",
+      "routeSkill": "litellm",
+      "litellm": {
+        "model": "ollama/qwen2.5:3b",
+        "api_base": "http://host.docker.internal:11434"
+      }
     }
   },
   "criteria": {
-    "priority": ["qwen3-mlx", "trinity-free", "chimera-free", "kimi"],
+    "priority": ["qwen3-mlx", "qwen-cpu-fallback", "trinity-free", "chimera-free", "kimi"],
     "tiers": {
-      "local": ["qwen3-mlx"],
+      "local": ["qwen3-mlx", "qwen-cpu-fallback"],
       "free": ["trinity-free", "qwen3-coder-free", "chimera-free", "qwen3-next-free", "glm-free", "deepseek-free", "nemotron-free", "gpt-oss-free", "gpt-oss-small-free"],
       "paid": ["kimi", "kimi-k2-thinking"]
     },
@@ -240,5 +259,12 @@
       "social": "trinity-free",
       "journalist": "qwen3-next-free"
     }
+  },
+  "profiles": {
+    "routing":  { "model": "qwen3-mlx",        "temperature": 0.3, "max_tokens": 512 },
+    "analysis": { "model": "qwen3-mlx",        "temperature": 0.7, "max_tokens": 4096 },
+    "creative": { "model": "trinity-free",     "temperature": 0.9, "max_tokens": 2048 },
+    "code":     { "model": "qwen3-coder-free", "temperature": 0.2, "max_tokens": 8192 },
+    "social":   { "model": "trinity-free",     "temperature": 0.8, "max_tokens": 1024 }
   }
 }

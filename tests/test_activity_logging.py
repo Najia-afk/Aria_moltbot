@@ -5,6 +5,8 @@ from unittest.mock import AsyncMock, patch, MagicMock
 
 from aria_skills.base import SkillConfig, SkillResult, BaseSkill, logged_method
 
+pytestmark = pytest.mark.unit
+
 
 class DummySkill(BaseSkill):
     """Test skill for decorator testing."""

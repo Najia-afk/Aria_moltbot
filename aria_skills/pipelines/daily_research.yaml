@@ -1,0 +1,52 @@
+# daily_research.yaml — Daily research workflow
+name: daily_research
+description: Check active goals, research relevant topics, analyze findings, save a report, and post a summary.
+
+steps:
+  - name: check_goals
+    skill: goals
+    method: list_active
+    params: {}
+    on_failure: stop
+    timeout_seconds: 30
+
+  - name: research
+    skill: research
+    method: search_topics
+    params:
+      topics: "{{context.check_goals.topics}}"
+    depends_on:
+      - check_goals
+    on_failure: stop
+    timeout_seconds: 120
+
+  - name: analyze
+    skill: research
+    method: analyze_results
+    params:
+      data: "{{context.research.results}}"
+    depends_on:
+      - research
+    on_failure: skip
+    timeout_seconds: 90
+
+  - name: save_report
+    skill: database
+    method: save_report
+    params:
+      title: "Daily Research Report"
+      content: "{{context.analyze.summary}}"
+    depends_on:
+      - analyze
+    on_failure: "retry:2"
+    timeout_seconds: 30
+
+  - name: post_summary
+    skill: moltbook
+    method: post_status
+    params:
+      message: "{{context.analyze.summary}}"
+    depends_on:
+      - save_report
+    on_failure: skip
+    timeout_seconds: 30

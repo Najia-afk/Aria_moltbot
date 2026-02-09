@@ -157,7 +157,13 @@ services:
       - "--ping=true"
       - "--providers.file.filename=/etc/traefik/dynamic.yaml"
       - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.transport.respondingTimeouts.readTimeout=120s"
+      - "--entrypoints.web.transport.respondingTimeouts.writeTimeout=120s"
+      - "--entrypoints.web.transport.respondingTimeouts.idleTimeout=300s"
       - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.websecure.transport.respondingTimeouts.readTimeout=120s"
+      - "--entrypoints.websecure.transport.respondingTimeouts.writeTimeout=120s"
+      - "--entrypoints.websecure.transport.respondingTimeouts.idleTimeout=300s"
       - "--metrics.prometheus=true"
     environment:
       CLAWDBOT_TOKEN: ${CLAWDBOT_TOKEN:-default-clawdbot-token}

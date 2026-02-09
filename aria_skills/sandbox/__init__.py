@@ -11,7 +11,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
-from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
+from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
 from aria_skills.registry import SkillRegistry
 
 try:
@@ -47,6 +47,10 @@ class SandboxSkill(BaseSkill):
     def name(self) -> str:
         return "sandbox"
 
+    @property
+    def canonical_name(self) -> str:
+        return "aria-sandbox"
+
     async def initialize(self) -> bool:
         if not HAS_HTTPX:
             self.logger.error("httpx not installed — sandbox unavailable")
@@ -77,6 +81,7 @@ class SandboxSkill(BaseSkill):
             self._status = SkillStatus.ERROR
         return self._status
 
+    @logged_method()
     async def run_code(self, code: str, timeout: int = 30) -> SkillResult:
         """Execute Python code in the sandbox."""
         if not self._client:
@@ -102,6 +107,7 @@ class SandboxSkill(BaseSkill):
             self._log_usage("run_code", False, error=str(e))
             return SkillResult.fail(f"Sandbox execution failed: {e}")
 
+    @logged_method()
     async def write_file(self, path: str, content: str) -> SkillResult:
         """Write a file in the sandbox via code execution."""
         if not self._client:
@@ -117,6 +123,7 @@ class SandboxSkill(BaseSkill):
 
         return await self.run_code(code, timeout=10)
 
+    @logged_method()
     async def read_file(self, path: str) -> SkillResult:
         """Read a file from the sandbox via code execution."""
         if not self._client:
@@ -130,6 +137,7 @@ class SandboxSkill(BaseSkill):
 
         return result
 
+    @logged_method()
     async def run_tests(self, test_path: str = "tests/") -> SkillResult:
         """Run pytest in the sandbox."""
         if not self._client:

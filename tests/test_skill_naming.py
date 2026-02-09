@@ -15,6 +15,8 @@ from typing import Optional
 
 import pytest
 
+pytestmark = pytest.mark.unit
+
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
 from aria_skills.registry import SkillRegistry
 

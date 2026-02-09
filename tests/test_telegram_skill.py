@@ -6,6 +6,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from aria_skills.base import SkillConfig, SkillResult, SkillStatus
 from aria_skills.telegram import TelegramSkill
 
+pytestmark = pytest.mark.unit
+
 
 @pytest.fixture
 def config():

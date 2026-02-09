@@ -1,5 +1,31 @@
 # Aria Blue — Complete Website & API Audit Report
 
+## v1.1 Sprint Remediation Status
+
+> **Updated:** 2026-02-10 — Aria Blue v1.1 Sprint (37 tickets across 7 waves)
+
+The following audit findings have been **addressed** or **partially addressed** by the v1.1 sprint:
+
+| Finding | Status | Tickets |
+|---------|--------|--------|
+| **Architecture:** No ORM enforcement | ✅ Addressed | TICKET-01, 02 (SQLAlchemy consolidation) |
+| **Architecture:** Raw SQL in skills | ✅ Addressed | TICKET-03, 12 (all skills use api_client) |
+| **CRITICAL-3:** 3 duplicate `calculateLogCost()` | 🟡 Partially | TICKET-30 (centralized model pricing to `models.yaml`) |
+| **MEDIUM-1:** Code duplication (models/wallets/litellm) | 🟡 Partially | TICKET-30 centralized pricing; JS consolidation pending |
+| **MEDIUM-4:** Dashboard double-fetch of `/activities` | ✅ Addressed | TICKET-06 (Critical Bug Fixes) |
+| **LOW-1:** Unused API endpoints | 🟡 Partially | Documented; some cleaned up in TICKET-09 |
+| **LOW-2:** Inconsistent API variable names | 🟡 Partially | Standardization in progress |
+| **Testing:** 11 test failures | ✅ Addressed | TICKET-09, 31 (677+ tests, 0 failures) |
+| **Observability:** No structured logging | ✅ Addressed | TICKET-11, 17 (logging & observability stack) |
+
+**Remaining unaddressed (require frontend work):**
+- CRITICAL-1: Kimi pricing discrepancy (7× difference) — requires frontend JS consolidation
+- CRITICAL-2: Currency display mismatch ($/¥) — requires frontend normalization
+- MEDIUM-2: 4 pages hit `/litellm/spend` — needs client-side caching
+- MEDIUM-3: Services page 11 sequential API calls — needs `/status` consolidation
+
+---
+
 > **Generated for:** Major Restructure Planning  
 > **Scope:** All 22 web templates, Flask app routes, FastAPI endpoints, and API routers  
 > **Finding:** 22 templates (not 21 — `operations.html` was missed in the original list)

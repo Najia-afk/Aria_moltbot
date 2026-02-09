@@ -1,0 +1,50 @@
+{
+  "name": "aria-pipeline",
+  "version": "1.0.0",
+  "description": "Cognitive Pipeline Engine — compose and run multi-step skill workflows with dependency tracking, failure handling, and shared context.",
+  "author": "Aria Team",
+  "tools": [
+    {
+      "name": "run_pipeline",
+      "description": "Execute a named pipeline definition (YAML). Returns step results and overall status.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Pipeline name (matches YAML filename without extension)"
+          },
+          "context": {
+            "type": "object",
+            "description": "Optional initial context dict injected into the pipeline"
+          }
+        },
+        "required": ["name"]
+      }
+    },
+    {
+      "name": "list_pipelines",
+      "description": "List all available pipeline definitions from the pipelines directory.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "get_pipeline_status",
+      "description": "Retrieve the result of a previously-run pipeline by its ID.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "pipeline_id": {
+            "type": "string",
+            "description": "Short ID returned by run_pipeline"
+          }
+        },
+        "required": ["pipeline_id"]
+      }
+    }
+  ],
+  "capabilities": ["workflow", "orchestration", "multi-step"],
+  "category": "orchestration"
+}

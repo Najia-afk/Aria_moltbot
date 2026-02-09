@@ -129,6 +129,17 @@ class Cognition:
         # Step 2: Add to short-term memory
         self.memory.remember_short(prompt, "user_input")
         
+        # Step 2.5: Inject working memory context
+        if self._skills:
+            wm = self._skills.get("working_memory")
+            if wm and wm.is_available:
+                try:
+                    wm_result = await wm.get_context(limit=10)
+                    if wm_result.success and wm_result.data:
+                        context["working_memory"] = wm_result.data.get("context", [])
+                except Exception as e:
+                    self.logger.debug(f"Working memory context injection skipped: {e}")
+        
         # Step 3: Build context with recent memory
         recent = self.memory.recall_short(limit=5)
         context["recent_memory"] = recent
@@ -151,6 +162,22 @@ class Cognition:
         
         # Step 6: Log thought
         await self.memory.log_thought(f"Responded to: {prompt[:50]}...")
+        
+        # Step 6.5: Remember task in working memory
+        if self._skills:
+            wm = self._skills.get("working_memory")
+            if wm and wm.is_available:
+                try:
+                    await wm.remember(
+                        key=f"task:{prompt[:80]}",
+                        value={"prompt": prompt[:200], "response_len": len(result)},
+                        category="cognition",
+                        importance=0.6,
+                        ttl_hours=24,
+                        source="cognition.process",
+                    )
+                except Exception as e:
+                    self.logger.debug(f"Working memory remember skipped: {e}")
         
         return result
     

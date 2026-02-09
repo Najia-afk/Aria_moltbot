@@ -1,0 +1,44 @@
+# health_and_report.yaml — Health check and reporting workflow
+name: health_and_report
+description: Run system health checks, analyze any issues, create remediation goals, and file a report.
+
+steps:
+  - name: check_health
+    skill: health
+    method: check_system
+    params: {}
+    on_failure: stop
+    timeout_seconds: 60
+
+  - name: analyze_issues
+    skill: health
+    method: analyze_report
+    params:
+      report: "{{context.check_health.checks}}"
+    depends_on:
+      - check_health
+    condition: "context.check_health"
+    on_failure: skip
+    timeout_seconds: 60
+
+  - name: create_goal
+    skill: goals
+    method: create_goal
+    params:
+      title: "Fix health issues"
+      details: "{{context.analyze_issues.recommendations}}"
+    depends_on:
+      - analyze_issues
+    condition: "context.analyze_issues.has_issues == true"
+    on_failure: skip
+    timeout_seconds: 30
+
+  - name: report
+    skill: moltbook
+    method: post_status
+    params:
+      message: "{{context.check_health.overall_status}}"
+    depends_on:
+      - check_health
+    on_failure: skip
+    timeout_seconds: 30
