@@ -2,15 +2,20 @@
 # Aria Database Backup Script for Mac Server
 export PATH=/Applications/Docker.app/Contents/Resources/bin:/usr/bin:$PATH
 
+# Self-locate: resolve paths relative to this script
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ARIA_DIR="$(dirname "$SCRIPT_DIR")"
+
 # Source environment from .env if available
-ENV_FILE="/Users/najia/aria/stacks/brain/.env"
+ENV_FILE="${ARIA_DIR}/stacks/brain/.env"
 if [ -f "${ENV_FILE}" ]; then
     set -a
     source "${ENV_FILE}"
     set +a
 fi
 
-BACKUP_DIR="/Users/najia/aria_vault/backups"
+VAULT_DIR="${VAULT_DIR:-${HOME}/aria_vault}"
+BACKUP_DIR="${VAULT_DIR}/backups"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 BACKUP_FILE="aria_backup_${TIMESTAMP}.dump"
 

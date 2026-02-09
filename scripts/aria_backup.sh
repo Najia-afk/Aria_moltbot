@@ -1,23 +1,29 @@
 #!/bin/bash
 # Aria-Only Database Backup Script
 # Backs up ONLY Aria's tables from aria_warehouse, excluding LiteLLM's tables.
-# Stored securely in /Users/najia/aria_vault/backups/ (NOT accessible by Aria).
+# Stored securely in ~/aria_vault/backups/ (NOT accessible by Aria).
 #
 # Usage:  ./scripts/aria_backup.sh
-# Cron:   0 3 * * * /Users/najia/aria/scripts/aria_backup.sh >> /Users/najia/aria_vault/backups/backup.log 2>&1
+# Cron:   0 3 * * * ~/aria/scripts/aria_backup.sh >> ~/aria_vault/backups/backup.log 2>&1
 
 set -euo pipefail
+export PATH=/Applications/Docker.app/Contents/Resources/bin:/usr/local/bin:/usr/bin:$PATH
+
+# Self-locate: resolve paths relative to this script
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ARIA_DIR="$(dirname "$SCRIPT_DIR")"
 
 # Source environment from .env if available
-ENV_FILE="/Users/najia/aria/stacks/brain/.env"
+ENV_FILE="${ARIA_DIR}/stacks/brain/.env"
 if [ -f "${ENV_FILE}" ]; then
     set -a
     source "${ENV_FILE}"
     set +a
 fi
 
-# Configuration
-BACKUP_DIR="/Users/najia/aria_vault/backups"
+# Configuration — VAULT_DIR can be overridden via .env
+VAULT_DIR="${VAULT_DIR:-${HOME}/aria_vault}"
+BACKUP_DIR="${VAULT_DIR}/backups"
 DB_CONTAINER="aria-db"
 DB_NAME="aria_warehouse"
 DB_USER="${DB_USER:-admin}"

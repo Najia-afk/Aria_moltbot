@@ -2,15 +2,19 @@
 # Export Aria tables to JSON for aria_memories sync
 export PATH=/Applications/Docker.app/Contents/Resources/bin:/usr/bin:$PATH
 
+# Self-locate: resolve paths relative to this script
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ARIA_DIR="$(dirname "$SCRIPT_DIR")"
+
 # Source environment from .env if available
-ENV_FILE="/Users/najia/aria/stacks/brain/.env"
+ENV_FILE="${ARIA_DIR}/stacks/brain/.env"
 if [ -f "${ENV_FILE}" ]; then
     set -a
     source "${ENV_FILE}"
     set +a
 fi
 
-OUTPUT_DIR="/Users/najia/aria/aria_memories/db_snapshots"
+OUTPUT_DIR="${ARIA_DIR}/aria_memories/db_snapshots"
 mkdir -p "$OUTPUT_DIR"
 
 TABLES=(memories thoughts goals activity_log social_posts knowledge_entities)

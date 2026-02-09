@@ -6,22 +6,26 @@
 # Stores everything in ~/aria_vault/ (OUTSIDE the aria/ repo)
 #
 # Usage:  ./scripts/daily_backup.sh
-# Cron:   0 3 * * * /Users/najia/aria/scripts/daily_backup.sh >> /Users/najia/aria_vault/daily_backup.log 2>&1
+# Cron:   0 3 * * * ~/aria/scripts/daily_backup.sh >> ~/aria_vault/daily_backup.log 2>&1
 # =============================================================================
 
 set -euo pipefail
 export PATH=/Applications/Docker.app/Contents/Resources/bin:/usr/local/bin:/usr/bin:$PATH
 
+# Self-locate: resolve paths relative to this script
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ARIA_DIR="$(dirname "$SCRIPT_DIR")"
+
 # Source environment from .env if available (gets DB_USER, DB_PASSWORD, etc.)
-ENV_FILE="/Users/najia/aria/stacks/brain/.env"
+ENV_FILE="${ARIA_DIR}/stacks/brain/.env"
 if [ -f "${ENV_FILE}" ]; then
     set -a
     source "${ENV_FILE}"
     set +a
 fi
 
-# Configuration
-VAULT_DIR="/Users/najia/aria_vault"
+# Configuration — VAULT_DIR can be overridden via .env
+VAULT_DIR="${VAULT_DIR:-${HOME}/aria_vault}"
 BACKUP_DIR="${VAULT_DIR}/backups"
 CSV_DIR="${VAULT_DIR}/csv_exports"
 MEMORIES_DIR="${VAULT_DIR}/aria_memories_snapshot"
@@ -180,8 +184,8 @@ echo "[$(date -Iseconds)] JSON summary: ${JSON_SUMMARY}"
 # -------------------------------------------------------
 echo "[$(date -Iseconds)] Snapshotting aria_memories..."
 MEMORIES_SNAPSHOT="${MEMORIES_DIR}/aria_memories_${DATE_TAG}.tar.gz"
-if [ -d "/Users/najia/aria/aria_memories" ]; then
-    tar czf "${MEMORIES_SNAPSHOT}" -C /Users/najia/aria aria_memories/ 2>/dev/null || true
+if [ -d "${ARIA_DIR}/aria_memories" ]; then
+    tar czf "${MEMORIES_SNAPSHOT}" -C "${ARIA_DIR}" aria_memories/ 2>/dev/null || true
     echo "[$(date -Iseconds)] -> $(ls -lh "${MEMORIES_SNAPSHOT}" | awk '{print $5}')"
 fi
 
