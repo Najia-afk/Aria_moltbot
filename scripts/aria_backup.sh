@@ -12,7 +12,7 @@ set -euo pipefail
 BACKUP_DIR="/Users/najia/aria_vault/backups"
 DB_CONTAINER="aria-db"
 DB_NAME="aria_warehouse"
-DB_USER="aria_admin"
+DB_USER="${DB_USER:-admin}"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 BACKUP_FILE="${BACKUP_DIR}/aria_backup_${TIMESTAMP}.sql.gz"
 JSON_EXPORT="${BACKUP_DIR}/aria_export_${TIMESTAMP}.json"

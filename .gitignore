@@ -35,6 +35,9 @@ aria_memories/**
 !aria_memories/README.md
 !aria_memories/**/.gitkeep
 
+# plans - Sensitive strategic documents (never commit)
+plans/
+
 # Database dumps
 *.sql
 !**/schema.sql

@@ -12,7 +12,7 @@ echo "Output: $OUTPUT_DIR"
 
 for table in "${TABLES[@]}"; do
     echo "Exporting: $table"
-    docker exec aria-db psql -U aria_admin -d aria_warehouse -t -A -c \
+    docker exec aria-db psql -U "${DB_USER:-admin}" -d aria_warehouse -t -A -c \
         "SELECT COALESCE(json_agg(row_to_json(t)), '[]') FROM $table t;" \
         > "${OUTPUT_DIR}/${table}.json"
     
@@ -24,7 +24,7 @@ for table in "${TABLES[@]}"; do
         fi
     fi
     
-    count=$(docker exec aria-db psql -U aria_admin -d aria_warehouse -t -A -c "SELECT COUNT(*) FROM $table;")
+    count=$(docker exec aria-db psql -U "${DB_USER:-admin}" -d aria_warehouse -t -A -c "SELECT COUNT(*) FROM $table;")
     echo "  → $table: $count rows"
 done
 

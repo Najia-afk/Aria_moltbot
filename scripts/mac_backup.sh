@@ -11,7 +11,7 @@ echo "Timestamp: $TIMESTAMP"
 echo "Backup dir: $BACKUP_DIR"
 
 # Create backup inside container
-docker exec aria-db pg_dump -U aria_admin -d aria_warehouse -Fc -f /tmp/aria_backup.dump
+docker exec aria-db pg_dump -U "${DB_USER:-admin}" -d aria_warehouse -Fc -f /tmp/aria_backup.dump
 if [ $? -ne 0 ]; then
     echo "ERROR: pg_dump failed"
     exit 1
