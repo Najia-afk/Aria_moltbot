@@ -12,6 +12,14 @@
 set -euo pipefail
 export PATH=/Applications/Docker.app/Contents/Resources/bin:/usr/local/bin:/usr/bin:$PATH
 
+# Source environment from .env if available (gets DB_USER, DB_PASSWORD, etc.)
+ENV_FILE="/Users/najia/aria/stacks/brain/.env"
+if [ -f "${ENV_FILE}" ]; then
+    set -a
+    source "${ENV_FILE}"
+    set +a
+fi
+
 # Configuration
 VAULT_DIR="/Users/najia/aria_vault"
 BACKUP_DIR="${VAULT_DIR}/backups"

@@ -8,6 +8,14 @@
 
 set -euo pipefail
 
+# Source environment from .env if available
+ENV_FILE="/Users/najia/aria/stacks/brain/.env"
+if [ -f "${ENV_FILE}" ]; then
+    set -a
+    source "${ENV_FILE}"
+    set +a
+fi
+
 # Configuration
 BACKUP_DIR="/Users/najia/aria_vault/backups"
 DB_CONTAINER="aria-db"

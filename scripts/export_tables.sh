@@ -2,6 +2,14 @@
 # Export Aria tables to JSON for aria_memories sync
 export PATH=/Applications/Docker.app/Contents/Resources/bin:/usr/bin:$PATH
 
+# Source environment from .env if available
+ENV_FILE="/Users/najia/aria/stacks/brain/.env"
+if [ -f "${ENV_FILE}" ]; then
+    set -a
+    source "${ENV_FILE}"
+    set +a
+fi
+
 OUTPUT_DIR="/Users/najia/aria/aria_memories/db_snapshots"
 mkdir -p "$OUTPUT_DIR"
 
