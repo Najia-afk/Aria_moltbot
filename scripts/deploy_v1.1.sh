@@ -1,7 +1,7 @@
 #!/bin/bash
 # Aria v1.1 Production Deploy Script
 # Run on Mac Mini: bash deploy_v1.1.sh
-set -euo pipefail
+set -uo pipefail
 
 DOCKER="/Applications/Docker.app/Contents/Resources/bin/docker"
 COMPOSE="/Applications/Docker.app/Contents/Resources/bin/docker compose"
@@ -18,8 +18,7 @@ echo "============================================"
 # ── STEP 1: Pre-deploy row counts ──
 echo ""
 echo ">>> STEP 1: Pre-deploy baseline"
-$DOCKER exec aria-db psql -U $DB_USER -d $DB_NAME -c \
-  "SELECT tablename, n_live_tup as rows FROM pg_stat_user_tables ORDER BY tablename;"
+$DOCKER exec aria-db psql -U $DB_USER -d $DB_NAME -t -A -c "SELECT relname || '=' || n_live_tup FROM pg_stat_user_tables WHERE schemaname='public' ORDER BY 1"
 echo "PRE-DEPLOY BASELINE CAPTURED"
 
 # ── STEP 2: Backup ──
@@ -107,8 +106,7 @@ $DOCKER ps --format "table {{.Names}}\t{{.Status}}" | grep -E "aria|clawdbot|lit
 # ── STEP 8: Post-deploy row counts ──
 echo ""
 echo ">>> STEP 8: Post-deploy verification"
-$DOCKER exec aria-db psql -U $DB_USER -d $DB_NAME -c \
-  "SELECT tablename, n_live_tup as rows FROM pg_stat_user_tables ORDER BY tablename;"
+$DOCKER exec aria-db psql -U $DB_USER -d $DB_NAME -t -A -c "SELECT relname || '=' || n_live_tup FROM pg_stat_user_tables WHERE schemaname='public' ORDER BY 1"
 
 # ── STEP 9: Endpoint smoke tests ──
 echo ""
