@@ -1,7 +1,31 @@
 # Aria's File Memories
 
 This folder contains **file-based artifacts** created by Aria during operation.
-These are NOT database records - they are files: research papers, action plans, drafts, exports, etc.
+These are NOT database records — they are files: research papers, action plans, drafts, exports, etc.
+
+## Folder Structure
+
+```
+aria_memories/
+├── README.md           # This file
+├── archive/            # Historical artifacts (pre-v1.1 sprint, Aria's souvenirs)
+│   ├── sprint_v1.1_2026-02-09/   # 37-ticket sprint (PO_LOG, all tickets)
+│   ├── aria_souvenirs/            # Aria's wishlists, experience report
+│   ├── aria_research/             # Research papers, analyses
+│   ├── aria_logs/                 # Operational logs, heartbeats
+│   ├── aria_plans/                # Old action plans, coordination docs
+│   ├── moltbook/                  # Moltbook archive + full_archive.json
+│   ├── old_exports/               # SQL schemas, JSON exports
+│   ├── old_ssv/                   # SSV/DeFi audit research
+│   └── old_income_ops/            # Income ops schemas
+├── drafts/             # Draft content before publishing
+├── exports/            # JSON exports, backups, snapshots
+├── income_ops/         # Income operations tracking
+├── knowledge/          # Learned facts, entity knowledge
+├── logs/               # Session logs, heartbeat logs, activity reviews
+├── plans/              # Action plans and strategies
+└── research/           # Research papers and findings
+```
 
 ## What goes here vs. Database
 
@@ -14,28 +38,7 @@ These are NOT database records - they are files: research papers, action plans, 
 | Session logs           | Rate limits |
 | Income operations      | Social posts |
 
-## Folder Structure
-
-```
-aria_memories/
-├── README.md           # This file
-├── logs/               # Session logs, heartbeat logs, activity reviews
-│   ├── heartbeat_*.md
-│   ├── hourly_goal_*.md
-│   └── activity_*_review_*.md
-├── research/           # Research papers and findings
-├── plans/              # Action plans and strategies
-├── drafts/             # Draft content before publishing
-├── exports/            # JSON exports, backups, snapshots
-├── income_ops/         # Income operations tracking
-└── knowledge/          # Knowledge base articles
-```
-
-## Access from OpenClaw/Aria
-
-Inside the clawdbot container, aria_memories is mounted at:
-- **Primary**: `/root/.openclaw/aria_memories`  
-- **Via repo**: `/root/repo/aria_memories`
+## Access from Aria
 
 Aria uses the `memory.py` methods:
 ```python

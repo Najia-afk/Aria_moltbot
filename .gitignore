@@ -31,11 +31,6 @@ stacks/**/.env
 aria_memory/
 aria_memory/**
 
-# aria_memories - Aria's runtime artifacts (only README + .gitkeep tracked)
-aria_memories/**
-!aria_memories/README.md
-!aria_memories/**/.gitkeep
-
 # plans - Sensitive strategic documents (never commit)
 plans/
 
