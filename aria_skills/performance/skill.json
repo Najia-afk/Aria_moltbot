@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Log and query Aria's performance reviews and self-assessments.",
   "author": "Aria Team",
+  "layer": 4,
+  "dependencies": ["api_client"],
+  "focus_affinity": ["orchestrator"],
   "tools": [
     {
       "name": "perf_log",

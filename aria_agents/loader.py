@@ -4,11 +4,19 @@ Agent configuration loader.
 
 Loads agent definitions from AGENTS.md.
 """
+import logging
 import re
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 
 from aria_agents.base import AgentConfig, AgentRole
+from aria_models.loader import load_catalog
+
+logger = logging.getLogger(__name__)
+
+# Single source of truth: models.yaml routing.primary
+_catalog = load_catalog()
+_default_model = _catalog.get("routing", {}).get("primary", "litellm/qwen3-mlx")
 
 
 class AgentLoader:
@@ -91,6 +99,11 @@ class AgentLoader:
             try:
                 role = AgentRole(role_str)
             except ValueError:
+                logger.warning(
+                    "Unknown agent role '%s' for agent '%s', "
+                    "falling back to COORDINATOR",
+                    role_str, agent_id,
+                )
                 role = AgentRole.COORDINATOR
             
             # Create config
@@ -98,7 +111,7 @@ class AgentLoader:
                 id=agent_id,
                 name=props.get("name", agent_id),
                 role=role,
-                model=props.get("model", "qwen3-mlx"),
+                model=props.get("model", _default_model),
                 parent=props.get("parent"),
                 capabilities=props.get("capabilities", []),
                 skills=props.get("skills", []),

@@ -17,6 +17,8 @@ The following audit findings have been **addressed** or **partially addressed** 
 | **LOW-2:** Inconsistent API variable names | 🟡 Partially | Standardization in progress |
 | **Testing:** 11 test failures | ✅ Addressed | TICKET-09, 31 (677+ tests, 0 failures) |
 | **Observability:** No structured logging | ✅ Addressed | TICKET-11, 17 (logging & observability stack) |
+| **Directory:** `experiment/` skill (dead code) | ✅ Resolved | S-18 (deprecated skill removed) |
+| **Directory:** `hooks/` flagged as dead code | ✅ Reclassified | Contains `soul-evil/` (evil mode toggle) — not dead code |
 
 **Remaining unaddressed (require frontend work):**
 - CRITICAL-1: Kimi pricing discrepancy (7× difference) — requires frontend JS consolidation
@@ -713,6 +715,28 @@ These endpoints exist in routers but are NOT called by any template:
 5. **Add client-side caching** for balance/spend data (e.g., `sessionStorage` with 30s TTL) to avoid redundant fetches when navigating between pages.
 6. **Standardize API variable** to just `API_BASE_URL` everywhere — remove all `API_URL`, `API_BASE`, and redundant Jinja re-renders.
 7. **Clean up unused endpoints** or document them as internal/skill-only APIs.
+
+---
+
+## 7. Resolution Status — Sprint v1.2
+
+> **Updated:** 2026-02-10 — Sprint v1.2 (S-series tickets)
+
+Sprint v1.2 addressed all critical and high-severity findings from the architecture and skill audits:
+
+| Area | Action | Status |
+|------|--------|--------|
+| **Deprecated skills** | Removed 6 skills: `database`, `brainstorm`, `community`, `fact_check`, `model_switcher`, `experiment` | ✅ Resolved |
+| **Agent roles** | Expanded `AgentRole` enum to 8 roles; added pheromone scoring | ✅ Resolved |
+| **Skill catalog** | Created `aria_skills/catalog.py` with `--list-skills` CLI | ✅ Resolved |
+| **Security hardening** | CORS restrictions, admin auth, env-var secrets | ✅ Resolved |
+| **Gateway abstraction** | `aria_mind/gateway.py` created for OpenClaw phase-out | ✅ Resolved |
+| **`hooks/` directory** | Reclassified: contains `soul-evil/` (evil mode toggle), not dead code | ✅ Reclassified |
+| **Working memory** | `sync_to_files()` added for session-surviving state | ✅ Resolved |
+| **Model catalog** | `models.yaml` is now single source of truth | ✅ Resolved |
+| **Coordinator** | `solve()` method added (explore → work → validate cycle) | ✅ Resolved |
+
+All critical/high findings from the v1.1 audit are now resolved or reclassified. Remaining open items are frontend-only (CRITICAL-1, CRITICAL-2, MEDIUM-2, MEDIUM-3).
 
 ---
 

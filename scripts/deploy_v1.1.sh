@@ -7,7 +7,7 @@ DOCKER="/Applications/Docker.app/Contents/Resources/bin/docker"
 COMPOSE="/Applications/Docker.app/Contents/Resources/bin/docker compose"
 ARIA_DIR="$HOME/aria"
 BACKUP_DIR="$HOME/aria_backups/pre_v1.1_$(date +%Y%m%d_%H%M%S)"
-DB_USER="aria_admin"
+DB_USER="${DB_USER:-admin}"
 DB_NAME="aria_warehouse"
 
 echo "============================================"

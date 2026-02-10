@@ -10,7 +10,7 @@ VAULT_DIR="${HOME}/aria_vault"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 KEEP_DAYS=14
 DB_CONTAINER="aria-db"
-DB_USER="aria_admin"
+DB_USER="${DB_USER:-admin}"
 
 mkdir -p "${VAULT_DIR}"
 

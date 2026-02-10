@@ -1,0 +1,419 @@
+{% extends "base.html" %}
+{% block title %}Working Memory{% endblock %}
+
+{% block extra_css %}
+<style>
+    .page-controls { display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+    .filter-select { padding: 10px 14px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); cursor: pointer; font-size: 13px; }
+
+    /* Stats */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 15px; margin-bottom: 25px; }
+    .stat-card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 18px; }
+    .stat-card h4 { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.03em; }
+    .stat-card .value { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+    .stat-card.blue .value { color: var(--accent-blue); }
+    .stat-card.green .value { color: var(--success); }
+    .stat-card.purple .value { color: #a855f7; }
+    .stat-card.orange .value { color: #f59e0b; }
+
+    /* Tables */
+    .section-title { font-size: 15px; font-weight: 600; margin: 20px 0 12px; display: flex; align-items: center; gap: 8px; }
+    .data-table { width: 100%; background: var(--bg-secondary); border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); }
+    .data-table th, .data-table td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border-color); font-size: 13px; }
+    .data-table th { background: rgba(0,0,0,0.2); font-weight: 600; color: var(--text-secondary); font-size: 11px; text-transform: uppercase; }
+    .data-table tr:hover { background: rgba(0,212,255,0.04); }
+    .data-table tr:last-child td { border-bottom: none; }
+
+    /* Badges */
+    .category-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; background: rgba(124,58,237,0.15); color: #a855f7; }
+    .importance-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; }
+    .importance-badge.high { color: var(--danger); }
+    .importance-badge.medium { color: #f59e0b; }
+    .importance-badge.low { color: var(--text-muted); }
+    .empty-state { text-align: center; padding: 50px 20px; color: var(--text-secondary); }
+
+    /* Buttons */
+    .btn-sm { padding: 5px 12px; font-size: 12px; border-radius: 6px; border: none; cursor: pointer; font-weight: 600; transition: all 0.2s; }
+    .btn-create { background: var(--accent-primary); color: #fff; }
+    .btn-create:hover { opacity: 0.85; }
+    .btn-checkpoint { background: rgba(34,197,94,0.2); color: var(--success); }
+    .btn-checkpoint:hover { background: rgba(34,197,94,0.3); }
+    .btn-danger { background: rgba(239,68,68,0.15); color: var(--danger); }
+    .btn-danger:hover { background: rgba(239,68,68,0.25); }
+    .btn-edit { background: rgba(59,130,246,0.15); color: #3b82f6; }
+    .btn-edit:hover { background: rgba(59,130,246,0.25); }
+
+    /* Create Form */
+    .create-form-wrapper { display: none; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; margin-bottom: 25px; }
+    .create-form-wrapper.visible { display: block; }
+    .create-form-wrapper h3 { font-size: 15px; font-weight: 600; margin-bottom: 15px; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group.full-width { grid-column: 1 / -1; }
+    .form-group label { font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em; }
+    .form-group input, .form-group textarea, .form-group select {
+        padding: 10px 14px; background: var(--bg-primary, #0d1117); border: 1px solid var(--border-color);
+        border-radius: 8px; color: var(--text-primary); font-size: 13px; font-family: inherit;
+    }
+    .form-group input:focus, .form-group textarea:focus { outline: none; border-color: var(--accent-primary); }
+    .form-group textarea { resize: vertical; min-height: 80px; }
+    .form-actions { display: flex; gap: 10px; margin-top: 15px; justify-content: flex-end; }
+
+    /* Context Panel */
+    .context-panel { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; margin-top: 25px; }
+    .context-panel h3 { font-size: 15px; font-weight: 600; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
+    .context-item { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border-color); }
+    .context-item:last-child { border-bottom: none; }
+    .context-bar-wrapper { flex: 0 0 120px; height: 8px; background: var(--border-color); border-radius: 4px; overflow: hidden; }
+    .context-bar { height: 100%; border-radius: 4px; transition: width 0.3s; }
+    .context-key { font-weight: 600; font-size: 13px; color: var(--text-primary); min-width: 120px; }
+    .context-value { flex: 1; font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .context-score { font-size: 12px; font-weight: 600; color: var(--accent-primary); min-width: 50px; text-align: right; }
+
+    /* Checkpoint Section */
+    .checkpoint-section { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; margin-top: 25px; }
+    .checkpoint-section h3 { font-size: 15px; font-weight: 600; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
+    .checkpoint-info { font-size: 13px; color: var(--text-secondary); }
+    .checkpoint-info code { font-size: 12px; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; }
+    .checkpoint-meta { display: flex; gap: 20px; margin-top: 8px; font-size: 12px; color: var(--text-muted); }
+
+    @media (max-width: 768px) { .form-grid { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>🧠 Working Memory</h1>
+    <p>Aria's short-term working memory — active context, items, and checkpoints</p>
+</div>
+
+<!-- Stats Grid -->
+<div class="stats-grid">
+    <div class="stat-card blue">
+        <h4>Total Items</h4>
+        <div class="value" id="stat-total">-</div>
+    </div>
+    <div class="stat-card purple">
+        <h4>Categories</h4>
+        <div class="value" id="stat-categories">-</div>
+    </div>
+    <div class="stat-card orange">
+        <h4>Avg Importance</h4>
+        <div class="value" id="stat-avg-importance">-</div>
+    </div>
+    <div class="stat-card green">
+        <h4>Checkpoints</h4>
+        <div class="value" id="stat-checkpoints">-</div>
+    </div>
+</div>
+
+<!-- Controls -->
+<div class="page-controls">
+    <select class="filter-select" id="category-filter">
+        <option value="">All Categories</option>
+    </select>
+    <button class="btn-sm btn-create" onclick="toggleCreateForm()">+ New Item</button>
+    <button class="btn-sm btn-checkpoint" onclick="createCheckpoint()">📸 Checkpoint</button>
+    <button class="btn-sm" style="background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border-color);" onclick="loadItems()">Refresh</button>
+</div>
+
+<!-- Create Form (hidden) -->
+<div class="create-form-wrapper" id="create-form">
+    <h3>➕ New Working Memory Item</h3>
+    <div class="form-grid">
+        <div class="form-group">
+            <label>Key</label>
+            <input type="text" id="form-key" placeholder="e.g. current_task">
+        </div>
+        <div class="form-group">
+            <label>Category</label>
+            <select id="form-category">
+                <option value="context">context</option>
+                <option value="task">task</option>
+                <option value="goal">goal</option>
+                <option value="observation">observation</option>
+                <option value="decision">decision</option>
+                <option value="scratch">scratch</option>
+            </select>
+        </div>
+        <div class="form-group full-width">
+            <label>Value</label>
+            <textarea id="form-value" placeholder="Item value or content..."></textarea>
+        </div>
+        <div class="form-group">
+            <label>Importance (0.0 – 1.0)</label>
+            <input type="number" id="form-importance" min="0" max="1" step="0.1" value="0.5">
+        </div>
+        <div class="form-group">
+            <label>TTL (hours, 0 = no expiry)</label>
+            <input type="number" id="form-ttl" min="0" step="1" value="0">
+        </div>
+    </div>
+    <div class="form-actions">
+        <button class="btn-sm" style="background:var(--bg-primary,#0d1117);color:var(--text-secondary);border:1px solid var(--border-color);" onclick="toggleCreateForm()">Cancel</button>
+        <button class="btn-sm btn-create" onclick="createItem()">Create Item</button>
+    </div>
+</div>
+
+<!-- Items Table -->
+<h3 class="section-title">📋 Memory Items</h3>
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Category</th>
+            <th>Key</th>
+            <th>Value</th>
+            <th>Importance</th>
+            <th>TTL</th>
+            <th>Last Accessed</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody id="items-body">
+        <tr><td colspan="7" class="empty-state">Loading...</td></tr>
+    </tbody>
+</table>
+
+<!-- Context Panel -->
+<div class="context-panel">
+    <h3>🎯 Top Context (by relevance)</h3>
+    <div id="context-list">
+        <div class="empty-state">Loading context...</div>
+    </div>
+</div>
+
+<!-- Checkpoint Section -->
+<div class="checkpoint-section">
+    <h3>📸 Checkpoints</h3>
+    <div id="checkpoint-info">
+        <div class="checkpoint-info" style="color:var(--text-muted);">Loading checkpoint data...</div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script data-page-script>
+// ── State ───────────────────────────────────────────────────────────────────
+let _items = [];
+let _categories = new Set();
+
+// ── Toggle Create Form ──────────────────────────────────────────────────────
+function toggleCreateForm() {
+    document.getElementById('create-form').classList.toggle('visible');
+}
+
+// ── Load Items ──────────────────────────────────────────────────────────────
+async function loadItems() {
+    try {
+        const res = await fetch(`${API_BASE_URL}/working-memory`);
+        const data = await res.json();
+        _items = data.items || data || [];
+
+        // Derive categories
+        _categories = new Set(_items.map(i => i.category).filter(Boolean));
+        populateCategoryFilter();
+
+        // Stats
+        document.getElementById('stat-total').textContent = _items.length;
+        document.getElementById('stat-categories').textContent = _categories.size;
+        const avgImp = _items.length > 0
+            ? (_items.reduce((s, i) => s + (i.importance || 0), 0) / _items.length).toFixed(2)
+            : '-';
+        document.getElementById('stat-avg-importance').textContent = avgImp;
+
+        renderItems();
+    } catch (e) {
+        console.error('Load items error:', e);
+        document.getElementById('items-body').innerHTML =
+            '<tr><td colspan="7" class="empty-state">Failed to load working memory items</td></tr>';
+    }
+}
+
+// ── Populate Category Filter ────────────────────────────────────────────────
+function populateCategoryFilter() {
+    const select = document.getElementById('category-filter');
+    const current = select.value;
+    select.innerHTML = '<option value="">All Categories</option>';
+    [..._categories].sort().forEach(cat => {
+        const opt = document.createElement('option');
+        opt.value = cat;
+        opt.textContent = cat;
+        if (cat === current) opt.selected = true;
+        select.appendChild(opt);
+    });
+}
+
+// ── Render Items Table ──────────────────────────────────────────────────────
+function renderItems() {
+    const filter = document.getElementById('category-filter').value;
+    let filtered = _items;
+    if (filter) filtered = filtered.filter(i => i.category === filter);
+
+    const body = document.getElementById('items-body');
+    if (filtered.length === 0) {
+        body.innerHTML = '<tr><td colspan="7" class="empty-state">No items found</td></tr>';
+        return;
+    }
+
+    body.innerHTML = filtered.map(item => {
+        const imp = item.importance || 0;
+        const impClass = imp >= 0.7 ? 'high' : imp >= 0.4 ? 'medium' : 'low';
+        const truncVal = (item.value || '').length > 80
+            ? (item.value || '').substring(0, 80) + '…'
+            : (item.value || '');
+        const ttlDisplay = item.ttl_hours ? `${item.ttl_hours}h` : '∞';
+        const accessed = item.last_accessed ? formatDate(item.last_accessed) : '-';
+
+        return `<tr>
+            <td><span class="category-badge">${item.category || '-'}</span></td>
+            <td><strong>${item.key || '-'}</strong></td>
+            <td title="${(item.value || '').replace(/"/g, '&quot;')}">${truncVal}</td>
+            <td><span class="importance-badge ${impClass}">${imp.toFixed(1)}</span></td>
+            <td>${ttlDisplay}</td>
+            <td>${accessed}</td>
+            <td>
+                <button class="btn-sm btn-danger" onclick="deleteItem('${item.id}')">Delete</button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+// ── Create Item ─────────────────────────────────────────────────────────────
+async function createItem() {
+    const key = document.getElementById('form-key').value.trim();
+    const value = document.getElementById('form-value').value.trim();
+    const category = document.getElementById('form-category').value;
+    const importance = parseFloat(document.getElementById('form-importance').value) || 0.5;
+    const ttl_hours = parseInt(document.getElementById('form-ttl').value) || 0;
+
+    if (!key || !value) {
+        alert('Key and Value are required.');
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/working-memory`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key, value, category, importance, ttl_hours, source: 'web_ui' })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        toggleCreateForm();
+        document.getElementById('form-key').value = '';
+        document.getElementById('form-value').value = '';
+        document.getElementById('form-importance').value = '0.5';
+        document.getElementById('form-ttl').value = '0';
+        loadItems();
+    } catch (e) {
+        console.error('Create error:', e);
+        alert('Failed to create item: ' + e.message);
+    }
+}
+
+// ── Delete Item ─────────────────────────────────────────────────────────────
+async function deleteItem(id) {
+    if (!confirm('Delete this working memory item?')) return;
+    try {
+        const res = await fetch(`${API_BASE_URL}/working-memory/${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        loadItems();
+    } catch (e) {
+        console.error('Delete error:', e);
+        alert('Failed to delete item: ' + e.message);
+    }
+}
+
+// ── Load Context ────────────────────────────────────────────────────────────
+async function loadContext() {
+    try {
+        const res = await fetch(`${API_BASE_URL}/working-memory/context?limit=20`);
+        const data = await res.json();
+        const items = data.items || data || [];
+
+        const container = document.getElementById('context-list');
+        if (items.length === 0) {
+            container.innerHTML = '<div class="empty-state">No context items</div>';
+            return;
+        }
+
+        const maxScore = Math.max(...items.map(i => i.relevance_score || i.importance || 0), 0.01);
+
+        container.innerHTML = items.map(item => {
+            const score = item.relevance_score || item.importance || 0;
+            const pct = (score / maxScore * 100).toFixed(0);
+            const hue = Math.round(score / maxScore * 120); // 0=red, 120=green
+            return `<div class="context-item">
+                <span class="context-key">${item.key || '-'}</span>
+                <div class="context-bar-wrapper">
+                    <div class="context-bar" style="width:${pct}%;background:hsl(${hue},70%,50%)"></div>
+                </div>
+                <span class="context-value">${(item.value || '').substring(0, 100)}</span>
+                <span class="context-score">${score.toFixed(2)}</span>
+            </div>`;
+        }).join('');
+    } catch (e) {
+        console.error('Context error:', e);
+        document.getElementById('context-list').innerHTML =
+            '<div class="empty-state">Failed to load context</div>';
+    }
+}
+
+// ── Checkpoints ─────────────────────────────────────────────────────────────
+async function createCheckpoint() {
+    try {
+        const res = await fetch(`${API_BASE_URL}/working-memory/checkpoint`, { method: 'POST' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        alert('Checkpoint created!');
+        loadCheckpoint();
+    } catch (e) {
+        console.error('Checkpoint create error:', e);
+        alert('Failed to create checkpoint: ' + e.message);
+    }
+}
+
+async function loadCheckpoint() {
+    try {
+        const res = await fetch(`${API_BASE_URL}/working-memory/checkpoint`);
+        const data = await res.json();
+
+        const container = document.getElementById('checkpoint-info');
+        const cp = data.checkpoint || data;
+
+        if (!cp || !cp.id) {
+            container.innerHTML = '<div class="checkpoint-info" style="color:var(--text-muted);">No checkpoints yet</div>';
+            document.getElementById('stat-checkpoints').textContent = '0';
+            return;
+        }
+
+        document.getElementById('stat-checkpoints').textContent = data.total || '1';
+
+        container.innerHTML = `
+            <div class="checkpoint-info">
+                <strong>Latest Checkpoint:</strong> <code>${cp.id}</code>
+                <div class="checkpoint-meta">
+                    <span>📅 ${cp.created_at ? formatDate(cp.created_at) : '-'}</span>
+                    <span>📦 ${cp.item_count || '-'} items</span>
+                    ${cp.description ? `<span>📝 ${cp.description}</span>` : ''}
+                </div>
+            </div>`;
+    } catch (e) {
+        console.error('Checkpoint load error:', e);
+        document.getElementById('checkpoint-info').innerHTML =
+            '<div class="checkpoint-info" style="color:var(--text-muted);">Failed to load checkpoint data</div>';
+        document.getElementById('stat-checkpoints').textContent = '-';
+    }
+}
+
+// ── Init ────────────────────────────────────────────────────────────────────
+document.getElementById('category-filter').addEventListener('change', renderItems);
+
+async function init() {
+    loadItems();
+    loadContext();
+    loadCheckpoint();
+}
+
+init();
+setInterval(() => { loadItems(); loadContext(); }, 30000);
+</script>
+{% endblock %}

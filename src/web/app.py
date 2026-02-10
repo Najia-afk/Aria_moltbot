@@ -119,6 +119,18 @@ def create_app():
     def sessions():
         return render_template('sessions.html')
 
+    @app.route('/working-memory')
+    def working_memory():
+        return render_template('working_memory.html')
+
+    @app.route('/skills')
+    def skills():
+        return render_template('skills.html')
+
+    @app.route('/soul')
+    def soul():
+        return render_template('soul.html')
+
     @app.route('/model-usage')
     def model_usage():
         return render_template('model_usage.html')

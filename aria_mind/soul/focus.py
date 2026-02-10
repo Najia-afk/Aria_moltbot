@@ -20,6 +20,9 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
 from pathlib import Path
+import logging
+
+_focus_log = logging.getLogger("aria.focus")
 
 # Import model catalog loader - models.yaml is the source of truth
 try:
@@ -66,6 +69,9 @@ def _get_model_hint(focus_type: str) -> str:
         hint = get_focus_default(focus_type)
         if hint:
             return hint
+    _focus_log.warning(
+        "Catalog lookup failed for focus '%s'; using hardcoded fallback", focus_type
+    )
     return _FALLBACK_MODEL_HINTS.get(focus_type, "qwen3-mlx")
 
 

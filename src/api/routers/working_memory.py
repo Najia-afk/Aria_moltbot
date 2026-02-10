@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy import select, delete, update, func, text
+from sqlalchemy import select, delete, update, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import WorkingMemory
@@ -71,6 +71,8 @@ async def get_working_memory_context(
             > func.now()
         )
     )
+    # Cap SQL results to avoid loading entire table into memory
+    stmt = stmt.order_by(WorkingMemory.importance.desc()).limit(200)
     result = await db.execute(stmt)
     rows = result.scalars().all()
 

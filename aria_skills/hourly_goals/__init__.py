@@ -5,12 +5,10 @@ Hourly micro-goal skill.
 Manages small, time-boxed goals for Aria's hourly cycles.
 Persists via REST API (TICKET-12: eliminate in-memory stubs).
 """
-import os
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-import httpx
-
+from aria_skills.api_client import get_api_client
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
 from aria_skills.registry import SkillRegistry
 
@@ -26,8 +24,7 @@ class HourlyGoalsSkill(BaseSkill):
     def __init__(self, config: SkillConfig):
         super().__init__(config)
         self._hourly_goals: Dict[int, List[Dict]] = {}  # fallback cache
-        self._api_url = os.environ.get('ARIA_API_URL', 'http://aria-api:8000/api')
-        self._client: Optional[httpx.AsyncClient] = None
+        self._api = None
     
     @property
     def name(self) -> str:
@@ -35,16 +32,14 @@ class HourlyGoalsSkill(BaseSkill):
     
     async def initialize(self) -> bool:
         """Initialize hourly goals."""
-        self._client = httpx.AsyncClient(base_url=self._api_url, timeout=30.0)
+        self._api = await get_api_client()
         self._status = SkillStatus.AVAILABLE
         self.logger.info("Hourly goals initialized (API-backed)")
         return True
     
     async def close(self):
-        """Close the httpx client."""
-        if self._client:
-            await self._client.aclose()
-            self._client = None
+        """Cleanup (shared API client is managed by api_client module)."""
+        self._api = None
     
     async def health_check(self) -> SkillStatus:
         """Check availability."""
@@ -79,7 +74,7 @@ class HourlyGoalsSkill(BaseSkill):
         }
         
         try:
-            resp = await self._client.post("/hourly-goals", json=goal_data)
+            resp = await self._api._client.post("/hourly-goals", json=goal_data)
             resp.raise_for_status()
             api_data = resp.json()
             return SkillResult.ok(api_data if api_data else goal_data)
@@ -95,7 +90,7 @@ class HourlyGoalsSkill(BaseSkill):
         """Get goals for the current hour."""
         current_hour = datetime.now(timezone.utc).hour
         try:
-            resp = await self._client.get("/hourly-goals", params={"hour": current_hour})
+            resp = await self._api._client.get("/hourly-goals", params={"hour": current_hour})
             resp.raise_for_status()
             api_data = resp.json()
             goals = api_data if isinstance(api_data, list) else api_data.get("goals", [])
@@ -122,7 +117,7 @@ class HourlyGoalsSkill(BaseSkill):
             "completed_at": datetime.now(timezone.utc).isoformat(),
         }
         try:
-            resp = await self._client.put(f"/hourly-goals/{goal_id}", json=update_data)
+            resp = await self._api._client.put(f"/hourly-goals/{goal_id}", json=update_data)
             resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:
@@ -138,7 +133,7 @@ class HourlyGoalsSkill(BaseSkill):
     async def get_day_summary(self) -> SkillResult:
         """Get summary of all hourly goals for today."""
         try:
-            resp = await self._client.get("/hourly-goals")
+            resp = await self._api._client.get("/hourly-goals")
             resp.raise_for_status()
             api_data = resp.json()
             goals_list = api_data if isinstance(api_data, list) else api_data.get("goals", [])

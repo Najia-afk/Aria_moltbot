@@ -21,7 +21,13 @@ def get_database_url() -> str:
     """Get database URL from environment (same as session.py)."""
     url = os.environ.get("DATABASE_URL")
     if not url:
-        raise ValueError("DATABASE_URL environment variable required for migrations")
+        raise ValueError(
+            "DATABASE_URL environment variable required for migrations.\n"
+            "Example: DATABASE_URL=postgresql+asyncpg://admin:password@localhost:5432/aria_warehouse"
+        )
+    # Ensure asyncpg driver prefix for async engine
+    if url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
     return url
 
 

@@ -7,13 +7,11 @@ Handles source discovery, article synthesis, and research workflows.
 Persists via REST API (TICKET-12: eliminate in-memory stubs).
 """
 import hashlib
-import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-import httpx
-
+from aria_skills.api_client import get_api_client
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
 from aria_skills.registry import SkillRegistry
 
@@ -74,19 +72,14 @@ class ResearchSkill(BaseSkill):
     async def initialize(self) -> bool:
         """Initialize research skill."""
         self._projects: dict[str, ResearchProject] = {}  # fallback cache
-        self._api_url = os.environ.get('ARIA_API_URL', 'http://aria-api:8000/api')
-        self._client: Optional[httpx.AsyncClient] = httpx.AsyncClient(
-            base_url=self._api_url, timeout=30.0
-        )
+        self._api = await get_api_client()
         self._status = SkillStatus.AVAILABLE
         self.logger.info("📚 Research skill initialized (API-backed)")
         return True
     
     async def close(self):
-        """Close the httpx client."""
-        if self._client:
-            await self._client.aclose()
-            self._client = None
+        """Cleanup (shared API client is managed by api_client module)."""
+        self._api = None
     
     async def health_check(self) -> SkillStatus:
         """Check research skill availability."""
@@ -421,7 +414,7 @@ class ResearchSkill(BaseSkill):
             params = {"type": "research"}
             if status:
                 params["status"] = status
-            resp = await self._client.get("/memories", params=params)
+            resp = await self._api._client.get("/memories", params=params)
             resp.raise_for_status()
             api_data = resp.json()
             memories = api_data if isinstance(api_data, list) else api_data.get("memories", [])
@@ -471,7 +464,7 @@ class ResearchSkill(BaseSkill):
                 "key": project.id,
                 "data": self._serialize_project(project),
             }
-            await self._client.post("/memories", json=memory_data)
+            await self._api._client.post("/memories", json=memory_data)
         except Exception as e:
             self.logger.warning(f"API _save_project_to_api failed: {e}")
     

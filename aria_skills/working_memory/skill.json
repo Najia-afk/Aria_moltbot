@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Persistent working memory that survives restarts. Stores key/value items with importance scoring, weighted context retrieval, and checkpoint/restore for session continuity.",
   "author": "Aria Team",
+  "layer": 3,
+  "dependencies": ["api_client"],
+  "focus_affinity": ["orchestrator"],
   "tools": [
     {
       "name": "remember",

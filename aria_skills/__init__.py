@@ -35,8 +35,9 @@ from aria_skills.registry import SkillRegistry
 
 # Import skill implementations from subdirectories
 from aria_skills.moltbook import MoltbookSkill
-from aria_skills.database import DatabaseSkill
-from aria_skills.llm import MoonshotSkill, OllamaSkill
+from aria_skills.llm import MoonshotSkill, OllamaSkill  # legacy alias
+from aria_skills.moonshot import MoonshotSkill          # v2 canonical
+from aria_skills.ollama import OllamaSkill              # v2 canonical
 from aria_skills.health import HealthMonitorSkill
 from aria_skills.goals import GoalSchedulerSkill
 from aria_skills.knowledge_graph import KnowledgeGraphSkill
@@ -53,7 +54,6 @@ from aria_skills.schedule import ScheduleSkill
 from aria_skills.security_scan import SecurityScanSkill
 from aria_skills.ci_cd import CICDSkill
 from aria_skills.data_pipeline import DataPipelineSkill
-from aria_skills.experiment import ExperimentSkill
 
 # Security skill (v1.3.0) - Runtime input protection
 from aria_skills.input_guard import InputGuardSkill
@@ -62,14 +62,16 @@ from aria_skills.input_guard import InputGuardSkill
 from aria_skills.api_client import AriaAPIClient, get_api_client
 from aria_skills.market_data import MarketDataSkill
 from aria_skills.portfolio import PortfolioSkill
-from aria_skills.brainstorm import BrainstormSkill
 from aria_skills.research import ResearchSkill
-from aria_skills.fact_check import FactCheckSkill
-from aria_skills.community import CommunitySkill
-from aria_skills.model_switcher import ModelSwitcherSkill
 
 # Pipeline Engine (v1.4.0) — Cognitive multi-step workflows
 from aria_skills.pipeline_skill import PipelineSkill
+
+# Agent & Runtime Skills (v1.1)
+from aria_skills.agent_manager import AgentManagerSkill
+from aria_skills.sandbox import SandboxSkill
+from aria_skills.telegram import TelegramSkill
+from aria_skills.working_memory import WorkingMemorySkill
 
 __all__ = [
     # Base classes
@@ -80,14 +82,12 @@ __all__ = [
     "SkillRegistry",
     # Core Skills
     "MoltbookSkill",
-    "DatabaseSkill",
     "OllamaSkill",  # Default LLM (local)
     "MoonshotSkill",
     "KnowledgeGraphSkill",
     "HealthMonitorSkill",
     "GoalSchedulerSkill",
     "PytestSkill",
-    "ModelSwitcherSkill",
     # Communication Skills (v1.1.0)
     "PerformanceSkill",
     "SocialSkill",
@@ -98,16 +98,17 @@ __all__ = [
     "SecurityScanSkill",      # DevSecOps
     "CICDSkill",              # DevSecOps
     "DataPipelineSkill",      # Data Architect
-    "ExperimentSkill",        # Data Architect
     "MarketDataSkill",        # Crypto Trader
     "PortfolioSkill",         # Crypto Trader
-    "BrainstormSkill",        # Creative
     "ResearchSkill",          # Journalist
-    "FactCheckSkill",         # Journalist
-    "CommunitySkill",         # Social Architect
     # API Client
     "AriaAPIClient",
     "get_api_client",
     # Pipeline Engine (v1.4.0)
     "PipelineSkill",
+    # Agent & Runtime Skills (v1.1)
+    "AgentManagerSkill",
+    "SandboxSkill",
+    "TelegramSkill",
+    "WorkingMemorySkill",
 ]

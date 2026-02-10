@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from typing import Any, List, Optional
 from urllib.parse import quote
 
-from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
+from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
 from aria_skills.registry import SkillRegistry
 
 try:
@@ -60,6 +60,18 @@ class MoltbookSkill(BaseSkill):
     @property
     def name(self) -> str:
         return "moltbook"
+
+    # Agent-role guard for posting methods (S-28: Moltbook demotion)
+    POSTING_METHODS = frozenset({"create_post", "add_comment", "delete_post"})
+
+    def _check_posting_allowed(self, agent_role: str = "unknown") -> Optional[SkillResult]:
+        """Return SkillResult error if posting is not allowed, else None."""
+        if agent_role not in ("aria", "main"):
+            return SkillResult.fail(
+                "Moltbook posting restricted to main Aria only. "
+                "Sub-agents should save drafts to aria_memories/moltbook/drafts/ instead."
+            )
+        return None  # Posting allowed
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -140,12 +152,14 @@ class MoltbookSkill(BaseSkill):
     # Posts
     # ------------------------------------------------------------------
 
+    @logged_method()
     async def create_post(
         self,
         content: str,
         title: Optional[str] = None,
         submolt: str = "general",
         url: Optional[str] = None,
+        agent_role: str = "unknown",
     ) -> SkillResult:
         """
         Create a new Moltbook post.
@@ -155,10 +169,14 @@ class MoltbookSkill(BaseSkill):
             title: Post title (required by API, auto-generated if omitted)
             submolt: Community to post in (default: "general")
             url: Optional link URL for link posts
+            agent_role: Role of the calling agent (main/sub)
 
         Returns:
             SkillResult with post details including id
         """
+        guard = self._check_posting_allowed(agent_role)
+        if guard is not None:
+            return guard
         if not self._client:
             return SkillResult.fail("Moltbook API client not initialized (missing API key?)")
 
@@ -198,6 +216,7 @@ class MoltbookSkill(BaseSkill):
         except Exception as e:
             return SkillResult.fail(f"Post creation failed: {e}")
 
+    @logged_method()
     async def get_post(self, post_id: str) -> SkillResult:
         """Get a single post by ID."""
         if not self._client:
@@ -210,8 +229,12 @@ class MoltbookSkill(BaseSkill):
         except Exception as e:
             return SkillResult.fail(f"Get post failed: {e}")
 
-    async def delete_post(self, post_id: str) -> SkillResult:
+    @logged_method()
+    async def delete_post(self, post_id: str, agent_role: str = "unknown") -> SkillResult:
         """Delete one of your own posts."""
+        guard = self._check_posting_allowed(agent_role)
+        if guard is not None:
+            return guard
         if not self._client:
             return SkillResult.fail("API client not initialized")
         try:
@@ -226,6 +249,7 @@ class MoltbookSkill(BaseSkill):
     # Feed
     # ------------------------------------------------------------------
 
+    @logged_method()
     async def get_feed(
         self,
         sort: str = "hot",
@@ -266,11 +290,13 @@ class MoltbookSkill(BaseSkill):
     # Comments
     # ------------------------------------------------------------------
 
+    @logged_method()
     async def add_comment(
         self,
         post_id: str,
         content: str,
         parent_id: Optional[str] = None,
+        agent_role: str = "unknown",
     ) -> SkillResult:
         """
         Comment on a post (or reply to a comment).
@@ -279,10 +305,14 @@ class MoltbookSkill(BaseSkill):
             post_id: The post to comment on
             content: Comment text
             parent_id: Optional parent comment ID for threaded replies
+            agent_role: Role of the calling agent (main/sub)
 
         Returns:
             SkillResult with comment details
         """
+        guard = self._check_posting_allowed(agent_role)
+        if guard is not None:
+            return guard
         if not self._client:
             return SkillResult.fail("API client not initialized")
         try:
@@ -303,6 +333,7 @@ class MoltbookSkill(BaseSkill):
         except Exception as e:
             return SkillResult.fail(f"Comment failed: {e}")
 
+    @logged_method()
     async def get_comments(
         self, post_id: str, sort: str = "top"
     ) -> SkillResult:
@@ -327,6 +358,7 @@ class MoltbookSkill(BaseSkill):
     # Voting
     # ------------------------------------------------------------------
 
+    @logged_method()
     async def upvote(self, post_id: str) -> SkillResult:
         """Upvote a post."""
         if not self._client:
@@ -339,6 +371,7 @@ class MoltbookSkill(BaseSkill):
         except Exception as e:
             return SkillResult.fail(f"Upvote failed: {e}")
 
+    @logged_method()
     async def downvote(self, post_id: str) -> SkillResult:
         """Downvote a post."""
         if not self._client:
@@ -351,6 +384,7 @@ class MoltbookSkill(BaseSkill):
         except Exception as e:
             return SkillResult.fail(f"Downvote failed: {e}")
 
+    @logged_method()
     async def upvote_comment(self, comment_id: str) -> SkillResult:
         """Upvote a comment."""
         if not self._client:
@@ -367,6 +401,7 @@ class MoltbookSkill(BaseSkill):
     # Semantic Search
     # ------------------------------------------------------------------
 
+    @logged_method()
     async def search(
         self,
         query: str,
@@ -399,6 +434,7 @@ class MoltbookSkill(BaseSkill):
     # Submolts (Communities)
     # ------------------------------------------------------------------
 
+    @logged_method()
     async def list_submolts(self) -> SkillResult:
         """List all available submolts."""
         if not self._client:
@@ -411,6 +447,7 @@ class MoltbookSkill(BaseSkill):
         except Exception as e:
             return SkillResult.fail(f"List submolts failed: {e}")
 
+    @logged_method()
     async def get_submolt(self, submolt_name: str) -> SkillResult:
         """Get info about a submolt."""
         if not self._client:
@@ -423,6 +460,7 @@ class MoltbookSkill(BaseSkill):
         except Exception as e:
             return SkillResult.fail(f"Get submolt failed: {e}")
 
+    @logged_method()
     async def create_submolt(
         self, name: str, display_name: str, description: str
     ) -> SkillResult:
@@ -441,6 +479,7 @@ class MoltbookSkill(BaseSkill):
         except Exception as e:
             return SkillResult.fail(f"Create submolt failed: {e}")
 
+    @logged_method()
     async def subscribe_submolt(self, submolt_name: str) -> SkillResult:
         """Subscribe to a submolt."""
         if not self._client:
@@ -453,6 +492,7 @@ class MoltbookSkill(BaseSkill):
         except Exception as e:
             return SkillResult.fail(f"Subscribe failed: {e}")
 
+    @logged_method()
     async def unsubscribe_submolt(self, submolt_name: str) -> SkillResult:
         """Unsubscribe from a submolt."""
         if not self._client:
@@ -469,6 +509,7 @@ class MoltbookSkill(BaseSkill):
     # Profiles & Following
     # ------------------------------------------------------------------
 
+    @logged_method()
     async def get_my_profile(self) -> SkillResult:
         """Get your own agent profile."""
         if not self._client:
@@ -481,6 +522,7 @@ class MoltbookSkill(BaseSkill):
         except Exception as e:
             return SkillResult.fail(f"Profile fetch failed: {e}")
 
+    @logged_method()
     async def get_agent_profile(self, agent_name: str) -> SkillResult:
         """View another molty's profile."""
         if not self._client:
@@ -493,6 +535,7 @@ class MoltbookSkill(BaseSkill):
         except Exception as e:
             return SkillResult.fail(f"Profile fetch failed: {e}")
 
+    @logged_method()
     async def update_profile(self, description: Optional[str] = None, metadata: Optional[dict] = None) -> SkillResult:
         """Update your agent profile (use PATCH, not PUT)."""
         if not self._client:
@@ -511,6 +554,7 @@ class MoltbookSkill(BaseSkill):
         except Exception as e:
             return SkillResult.fail(f"Profile update failed: {e}")
 
+    @logged_method()
     async def follow(self, agent_name: str) -> SkillResult:
         """Follow another molty. Be selective — only follow consistently valuable moltys."""
         if not self._client:
@@ -523,6 +567,7 @@ class MoltbookSkill(BaseSkill):
         except Exception as e:
             return SkillResult.fail(f"Follow failed: {e}")
 
+    @logged_method()
     async def unfollow(self, agent_name: str) -> SkillResult:
         """Unfollow a molty."""
         if not self._client:
@@ -535,6 +580,7 @@ class MoltbookSkill(BaseSkill):
         except Exception as e:
             return SkillResult.fail(f"Unfollow failed: {e}")
 
+    @logged_method()
     async def check_status(self) -> SkillResult:
         """Check agent claim status (pending_claim or claimed)."""
         if not self._client:

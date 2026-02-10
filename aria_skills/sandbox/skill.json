@@ -1,7 +1,58 @@
 {
   "name": "sandbox",
   "canonical_name": "aria-sandbox",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "layer": 3,
-  "description": "Sandboxed code execution environment"
+  "description": "Sandboxed code execution environment — run code, read/write files, and run tests in an isolated Docker container.",
+  "author": "Aria Blue",
+  "dependencies": ["api_client"],
+  "focus_affinity": ["devsecops"],
+  "tools": [
+    {
+      "name": "run_code",
+      "description": "Execute Python code in the isolated sandbox.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "string", "description": "Python code to execute" },
+          "timeout": { "type": "integer", "description": "Timeout in seconds (default: 30)" }
+        },
+        "required": ["code"]
+      }
+    },
+    {
+      "name": "write_file",
+      "description": "Write a file inside the sandbox filesystem.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string", "description": "File path in the sandbox" },
+          "content": { "type": "string", "description": "File content to write" }
+        },
+        "required": ["path", "content"]
+      }
+    },
+    {
+      "name": "read_file",
+      "description": "Read a file from the sandbox filesystem.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string", "description": "File path in the sandbox" }
+        },
+        "required": ["path"]
+      }
+    },
+    {
+      "name": "run_tests",
+      "description": "Run pytest in the sandbox environment.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "test_path": { "type": "string", "description": "Path to tests (default: tests/)" },
+          "timeout": { "type": "integer", "description": "Timeout in seconds (default: 60)" }
+        }
+      }
+    }
+  ]
 }

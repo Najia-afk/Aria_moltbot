@@ -1,5 +1,5 @@
 """
-Admin endpoints — service control + soul file access.
+Admin endpoints — service control + soul file access + DB maintenance.
 """
 
 import asyncio
@@ -8,10 +8,15 @@ from typing import Optional
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import ARIA_ADMIN_TOKEN, SERVICE_CONTROL_ENABLED
+from deps import get_db
 
 router = APIRouter(tags=["Admin"])
+
+VACUUM_TABLES = ["activity_log", "model_usage", "heartbeat_log", "thoughts"]
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -53,10 +58,11 @@ async def _run_docker_command(command: str) -> Optional[dict]:
 async def api_service_control(service_id: str, action: str, request: Request):
     if not SERVICE_CONTROL_ENABLED:
         raise HTTPException(status_code=403, detail="Service control disabled")
-    if ARIA_ADMIN_TOKEN:
-        token = request.headers.get("X-Admin-Token", "")
-        if token != ARIA_ADMIN_TOKEN:
-            raise HTTPException(status_code=401, detail="Unauthorized")
+    if not ARIA_ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Admin token not configured")
+    token = request.headers.get("X-Admin-Token", "")
+    if token != ARIA_ADMIN_TOKEN:
+        raise HTTPException(status_code=401, detail="Unauthorized")
     if action not in {"restart", "stop", "start"}:
         raise HTTPException(status_code=400, detail="Invalid action")
 
@@ -91,6 +97,8 @@ async def read_soul_file(filename: str):
     allowed = [
         "SOUL.md", "IDENTITY.md", "USER.md", "AGENTS.md",
         "HEARTBEAT.md", "BOOTSTRAP.md",
+        "GOALS.md", "SECURITY.md", "MEMORY.md", "SKILLS.md",
+        "TOOLS.md", "AWAKENING.md", "ORCHESTRATION.md",
     ]
     if filename not in allowed:
         raise HTTPException(status_code=404, detail="Soul file not found")
@@ -100,3 +108,36 @@ async def read_soul_file(filename: str):
             return {"filename": filename, "content": f.read()}
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Soul file not found")
+
+
+# ── DB Maintenance ───────────────────────────────────────────────────────────
+
+@router.post("/maintenance")
+async def run_maintenance(db: AsyncSession = Depends(get_db)):
+    """Run VACUUM ANALYZE on high-write tables."""
+    results = {}
+    for table in VACUUM_TABLES:
+        try:
+            # VACUUM cannot run in a transaction, use ANALYZE instead
+            await db.execute(text(f"ANALYZE {table}"))
+            results[table] = "analyzed"
+        except Exception as e:
+            results[table] = f"error: {e}"
+    return {"maintenance": "complete", "tables": results}
+
+
+@router.get("/table-stats")
+async def table_stats(db: AsyncSession = Depends(get_db)):
+    """Get dead tuple counts for high-write tables."""
+    result = await db.execute(text("""
+        SELECT relname, n_live_tup, n_dead_tup, last_vacuum, last_autovacuum
+        FROM pg_stat_user_tables
+        WHERE relname = ANY(:tables)
+        ORDER BY n_dead_tup DESC
+    """), {"tables": VACUUM_TABLES})
+    rows = result.all()
+    return [
+        {"table": r.relname, "live_tuples": r.n_live_tup, "dead_tuples": r.n_dead_tup,
+         "last_vacuum": r.last_vacuum.isoformat() if r.last_vacuum else None}
+        for r in rows
+    ]

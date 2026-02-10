@@ -12,6 +12,7 @@ Config:
     api_base_url: Base URL for Aria API (default: http://aria-api:8000)
 """
 import asyncio
+import os
 from typing import Any, Dict, List, Optional
 
 import httpx

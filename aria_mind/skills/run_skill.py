@@ -21,6 +21,18 @@ from datetime import datetime, timezone
 sys.path.insert(0, '/root/.openclaw/workspace/skills')
 sys.path.insert(0, '/root/.openclaw/workspace')
 
+# Load default model names from models.yaml (single source of truth)
+try:
+    from aria_models.loader import load_catalog as _load_catalog
+    _cat = _load_catalog()
+    _kimi_model = _cat.get("models", {}).get("kimi", {}).get("litellm", {}).get("model", "")
+    _DEFAULT_KIMI_MODEL = _kimi_model.removeprefix("moonshot/") or "kimi-k2.5"
+    _ollama_model = _cat.get("models", {}).get("qwen-cpu-fallback", {}).get("litellm", {}).get("model", "")
+    _DEFAULT_OLLAMA_MODEL = _ollama_model.removeprefix("ollama/") or "qwen2.5:3b"
+except Exception:
+    _DEFAULT_KIMI_MODEL = "kimi-k2.5"
+    _DEFAULT_OLLAMA_MODEL = "qwen2.5:3b"
+
 # Dynamic skill registry - maps skill_name to (module_name, class_name, config_factory)
 # ⚠️ ORDERING MATTERS: Aria gravitates toward the first skills listed.
 #    api_client is PRIMARY for all DB reads/writes (clean REST over aria-api).
@@ -66,11 +78,11 @@ SKILL_REGISTRY = {
     # === LLM & Model Management ===
     'llm': ('aria_skills.llm', 'OllamaSkill', lambda: {
         'host': os.environ.get('OLLAMA_URL', 'http://host.docker.internal:11434'),
-        'model': os.environ.get('OLLAMA_MODEL', 'qwen3-vl:8b')
+        'model': os.environ.get('OLLAMA_MODEL', _DEFAULT_OLLAMA_MODEL)
     }),
     'moonshot': ('aria_skills.llm', 'MoonshotSkill', lambda: {
         'api_key': os.environ.get('MOONSHOT_API_KEY') or os.environ.get('MOONSHOT_KIMI_KEY'),
-        'model': os.environ.get('MOONSHOT_MODEL', 'kimi-k2.5')
+        'model': os.environ.get('MOONSHOT_MODEL', _DEFAULT_KIMI_MODEL)
     }),
     'litellm': ('aria_skills.litellm', 'LiteLLMSkill', lambda: {
         'litellm_url': os.environ.get('LITELLM_URL', 'http://litellm:4000'),

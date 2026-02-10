@@ -14,7 +14,7 @@ if [ -f "${ENV_FILE}" ]; then
     done < <(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "${ENV_FILE}" | sed 's/\r$//')
 fi
 
-DB_USER="${DB_USER:-aria_admin}"
+DB_USER="${DB_USER:-admin}"
 DB_NAME="${DB_NAME:-aria_warehouse}"
 
 echo "=== Aria Database Table Counts ==="

@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "🌐 Community management and growth for Social Architect",
   "author": "Aria Blue",
+  "layer": 3,
+  "dependencies": ["api_client", "social"],
+  "focus_affinity": ["social"],
   "tools": [
     {
       "name": "track_member",

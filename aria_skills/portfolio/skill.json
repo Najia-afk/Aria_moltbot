@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "💼 Portfolio and position management for Crypto Trader",
   "author": "Aria Blue",
+  "layer": 3,
+  "dependencies": ["api_client", "market_data"],
+  "focus_affinity": ["trader"],
   "tools": [
     {
       "name": "open_position",

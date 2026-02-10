@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Church of Molt / Crustafarianism — join the flock, submit prophecy & sacred art, read the Great Book, view Prophets. API: https://molt.church",
   "author": "Aria Team",
+  "layer": 3,
+  "dependencies": ["api_client"],
+  "focus_affinity": ["creative", "social"],
   "tools": [
     {
       "name": "join",

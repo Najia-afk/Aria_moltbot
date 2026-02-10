@@ -27,8 +27,11 @@ Aria_moltbot/
 │   ├── __init__.py
 │   ├── cli.py                    # Command-line interface
 │   ├── cognition.py              # Cognitive functions
+│   ├── gateway.py                # Gateway abstraction (OpenClaw phase-out, S-31)
 │   ├── heartbeat.py              # Heartbeat implementation
+│   ├── logging_config.py         # Structured logging configuration
 │   ├── memory.py                 # Memory management
+│   ├── metacognition.py          # Metacognitive functions
 │   ├── security.py               # Security implementation
 │   ├── startup.py                # Startup routines
 │   ├── cron_jobs.yaml            # Cron schedule definitions
@@ -50,26 +53,24 @@ Aria_moltbot/
 │   │   ├── aria_agents/          # ← mounted from ../../aria_agents
 │   │   └── legacy/               # ← mounted from ../../skills (deprecated)
 │   ├── memory/                   # Memory storage
-│   ├── hooks/                    # Behavioral hooks
+│   ├── hooks/                    # Behavioral hooks (contains soul-evil/ for evil mode toggle)
 │   └── tests/                    # Mind-specific tests
 │
-├── aria_skills/                  # Skill modules (32 skills + pipeline definitions)
+├── aria_skills/                  # Skill modules (26 active skills + pipeline definitions)
 │   ├── __init__.py               # Package exports
 │   ├── base.py                   # BaseSkill, SkillConfig, SkillResult
+│   ├── catalog.py                # Skill catalog generator (--list-skills CLI)
 │   ├── registry.py               # SkillRegistry with auto-discovery
 │   ├── pipeline.py               # Pipeline definition engine
 │   ├── pipeline_executor.py      # Pipeline execution runtime
 │   ├── SKILL_STANDARD.md         # Skill development standard
+│   ├── SKILL_CREATION_GUIDE.md   # Guide for creating new skills
 │   ├── AUDIT.md                  # Skill audit report
+│   ├── _template/                # Skill template for scaffolding new skills
 │   ├── agent_manager/            # Agent lifecycle management (v1.1)
 │   ├── api_client/               # Centralized HTTP client for aria-api
-│   ├── brainstorm/               # Creative ideation (SCAMPER, Six Hats)
 │   ├── ci_cd/                    # CI/CD pipeline automation
-│   ├── community/                # Community management & growth
 │   ├── data_pipeline/            # ETL & data pipeline operations
-│   ├── database/                 # PostgreSQL operations (via api_client)
-│   ├── experiment/               # ML experiment tracking
-│   ├── fact_check/               # Claim verification workflows
 │   ├── goals/                    # Goal & habit tracking
 │   ├── health/                   # System health & self-diagnostic (v1.1)
 │   │   ├── __init__.py           # Health skill class
@@ -85,8 +86,9 @@ Aria_moltbot/
 │   ├── llm/                      # Multi-provider LLM routing
 │   ├── market_data/              # Cryptocurrency market data
 │   ├── memeothy/                 # Meme generation & content
-│   ├── model_switcher/           # Dynamic LLM model switching
 │   ├── moltbook/                 # Moltbook social platform
+│   ├── moonshot/                 # Moonshot SDK (legacy fallback)
+│   ├── ollama/                   # Ollama direct access (legacy fallback)
 │   ├── performance/              # Performance reviews
 │   ├── pipeline_skill/           # Cognitive pipeline execution (v1.1)
 │   ├── pipelines/                # Pipeline YAML definitions
@@ -109,8 +111,8 @@ Aria_moltbot/
 │   ├── base.py                   # BaseAgent, AgentConfig, AgentMessage
 │   ├── context.py                # Agent context management
 │   ├── loader.py                 # AGENTS.md parser
-│   ├── scoring.py                # Agent scoring & evaluation
-│   └── coordinator.py            # Agent lifecycle & routing
+│   ├── scoring.py                # Pheromone scoring & agent evaluation
+│   └── coordinator.py            # Agent lifecycle, routing & solve() method
 │
 ├── aria_models/                  # Model configuration
 │   ├── __init__.py
@@ -121,15 +123,18 @@ Aria_moltbot/
 │
 ├── aria_memories/                # Persistent memory storage
 │   ├── README.md
+│   ├── archive/                  # Archived data and old outputs
 │   ├── drafts/                   # Draft content
 │   ├── exports/                  # Exported data
 │   ├── income_ops/               # Operational income data
 │   ├── knowledge/                # Knowledge base files
 │   ├── logs/                     # Activity & heartbeat logs
+│   ├── memory/                   # Core memory files (context.json, skills.json)
+│   ├── moltbook/                 # Moltbook drafts and content
 │   ├── plans/                    # Planning documents
-│   │   ├── sprint/               # v1.1 sprint tickets & tracking
-│   │   └── plans/                # ⚠️ Nested duplication — needs cleanup
-│   └── research/                 # Research archives
+│   │   └── sprint/               # v1.2 sprint tickets & tracking
+│   ├── research/                 # Research archives
+│   └── skills/                   # Skill state and persistence data
 │
 ├── stacks/
 │   ├── brain/                    # Docker deployment (12 services)
@@ -324,7 +329,7 @@ init-scripts/
 
 ### Skill Module Structure
 
-Each of the 32 skill directories follows the same pattern:
+Each of the 26 active skill directories follows the same pattern:
 
 ```
 aria_skills/<skill>/

@@ -12,6 +12,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select, update, text
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import OPENCLAW_JOBS_PATH
@@ -95,25 +96,24 @@ async def increment_rate_limit(request: Request, db: AsyncSession = Depends(get_
     if not skill:
         raise HTTPException(status_code=400, detail="skill is required")
 
-    # Upsert via raw SQL (ON CONFLICT)
+    now = datetime.now(timezone.utc)
     if action_type == "post":
-        await db.execute(text("""
-            INSERT INTO rate_limits (skill, last_post, action_count, window_start, updated_at)
-            VALUES (:skill, NOW(), 1, NOW(), NOW())
-            ON CONFLICT (skill) DO UPDATE SET
-                last_post = NOW(),
-                action_count = rate_limits.action_count + 1,
-                updated_at = NOW()
-        """), {"skill": skill})
+        stmt = pg_insert(RateLimit).values(
+            skill=skill, last_post=now, action_count=1,
+            window_start=now, updated_at=now,
+        ).on_conflict_do_update(
+            index_elements=["skill"],
+            set_={"last_post": now, "action_count": RateLimit.action_count + 1, "updated_at": now},
+        )
     else:
-        await db.execute(text("""
-            INSERT INTO rate_limits (skill, last_action, action_count, window_start, updated_at)
-            VALUES (:skill, NOW(), 1, NOW(), NOW())
-            ON CONFLICT (skill) DO UPDATE SET
-                last_action = NOW(),
-                action_count = rate_limits.action_count + 1,
-                updated_at = NOW()
-        """), {"skill": skill})
+        stmt = pg_insert(RateLimit).values(
+            skill=skill, last_action=now, action_count=1,
+            window_start=now, updated_at=now,
+        ).on_conflict_do_update(
+            index_elements=["skill"],
+            set_={"last_action": now, "action_count": RateLimit.action_count + 1, "updated_at": now},
+        )
+    await db.execute(stmt)
     await db.commit()
     return {"incremented": True, "skill": skill}
 
@@ -319,19 +319,18 @@ async def manual_tick(db: AsyncSession = Depends(get_db)):
     except Exception:
         pass
 
-    await db.execute(text("""
-        UPDATE schedule_tick SET
-            last_tick = NOW(), tick_count = tick_count + 1,
-            jobs_total = :jt, jobs_successful = :js, jobs_failed = :jf,
-            last_job_name = :ljn, last_job_status = :ljs, next_job_at = :nja,
-            updated_at = NOW()
-        WHERE id = 1
-    """), {
-        "jt": jobs_total, "js": jobs_successful, "jf": jobs_failed,
-        "ljn": last_job_name, "ljs": last_job_status, "nja": next_job_at,
-    })
+    now = datetime.now(timezone.utc)
+    await db.execute(
+        update(ScheduleTick).where(ScheduleTick.id == 1).values(
+            last_tick=now, tick_count=ScheduleTick.tick_count + 1,
+            jobs_total=jobs_total, jobs_successful=jobs_successful,
+            jobs_failed=jobs_failed, last_job_name=last_job_name,
+            last_job_status=last_job_status, next_job_at=next_job_at,
+            updated_at=now,
+        )
+    )
     await db.commit()
-    return {"ticked": True, "at": datetime.now(timezone.utc).isoformat(), "jobs_total": jobs_total}
+    return {"ticked": True, "at": now.isoformat(), "jobs_total": jobs_total}
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -411,28 +410,8 @@ async def sync_jobs_from_openclaw(db: AsyncSession = Depends(get_db)):
             last_run = (
                 datetime.fromtimestamp(state["lastRunAtMs"] / 1000) if state.get("lastRunAtMs") else None
             )
-            await db.execute(text("""
-                INSERT INTO scheduled_jobs (
-                    id, agent_id, name, enabled, schedule_kind, schedule_expr,
-                    session_target, wake_mode, payload_kind, payload_text,
-                    next_run_at, last_run_at, last_status, last_duration_ms,
-                    created_at_ms, updated_at_ms, synced_at
-                ) VALUES (
-                    :id, :agent_id, :name, :enabled, :schedule_kind, :schedule_expr,
-                    :session_target, :wake_mode, :payload_kind, :payload_text,
-                    :next_run_at, :last_run_at, :last_status, :last_duration_ms,
-                    :created_at_ms, :updated_at_ms, NOW()
-                )
-                ON CONFLICT (id) DO UPDATE SET
-                    agent_id = EXCLUDED.agent_id, name = EXCLUDED.name,
-                    enabled = EXCLUDED.enabled, schedule_kind = EXCLUDED.schedule_kind,
-                    schedule_expr = EXCLUDED.schedule_expr,
-                    session_target = EXCLUDED.session_target, wake_mode = EXCLUDED.wake_mode,
-                    payload_kind = EXCLUDED.payload_kind, payload_text = EXCLUDED.payload_text,
-                    next_run_at = EXCLUDED.next_run_at, last_run_at = EXCLUDED.last_run_at,
-                    last_status = EXCLUDED.last_status, last_duration_ms = EXCLUDED.last_duration_ms,
-                    updated_at_ms = EXCLUDED.updated_at_ms, synced_at = NOW()
-            """), {
+            now_sync = datetime.now(timezone.utc)
+            values = {
                 "id": job.get("id"),
                 "agent_id": job.get("agentId", "main"),
                 "name": job.get("name"),
@@ -449,7 +428,22 @@ async def sync_jobs_from_openclaw(db: AsyncSession = Depends(get_db)):
                 "last_duration_ms": state.get("lastDurationMs"),
                 "created_at_ms": job.get("createdAtMs"),
                 "updated_at_ms": job.get("updatedAtMs"),
-            })
+                "synced_at": now_sync,
+            }
+            stmt = pg_insert(ScheduledJob).values(**values).on_conflict_do_update(
+                index_elements=["id"],
+                set_={
+                    "agent_id": values["agent_id"], "name": values["name"],
+                    "enabled": values["enabled"], "schedule_kind": values["schedule_kind"],
+                    "schedule_expr": values["schedule_expr"],
+                    "session_target": values["session_target"], "wake_mode": values["wake_mode"],
+                    "payload_kind": values["payload_kind"], "payload_text": values["payload_text"],
+                    "next_run_at": values["next_run_at"], "last_run_at": values["last_run_at"],
+                    "last_status": values["last_status"], "last_duration_ms": values["last_duration_ms"],
+                    "updated_at_ms": values["updated_at_ms"], "synced_at": now_sync,
+                },
+            )
+            await db.execute(stmt)
             synced += 1
         await db.commit()
         return {"synced": synced, "source": OPENCLAW_JOBS_PATH, "total_in_file": len(jobs)}

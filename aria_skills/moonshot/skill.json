@@ -1,0 +1,35 @@
+{
+  "name": "aria-moonshot",
+  "version": "2.0.0",
+  "description": "Moonshot (Kimi) LLM interface — chat completion via Moonshot API.",
+  "author": "Aria Team",
+  "layer": 2,
+  "dependencies": ["api_client"],
+  "focus_affinity": ["orchestrator"],
+  "tools": [
+    {
+      "name": "chat",
+      "description": "Send a chat completion request to Moonshot/Kimi API.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": { "type": "string" },
+                "content": { "type": "string" }
+              }
+            },
+            "description": "Chat messages with role and content"
+          },
+          "temperature": { "type": "number", "description": "Sampling temperature 0-1 (default: 0.7)" },
+          "max_tokens": { "type": "integer", "description": "Maximum response tokens (default: 2048)" },
+          "system_prompt": { "type": "string", "description": "Optional system message" }
+        },
+        "required": ["messages"]
+      }
+    }
+  ]
+}

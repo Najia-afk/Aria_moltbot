@@ -59,3 +59,8 @@ result = memory.load_artifact("action_plan.md", category="plans")
 
 This folder is tracked by git for visibility and backup.
 Aria can commit her own changes via the git skill.
+
+## Write Policy
+- **ALLOWED:** All subdirectories under `aria_memories/` listed in `MemoryManager.ALLOWED_CATEGORIES`
+- **FORBIDDEN:** `aria_mind/`, `aria_skills/`, `aria_agents/`, `aria_models/`, `src/`, `tests/`
+- **Enforcement:** `save_artifact()` validates category against whitelist and rejects `..` traversal

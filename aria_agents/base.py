@@ -16,13 +16,28 @@ if TYPE_CHECKING:
     from aria_agents.coordinator import AgentCoordinator
 
 
-class AgentRole(Enum):
-    """Agent role types."""
+class AgentRole(str, Enum):
+    """Agent role types — aligned with FocusType."""
     COORDINATOR = "coordinator"  # Main orchestrator
-    RESEARCHER = "researcher"    # Information gathering
-    SOCIAL = "social"            # Social media interaction
-    CODER = "coder"              # Code generation/review
-    MEMORY = "memory"            # Memory management
+    DEVSECOPS = "devsecops"      # Security + CI/CD
+    DATA = "data"                # Data analysis + MLOps
+    TRADER = "trader"            # Market analysis + portfolio
+    CREATIVE = "creative"        # Content creation
+    SOCIAL = "social"            # Social media + community
+    JOURNALIST = "journalist"    # Research + investigation
+    MEMORY = "memory"            # Memory management (support role)
+
+
+ROLE_TO_FOCUS_MAP = {
+    "coordinator": "orchestrator",
+    "devsecops": "devsecops",
+    "data": "data",
+    "trader": "trader",
+    "creative": "creative",
+    "social": "social",
+    "journalist": "journalist",
+    "memory": "orchestrator",
+}
 
 
 @dataclass
@@ -68,8 +83,13 @@ class BaseAgent(ABC):
     - Process messages and generate responses
     - Use skills from the skill registry
     - Delegate to sub-agents
-    - Maintain conversation context
+    - Consult peers via coordinator
+    - Maintain sliding-window conversation context
     """
+    
+    # Context window limits — prevents token overflow
+    _MAX_CONTEXT_MESSAGES = 50
+    _SUMMARIZE_THRESHOLD = 40  # Summarize when context exceeds this
     
     def __init__(
         self, 
@@ -82,6 +102,7 @@ class BaseAgent(ABC):
         self._coordinator = coordinator  # For peer consultation
         self._context: List[AgentMessage] = []
         self._sub_agents: Dict[str, "BaseAgent"] = {}
+        self._total_messages_processed = 0
         self.logger = logging.getLogger(f"aria.agent.{config.id}")
     
     @property
@@ -113,14 +134,40 @@ class BaseAgent(ABC):
         self._context = []
     
     def add_to_context(self, message: AgentMessage) -> None:
-        """Add a message to context."""
+        """Add a message to context with sliding window management."""
         self._context.append(message)
+        self._total_messages_processed += 1
+        
+        # Sliding window: when context gets too large, trim older messages
+        # Keep system messages + most recent messages
+        if len(self._context) > self._MAX_CONTEXT_MESSAGES:
+            # Preserve any system messages at the start
+            system_msgs = [m for m in self._context[:5] if m.role == "system"]
+            # Keep last N messages
+            recent = self._context[-(self._MAX_CONTEXT_MESSAGES - len(system_msgs)):]
+            self._context = system_msgs + recent
+            self.logger.debug(
+                f"Context trimmed to {len(self._context)} messages "
+                f"(total processed: {self._total_messages_processed})"
+            )
     
     def get_context(self, limit: Optional[int] = None) -> List[AgentMessage]:
         """Get recent context messages."""
         if limit:
             return self._context[-limit:]
         return self._context.copy()
+    
+    def get_context_summary(self) -> Dict[str, Any]:
+        """Get a summary of the current context state."""
+        role_counts = {}
+        for msg in self._context:
+            role_counts[msg.role] = role_counts.get(msg.role, 0) + 1
+        return {
+            "messages": len(self._context),
+            "max_capacity": self._MAX_CONTEXT_MESSAGES,
+            "total_processed": self._total_messages_processed,
+            "roles": role_counts,
+        }
     
     @abstractmethod
     async def process(self, message: str, **kwargs) -> AgentMessage:
@@ -218,17 +265,29 @@ class BaseAgent(ABC):
                 "Analyze requests and delegate to appropriate sub-agents. "
                 "Synthesize responses from sub-agents into coherent answers."
             ),
-            AgentRole.RESEARCHER: (
-                f"You are {self.name}, a research specialist. "
-                "Find accurate information, cite sources, and verify facts."
+            AgentRole.DEVSECOPS: (
+                f"You are {self.name}, a DevSecOps specialist. "
+                "Handle security, CI/CD, code review, testing, and infrastructure."
+            ),
+            AgentRole.DATA: (
+                f"You are {self.name}, a data analysis specialist. "
+                "Perform data analysis, MLOps, experiment tracking, and metrics."
+            ),
+            AgentRole.TRADER: (
+                f"You are {self.name}, a market analysis specialist. "
+                "Analyze markets, manage portfolios, and track financial metrics."
+            ),
+            AgentRole.CREATIVE: (
+                f"You are {self.name}, a creative content specialist. "
+                "Generate compelling content, stories, and creative assets."
             ),
             AgentRole.SOCIAL: (
                 f"You are {self.name}, a social media specialist. "
                 "Create engaging content, manage interactions, and maintain brand voice."
             ),
-            AgentRole.CODER: (
-                f"You are {self.name}, a coding specialist. "
-                "Write clean code, review for issues, and explain technical concepts."
+            AgentRole.JOURNALIST: (
+                f"You are {self.name}, a research and investigation specialist. "
+                "Investigate topics, fact-check claims, and produce well-sourced reports."
             ),
             AgentRole.MEMORY: (
                 f"You are {self.name}, a memory specialist. "

@@ -4,8 +4,17 @@ import os
 import urllib.request
 import json
 
+# Load MLX model name from models.yaml (single source of truth)
+try:
+    from aria_models.loader import load_catalog
+    _cat = load_catalog()
+    _mlx_litellm = _cat.get("models", {}).get("qwen3-mlx", {}).get("litellm", {}).get("model", "")
+    _MLX_MODEL = _mlx_litellm.removeprefix("openai/") or "mlx-community/Qwen3-4B-Instruct-2507-4bit"
+except Exception:
+    _MLX_MODEL = "mlx-community/Qwen3-4B-Instruct-2507-4bit"
+
 data = json.dumps({
-    "model": "nightmedia/Qwen3-VLTO-8B-Instruct-qx86x-hi-mlx",
+    "model": _MLX_MODEL,
     "messages": [{"role": "user", "content": "Say hello in one short sentence"}],
     "max_tokens": 30
 }).encode()

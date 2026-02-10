@@ -5,12 +5,10 @@ Goal and task management skill.
 Handles goal creation, scheduling, and tracking.
 Persists via REST API (TICKET-12: eliminate in-memory stubs).
 """
-import os
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-import httpx
-
+from aria_skills.api_client import get_api_client
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
 from aria_skills.registry import SkillRegistry
 
@@ -29,8 +27,7 @@ class GoalSchedulerSkill(BaseSkill):
         super().__init__(config)
         self._goals: Dict[str, Dict] = {}  # fallback cache
         self._goal_counter = 0
-        self._api_url = os.environ.get('ARIA_API_URL', 'http://aria-api:8000/api')
-        self._client: Optional[httpx.AsyncClient] = None
+        self._api = None
     
     @property
     def name(self) -> str:
@@ -40,16 +37,14 @@ class GoalSchedulerSkill(BaseSkill):
         """Initialize goal scheduler."""
         self._max_active = self.config.config.get("max_active_goals", 10)
         self._default_priority = self.config.config.get("default_priority", 3)
-        self._client = httpx.AsyncClient(base_url=self._api_url, timeout=30.0)
+        self._api = await get_api_client()
         self._status = SkillStatus.AVAILABLE
         self.logger.info("Goal scheduler initialized (API-backed)")
         return True
     
     async def close(self):
-        """Close the httpx client."""
-        if self._client:
-            await self._client.aclose()
-            self._client = None
+        """Cleanup (shared API client is managed by api_client module)."""
+        self._api = None
     
     async def health_check(self) -> SkillStatus:
         """Check scheduler availability."""
@@ -105,7 +100,7 @@ class GoalSchedulerSkill(BaseSkill):
         # Always cache locally for fallback lookups
         self._goals[goal_id] = goal
         try:
-            resp = await self._client.post("/goals", json=goal)
+            resp = await self._api._client.post("/goals", json=goal)
             resp.raise_for_status()
             api_data = resp.json()
             # Merge API response with local goal data
@@ -157,7 +152,7 @@ class GoalSchedulerSkill(BaseSkill):
             update_data["notes"] = notes
         
         try:
-            resp = await self._client.put(f"/goals/{goal_id}", json=update_data)
+            resp = await self._api._client.patch(f"/goals/{goal_id}", json=update_data)
             resp.raise_for_status()
             api_data = resp.json()
             self._log_usage("update_goal", True)
@@ -197,7 +192,7 @@ class GoalSchedulerSkill(BaseSkill):
     async def get_goal(self, goal_id: str) -> SkillResult:
         """Get a specific goal."""
         try:
-            resp = await self._client.get(f"/goals/{goal_id}")
+            resp = await self._api._client.get(f"/goals/{goal_id}")
             resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:
@@ -233,7 +228,7 @@ class GoalSchedulerSkill(BaseSkill):
                 params["priority"] = priority
             if tag:
                 params["tag"] = tag
-            resp = await self._client.get("/goals", params=params)
+            resp = await self._api._client.get("/goals", params=params)
             resp.raise_for_status()
             api_data = resp.json()
             if isinstance(api_data, list):
@@ -262,7 +257,7 @@ class GoalSchedulerSkill(BaseSkill):
         Returns highest priority active goals that are due soonest.
         """
         try:
-            resp = await self._client.get("/goals", params={"status": "active", "limit": limit})
+            resp = await self._api._client.get("/goals", params={"status": "active", "limit": limit})
             resp.raise_for_status()
             api_data = resp.json()
             goals = api_data if isinstance(api_data, list) else api_data.get("goals", [])
@@ -297,7 +292,7 @@ class GoalSchedulerSkill(BaseSkill):
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
         try:
-            resp = await self._client.post(f"/goals/{parent_id}/subtasks", json=subtask)
+            resp = await self._api._client.post(f"/goals/{parent_id}/subtasks", json=subtask)
             resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:
@@ -312,7 +307,7 @@ class GoalSchedulerSkill(BaseSkill):
     async def complete_subtask(self, parent_id: str, subtask_id: str) -> SkillResult:
         """Mark a subtask as complete."""
         try:
-            resp = await self._client.put(
+            resp = await self._api._client.patch(
                 f"/goals/{parent_id}/subtasks/{subtask_id}",
                 json={"status": "completed", "completed_at": datetime.now(timezone.utc).isoformat()},
             )
@@ -336,7 +331,7 @@ class GoalSchedulerSkill(BaseSkill):
     async def get_summary(self) -> SkillResult:
         """Get goal summary statistics."""
         try:
-            resp = await self._client.get("/goals")
+            resp = await self._api._client.get("/goals")
             resp.raise_for_status()
             api_data = resp.json()
             goals = api_data if isinstance(api_data, list) else api_data.get("goals", [])

@@ -5,12 +5,10 @@ Job scheduling skill.
 Manages scheduled jobs and recurring tasks.
 Persists via REST API (TICKET-12: eliminate in-memory stubs).
 """
-import os
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Dict, List, Optional
 
-import httpx
-
+from aria_skills.api_client import get_api_client
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
 from aria_skills.registry import SkillRegistry
 
@@ -27,8 +25,7 @@ class ScheduleSkill(BaseSkill):
         super().__init__(config)
         self._jobs: Dict[str, Dict] = {}  # fallback cache
         self._job_counter = 0
-        self._api_url = os.environ.get('ARIA_API_URL', 'http://aria-api:8000/api')
-        self._client: Optional[httpx.AsyncClient] = None
+        self._api = None
     
     @property
     def name(self) -> str:
@@ -36,16 +33,14 @@ class ScheduleSkill(BaseSkill):
     
     async def initialize(self) -> bool:
         """Initialize scheduler."""
-        self._client = httpx.AsyncClient(base_url=self._api_url, timeout=30.0)
+        self._api = await get_api_client()
         self._status = SkillStatus.AVAILABLE
         self.logger.info("Schedule skill initialized (API-backed)")
         return True
     
     async def close(self):
-        """Close the httpx client."""
-        if self._client:
-            await self._client.aclose()
-            self._client = None
+        """Cleanup (shared API client is managed by api_client module)."""
+        self._api = None
     
     async def health_check(self) -> SkillStatus:
         """Check scheduler availability."""
@@ -90,7 +85,7 @@ class ScheduleSkill(BaseSkill):
         }
         
         try:
-            resp = await self._client.post("/schedule", json=job)
+            resp = await self._api._client.post("/schedule", json=job)
             resp.raise_for_status()
             api_data = resp.json()
             return SkillResult.ok(api_data if api_data else job)
@@ -102,7 +97,7 @@ class ScheduleSkill(BaseSkill):
     async def get_job(self, job_id: str) -> SkillResult:
         """Get a specific job."""
         try:
-            resp = await self._client.get(f"/schedule/{job_id}")
+            resp = await self._api._client.get(f"/schedule/{job_id}")
             resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:
@@ -117,7 +112,7 @@ class ScheduleSkill(BaseSkill):
             params: Dict[str, Any] = {}
             if enabled_only:
                 params["enabled"] = True
-            resp = await self._client.get("/schedule", params=params)
+            resp = await self._api._client.get("/schedule", params=params)
             resp.raise_for_status()
             api_data = resp.json()
             jobs = api_data if isinstance(api_data, list) else api_data.get("jobs", [])
@@ -142,7 +137,7 @@ class ScheduleSkill(BaseSkill):
     async def enable_job(self, job_id: str) -> SkillResult:
         """Enable a job."""
         try:
-            resp = await self._client.put(f"/schedule/{job_id}", json={"enabled": True})
+            resp = await self._api._client.put(f"/schedule/{job_id}", json={"enabled": True})
             resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:
@@ -156,7 +151,7 @@ class ScheduleSkill(BaseSkill):
     async def disable_job(self, job_id: str) -> SkillResult:
         """Disable a job."""
         try:
-            resp = await self._client.put(f"/schedule/{job_id}", json={"enabled": False})
+            resp = await self._api._client.put(f"/schedule/{job_id}", json={"enabled": False})
             resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:
@@ -170,7 +165,7 @@ class ScheduleSkill(BaseSkill):
     async def delete_job(self, job_id: str) -> SkillResult:
         """Delete a job."""
         try:
-            resp = await self._client.delete(f"/schedule/{job_id}")
+            resp = await self._api._client.delete(f"/schedule/{job_id}")
             resp.raise_for_status()
             return SkillResult.ok({"deleted": job_id})
         except Exception as e:
@@ -184,7 +179,7 @@ class ScheduleSkill(BaseSkill):
         """Get jobs that are due to run."""
         now = datetime.now(timezone.utc)
         try:
-            resp = await self._client.get("/schedule", params={"due": True})
+            resp = await self._api._client.get("/schedule", params={"due": True})
             resp.raise_for_status()
             api_data = resp.json()
             jobs = api_data if isinstance(api_data, list) else api_data.get("jobs", [])
@@ -216,7 +211,7 @@ class ScheduleSkill(BaseSkill):
             "last_success": success,
         }
         try:
-            resp = await self._client.put(f"/schedule/{job_id}", json=run_data)
+            resp = await self._api._client.put(f"/schedule/{job_id}", json=run_data)
             resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:

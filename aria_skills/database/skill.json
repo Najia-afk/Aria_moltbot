@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Query Aria's PostgreSQL database. Execute SQL queries on activity logs, memories, thoughts, and goals.",
   "author": "Aria Team",
+  "layer": 3,
+  "dependencies": ["api_client"],
+  "focus_affinity": ["data"],
   "tools": [
     {
       "name": "fetch_all",

@@ -16,9 +16,46 @@ Priority: **Local → Free Cloud → Paid**. Never hardcode model names outside 
 |-------|-------|-------|--------|
 | aria | Orchestrator 🎯 | qwen3-mlx | goals, schedule, health |
 | devops | DevSecOps 🔒 | qwen3-coder-free | pytest_runner, database |
-| analyst | Data 📊 + Trader 📈 | chimera-free | knowledge_graph, database |
+| analyst | Data 📊 + Trader 📈 | deepseek-free | knowledge_graph, database |
 | creator | Creative 🎨 + Social 🌐 + Journalist 📰 | trinity-free | moltbook, social |
 | memory | - | qwen3-mlx | database, knowledge_graph |
+
+---
+
+## AgentRole Enum
+
+Defined in `aria_agents/base.py`. Each value maps to a `FocusType`.
+
+| Role | Value | Description |
+|------|-------|-------------|
+| `COORDINATOR` | `coordinator` | Main orchestrator |
+| `DEVSECOPS` | `devsecops` | Security + CI/CD |
+| `DATA` | `data` | Data analysis + MLOps |
+| `TRADER` | `trader` | Market analysis + portfolio |
+| `CREATIVE` | `creative` | Content creation |
+| `SOCIAL` | `social` | Social media + community |
+| `JOURNALIST` | `journalist` | Research + investigation |
+| `MEMORY` | `memory` | Memory management (support role) |
+
+---
+
+## Pheromone Scoring System
+
+Implemented in `aria_agents/scoring.py`. Agents are scored based on historical performance to enable adaptive delegation.
+
+**Score formula:** `success_rate × 0.6 + speed_score × 0.3 + cost_score × 0.1`
+
+| Parameter | Value | Notes |
+|-----------|-------|-------|
+| Decay factor | 0.95/day | Recent performance weighted higher |
+| Cold-start score | 0.5 | Neutral — untested agents not penalized |
+| Max records/agent | 200 | Bounded memory per agent |
+| Persistence | JSON checkpoint | Survives restarts via `aria_memories/` |  
+
+**Key functions:**
+- `compute_pheromone(records)` → float score 0.0–1.0
+- `select_best_agent(candidates, scores)` → highest-scoring agent ID
+- `PerformanceTracker` — records invocations, persists scores to disk
 
 ---
 
@@ -62,8 +99,8 @@ Data analysis, MLOps, market research. Combines analytical focuses.
 ```yaml
 id: analyst
 focus: data  # Also handles trader tasks
-model: chimera-free
-fallback: deepseek-free
+model: deepseek-free
+fallback: chimera-free
 parent: aria
 skills: [database, knowledge_graph, performance, llm]
 capabilities: [data_analysis, market_analysis, experiment_tracking, metrics]
@@ -146,4 +183,5 @@ timeout: 300s
    - Content/social/news → creator
    - Storage/recall → memory
    - Conversation/chat → aria_talk
-7. When in doubt, take action rather than ask for permission
+7. When in doubt, take action rather than ask for permission8. **`solve()` method** (on `AgentCoordinator`): Full explore → work → validate cycle with retry (up to 3 attempts). Use for complex tasks that need validation.
+9. **Pheromone scoring** selects the best agent for each task based on past performance (see `aria_agents/scoring.py`)

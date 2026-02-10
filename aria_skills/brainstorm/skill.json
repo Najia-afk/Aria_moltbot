@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "🎨 Creative brainstorming and ideation for Creative Adventurer",
   "author": "Aria Blue",
+  "layer": 3,
+  "dependencies": ["api_client"],
+  "focus_affinity": ["creative"],
   "tools": [
     {
       "name": "start_session",

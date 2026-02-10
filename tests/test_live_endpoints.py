@@ -4,7 +4,7 @@ TICKET-33 · Live API Endpoint Tests
 Integration tests for every REST endpoint in aria-api (FastAPI, port 8000).
 
 • Connects to a running aria-api instance (default: localhost:8000).
-• Override with env var  ARIA_API_URL=http://192.168.1.53:8000
+• Override with env var  ARIA_API_URL=http://<MAC_HOST>:8000
 • All tests are marked @pytest.mark.integration and auto-skip when the API
   is unreachable — perfectly safe to include in CI on every push.
 

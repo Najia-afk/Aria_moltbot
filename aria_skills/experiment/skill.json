@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "🧪 ML experiment tracking and model management for Data Architect",
   "author": "Aria Blue",
+  "layer": 3,
+  "dependencies": ["api_client"],
+  "focus_affinity": ["data"],
   "tools": [
     {
       "name": "create_experiment",

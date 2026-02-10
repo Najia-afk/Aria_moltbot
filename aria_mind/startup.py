@@ -20,10 +20,32 @@ logging.basicConfig(
 logger = logging.getLogger("aria.startup")
 
 
+def validate_env():
+    """Warn on missing critical environment variables."""
+    required = {
+        "DB_PASSWORD": "Database will fail to authenticate",
+        "LITELLM_MASTER_KEY": "LLM proxy auth will fail",
+    }
+    recommended = [
+        "WEB_SECRET_KEY", "CLAWDBOT_TOKEN", "BRAVE_API_KEY",
+        "CORS_ALLOWED_ORIGINS", "MAC_HOST",
+    ]
+    for var, impact in required.items():
+        val = os.getenv(var, "")
+        if not val or val in ("admin", "sk-change-me", "aria-dev-secret-key", "default-clawdbot-token"):
+            logger.error(f"MISSING/INSECURE REQUIRED: {var} — {impact}")
+    for var in recommended:
+        if not os.getenv(var):
+            logger.warning(f"MISSING RECOMMENDED: {var}")
+
+
 async def run_startup():
     """Execute Aria's startup sequence."""
-    from aria_mind.logging_config import configure_logging
+    from aria_mind.logging_config import configure_logging, correlation_id_var, new_correlation_id
     configure_logging()
+    correlation_id_var.set(new_correlation_id())
+
+    validate_env()
 
     print("=" * 60)
     print("⚡️ ARIA BLUE - AWAKENING SEQUENCE")
@@ -61,6 +83,13 @@ async def run_startup():
             except Exception as e:
                 skills_status[skill_name] = f"error: {e}"
                 print(f"   ✗ {skill_name}: {e}")
+
+    # Save skill catalog for runtime discovery
+    try:
+        from aria_skills.catalog import save_catalog
+        save_catalog()
+    except Exception as e:
+        logger.debug(f"Skill catalog save failed: {e}")
     
     # =========================================================================
     # Phase 2: Initialize Mind
@@ -267,24 +296,7 @@ async def run_forever():
         while True:
             heartbeat_count += 1
             
-            # Log heartbeat to database
-            if db and db.is_available:
-                try:
-                    await db.execute(
-                        """
-                        INSERT INTO heartbeat_log (beat_number, status, details)
-                        VALUES ($1, $2, $3)
-                        """,
-                        heartbeat_count,
-                        "alive",
-                        json.dumps({
-                            "timestamp": datetime.now(timezone.utc).isoformat(),
-                            "mind_alive": mind.is_alive,
-                            "soul": mind.soul.name if mind.soul else None,
-                        }),
-                    )
-                except Exception as e:
-                    logger.debug(f"Heartbeat log failed: {e}")
+            # Heartbeat DB logging now handled by heartbeat.py via api_client
             
             if heartbeat_count % 60 == 0:  # Every hour (60 * 60s)
                 logger.info(f"💓 Heartbeat #{heartbeat_count} - Aria is alive")
@@ -306,20 +318,20 @@ async def run_forever():
                     print(f"   ⚠ Working memory checkpoint failed: {ckpt_result.error}")
             except Exception as e:
                 logger.debug(f"WM checkpoint on shutdown failed: {e}")
-        if db and db.is_available:
-            try:
-                await db.execute(
-                    """
-                    INSERT INTO activity_log (action, skill, details, success)
-                    VALUES ($1, $2, $3, $4)
-                    """,
-                    "shutdown",
-                    "system",
-                    json.dumps({"heartbeats": heartbeat_count, "timestamp": datetime.now(timezone.utc).isoformat()}),
-                    True,
+        # Shutdown logging now handled via api_client
+        try:
+            from aria_skills.api_client import get_api_client
+            api = await get_api_client()
+            if api:
+                await api.create_activity(
+                    action="shutdown",
+                    skill="system",
+                    details={"heartbeats": heartbeat_count, "timestamp": datetime.now(timezone.utc).isoformat()},
+                    success=True,
                 )
-            except Exception:
-                pass
+        except Exception:
+            pass
+        await mind.shutdown()
         print("👋 Goodbye.")
 
 

@@ -4,7 +4,8 @@ Cognitive Pipeline Engine — executes multi-step skill workflows.
 
 Responsibilities:
 - Topological sort of steps by depends_on (cycle detection)
-- Sequential execution with shared context dict
+- **Parallel execution** of independent DAG branches
+- Sequential execution for dependent steps
 - Template resolution: {{context.step_name.field}} in params
 - Failure handling: stop / skip / retry:N / fallback:skill.method
 - Per-step timeout via asyncio.wait_for
@@ -133,7 +134,13 @@ class PipelineExecutor:
     # ── public API ──────────────────────────────────────────────────────
 
     async def execute(self, pipeline: Pipeline) -> PipelineResult:
-        """Run every step of *pipeline* and return a PipelineResult."""
+        """
+        Run every step of *pipeline* with parallel execution of independent branches.
+        
+        Steps with no unresolved dependencies run concurrently.
+        Steps that depend on others wait until their dependencies complete.
+        This significantly speeds up pipelines with independent branches.
+        """
         pipeline.status = StepStatus.RUNNING
         pipeline.created_at = datetime.now(timezone.utc).isoformat()
         errors: List[str] = []
@@ -150,55 +157,88 @@ class PipelineExecutor:
                 errors=[str(exc)],
             )
 
-        for step in ordered:
-            # ── Condition check ──────────────────────────────────────
-            if step.condition and not self._evaluate_condition(
-                step.condition, pipeline.context
-            ):
-                step.status = StepStatus.SKIPPED
-                logger.info(
-                    "Step '%s' skipped (condition false)", step.name
-                )
-                continue
+        # Build dependency tracking for parallel execution
+        step_map: Dict[str, PipelineStep] = {s.name: s for s in ordered}
+        completed_steps: set = set()
+        failed_stop = False
 
-            # ── Execute step ─────────────────────────────────────────
-            success = await self._execute_step(step, pipeline.context)
-            step_results[step.name] = step.result
-
-            if success:
-                pipeline.context[step.name] = step.result
+        # Execute in waves: each wave contains steps whose deps are all satisfied
+        remaining = list(ordered)
+        
+        while remaining and not failed_stop:
+            # Find all steps whose dependencies are satisfied
+            ready = []
+            not_ready = []
+            for step in remaining:
+                if all(dep in completed_steps for dep in step.depends_on):
+                    ready.append(step)
+                else:
+                    not_ready.append(step)
+            
+            if not ready:
+                # Deadlock — deps can't be satisfied (shouldn't happen after topo sort)
+                errors.append("Deadlock: no steps ready but dependencies unsatisfied")
+                break
+            
+            # Execute ready steps in parallel
+            if len(ready) == 1:
+                # Single step — run directly (no async overhead)
+                step = ready[0]
+                success = await self._execute_single_step(step, pipeline, errors)
+                if success:
+                    step_results[step.name] = step.result
+                    completed_steps.add(step.name)
+                else:
+                    strategy, _ = _parse_on_failure(step.on_failure)
+                    if strategy == "stop":
+                        failed_stop = True
+                    else:
+                        completed_steps.add(step.name)  # Mark as done even if skipped
             else:
-                errors.append(f"{step.name}: {step.error}")
-                strategy, arg = _parse_on_failure(step.on_failure)
-
-                if strategy == "stop":
-                    logger.error(
-                        "Pipeline '%s' stopped at step '%s': %s",
-                        pipeline.name, step.name, step.error,
-                    )
-                    break
-                elif strategy == "skip":
-                    logger.warning(
-                        "Step '%s' failed but skipped: %s",
-                        step.name, step.error,
-                    )
-                    continue
-                # retry and fallback are handled inside _execute_step
+                # Multiple independent steps — run in parallel!
+                logger.info(
+                    "Parallel wave: executing %d independent steps: %s",
+                    len(ready), [s.name for s in ready],
+                )
+                
+                async def _run_step(s: PipelineStep):
+                    return s, await self._execute_single_step(s, pipeline, errors)
+                
+                results = await asyncio.gather(
+                    *[_run_step(s) for s in ready],
+                    return_exceptions=True,
+                )
+                
+                for result in results:
+                    if isinstance(result, Exception):
+                        errors.append(f"Parallel execution error: {result}")
+                        continue
+                    
+                    step, success = result
+                    if success:
+                        step_results[step.name] = step.result
+                        completed_steps.add(step.name)
+                    else:
+                        strategy, _ = _parse_on_failure(step.on_failure)
+                        if strategy == "stop":
+                            failed_stop = True
+                            break
+                        else:
+                            completed_steps.add(step.name)
+            
+            remaining = not_ready
 
         total_ms = int((time.monotonic() - total_start) * 1000)
         pipeline.total_duration_ms = total_ms
         pipeline.completed_at = datetime.now(timezone.utc).isoformat()
 
         # Compute step counts
-        completed = sum(1 for s in ordered if s.status == StepStatus.SUCCESS)
-        failed = sum(1 for s in ordered if s.status == StepStatus.FAILED)
-        skipped = sum(1 for s in ordered if s.status == StepStatus.SKIPPED)
+        all_steps = pipeline.steps
+        completed = sum(1 for s in all_steps if s.status == StepStatus.SUCCESS)
+        failed = sum(1 for s in all_steps if s.status == StepStatus.FAILED)
+        skipped = sum(1 for s in all_steps if s.status == StepStatus.SKIPPED)
 
-        if errors and any(
-            s.status == StepStatus.FAILED
-            and _parse_on_failure(s.on_failure)[0] == "stop"
-            for s in ordered
-        ):
+        if failed_stop:
             pipeline.status = StepStatus.FAILED
         else:
             pipeline.status = StepStatus.SUCCESS
@@ -214,6 +254,43 @@ class PipelineExecutor:
             errors=errors,
             context=dict(pipeline.context),
         )
+
+    async def _execute_single_step(
+        self,
+        step: PipelineStep,
+        pipeline: Pipeline,
+        errors: List[str],
+    ) -> bool:
+        """Execute a single step with condition check, handling errors list."""
+        # Condition check
+        if step.condition and not self._evaluate_condition(
+            step.condition, pipeline.context
+        ):
+            step.status = StepStatus.SKIPPED
+            logger.info("Step '%s' skipped (condition false)", step.name)
+            return True  # Skipped counts as "not a failure"
+
+        success = await self._execute_step(step, pipeline.context)
+        
+        if success:
+            pipeline.context[step.name] = step.result
+        else:
+            errors.append(f"{step.name}: {step.error}")
+            strategy, _ = _parse_on_failure(step.on_failure)
+            if strategy == "skip":
+                logger.warning(
+                    "Step '%s' failed but skipped: %s",
+                    step.name, step.error,
+                )
+                return True  # Skipped
+            elif strategy == "stop":
+                logger.error(
+                    "Pipeline '%s' stopped at step '%s': %s",
+                    pipeline.name, step.name, step.error,
+                )
+                return False
+        
+        return success
 
     # ── internals ───────────────────────────────────────────────────────
 

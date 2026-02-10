@@ -1,17 +1,98 @@
 {
   "name": "agent_manager",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Runtime agent lifecycle management — spawn, monitor, terminate, prune sessions",
   "author": "Aria Blue",
-  "capabilities": [
-    "list_agents",
-    "spawn_agent",
-    "terminate_agent",
-    "get_agent_stats",
-    "prune_stale_sessions",
-    "get_performance_report"
-  ],
-  "dependencies": ["httpx"],
+  "layer": 3,
+  "dependencies": ["api_client", "session_manager"],
+  "focus_affinity": ["orchestrator"],
   "config_keys": ["api_url"],
-  "api_backed": true
+  "api_backed": true,
+  "tools": [
+    {
+      "name": "list_agents",
+      "description": "List agent sessions, optionally filtered by status or agent_id.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "Filter by agent status" },
+          "agent_id": { "type": "string", "description": "Filter by agent ID" },
+          "limit": { "type": "integer", "description": "Max results (default: 50)" }
+        }
+      }
+    },
+    {
+      "name": "spawn_agent",
+      "description": "Spawn a new agent session with context protocol.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "agent_type": { "type": "string", "description": "Type of agent to spawn" },
+          "context": { "type": "object", "description": "Initial context for the agent" }
+        },
+        "required": ["agent_type"]
+      }
+    },
+    {
+      "name": "terminate_agent",
+      "description": "Gracefully terminate an agent session.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "session_id": { "type": "string", "description": "Session ID to terminate" }
+        },
+        "required": ["session_id"]
+      }
+    },
+    {
+      "name": "get_agent_stats",
+      "description": "Get usage metrics for a specific agent session.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "session_id": { "type": "string", "description": "Session ID to get stats for" }
+        },
+        "required": ["session_id"]
+      }
+    },
+    {
+      "name": "prune_stale_sessions",
+      "description": "Bulk cleanup of stale agent sessions.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "max_age_hours": { "type": "number", "description": "Max age in hours (default: 24)" }
+        }
+      }
+    },
+    {
+      "name": "get_performance_report",
+      "description": "Generate aggregate performance metrics across all agents.",
+      "input_schema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "get_agent_health",
+      "description": "Check all active agents, their status, uptime, and recent performance.",
+      "input_schema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "spawn_focused_agent",
+      "description": "Spawn a sub-agent with scoped context and limited tool set.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "task": { "type": "string", "description": "Task description for the sub-agent" },
+          "focus": { "type": "string", "description": "Focus area (research, devsecops, creative, etc.)" },
+          "tools": { "type": "array", "items": { "type": "string" }, "description": "List of allowed tool/skill names" }
+        },
+        "required": ["task", "focus", "tools"]
+      }
+    }
+  ]
 }

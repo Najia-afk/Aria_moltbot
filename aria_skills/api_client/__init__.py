@@ -859,6 +859,88 @@ class AriaAPIClient(BaseSkill):
             return SkillResult.fail(f"Failed to get provider balances: {e}")
 
     # ========================================
+    # Working Memory
+    # ========================================
+    async def remember(self, key: str, value: Any, category: str = "general",
+                       importance: float = 0.5, ttl_hours: Optional[int] = None,
+                       source: Optional[str] = None) -> SkillResult:
+        """Store a working memory item."""
+        try:
+            resp = await self._client.post("/working-memory", json={
+                "key": key, "value": value, "category": category,
+                "importance": importance, "ttl_hours": ttl_hours, "source": source,
+            })
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to store working memory: {e}")
+
+    async def recall(self, key: Optional[str] = None,
+                     category: Optional[str] = None,
+                     limit: int = 50) -> SkillResult:
+        """Retrieve working memory items."""
+        try:
+            params: Dict[str, Any] = {"limit": limit}
+            if key:
+                params["key"] = key
+            if category:
+                params["category"] = category
+            resp = await self._client.get("/working-memory", params=params)
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to recall working memory: {e}")
+
+    async def get_working_memory_context(self, limit: int = 20,
+                                          category: Optional[str] = None) -> SkillResult:
+        """Get weighted-ranked context for LLM injection."""
+        try:
+            params: Dict[str, Any] = {"limit": limit}
+            if category:
+                params["category"] = category
+            resp = await self._client.get("/working-memory/context", params=params)
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to get working memory context: {e}")
+
+    async def working_memory_checkpoint(self) -> SkillResult:
+        """Snapshot current working memory."""
+        try:
+            resp = await self._client.post("/working-memory/checkpoint", json={})
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to checkpoint working memory: {e}")
+
+    async def restore_working_memory_checkpoint(self) -> SkillResult:
+        """Restore from latest working memory checkpoint."""
+        try:
+            resp = await self._client.get("/working-memory/checkpoint")
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to restore checkpoint: {e}")
+
+    async def forget_working_memory(self, item_id: str) -> SkillResult:
+        """Delete a working memory item."""
+        try:
+            resp = await self._client.delete(f"/working-memory/{item_id}")
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to forget working memory item: {e}")
+
+    async def update_working_memory(self, item_id: str, **kwargs) -> SkillResult:
+        """Update a working memory item."""
+        try:
+            resp = await self._client.patch(f"/working-memory/{item_id}", json=kwargs)
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to update working memory item: {e}")
+
+    # ========================================
     # Generic / Raw
     # ========================================
     async def get(self, path: str, params: Optional[Dict] = None) -> SkillResult:
@@ -896,6 +978,24 @@ class AriaAPIClient(BaseSkill):
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"DELETE {path} failed: {e}")
+
+    # ── Performance logging (S-21) ──────────────────────────────────
+
+    async def log_agent_performance(self, data: dict) -> SkillResult:
+        """POST agent performance record to aria-api."""
+        return await self.post("/performance", data=data)
+
+    async def get_agent_performance(
+        self, agent_id: Optional[str] = None, limit: int = 100
+    ) -> list:
+        """GET agent performance records, optionally filtered by agent."""
+        params: Dict[str, Any] = {"limit": limit}
+        if agent_id:
+            params["agent_id"] = agent_id
+        result = await self.get("/performance", params=params)
+        if result.success:
+            return result.data.get("records", []) if isinstance(result.data, dict) else []
+        return []
 
 
 # Singleton instance for convenience

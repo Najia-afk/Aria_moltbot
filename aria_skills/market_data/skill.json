@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "📈 Cryptocurrency market data and analysis for Crypto Trader",
   "author": "Aria Blue",
+  "layer": 3,
+  "dependencies": ["api_client"],
+  "focus_affinity": ["trader"],
   "tools": [
     {
       "name": "get_price",

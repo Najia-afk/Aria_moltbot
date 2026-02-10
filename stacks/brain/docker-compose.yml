@@ -58,6 +58,8 @@ services:
       OPENCLAW_GATEWAY_TOKEN: ${CLAWDBOT_TOKEN:-default-clawdbot-token}
       OPENCLAW_NO_ONBOARD: "1"
       OPENCLAW_NO_PROMPT: "1"
+      # Custom system prompt for Aria (S-27)
+      OPENCLAW_SYSTEM_PROMPT_FILE: "/root/.openclaw/system_prompt.txt"
       # Remote browser (aria-browser container via CDP)
       BROWSER_CDP_URL: http://aria-browser:3000
       # LiteLLM credentials for local model routing
@@ -103,6 +105,8 @@ services:
       - ./openclaw-entrypoint.sh:/openclaw-entrypoint.sh:ro
       # Mount OpenClaw config template
       - ./openclaw-config.json:/root/.openclaw/openclaw-config-template.json:ro
+      # Custom system prompt for Aria (S-27)
+      - ../../prompts/system_prompt.txt:/root/.openclaw/system_prompt.txt:ro
     ports:
       - "18789:18789"
     depends_on:
@@ -430,6 +434,28 @@ services:
     cpus: ${ARIA_API_CPU_LIMIT:-0.5}
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
+  # Aria Sandbox — isolated code execution environment (S-29)
+  # Used by sandbox skill (aria_skills/sandbox/__init__.py) via httpx on port 9999
+  aria-sandbox:
+    build:
+      context: ../sandbox
+      dockerfile: Dockerfile
+    container_name: aria-sandbox
+    restart: unless-stopped
+    profiles: ["sandbox"]
+    environment:
+      SANDBOX_PORT: "9999"
+      SANDBOX_TIMEOUT: "60"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+    networks:
+      - aria-net
+    mem_limit: 512m
+    cpus: 1.0
 
 volumes:
   aria_pg_data:

@@ -36,7 +36,10 @@ if MLX_ENABLED:
     )
 
 # ── Admin / Service control ──────────────────────────────────────────────────
-ARIA_ADMIN_TOKEN = os.getenv("ARIA_ADMIN_TOKEN", "")
+ARIA_ADMIN_TOKEN = os.getenv("ARIA_ADMIN_TOKEN")
+if not ARIA_ADMIN_TOKEN:
+    import logging as _logging
+    _logging.getLogger("aria.api").warning("ARIA_ADMIN_TOKEN not set — admin endpoints will reject all requests")
 SERVICE_CONTROL_ENABLED = os.getenv(
     "ARIA_SERVICE_CONTROL_ENABLED", "false"
 ).lower() in {"1", "true", "yes"}

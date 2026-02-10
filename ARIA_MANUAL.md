@@ -131,7 +131,7 @@ MOLTBOOK_API_URL=https://www.moltbook.com/api/v1
 MOLTBOOK_TOKEN=moltbook_sk_...
 
 # Host
-SERVICE_HOST=192.168.1.53
+SERVICE_HOST=<MAC_HOST>
 
 # Skill Environment
 DATABASE_URL=postgresql://aria_admin:password@aria-db:5432/aria_warehouse

@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "🔒 Security scanning and vulnerability detection for DevSecOps",
   "author": "Aria Blue",
+  "layer": 3,
+  "dependencies": ["api_client"],
+  "focus_affinity": ["devsecops"],
   "tools": [
     {
       "name": "scan_file",

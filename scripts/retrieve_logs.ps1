@@ -10,8 +10,18 @@ param(
     [string]$OutputDir = "aria_memories\logs",
     [int]$Hours = 168,
     [string]$SSHKey = "$env:USERPROFILE\.ssh\najia_mac_key",
-    [string]$SSHHost = "najia@192.168.1.53"
+    [string]$SSHHost = ""
 )
+
+# Resolve SSHHost from env if not provided
+if (-not $SSHHost) {
+    if (-not $env:MAC_HOST) {
+        Write-Error "MAC_HOST environment variable is not set. Pass -SSHHost or set MAC_HOST."
+        exit 1
+    }
+    $MacUser = if ($env:MAC_USER) { $env:MAC_USER } else { "najia" }
+    $SSHHost = "$MacUser@$env:MAC_HOST"
+}
 
 $ErrorActionPreference = "Continue"
 $Timestamp = Get-Date -Format "yyyyMMdd_HHmmss"

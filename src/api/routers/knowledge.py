@@ -16,9 +16,10 @@ router = APIRouter(tags=["Knowledge Graph"])
 
 
 @router.get("/knowledge-graph")
-async def get_knowledge_graph(db: AsyncSession = Depends(get_db)):
+async def get_knowledge_graph(limit: int = 500, offset: int = 0, db: AsyncSession = Depends(get_db)):
     entities = (await db.execute(
         select(KnowledgeEntity).order_by(KnowledgeEntity.created_at.desc())
+        .limit(limit).offset(offset)
     )).scalars().all()
 
     # Relations with entity names via subquery / manual join
@@ -34,6 +35,7 @@ async def get_knowledge_graph(db: AsyncSession = Depends(get_db)):
         .join(E1, KnowledgeRelation.from_entity == E1.id)
         .join(E2, KnowledgeRelation.to_entity == E2.id)
         .order_by(KnowledgeRelation.created_at.desc())
+        .limit(limit).offset(offset)
     )
     relation_rows = relations_result.all()
 
@@ -57,10 +59,11 @@ async def get_knowledge_graph(db: AsyncSession = Depends(get_db)):
 @router.get("/knowledge-graph/entities")
 async def get_knowledge_entities(
     limit: int = 100,
+    offset: int = 0,
     type: str = None,
     db: AsyncSession = Depends(get_db),
 ):
-    stmt = select(KnowledgeEntity).order_by(KnowledgeEntity.created_at.desc()).limit(limit)
+    stmt = select(KnowledgeEntity).order_by(KnowledgeEntity.created_at.desc()).limit(limit).offset(offset)
     if type:
         stmt = stmt.where(KnowledgeEntity.type == type)
     result = await db.execute(stmt)

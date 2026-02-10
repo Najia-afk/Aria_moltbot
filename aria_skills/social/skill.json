@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Manage Aria's social presence and posts on Moltbook and other platforms.",
   "author": "Aria Team",
+  "layer": 3,
+  "dependencies": ["api_client", "moltbook"],
+  "focus_affinity": ["social", "creative"],
   "tools": [
     {
       "name": "social_post",

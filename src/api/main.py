@@ -8,6 +8,9 @@ Modular API with:
   • Prometheus instrumentation
 """
 
+import logging
+import os
+import time as _time
 import uuid as _uuid
 from contextlib import asynccontextmanager
 
@@ -66,9 +69,13 @@ app = FastAPI(
 
 # ── Middleware ────────────────────────────────────────────────────────────────
 
+_CORS_ORIGINS = os.getenv(
+    "CORS_ALLOWED_ORIGINS", "http://localhost:5000,http://aria-web:5000"
+).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -88,6 +95,22 @@ app.add_middleware(
 )
 
 Instrumentator().instrument(app).expose(app)
+
+_perf_logger = logging.getLogger("aria.perf")
+
+
+@app.middleware("http")
+async def request_timing_middleware(request, call_next):
+    start = _time.perf_counter()
+    response = await call_next(request)
+    elapsed_ms = (_time.perf_counter() - start) * 1000
+    response.headers["X-Response-Time-Ms"] = f"{elapsed_ms:.1f}"
+    if elapsed_ms > 100:
+        _perf_logger.warning(
+            "Slow request: %s %s took %.1fms (status=%s)",
+            request.method, request.url.path, elapsed_ms, response.status_code,
+        )
+    return response
 
 
 @app.middleware("http")
@@ -131,6 +154,7 @@ from routers.records import router as records_router
 from routers.admin import router as admin_router
 from routers.models_config import router as models_config_router
 from routers.working_memory import router as working_memory_router
+from routers.skills import router as skills_router
 
 app.include_router(health_router)
 app.include_router(activities_router)
@@ -149,6 +173,7 @@ app.include_router(records_router)
 app.include_router(admin_router)
 app.include_router(models_config_router)
 app.include_router(working_memory_router)
+app.include_router(skills_router)
 
 # ── GraphQL ──────────────────────────────────────────────────────────────────
 

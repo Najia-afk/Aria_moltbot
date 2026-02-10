@@ -1,0 +1,25 @@
+{
+  "name": "aria-template",
+  "version": "1.0.0",
+  "description": "TODO: Short human-readable description of the skill.",
+  "author": "Aria Team",
+  "layer": 3,
+  "dependencies": ["api_client"],
+  "focus_affinity": ["orchestrator"],
+  "tools": [
+    {
+      "name": "do_something",
+      "description": "TODO: Describe what this tool does and when to use it.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "param": {
+            "type": "string",
+            "description": "TODO: Describe this parameter."
+          }
+        },
+        "required": ["param"]
+      }
+    }
+  ]
+}

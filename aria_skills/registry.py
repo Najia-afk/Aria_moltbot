@@ -77,7 +77,13 @@ class SkillRegistry:
             if config.enabled and config.name in self._skill_classes:
                 skill_class = self._skill_classes[config.name]
                 skill = skill_class(config)
-                if await skill.initialize():
+                # Pass the live registry to PipelineSkill so it can
+                # invoke other skills instead of using an empty registry.
+                if config.name == "pipeline":
+                    init_ok = await skill.initialize(registry=self)
+                else:
+                    init_ok = await skill.initialize()
+                if init_ok:
                     self._skills[config.name] = skill
                     self._skills[skill.canonical_name] = skill  # canonical alias
                     loaded += 1

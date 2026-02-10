@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Centralized HTTP client for all aria-api interactions. Use for activities, thoughts, memories, goals, knowledge graph, social posts, heartbeats, performance logs, and tasks.",
   "author": "Aria Team",
+  "layer": 1,
+  "dependencies": [],
+  "focus_affinity": ["orchestrator"],
   "tools": [
     {
       "name": "get_activities",

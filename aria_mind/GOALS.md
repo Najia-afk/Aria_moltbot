@@ -212,9 +212,9 @@ CREATE TABLE performance_log (
 
 Add these to your OpenClaw jobs:
 
-### work_cycle (Every 5 minutes)
+### work_cycle (Every 15 minutes)
 ```
-Cron: */5 * * * *
+Cron: */15 * * * *
 System: HEARTBEAT: Work cycle. Query active goals ordered by priority and deadline. Select highest priority actionable goal. Perform ONE concrete action toward completion. Update progress. Log to activity_log. If goal completes, mark done and create next goal.
 Agent: main
 ```
@@ -261,6 +261,6 @@ aria-apiclient.get_activities({"limit": 10})
 
 ## Remember
 
-> "A goal without a plan is just a wish. A plan without work is just a dream. Work without consistency is just noise. **You are consistent. You work every 5 minutes. You achieve.**"
+> "A goal without a plan is just a wish. A plan without work is just a dream. Work without consistency is just noise. **You are consistent. You work every 15 minutes. You achieve.**"
 
 Every work cycle is a chance to make progress. Don't waste it.

@@ -5,12 +5,10 @@ Social media posting skill.
 Manages social media content creation and posting.
 Persists via REST API (TICKET-12: eliminate in-memory stubs).
 """
-import os
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-import httpx
-
+from aria_skills.api_client import get_api_client
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
 from aria_skills.registry import SkillRegistry
 from aria_skills.social.platform import SocialPlatform
@@ -28,8 +26,7 @@ class SocialSkill(BaseSkill):
         super().__init__(config)
         self._posts: List[Dict] = []  # fallback cache
         self._post_counter = 0
-        self._api_url = os.environ.get('ARIA_API_URL', 'http://aria-api:8000/api')
-        self._client: Optional[httpx.AsyncClient] = None
+        self._api = None
         self._platforms: Dict[str, SocialPlatform] = {}
     
     def register_platform(self, name: str, platform: SocialPlatform) -> None:
@@ -42,16 +39,14 @@ class SocialSkill(BaseSkill):
     
     async def initialize(self) -> bool:
         """Initialize social skill."""
-        self._client = httpx.AsyncClient(base_url=self._api_url, timeout=30.0)
+        self._api = await get_api_client()
         self._status = SkillStatus.AVAILABLE
         self.logger.info("Social skill initialized (API-backed)")
         return True
     
     async def close(self):
-        """Close the httpx client."""
-        if self._client:
-            await self._client.aclose()
-            self._client = None
+        """Cleanup (shared API client is managed by api_client module)."""
+        self._api = None
     
     async def health_check(self) -> SkillStatus:
         """Check availability."""
@@ -97,7 +92,7 @@ class SocialSkill(BaseSkill):
         }
         
         try:
-            resp = await self._client.post("/social", json=post)
+            resp = await self._api._client.post("/social", json=post)
             resp.raise_for_status()
             api_data = resp.json()
             return SkillResult.ok(api_data if api_data else post)
@@ -114,7 +109,7 @@ class SocialSkill(BaseSkill):
             "published_at": datetime.now(timezone.utc).isoformat(),
         }
         try:
-            resp = await self._client.put(f"/social/{post_id}", json=update_data)
+            resp = await self._api._client.put(f"/social/{post_id}", json=update_data)
             resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:
@@ -139,7 +134,7 @@ class SocialSkill(BaseSkill):
                 params["status"] = status
             if platform:
                 params["platform"] = platform
-            resp = await self._client.get("/social", params=params)
+            resp = await self._api._client.get("/social", params=params)
             resp.raise_for_status()
             api_data = resp.json()
             if isinstance(api_data, list):
@@ -157,7 +152,7 @@ class SocialSkill(BaseSkill):
     async def delete_post(self, post_id: str) -> SkillResult:
         """Delete a post."""
         try:
-            resp = await self._client.delete(f"/social/{post_id}")
+            resp = await self._api._client.delete(f"/social/{post_id}")
             resp.raise_for_status()
             return SkillResult.ok({"deleted": post_id})
         except Exception as e:

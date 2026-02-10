@@ -5,12 +5,10 @@ Performance logging skill.
 Tracks and logs Aria's performance metrics.
 Persists via REST API (TICKET-12: eliminate in-memory stubs).
 """
-import os
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-import httpx
-
+from aria_skills.api_client import get_api_client
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
 from aria_skills.registry import SkillRegistry
 
@@ -26,8 +24,7 @@ class PerformanceSkill(BaseSkill):
     def __init__(self, config: SkillConfig):
         super().__init__(config)
         self._logs: List[Dict] = []  # fallback cache
-        self._api_url = os.environ.get('ARIA_API_URL', 'http://aria-api:8000/api')
-        self._client: Optional[httpx.AsyncClient] = None
+        self._api = None
     
     @property
     def name(self) -> str:
@@ -35,16 +32,14 @@ class PerformanceSkill(BaseSkill):
     
     async def initialize(self) -> bool:
         """Initialize performance skill."""
-        self._client = httpx.AsyncClient(base_url=self._api_url, timeout=30.0)
+        self._api = await get_api_client()
         self._status = SkillStatus.AVAILABLE
         self.logger.info("Performance skill initialized (API-backed)")
         return True
     
     async def close(self):
-        """Close the httpx client."""
-        if self._client:
-            await self._client.aclose()
-            self._client = None
+        """Cleanup (shared API client is managed by api_client module)."""
+        self._api = None
     
     async def health_check(self) -> SkillStatus:
         """Check availability."""
@@ -78,7 +73,7 @@ class PerformanceSkill(BaseSkill):
         }
         
         try:
-            resp = await self._client.post("/performance", json=log)
+            resp = await self._api._client.post("/performance", json=log)
             resp.raise_for_status()
             api_data = resp.json()
             return SkillResult.ok(api_data if api_data else log)
@@ -91,7 +86,7 @@ class PerformanceSkill(BaseSkill):
     async def get_reviews(self, limit: int = 10) -> SkillResult:
         """Get recent performance reviews."""
         try:
-            resp = await self._client.get("/performance", params={"limit": limit})
+            resp = await self._api._client.get("/performance", params={"limit": limit})
             resp.raise_for_status()
             api_data = resp.json()
             if isinstance(api_data, list):
@@ -107,7 +102,7 @@ class PerformanceSkill(BaseSkill):
     async def get_improvement_summary(self) -> SkillResult:
         """Summarize improvement areas across reviews."""
         try:
-            resp = await self._client.get("/performance")
+            resp = await self._api._client.get("/performance")
             resp.raise_for_status()
             api_data = resp.json()
             logs = api_data if isinstance(api_data, list) else api_data.get("reviews", [])

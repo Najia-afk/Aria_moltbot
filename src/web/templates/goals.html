@@ -54,6 +54,16 @@
     </div>
 </div>
 
+<!-- Goal Category Chart -->
+<div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+        <h3>Goal Category Balance</h3>
+    </div>
+    <div class="card-body" style="display: flex; justify-content: center; padding: 1.5rem;">
+        <canvas id="goalCategoryChart" width="350" height="350"></canvas>
+    </div>
+</div>
+
 <!-- Filters -->
 <div class="filters">
     <div class="search-box">
@@ -845,6 +855,49 @@ textarea.form-input {
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+async function loadGoalCategoryChart() {
+    const CATEGORIES = ['Learn', 'Create', 'Connect', 'Reflect', 'Optimize', 'Help'];
+    const COLORS = ['#7c3aed', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899'];
+    try {
+        const resp = await fetch(`${API_BASE_URL}/hourly-goals`);
+        const data = await resp.json();
+        const goals = data.goals || data || [];
+        const counts = {};
+        CATEGORIES.forEach(c => counts[c] = 0);
+        (Array.isArray(goals) ? goals : []).forEach(g => {
+            const type = (g.goal_type || '').toLowerCase();
+            const matched = CATEGORIES.find(c => type.includes(c.toLowerCase()));
+            if (matched) counts[matched]++;
+        });
+        const ctx = document.getElementById('goalCategoryChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: CATEGORIES,
+                datasets: [{
+                    data: CATEGORIES.map(c => counts[c]),
+                    backgroundColor: COLORS,
+                    borderWidth: 2,
+                    borderColor: '#1a1a2e',
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { position: 'bottom', labels: { color: '#a0a0b8', padding: 16, font: { size: 13 } } },
+                    title: { display: true, text: 'Hourly Goals by Category', color: '#e0e0f0', font: { size: 15 } }
+                }
+            }
+        });
+    } catch (err) {
+        console.error('Goal category chart failed:', err);
+    }
+}
+loadGoalCategoryChart();
+</script>
 <script data-page-script>
 let allGoals = [];
 

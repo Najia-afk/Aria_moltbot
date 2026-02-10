@@ -3,6 +3,9 @@
   "version": "1.1.0",
   "description": "Switch between LLM models and toggle thinking/reasoning mode. Use no_think for faster simple queries.",
   "author": "Aria Team",
+  "layer": 2,
+  "dependencies": ["litellm"],
+  "focus_affinity": ["orchestrator"],
   "tools": [
     {
       "name": "list_models",

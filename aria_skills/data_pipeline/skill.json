@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "📊 Data pipeline management and ETL operations for Data Architect",
   "author": "Aria Blue",
+  "layer": 3,
+  "dependencies": ["api_client", "database"],
+  "focus_affinity": ["data"],
   "tools": [
     {
       "name": "define_pipeline",

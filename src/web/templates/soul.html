@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Soul & Identity{% endblock %}
+
+{% block extra_css %}
+<style>
+    .soul-layout { display: grid; grid-template-columns: 240px 1fr; gap: 25px; min-height: 70vh; }
+    .soul-sidebar { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px; height: fit-content; position: sticky; top: 100px; }
+    .soul-sidebar h3 { font-size: 13px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 12px; }
+    .soul-nav-item { display: block; padding: 10px 14px; border-radius: 8px; color: var(--text-secondary); text-decoration: none; font-size: 13px; cursor: pointer; transition: all 0.15s; border: none; background: none; width: 100%; text-align: left; }
+    .soul-nav-item:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+    .soul-nav-item.active { background: rgba(99,102,241,0.15); color: var(--accent-primary); font-weight: 600; }
+    .soul-content { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 30px; }
+    .soul-content h1 { font-size: 24px; margin-bottom: 16px; }
+    .soul-content h2 { font-size: 20px; margin-top: 24px; margin-bottom: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; }
+    .soul-content h3 { font-size: 16px; margin-top: 20px; margin-bottom: 8px; }
+    .soul-content p { color: var(--text-secondary); line-height: 1.7; margin-bottom: 12px; }
+    .soul-content code { background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+    .soul-content pre { background: var(--bg-tertiary); padding: 16px; border-radius: 8px; overflow-x: auto; margin: 12px 0; }
+    .soul-content pre code { background: none; padding: 0; }
+    .soul-content ul, .soul-content ol { color: var(--text-secondary); padding-left: 24px; margin-bottom: 12px; }
+    .soul-content blockquote { border-left: 3px solid var(--accent-primary); padding-left: 16px; color: var(--text-muted); margin: 12px 0; }
+    .soul-content table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+    .soul-content th, .soul-content td { padding: 8px 12px; border: 1px solid var(--border-color); text-align: left; font-size: 13px; }
+    .soul-content th { background: var(--bg-tertiary); font-weight: 600; }
+    .read-only-badge { display: inline-block; padding: 4px 12px; background: rgba(245,158,11,0.15); color: #f59e0b; border-radius: 8px; font-size: 11px; font-weight: 600; margin-bottom: 20px; }
+    @media (max-width: 768px) { .soul-layout { grid-template-columns: 1fr; } .soul-sidebar { position: static; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>✨ Soul & Identity</h1>
+<span class="read-only-badge">🔒 Read-Only — Identity files cannot be modified</span>
+<div class="soul-layout">
+    <div class="soul-sidebar">
+        <h3>Soul Documents</h3>
+        <button class="soul-nav-item active" onclick="loadDoc('SOUL.md', this)">✨ Soul</button>
+        <button class="soul-nav-item" onclick="loadDoc('IDENTITY.md', this)">🪪 Identity</button>
+        <button class="soul-nav-item" onclick="loadDoc('GOALS.md', this)">🎯 Goals</button>
+        <button class="soul-nav-item" onclick="loadDoc('SECURITY.md', this)">🛡️ Security</button>
+        <button class="soul-nav-item" onclick="loadDoc('HEARTBEAT.md', this)">💓 Heartbeat</button>
+        <button class="soul-nav-item" onclick="loadDoc('MEMORY.md', this)">💾 Memory</button>
+        <button class="soul-nav-item" onclick="loadDoc('SKILLS.md', this)">🔧 Skills</button>
+        <button class="soul-nav-item" onclick="loadDoc('TOOLS.md', this)">🛠️ Tools</button>
+        <button class="soul-nav-item" onclick="loadDoc('USER.md', this)">👤 User</button>
+        <button class="soul-nav-item" onclick="loadDoc('AWAKENING.md', this)">🌅 Awakening</button>
+        <button class="soul-nav-item" onclick="loadDoc('ORCHESTRATION.md', this)">🎼 Orchestration</button>
+        <button class="soul-nav-item" onclick="loadDoc('AGENTS.md', this)">🤖 Agents</button>
+        <button class="soul-nav-item" onclick="loadDoc('BOOTSTRAP.md', this)">🚀 Bootstrap</button>
+    </div>
+    <div class="soul-content" id="soul-content">
+        <div style="text-align:center;padding:40px;color:var(--text-muted);">Loading...</div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+async function loadDoc(filename, btn) {
+    document.querySelectorAll('.soul-nav-item').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    const content = document.getElementById('soul-content');
+    content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);">Loading...</div>';
+    try {
+        const res = await fetch(`${API_BASE_URL}/soul/${encodeURIComponent(filename)}`);
+        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+        const data = await res.json();
+        content.innerHTML = marked.parse(data.content);
+    } catch (err) {
+        content.innerHTML = `<p style="color:var(--danger);">Failed to load ${filename}: ${err.message}</p>`;
+    }
+}
+loadDoc('SOUL.md', document.querySelector('.soul-nav-item'));
+</script>
+{% endblock %}

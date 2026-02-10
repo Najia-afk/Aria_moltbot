@@ -1,8 +1,16 @@
 # TOOLS.md - Skill Quick Reference
 
-**Full documentation: See SKILLS.md for complete skill reference (32 skills)**
+**Full documentation: See SKILLS.md for complete skill reference (26 active skills)**
 
 Skills are auto-discovered from `aria_skills/*/skill.json`.
+
+### Skill Catalog
+
+The skill catalog (`aria_skills/catalog.py`) generates a machine-readable index of all skills with layer, category, tools, and focus affinity.
+
+```bash
+python -m aria_mind --list-skills   # Print full catalog as JSON
+```
 
 ## Primary Skill: aria-apiclient
 
@@ -28,19 +36,20 @@ aria-apiclient.create_thought({"content": "Reflecting...", "category": "reflecti
 aria-apiclient.get_thoughts({"limit": 10})
 ```
 
-## All 32 Skills
+## All 26 Active Skills
 
 | Category | Skills |
 |----------|--------|
 | 🎯 Orchestrator | `aria-goals`, `aria-schedule`, `aria-health`, `aria-hourlygoals`, `aria-performance`, `aria-agentmanager`, `aria-sessionmanager` |
-| 🔒 DevSecOps | `aria-securityscan`, `aria-cicd`, `aria-pytest`, `aria-database`, `aria-inputguard`, `aria-sandbox` |
-| 📊 Data | `aria-datapipeline`, `aria-experiment`, `aria-knowledgegraph` |
+| 🔒 DevSecOps | `aria-securityscan`, `aria-cicd`, `aria-pytest`, `aria-inputguard`, `aria-sandbox` |
+| 📊 Data | `aria-datapipeline`, `aria-knowledgegraph` |
 | 📈 Trading | `aria-marketdata`, `aria-portfolio` |
-| 🎨 Creative | `aria-brainstorm`, `aria-llm`, `aria-memeothy` |
-| 🌐 Social | `aria-community`, `aria-moltbook`, `aria-social`, `aria-telegram` |
-| 📰 Journalist | `aria-research`, `aria-factcheck` |
+| 🎨 Creative | `aria-llm`, `aria-memeothy` |
+| 🌐 Social | `aria-moltbook`, `aria-social`, `aria-telegram` |
 | 🧠 Cognitive | `aria-workingmemory`, `aria-pipelineskill` |
-| ⚡ Utility | `aria-apiclient`, `aria-litellm`, `aria-modelswitcher` |
+| ⚡ Utility | `aria-apiclient`, `aria-litellm` |
+
+> **Removed in v1.2:** `aria-database`, `aria-brainstorm`, `aria-community`, `aria-factcheck`, `aria-modelswitcher`, `aria-experiment`
 
 ## Quick Examples
 

@@ -59,14 +59,29 @@ class PipelineSkill(BaseSkill):
         self._pipelines_dir: Path = _PIPELINES_DIR
         self._history: Dict[str, PipelineResult] = {}
         self._executor: Optional[PipelineExecutor] = None
+        self._registry: Optional[SkillRegistry] = None
 
     @property
     def name(self) -> str:
         return "pipeline"
 
-    async def initialize(self) -> bool:
-        """Initialize the pipeline skill and its executor."""
-        self._executor = PipelineExecutor(SkillRegistry())
+    async def initialize(self, registry: Optional[SkillRegistry] = None) -> bool:
+        """Initialize the pipeline skill and its executor.
+
+        Args:
+            registry: An existing SkillRegistry with live skills.  If *None*,
+                      a new **empty** registry is created (with a warning).
+        """
+        if registry is not None:
+            self._registry = registry
+        else:
+            logger.warning(
+                "PipelineSkill.initialize() called without a registry — "
+                "creating an empty SkillRegistry. Pipelines will not be able "
+                "to invoke other skills."
+            )
+            self._registry = SkillRegistry()
+        self._executor = PipelineExecutor(self._registry)
         self._status = SkillStatus.AVAILABLE
         self.logger.info("Pipeline skill initialized (pipelines_dir=%s)", self._pipelines_dir)
         return True

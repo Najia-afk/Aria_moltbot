@@ -6,6 +6,115 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.2.0] — 2026-02-XX (Cognitive Upgrade — "Make Her Better")
+
+**Theme:** Deep cognitive improvements to make Aria more autonomous, self-aware, and capable.  
+**Philosophy:** "She's not just a processor — she's a growing, learning entity."
+
+### Added — New Capabilities
+
+#### Metacognitive Self-Improvement Engine (`aria_mind/metacognition.py`)
+- **NEW MODULE** — Aria now tracks her own growth over time
+- Task success/failure pattern recognition by category
+- Learning velocity measurement (is she getting faster? more accurate?)
+- Failure pattern detection with adaptive strategy suggestions
+- Strength identification (what is she best at?)
+- Growth milestones with 13 achievement types (First Success → Grandmaster)
+- Natural language self-assessment generation
+- Persistent state survival across restarts via JSON checkpointing
+
+#### LLM-Powered Genuine Reflection (`aria_mind/cognition.py`)
+- `reflect()` now routes through LLM for genuine self-reflection
+- Creates real internal journal entries, not just string concatenation
+- Falls back to structured reflection when LLM is unavailable
+- Includes metacognitive summary in reflection context
+
+#### Intelligent Goal Decomposition (`aria_mind/cognition.py`)
+- `plan()` now uses LLM + explore/work/validate cycle
+- Skill-aware planning (considers available tools)
+- Agent-aware planning (considers available agents)
+- Falls back to intelligent heuristic when LLM unavailable
+- New `assess_task_complexity()` for metacognitive task evaluation
+
+#### Memory Consolidation Engine (`aria_mind/memory.py`)
+- `consolidate()` — transforms short-term memories into long-term knowledge
+- LLM-powered summarization of memory categories
+- Pattern recognition across memory entries
+- Automatic file artifact creation for human visibility
+- `flag_important()` — mark critical memories for review
+- `checkpoint_short_term()` / `restore_short_term()` — survive restarts
+- `get_patterns()` — analyze cognitive patterns for self-awareness
+
+#### Self-Healing Heartbeat (`aria_mind/heartbeat.py`)
+- **Subsystem self-healing** — auto-reconnects failed memory, soul, cognition
+- **5-minute goal work cycle** — match GOALS.md specification
+- **30-minute reflection triggers** — automatic periodic self-reflection
+- **60-minute consolidation triggers** — automatic memory consolidation
+- Emergency self-heal after 5 consecutive failures
+- Detailed subsystem health tracking
+
+#### Pheromone Performance Tracking (`aria_agents/scoring.py`)
+- **NEW CLASS: `PerformanceTracker`** — records agent performance over time
+- Speed, success rate, and cost normalized scoring
+- Session survival via JSON persistence to aria_memories/knowledge/
+- Agent leaderboard with detailed stats per agent
+- Module-level singleton `get_performance_tracker()`
+- Auto-save every 10 invocations
+
+### Changed — Enhanced Existing Systems
+
+#### Agent Coordinator (`aria_agents/coordinator.py`)
+- `process()` now uses pheromone-based agent selection
+- Every agent call is timed and recorded for performance tracking
+- Auto-detects roundtable needs and synthesizes multi-agent perspectives
+- `get_status()` includes performance leaderboard
+
+#### Cognition Processing (`aria_mind/cognition.py`)
+- **Retry logic** — up to 2 retries with different approaches before fallback
+- **Confidence tracking** — grows with successes, decays with failures
+- **Metacognitive context injection** — Aria knows how she's performing
+- **Performance metrics** — latency tracking, success rate, streak counting
+- Enhanced `get_status()` with full metacognitive metrics
+
+#### Agent Context Management (`aria_agents/base.py`)
+- **Sliding window** — context auto-trims at 50 messages (was unbounded)
+- Preserves system messages at context start
+- New `get_context_summary()` for context status reporting
+- Tracks total messages processed per agent
+
+#### Pipeline Engine (`aria_skills/pipeline_executor.py`)
+- **Parallel DAG execution** — independent branches run concurrently
+- Wave-based scheduling: steps with satisfied deps run in parallel
+- Falls back to sequential for single ready steps (no async overhead)
+- Proper error handling for parallel failures
+
+#### Memory Manager (`aria_mind/memory.py`)
+- Short-term capacity increased from 100 → 200 entries
+- `remember_short()` now tracks category frequency for pattern analysis
+- Enhanced `get_status()` with consolidation data and top categories
+
+#### AriaMind Core (`aria_mind/__init__.py`)
+- Version bumped to 1.1.0
+- New `introspect()` — full self-awareness report
+- `think()` now records outcomes in metacognitive engine
+- `initialize()` restores memory checkpoints and metacognitive state
+- `shutdown()` persists all state (metacognition + memory checkpoint)
+- Task classification for metacognitive tracking
+- Enhanced `__repr__` with task count and milestone count
+
+### Files Modified (9 existing + 1 new)
+- `aria_mind/__init__.py` — Enhanced AriaMind class
+- `aria_mind/cognition.py` — LLM reflection, intelligent planning, retry logic
+- `aria_mind/memory.py` — Consolidation engine, pattern recognition
+- `aria_mind/heartbeat.py` — Self-healing, autonomous action scheduling
+- `aria_mind/metacognition.py` — **NEW** — Self-improvement engine
+- `aria_agents/coordinator.py` — Performance-aware routing
+- `aria_agents/scoring.py` — PerformanceTracker with persistence
+- `aria_agents/base.py` — Sliding window context management
+- `aria_skills/pipeline_executor.py` — Parallel DAG execution
+
+---
+
 ## [1.1.0] — 2026-02-10 (Aria Blue v1.1 Sprint)
 
 **Branch:** `vscode_dev` — 37 tickets across 7 waves  

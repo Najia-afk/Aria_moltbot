@@ -47,5 +47,43 @@ Aria → stores_in → PostgreSQL (memory)
 
 ---
 
-*Last updated: 2026-01-31*
-*Memory version: 1.0*
+*Last updated: 2026-02-10*
+*Memory version: 1.1*
+
+---
+
+## aria_memories/ Directory Structure
+
+Persistent file-based memory. Mounted into the OpenClaw container. Managed by `MemoryManager` in `aria_mind/memory.py`.
+
+```
+aria_memories/
+├── archive/       # Archived data and old outputs
+├── drafts/        # Draft content (posts, reports)
+├── exports/       # Exported data (CSV, JSON)
+├── income_ops/    # Operational income data
+├── knowledge/     # Knowledge base files
+├── logs/          # Activity & heartbeat logs
+├── memory/        # Core memory files (context.json, skills.json)
+├── moltbook/      # Moltbook drafts and content
+├── plans/         # Planning documents & sprint tickets
+├── research/      # Research archives
+└── skills/        # Skill state and persistence data
+```
+
+### ALLOWED_CATEGORIES
+
+The `MemoryManager.ALLOWED_CATEGORIES` frozenset restricts which subdirectories can be written to, preventing path traversal or accidental writes outside the sandbox:
+
+```python
+ALLOWED_CATEGORIES = frozenset({
+    "archive", "drafts", "exports", "income_ops", "knowledge",
+    "logs", "memory", "moltbook", "plans", "research", "skills",
+})
+```
+
+Attempts to save artifacts to unlisted categories raise a `ValueError`.
+
+### sync_to_files()
+
+The `WorkingMemory` skill (`aria_skills/working_memory/`) provides `sync_to_files()` which writes current session state (active goals, recent activities, system health) to `aria_memories/memory/context.json`. This runs on a cron schedule so that OpenClaw sessions start with warm context, reducing token usage.

@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Cognitive Pipeline Engine — compose and run multi-step skill workflows with dependency tracking, failure handling, and shared context.",
   "author": "Aria Team",
+  "layer": 4,
+  "dependencies": ["api_client"],
+  "focus_affinity": ["orchestrator"],
   "tools": [
     {
       "name": "run_pipeline",

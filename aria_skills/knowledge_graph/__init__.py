@@ -5,12 +5,10 @@ Knowledge graph skill.
 Manages entities and relationships in Aria's knowledge base.
 Persists via REST API (TICKET-12: eliminate in-memory stubs).
 """
-import os
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-import httpx
-
+from aria_skills.api_client import get_api_client
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
 from aria_skills.registry import SkillRegistry
 
@@ -27,8 +25,7 @@ class KnowledgeGraphSkill(BaseSkill):
         super().__init__(config)
         self._entities: Dict[str, Dict] = {}  # fallback cache
         self._relations: List[Dict] = []  # fallback cache
-        self._api_url = os.environ.get('ARIA_API_URL', 'http://aria-api:8000/api')
-        self._client: Optional[httpx.AsyncClient] = None
+        self._api = None
     
     @property
     def name(self) -> str:
@@ -36,16 +33,14 @@ class KnowledgeGraphSkill(BaseSkill):
     
     async def initialize(self) -> bool:
         """Initialize knowledge graph."""
-        self._client = httpx.AsyncClient(base_url=self._api_url, timeout=30.0)
+        self._api = await get_api_client()
         self._status = SkillStatus.AVAILABLE
         self.logger.info("Knowledge graph initialized (API-backed)")
         return True
     
     async def close(self):
-        """Close the httpx client."""
-        if self._client:
-            await self._client.aclose()
-            self._client = None
+        """Cleanup (shared API client is managed by api_client module)."""
+        self._api = None
     
     async def health_check(self) -> SkillStatus:
         """Check availability."""
@@ -69,7 +64,7 @@ class KnowledgeGraphSkill(BaseSkill):
         }
         
         try:
-            resp = await self._client.post("/knowledge/entities", json=entity)
+            resp = await self._api._client.post("/knowledge-graph/entities", json=entity)
             resp.raise_for_status()
             api_data = resp.json()
             return SkillResult.ok(api_data if api_data else entity)
@@ -95,7 +90,7 @@ class KnowledgeGraphSkill(BaseSkill):
         }
         
         try:
-            resp = await self._client.post("/knowledge/relations", json=rel)
+            resp = await self._api._client.post("/knowledge-graph/relations", json=rel)
             resp.raise_for_status()
             api_data = resp.json()
             return SkillResult.ok(api_data if api_data else rel)
@@ -107,7 +102,7 @@ class KnowledgeGraphSkill(BaseSkill):
     async def get_entity(self, entity_id: str) -> SkillResult:
         """Get an entity by ID."""
         try:
-            resp = await self._client.get(f"/knowledge/entities/{entity_id}")
+            resp = await self._api._client.get(f"/knowledge-graph/entities/{entity_id}")
             resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:
@@ -130,7 +125,7 @@ class KnowledgeGraphSkill(BaseSkill):
                 params["type"] = entity_type
             if relation:
                 params["relation"] = relation
-            resp = await self._client.get("/knowledge/entities", params=params)
+            resp = await self._api._client.get("/knowledge-graph/entities", params=params)
             resp.raise_for_status()
             api_data = resp.json()
             entities = api_data if isinstance(api_data, list) else api_data.get("entities", [])

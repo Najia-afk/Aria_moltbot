@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "🔍 Fact-checking and claim verification for Journalist",
   "author": "Aria Blue",
+  "layer": 3,
+  "dependencies": ["api_client", "research"],
+  "focus_affinity": ["journalist"],
   "tools": [
     {
       "name": "extract_claims",

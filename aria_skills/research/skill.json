@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "📰 Research and information gathering for Journalist",
   "author": "Aria Blue",
+  "layer": 3,
+  "dependencies": ["api_client"],
+  "focus_affinity": ["journalist"],
   "tools": [
     {
       "name": "create_project",

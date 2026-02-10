@@ -710,7 +710,7 @@ docker compose up -d
 
 ```bash
 # SSH to server
-ssh -i najia_mac_key najia@192.168.1.53
+ssh -i najia_mac_key najia@$MAC_HOST
 
 # Deploy
 cd ~/aria-blue/stacks/brain

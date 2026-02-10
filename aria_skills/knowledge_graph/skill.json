@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Build and query Aria's knowledge graph. Store entities (people, places, concepts) and their relationships.",
   "author": "Aria Team",
+  "layer": 3,
+  "dependencies": ["api_client"],
+  "focus_affinity": ["data", "journalist"],
   "tools": [
     {
       "name": "kg_add_entity",

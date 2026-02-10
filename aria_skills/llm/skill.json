@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Access multiple LLM providers (Moonshot/Kimi, Ollama, OpenRouter) for text generation and chat.",
   "author": "Aria Team",
+  "layer": 2,
+  "dependencies": ["api_client"],
+  "focus_affinity": ["orchestrator"],
   "tools": [
     {
       "name": "llm_generate",

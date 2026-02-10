@@ -18,6 +18,18 @@ try:
 except ImportError:
     HAS_HTTPX = False
 
+# Load default model names from models.yaml (single source of truth)
+try:
+    from aria_models.loader import load_catalog as _load_catalog
+    _cat = _load_catalog()
+    _kimi_model = _cat.get("models", {}).get("kimi", {}).get("litellm", {}).get("model", "")
+    _DEFAULT_MOONSHOT_MODEL = _kimi_model.removeprefix("moonshot/") or "kimi-k2.5"
+    _ollama_model = _cat.get("models", {}).get("qwen-cpu-fallback", {}).get("litellm", {}).get("model", "")
+    _DEFAULT_OLLAMA_MODEL = _ollama_model.removeprefix("ollama/") or "qwen2.5:3b"
+except Exception:
+    _DEFAULT_MOONSHOT_MODEL = "kimi-k2.5"
+    _DEFAULT_OLLAMA_MODEL = "qwen2.5:3b"
+
 
 @SkillRegistry.register
 class MoonshotSkill(BaseSkill):
@@ -54,7 +66,7 @@ class MoonshotSkill(BaseSkill):
             self._status = SkillStatus.UNAVAILABLE
             return False
         
-        self._model = self.config.config.get("model", "kimi-k2.5")
+        self._model = self.config.config.get("model", _DEFAULT_MOONSHOT_MODEL)
         
         self._client = httpx.AsyncClient(
             base_url="https://api.moonshot.ai/v1",
@@ -173,7 +185,7 @@ class OllamaSkill(BaseSkill):
             os.environ.get("OLLAMA_HOST", "http://localhost:11434")
         ).rstrip("/")
         
-        self._model = self.config.config.get("model", "llama2")
+        self._model = self.config.config.get("model", _DEFAULT_OLLAMA_MODEL)
         
         self._client = httpx.AsyncClient(
             base_url=self._host,

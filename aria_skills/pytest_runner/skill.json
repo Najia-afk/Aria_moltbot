@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Run pytest for Aria codebase and return structured results.",
   "author": "Aria Team",
+  "layer": 3,
+  "dependencies": ["api_client"],
+  "focus_affinity": ["devsecops"],
   "tools": [
     {
       "name": "run_pytest",

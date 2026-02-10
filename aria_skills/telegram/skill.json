@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Telegram Bot API integration — send messages, receive updates, and reply to conversations via the Telegram Bot HTTP API.",
   "author": "Aria Team",
+  "layer": 3,
+  "dependencies": ["api_client"],
+  "focus_affinity": ["social"],
   "tools": [
     {
       "name": "send_message",

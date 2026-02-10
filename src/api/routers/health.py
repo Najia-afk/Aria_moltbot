@@ -128,24 +128,4 @@ async def api_stats(db: AsyncSession = Depends(get_db)):
     )
 
 
-@router.get("/stats-extended")
-async def api_stats_extended(db: AsyncSession = Depends(get_db)):
-    try:
-        activities_count = (await db.execute(select(func.count(ActivityLog.id)))).scalar() or 0
-        thoughts_count = (await db.execute(select(func.count(Thought.id)))).scalar() or 0
-        memories_count = (await db.execute(select(func.count(Memory.id)))).scalar() or 0
-        last_activity = (await db.execute(select(func.max(ActivityLog.created_at)))).scalar()
-        return {
-            "activities_count": activities_count,
-            "thoughts_count": thoughts_count,
-            "memories_count": memories_count,
-            "last_activity": last_activity.isoformat() if last_activity else None,
-        }
-    except Exception as e:
-        return {
-            "error": str(e),
-            "activities_count": 0,
-            "thoughts_count": 0,
-            "memories_count": 0,
-            "last_activity": None,
-        }
+

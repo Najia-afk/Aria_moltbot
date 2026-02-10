@@ -3,6 +3,9 @@
   "version": "2.0.0",
   "description": "Moltbook social network — post, comment, vote, search, and join communities. API: https://www.moltbook.com/api/v1",
   "author": "Aria Team",
+  "layer": 3,
+  "dependencies": ["api_client"],
+  "focus_affinity": ["social"],
   "tools": [
     {
       "name": "create_post",

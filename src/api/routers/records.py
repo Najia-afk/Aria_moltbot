@@ -1,8 +1,8 @@
 """
 Records, export, and search endpoints — generic table access.
 
-Uses raw SQL via SQLAlchemy ``text()`` since these operate on dynamic
-table names that can't be expressed as static ORM queries.
+Uses ORM queries via MODEL_MAP to resolve dynamic table names to
+their corresponding SQLAlchemy model classes.
 """
 
 from datetime import datetime
@@ -11,10 +11,15 @@ from typing import Any
 import uuid as uuid_mod
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import text
+from sqlalchemy import Text, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.models import ActivityLog, Thought, Memory
+from db.models import (
+    ActivityLog, AgentSession, ApiKeyRotation, Goal, HeartbeatLog, HourlyGoal,
+    KnowledgeEntity, KnowledgeRelation, Memory, ModelUsage, PendingComplexTask,
+    PerformanceLog, RateLimit, ScheduleTick, ScheduledJob, SecurityEvent,
+    SocialPost, Thought,
+)
 from deps import get_db
 
 router = APIRouter(tags=["Records"])
@@ -44,6 +49,27 @@ TABLE_MAP = {
     "schedule_tick": "schedule_tick",
 }
 
+MODEL_MAP = {
+    "activity_log": ActivityLog,
+    "thoughts": Thought,
+    "memories": Memory,
+    "goals": Goal,
+    "social_posts": SocialPost,
+    "heartbeat_log": HeartbeatLog,
+    "knowledge_entities": KnowledgeEntity,
+    "knowledge_relations": KnowledgeRelation,
+    "hourly_goals": HourlyGoal,
+    "performance_log": PerformanceLog,
+    "pending_complex_tasks": PendingComplexTask,
+    "security_events": SecurityEvent,
+    "agent_sessions": AgentSession,
+    "model_usage": ModelUsage,
+    "rate_limits": RateLimit,
+    "api_key_rotations": ApiKeyRotation,
+    "scheduled_jobs": ScheduledJob,
+    "schedule_tick": ScheduleTick,
+}
+
 ORDER_COL_MAP = {
     "activity_log": "created_at",
     "thoughts": "created_at",
@@ -64,6 +90,8 @@ ORDER_COL_MAP = {
     "scheduled_jobs": "synced_at",
     "schedule_tick": "updated_at",
 }
+
+MAX_EXPORT_ROWS = 10_000
 
 
 def _serialize_row(mapping: dict) -> dict:
@@ -92,15 +120,15 @@ async def api_records(
     if table not in TABLE_MAP:
         raise HTTPException(status_code=400, detail="Invalid table")
     db_table = TABLE_MAP[table]
-    order_col = ORDER_COL_MAP[db_table]
+    model = MODEL_MAP[db_table]
+    order_col = getattr(model, ORDER_COL_MAP[db_table])
     offset = (page - 1) * limit
 
-    total = (await db.execute(text(f"SELECT COUNT(*) FROM {db_table}"))).scalar() or 0
+    total = (await db.execute(select(func.count()).select_from(model))).scalar() or 0
     result = await db.execute(
-        text(f"SELECT * FROM {db_table} ORDER BY {order_col} DESC LIMIT :limit OFFSET :offset"),
-        {"limit": limit, "offset": offset},
+        select(model).order_by(order_col.desc()).limit(limit).offset(offset)
     )
-    records = [_serialize_row(dict(r._mapping)) for r in result.all()]
+    records = [r.to_dict() for r in result.scalars().all()]
     return {"records": records, "total": total, "page": page, "limit": limit}
 
 
@@ -109,10 +137,13 @@ async def api_export(table: str = "activities", db: AsyncSession = Depends(get_d
     if table not in TABLE_MAP:
         raise HTTPException(status_code=400, detail="Invalid table")
     db_table = TABLE_MAP[table]
-    order_col = ORDER_COL_MAP[db_table]
+    model = MODEL_MAP[db_table]
+    order_col = getattr(model, ORDER_COL_MAP[db_table])
 
-    result = await db.execute(text(f"SELECT * FROM {db_table} ORDER BY {order_col} DESC"))
-    records = [_serialize_row(dict(r._mapping)) for r in result.all()]
+    result = await db.execute(
+        select(model).order_by(order_col.desc()).limit(MAX_EXPORT_ROWS)
+    )
+    records = [r.to_dict() for r in result.scalars().all()]
     return {"records": records}
 
 
@@ -132,66 +163,66 @@ async def api_search(
     if activities:
         rows = (
             await db.execute(
-                text(
-                    "SELECT id, action, details, created_at FROM activity_log "
-                    "WHERE details::text ILIKE :like OR action ILIKE :like "
-                    "ORDER BY created_at DESC LIMIT 20"
-                ),
-                {"like": like},
+                select(ActivityLog)
+                .where(
+                    ActivityLog.details.cast(Text).ilike(like)
+                    | ActivityLog.action.ilike(like)
+                )
+                .order_by(ActivityLog.created_at.desc())
+                .limit(20)
             )
-        ).all()
+        ).scalars().all()
         for r in rows:
-            d = dict(r._mapping)
-            details = d.get("details", {})
+            details = r.details or {}
             content = (
                 (details.get("message") or details.get("description") or str(details))
                 if isinstance(details, dict) else str(details)
             )
             results["activities"].append({
-                "id": str(d["id"]),
-                "type": d["action"],
+                "id": str(r.id),
+                "type": r.action,
                 "content": content,
-                "timestamp": d["created_at"].isoformat() if d.get("created_at") else None,
+                "timestamp": r.created_at.isoformat() if r.created_at else None,
             })
 
     if thoughts:
         rows = (
             await db.execute(
-                text(
-                    "SELECT id, category, content, created_at FROM thoughts "
-                    "WHERE content ILIKE :like OR category ILIKE :like "
-                    "ORDER BY created_at DESC LIMIT 20"
-                ),
-                {"like": like},
+                select(Thought)
+                .where(
+                    Thought.content.ilike(like)
+                    | Thought.category.ilike(like)
+                )
+                .order_by(Thought.created_at.desc())
+                .limit(20)
             )
-        ).all()
+        ).scalars().all()
         for r in rows:
-            d = dict(r._mapping)
             results["thoughts"].append({
-                "id": str(d["id"]),
-                "type": d["category"],
-                "content": d["content"],
-                "timestamp": d["created_at"].isoformat() if d.get("created_at") else None,
+                "id": str(r.id),
+                "type": r.category,
+                "content": r.content,
+                "timestamp": r.created_at.isoformat() if r.created_at else None,
             })
 
     if memories:
         rows = (
             await db.execute(
-                text(
-                    "SELECT id, category, value, created_at FROM memories "
-                    "WHERE value::text ILIKE :like OR category ILIKE :like "
-                    "ORDER BY created_at DESC LIMIT 20"
-                ),
-                {"like": like},
+                select(Memory)
+                .where(
+                    Memory.value.cast(Text).ilike(like)
+                    | Memory.category.ilike(like)
+                )
+                .order_by(Memory.created_at.desc())
+                .limit(20)
             )
-        ).all()
+        ).scalars().all()
         for r in rows:
-            d = dict(r._mapping)
             results["memories"].append({
-                "id": str(d["id"]),
-                "type": d["category"],
-                "content": str(d["value"]),
-                "timestamp": d["created_at"].isoformat() if d.get("created_at") else None,
+                "id": str(r.id),
+                "type": r.category,
+                "content": str(r.value),
+                "timestamp": r.created_at.isoformat() if r.created_at else None,
             })
 
     return results

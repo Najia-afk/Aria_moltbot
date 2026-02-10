@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% block title %}Skill Registry{% endblock %}
+
+{% block extra_css %}
+<style>
+    .page-header { margin-bottom: 24px; }
+    .page-header h1 { font-size: 22px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+    .page-header p { color: var(--text-secondary); font-size: 13px; margin-top: 4px; }
+
+    /* Stats Grid */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px; margin-bottom: 24px; }
+    .stat-card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 18px; }
+    .stat-card h4 { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.03em; }
+    .stat-card .value { font-size: 26px; font-weight: 700; color: var(--text-primary); }
+    .stat-card.green .value { color: var(--success); }
+    .stat-card.orange .value { color: #f59e0b; }
+    .stat-card.red .value { color: var(--danger); }
+    .stat-card.blue .value { color: var(--accent-primary); }
+
+    /* Controls */
+    .page-controls { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+    .filter-select { padding: 10px 14px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); cursor: pointer; font-size: 13px; }
+    .search-box { flex: 1; min-width: 200px; padding: 10px 14px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); font-size: 13px; }
+    .search-box:focus { outline: none; border-color: var(--accent-primary); }
+    .refresh-btn { padding: 10px 18px; background: var(--accent-primary); color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
+    .refresh-btn:hover { opacity: 0.85; }
+
+    /* Skill Cards Grid */
+    .skills-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+    .skill-card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 18px; cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s; }
+    .skill-card:hover { border-color: var(--accent-primary); box-shadow: 0 0 0 1px var(--accent-primary); }
+    .skill-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .skill-card-name { font-size: 15px; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
+    .health-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+    .health-dot.healthy { background: var(--success); box-shadow: 0 0 6px var(--success); }
+    .health-dot.degraded { background: #f59e0b; box-shadow: 0 0 6px #f59e0b; }
+    .health-dot.unavailable { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
+    .layer-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; background: rgba(124,58,237,0.15); color: #a855f7; }
+    .skill-card-stats { display: flex; gap: 16px; font-size: 12px; color: var(--text-secondary); margin-bottom: 8px; }
+    .skill-card-stats span { display: flex; align-items: center; gap: 4px; }
+    .skill-card-meta { font-size: 11px; color: var(--text-muted); }
+    .skill-card-detail { display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-color); font-size: 12px; color: var(--text-secondary); }
+    .skill-card.expanded .skill-card-detail { display: block; }
+    .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; }
+    .meta-grid dt { color: var(--text-muted); font-size: 11px; }
+    .meta-grid dd { color: var(--text-primary); font-size: 12px; margin: 0; }
+
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--text-secondary); }
+    .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+
+    .loading-spinner { text-align: center; padding: 40px; color: var(--text-secondary); }
+
+    @media (max-width: 768px) { .skills-grid { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>🔧 Skill Registry</h1>
+    <p>Live status of all registered skills in the Aria ecosystem</p>
+</div>
+
+<!-- Stats -->
+<div class="stats-grid">
+    <div class="stat-card blue">
+        <h4>Total Skills</h4>
+        <div class="value" id="stat-total">—</div>
+    </div>
+    <div class="stat-card green">
+        <h4>Healthy</h4>
+        <div class="value" id="stat-healthy">—</div>
+    </div>
+    <div class="stat-card orange">
+        <h4>Degraded</h4>
+        <div class="value" id="stat-degraded">—</div>
+    </div>
+    <div class="stat-card red">
+        <h4>Unavailable</h4>
+        <div class="value" id="stat-unavailable">—</div>
+    </div>
+</div>
+
+<!-- Controls -->
+<div class="page-controls">
+    <input type="text" class="search-box" id="search-input" placeholder="Search skills…" oninput="filterLocal()">
+    <select class="filter-select" id="status-filter" onchange="loadSkills()">
+        <option value="">All Statuses</option>
+        <option value="healthy">Healthy</option>
+        <option value="degraded">Degraded</option>
+        <option value="unavailable">Unavailable</option>
+    </select>
+    <button class="refresh-btn" onclick="loadSkills()">↻ Refresh</button>
+</div>
+
+<!-- Skill Cards -->
+<div id="skills-container" class="skills-grid">
+    <div class="loading-spinner">Loading skills…</div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let allSkills = [];
+
+    async function loadSkills() {
+        const container = document.getElementById('skills-container');
+        container.innerHTML = '<div class="loading-spinner">Loading skills…</div>';
+
+        const statusFilter = document.getElementById('status-filter').value;
+        const params = statusFilter ? `?status=${statusFilter}` : '';
+
+        try {
+            const resp = await fetch(`${API_BASE_URL}/skills${params}`);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const data = await resp.json();
+
+            allSkills = data.skills || [];
+
+            // Update stats
+            document.getElementById('stat-total').textContent = data.count ?? allSkills.length;
+            document.getElementById('stat-healthy').textContent = data.healthy ?? 0;
+            document.getElementById('stat-degraded').textContent = data.degraded ?? 0;
+            document.getElementById('stat-unavailable').textContent = data.unavailable ?? 0;
+
+            renderSkills(allSkills);
+        } catch (err) {
+            container.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><p>Failed to load skills: ${err.message}</p></div>`;
+            console.error('loadSkills error:', err);
+        }
+    }
+
+    function renderSkills(skills) {
+        const container = document.getElementById('skills-container');
+        const search = (document.getElementById('search-input').value || '').toLowerCase();
+
+        const filtered = search
+            ? skills.filter(s => s.skill_name.toLowerCase().includes(search) || (s.canonical_name || '').toLowerCase().includes(search))
+            : skills;
+
+        if (!filtered.length) {
+            container.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>No skills found.</p></div>';
+            return;
+        }
+
+        container.innerHTML = filtered.map(s => {
+            const statusClass = s.status || 'unavailable';
+            const layer = s.layer ? `<span class="layer-badge">${escHtml(s.layer)}</span>` : '';
+            const lastCheck = s.last_health_check ? new Date(s.last_health_check).toLocaleString() : '—';
+            const lastExec = s.last_execution ? new Date(s.last_execution).toLocaleString() : '—';
+            const updatedAt = s.updated_at ? new Date(s.updated_at).toLocaleString() : '—';
+            const metaHtml = s.metadata ? `<pre style="margin:8px 0 0;white-space:pre-wrap;font-size:11px;color:var(--text-muted)">${escHtml(JSON.stringify(s.metadata, null, 2))}</pre>` : '';
+
+            return `
+                <div class="skill-card" onclick="this.classList.toggle('expanded')">
+                    <div class="skill-card-header">
+                        <div class="skill-card-name">
+                            <span class="health-dot ${statusClass}"></span>
+                            ${escHtml(s.skill_name)}
+                        </div>
+                        ${layer}
+                    </div>
+                    <div class="skill-card-stats">
+                        <span>▶ ${s.use_count ?? 0} uses</span>
+                        <span>✖ ${s.error_count ?? 0} errors</span>
+                        <span>Status: <strong>${escHtml(s.status)}</strong></span>
+                    </div>
+                    <div class="skill-card-meta">Last health check: ${lastCheck}</div>
+                    <div class="skill-card-detail">
+                        <dl class="meta-grid">
+                            <dt>Canonical Name</dt><dd>${escHtml(s.canonical_name || '—')}</dd>
+                            <dt>Last Execution</dt><dd>${lastExec}</dd>
+                            <dt>Updated At</dt><dd>${updatedAt}</dd>
+                            <dt>Layer</dt><dd>${escHtml(s.layer || '—')}</dd>
+                        </dl>
+                        ${metaHtml}
+                    </div>
+                </div>`;
+        }).join('');
+    }
+
+    function filterLocal() {
+        renderSkills(allSkills);
+    }
+
+    function escHtml(str) {
+        if (!str) return '';
+        const d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+    }
+
+    // Initial load
+    loadSkills();
+</script>
+{% endblock %}

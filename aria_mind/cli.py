@@ -4,6 +4,7 @@ Command-line interface for Aria Blue.
 
 Entry points for running and managing Aria.
 """
+import argparse
 import asyncio
 import sys
 import logging
@@ -12,14 +13,12 @@ from typing import Optional
 from aria_mind import AriaMind
 from aria_skills import SkillRegistry
 from aria_agents import AgentCoordinator
+from aria_mind.logging_config import configure_logging, correlation_id_var, new_correlation_id
 
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
+# Configure structured logging
+configure_logging()
+correlation_id_var.set(new_correlation_id())
 logger = logging.getLogger("aria.cli")
 
 
@@ -137,18 +136,23 @@ async def run_health_check():
 
 def main():
     """Main CLI entry point."""
-    if len(sys.argv) > 1:
-        command = sys.argv[1].lower()
-        
-        if command == "health":
-            asyncio.run(run_health_check())
-        elif command == "chat":
-            asyncio.run(run_interactive())
-        else:
-            print(f"Unknown command: {command}")
-            print("Usage: aria [health|chat]")
-            sys.exit(1)
-    else:
+    parser = argparse.ArgumentParser(description="Aria Blue CLI")
+    parser.add_argument("command", nargs="?", default="chat",
+                        choices=["health", "chat"],
+                        help="Command to run (default: chat)")
+    parser.add_argument("--list-skills", action="store_true",
+                        help="Print skill catalog")
+    args = parser.parse_args()
+
+    if args.list_skills:
+        from aria_skills.catalog import generate_catalog
+        import json
+        print(json.dumps(generate_catalog(), indent=2))
+        sys.exit(0)
+
+    if args.command == "health":
+        asyncio.run(run_health_check())
+    elif args.command == "chat":
         asyncio.run(run_interactive())
 
 

@@ -233,6 +233,38 @@
         "model": "ollama/qwen2.5:3b",
         "api_base": "http://host.docker.internal:11434"
       }
+    },
+    "phi4-mini-local": {
+      "provider": "litellm",
+      "name": "Phi-4 Mini 3.8B (Ollama Local)",
+      "reasoning": false,
+      "input": ["text"],
+      "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+      "contextWindow": 8192,
+      "maxTokens": 4096,
+      "tier": "local",
+      "routeSkill": "litellm",
+      "use_for": ["routing", "classification", "simple_qa"],
+      "litellm": {
+        "model": "ollama/phi4-mini:3.8b",
+        "api_base": "http://host.docker.internal:11434"
+      }
+    },
+    "qwen3-local": {
+      "provider": "litellm",
+      "name": "Qwen3 8B (Ollama Local)",
+      "reasoning": false,
+      "input": ["text"],
+      "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+      "contextWindow": 32768,
+      "maxTokens": 4096,
+      "tier": "local",
+      "routeSkill": "litellm",
+      "use_for": ["general", "code", "analysis"],
+      "litellm": {
+        "model": "ollama/qwen3:8b",
+        "api_base": "http://host.docker.internal:11434"
+      }
     }
   },
   "criteria": {

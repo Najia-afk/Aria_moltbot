@@ -12,7 +12,7 @@ set -euo pipefail
 
 # Defaults
 SSH_KEY="${SSH_KEY:-$HOME/.ssh/najia_mac_key}"
-SSH_HOST="${SSH_HOST:-najia@192.168.1.53}"
+SSH_HOST="${SSH_HOST:-${MAC_USER:-najia}@${MAC_HOST:?MAC_HOST env var not set}}"
 OUTPUT_DIR="${OUTPUT_DIR:-aria_memories/logs}"
 HOURS="${HOURS:-168}"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)

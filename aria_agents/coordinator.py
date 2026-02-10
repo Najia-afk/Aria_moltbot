@@ -14,12 +14,18 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from aria_agents.base import AgentConfig, AgentMessage, AgentRole, BaseAgent
 from aria_agents.context import AgentContext, AgentResult
-from aria_agents.scoring import compute_pheromone, select_best_agent, COLD_START_SCORE
+from aria_agents.scoring import (
+    compute_pheromone,
+    select_best_agent,
+    COLD_START_SCORE,
+    get_performance_tracker,
+    PerformanceTracker,
+)
 
 # Keywords that trigger cross-focus collaboration
 ROUNDTABLE_TRIGGERS = re.compile(
-    r"(cross-team|all perspectives|launch|promo|review|security.{0,20}data|"
-    r"data.{0,20}security|multi.?domain|collaboration|joint|coordinate)",
+    r"(cross-team|all perspectives|multi.?domain|collaboration|joint analysis|"
+    r"security.{0,20}data|data.{0,20}security|launch.{0,20}strategy|comprehensive.{0,20}review)",
     re.IGNORECASE
 )
 from aria_agents.loader import AgentLoader
@@ -97,8 +103,10 @@ class LLMAgent(BaseAgent):
             return response
         
         # Build messages for LLM
+        import os
+        context_limit = int(os.getenv("AGENT_CONTEXT_LIMIT", "10"))
         messages = [{"role": "system", "content": self.get_system_prompt()}]
-        for ctx_msg in self.get_context(limit=10):
+        for ctx_msg in self.get_context(limit=context_limit):
             messages.append({
                 "role": ctx_msg.role,
                 "content": ctx_msg.content,
@@ -131,12 +139,14 @@ class LLMAgent(BaseAgent):
 
 class AgentCoordinator:
     """
-    Coordinates multiple agents.
+    Coordinates multiple agents with performance-aware routing.
     
     Handles:
     - Agent lifecycle (creation, initialization)
-    - Message routing between agents
-    - Skill registry injection
+    - Message routing with pheromone-based agent selection
+    - Performance tracking and learning
+    - Cross-focus collaboration via roundtable
+    - Explore/Work/Validate structured task execution
     """
     
     def __init__(self, skill_registry: Optional["SkillRegistry"] = None):
@@ -145,6 +155,7 @@ class AgentCoordinator:
         self._configs: Dict[str, AgentConfig] = {}
         self._hierarchy: Dict[str, List[str]] = {}
         self._main_agent_id: Optional[str] = None
+        self._tracker: PerformanceTracker = get_performance_tracker()
         self.logger = logging.getLogger("aria.coordinator")
     
     def set_skill_registry(self, registry: "SkillRegistry") -> None:
@@ -206,17 +217,44 @@ class AgentCoordinator:
     
     async def process(self, message: str, agent_id: Optional[str] = None, **kwargs) -> AgentMessage:
         """
-        Process a message through an agent.
+        Process a message through an agent with performance tracking.
+        
+        Enhanced with:
+        - Pheromone-based agent selection when no specific agent requested
+        - Performance recording after each invocation
+        - Auto-detection of roundtable needs
         
         Args:
             message: Input message
-            agent_id: Target agent (defaults to main agent)
+            agent_id: Target agent (defaults to best available or main agent)
             **kwargs: Additional parameters
             
         Returns:
             Response from the agent
         """
-        target_id = agent_id or self._main_agent_id
+        # Auto-detect if this needs roundtable collaboration
+        if not agent_id and self.detect_roundtable_need(message):
+            self.logger.info("Auto-detected roundtable need — gathering perspectives")
+            perspectives = await self.roundtable(message)
+            if perspectives:
+                # Synthesize perspectives through main agent
+                synthesis_prompt = self._build_synthesis_prompt(message, perspectives)
+                agent_id = self._main_agent_id
+                message = synthesis_prompt
+        
+        # Select target agent — use pheromone scores if no specific agent requested
+        target_id = agent_id
+        if not target_id:
+            if len(self._agents) > 1 and self._tracker:
+                # Let performance scores guide agent selection
+                candidates = list(self._agents.keys())
+                target_id = self._tracker.get_best_agent(candidates)
+                self.logger.debug(
+                    f"Pheromone selection: {target_id} "
+                    f"(score={self._tracker.get_score(target_id):.3f})"
+                )
+            else:
+                target_id = self._main_agent_id
         
         if not target_id:
             return AgentMessage(
@@ -231,7 +269,51 @@ class AgentCoordinator:
                 content=f"Agent {target_id} not found",
             )
         
-        return await agent.process(message, **kwargs)
+        # Execute with timing for performance tracking
+        start = datetime.now(timezone.utc)
+        try:
+            result = await agent.process(message, **kwargs)
+            elapsed_ms = int((datetime.now(timezone.utc) - start).total_seconds() * 1000)
+            
+            # Record success
+            success = bool(result.content) and not result.content.startswith("[Error")
+            self._tracker.record(
+                agent_id=target_id,
+                success=success,
+                duration_ms=elapsed_ms,
+            )
+            
+            return result
+            
+        except Exception as e:
+            elapsed_ms = int((datetime.now(timezone.utc) - start).total_seconds() * 1000)
+            
+            # Record failure
+            self._tracker.record(
+                agent_id=target_id,
+                success=False,
+                duration_ms=elapsed_ms,
+            )
+            
+            self.logger.error(f"Agent {target_id} failed: {e}")
+            return AgentMessage(
+                role="system",
+                content=f"[Error: {e}]",
+                agent_id=target_id,
+            )
+    
+    def _build_synthesis_prompt(
+        self, original_message: str, perspectives: Dict[str, AgentMessage]
+    ) -> str:
+        """Build a synthesis prompt from roundtable perspectives."""
+        parts = [f"Original request: {original_message}\n\nPerspectives gathered:\n"]
+        for agent_id, msg in perspectives.items():
+            parts.append(f"**{agent_id}**: {msg.content[:500]}\n")
+        parts.append(
+            "\nSynthesize these perspectives into a coherent, actionable response. "
+            "Highlight agreements, resolve conflicts, and provide a unified recommendation."
+        )
+        return "\n".join(parts)
     
     async def broadcast(self, message: str, **kwargs) -> Dict[str, AgentMessage]:
         """
@@ -352,12 +434,16 @@ class AgentCoordinator:
         return {aid: resp for aid, resp in results if resp}
     
     def get_status(self) -> Dict[str, Any]:
-        """Get coordinator status."""
+        """Get coordinator status with performance leaderboard."""
         return {
             "agents": len(self._agents),
             "main_agent": self._main_agent_id,
             "hierarchy": self._hierarchy,
             "skill_registry": self._skill_registry is not None,
+            "performance": {
+                "total_invocations": self._tracker._total_invocations,
+                "leaderboard": self._tracker.get_leaderboard(),
+            },
         }
 
     # ── Explorer / Worker / Validator cycle ──────────────────────────────
@@ -381,8 +467,7 @@ class AgentCoordinator:
         text = response.content
 
         # Try to parse numbered lines
-        import re as _re
-        approaches = _re.findall(r"^\s*\d+[\.\)\-]\s*(.+)", text, _re.MULTILINE)
+        approaches = re.findall(r"^\s*\d+[\.)\-]\s*(.+)", text, re.MULTILINE)
         if approaches:
             return [a.strip() for a in approaches if a.strip()]
         # Fallback: return full response as single approach
@@ -404,10 +489,14 @@ class AgentCoordinator:
         response = await agent.process(prompt)
         elapsed = int((datetime.now(timezone.utc) - start).total_seconds() * 1000)
 
+        content = response.content
+        has_error = any(marker in content for marker in [
+            "[LLM Error:", "[Error:", "Failed:", "[LLM not available]"
+        ])
         return AgentResult(
             agent_id=agent_id,
-            success=True,
-            output=response.content,
+            success=not has_error,
+            output=content,
             duration_ms=elapsed,
         )
 
@@ -427,10 +516,36 @@ class AgentCoordinator:
         )
         response = await agent.process(prompt)
 
+        content = response.content.upper()
+        passed = "PASS" in content and "FAIL" not in content
         return AgentResult(
             agent_id=agent_id,
-            success=True,
+            success=passed,
             output=response.content,
+        )
+
+    async def solve(self, ctx: AgentContext, max_attempts: int = 3) -> AgentResult:
+        """Full explore -> work -> validate cycle with retry."""
+        approaches = await self.explore(ctx)
+
+        for attempt in range(max_attempts):
+            approach = approaches[attempt % len(approaches)]
+            result = await self.work(ctx, approach)
+
+            if not result.success:
+                self.logger.warning(f"Attempt {attempt+1} work failed: {result.output[:100]}")
+                continue
+
+            validation = await self.validate(ctx, result)
+            if validation.success:
+                return result
+
+            self.logger.warning(f"Attempt {attempt+1} validation failed: {validation.output[:100]}")
+
+        return AgentResult(
+            agent_id=ctx.agent_id or "unknown",
+            success=False,
+            output=f"Max {max_attempts} attempts exceeded",
         )
 
     async def spawn_parallel(self, tasks: list[AgentContext]) -> list[AgentResult]:
@@ -447,7 +562,7 @@ class AgentCoordinator:
         return list(await asyncio.gather(*[_limited(t) for t in tasks]))
 
     async def _process_task(self, ctx: AgentContext) -> AgentResult:
-        """Internal: run a single task and record timing."""
+        """Internal: run a single task, record timing, and track performance."""
         agent = self._agents.get(ctx.agent_id) or self.get_main_agent()
         agent_id = agent.id if agent else ctx.agent_id or "unknown"
 
@@ -458,14 +573,32 @@ class AgentCoordinator:
         try:
             response = await agent.process(ctx.task)
             elapsed = int((datetime.now(timezone.utc) - start).total_seconds() * 1000)
+            
+            # Record performance
+            success = bool(response.content) and not response.content.startswith("[Error")
+            self._tracker.record(
+                agent_id=agent_id,
+                success=success,
+                duration_ms=elapsed,
+                task_type="parallel_task",
+            )
+            
             return AgentResult(
                 agent_id=agent_id,
-                success=True,
+                success=success,
                 output=response.content,
                 duration_ms=elapsed,
             )
         except Exception as exc:
             elapsed = int((datetime.now(timezone.utc) - start).total_seconds() * 1000)
+            
+            self._tracker.record(
+                agent_id=agent_id,
+                success=False,
+                duration_ms=elapsed,
+                task_type="parallel_task",
+            )
+            
             return AgentResult(
                 agent_id=agent_id,
                 success=False,

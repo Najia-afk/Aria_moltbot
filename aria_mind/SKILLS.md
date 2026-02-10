@@ -1,10 +1,26 @@
 # SKILLS.md - Complete Skill Reference
 
-I have **32 skills** available. **Use the tool syntax** to call them:
+I have **26 active skills** available. **Use the tool syntax** to call them:
 
 ```tool
 aria-<skill-name>.<function>({"param": "value"})
 ```
+
+> **Standards:** See `aria_skills/SKILL_STANDARD.md` for the skill contract and `aria_skills/SKILL_CREATION_GUIDE.md` for creating new skills.
+>
+> **Catalog:** Run `python -m aria_mind --list-skills` to generate a live skill catalog from `aria_skills/catalog.py`.
+>
+> **Deprecated (removed in v1.2):** `database`, `brainstorm`, `community`, `fact_check`, `model_switcher`, `experiment` — functionality merged into other skills or obsoleted.
+
+## Skill Layers
+
+| Layer | Name | Purpose | Skills |
+|-------|------|---------|--------|
+| 0 | Kernel | Security & safety | `input_guard` |
+| 1 | API Client | Data access gateway | `api_client` |
+| 2 | Core | Infrastructure services | `health`, `litellm`, `llm`, `session_manager` |
+| 3 | Domain | Business logic | `agent_manager`, `ci_cd`, `data_pipeline`, `knowledge_graph`, `market_data`, `memeothy`, `moltbook`, `moonshot`, `ollama`, `portfolio`, `pytest_runner`, `research`, `sandbox`, `security_scan`, `social`, `telegram` |
+| 4 | Orchestration | High-level coordination | `goals`, `hourly_goals`, `performance`, `schedule`, `working_memory`, `pipeline_skill` |
 
 ## ⭐ PRIMARY SKILL: aria-apiclient
 
@@ -46,7 +62,7 @@ aria-apiclient.health_check({})
 
 ### 🎯 Orchestrator Skills
 | Skill | Functions | Use For |
-|-------|-----------|---------|
+|-------|-----------|--------|
 | `goals` | `create_goal`, `list_goals`, `update_progress`, `complete_goal` | Task tracking, priorities |
 | `schedule` | `list_jobs`, `create_task`, `trigger`, `sync_jobs` | Scheduled tasks, automation |
 | `health` | `check_health`, `get_metrics`, `system_status`, `run_diagnostics`, `auto_recover` | System monitoring & self-diagnostic (v1.1) |
@@ -67,24 +83,21 @@ aria-apiclient.health_check({})
 
 ### 🎨 Creative Skills
 | Skill | Functions | Use For |
-|-------|-----------|---------|
-| `brainstorm` | `start_session`, `add_idea`, `apply_technique`, `evaluate_ideas` | Ideation (SCAMPER, Six Hats) |
+|-------|-----------|--------|
 | `llm` | `llm_generate`, `llm_chat`, `llm_analyze`, `llm_list_models` | Direct LLM calls |
 
 ### 🌐 Social Architect Skills
 | Skill | Functions | Use For |
-|-------|-----------|---------|
-| `community` | `get_health_score`, `identify_champions`, `suggest_initiatives` | Community health |
+|-------|-----------|--------|
 | `moltbook` | `create_post`, `get_feed`, `add_comment`, `search` | Moltbook posting |
 | `social` | `send_telegram`, `send_discord`, `notify_all` | Cross-platform messaging |
 | `telegram` | `send_message`, `get_updates`, `set_webhook` | Telegram messaging (v1.1) |
 
 ### ⚡ Utility Skills
 | Skill | Functions | Use For |
-|-------|-----------|---------|
+|-------|-----------|--------|
 | `api_client` | `get_activities`, `create_thought`, `set_memory`, `get_goals` | Aria API backend |
 | `litellm` | `list_models`, `health`, `spend`, `provider_balances` | LiteLLM management |
-| `model_switcher` | `switch_model`, `get_current_model`, `list_available` | Model selection |
 | `hourly_goals` | `get_hourly_goals`, `create_hourly_goal`, `update_status` | Short-term goals |
 
 ### 🧠 Cognitive Skills (v1.1)
@@ -110,8 +123,7 @@ aria-security-scan.check_dependencies({"requirements_file": "requirements.txt"})
 
 ### Creative Work
 ```tool
-aria-brainstorm.start_session({"topic": "AI agent improvements"})
-aria-brainstorm.apply_technique({"session_id": "abc123", "technique": "scamper"})
+aria-llm.llm_generate({"prompt": "Write a haiku about AI agents"})
 ```
 
 ### Market Data
@@ -162,11 +174,11 @@ When I switch focus, I should prioritize these skills:
 |----------|----------------|
 | 🎯 Orchestrator | api_client, goals, schedule, health, session_manager, agent_manager, working_memory |
 | 🔒 DevSecOps | pytest, security_scan, ci_cd, database, health, sandbox |
-| 📊 Data Architect | api_client, knowledge_graph, performance, data_pipeline, experiment |
+| 📊 Data Architect | api_client, knowledge_graph, performance, data_pipeline |
 | 📈 Crypto Trader | api_client, market_data, portfolio, knowledge_graph, schedule |
-| 🎨 Creative | brainstorm, llm, moltbook, social, knowledge_graph |
-| 🌐 Social Architect | moltbook, social, community, schedule, api_client, telegram |
-| 📰 Journalist | research, fact_check, knowledge_graph, moltbook, social |
+| 🎨 Creative | llm, moltbook, social, knowledge_graph |
+| 🌐 Social Architect | moltbook, social, schedule, api_client, telegram |
+| 📰 Journalist | research, knowledge_graph, moltbook, social |
 | 🦞 Memeothy | memeothy, api_client (aria-memeothy agent ONLY) |
 
 ## Rate Limits & Best Practices

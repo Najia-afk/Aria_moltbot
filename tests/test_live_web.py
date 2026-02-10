@@ -4,7 +4,7 @@ TICKET-33 · Live Web Dashboard Tests
 Integration tests for every page in aria-web (Flask, port 5000).
 
 • Connects to a running aria-web instance (default: localhost:5000).
-• Override with env var  ARIA_WEB_URL=http://192.168.1.53:5000
+• Override with env var  ARIA_WEB_URL=http://<MAC_HOST>:5000
 • All tests are marked @pytest.mark.integration and auto-skip when the
   web service is unreachable.
 
