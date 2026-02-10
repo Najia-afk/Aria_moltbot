@@ -92,7 +92,11 @@ Instrumentator().instrument(app).expose(app)
 
 @app.middleware("http")
 async def correlation_middleware(request, call_next):
-    from aria_mind.logging_config import correlation_id_var
+    try:
+        from aria_mind.logging_config import correlation_id_var
+    except ModuleNotFoundError:
+        import contextvars as _ctx
+        correlation_id_var = _ctx.ContextVar("correlation_id", default="")
     cid = request.headers.get("X-Correlation-ID", str(_uuid.uuid4())[:8])
     correlation_id_var.set(cid)
     response = await call_next(request)
