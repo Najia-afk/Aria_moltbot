@@ -196,17 +196,25 @@ async def move_goal(
         "done": "completed",
     }
 
+    # Validate board_column
+    if not new_column or new_column not in column_to_status:
+        raise HTTPException(
+            status_code=400,
+            detail=f"board_column is required and must be one of: {list(column_to_status.keys())}",
+        )
+
     values = {
         "board_column": new_column,
         "position": new_position,
     }
 
-    new_status = column_to_status.get(new_column)
-    if new_status:
-        values["status"] = new_status
-        if new_status == "completed":
-            from sqlalchemy import text as sa_text
-            values["completed_at"] = sa_text("NOW()")
+    new_status = column_to_status[new_column]
+    values["status"] = new_status
+    if new_status == "completed":
+        values["completed_at"] = datetime.now()
+    elif new_column != "done":
+        # Clear completed_at when moving away from done
+        values["completed_at"] = None
 
     try:
         uid = uuid.UUID(goal_id)

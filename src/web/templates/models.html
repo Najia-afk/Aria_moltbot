@@ -587,8 +587,7 @@ async function loadBalances() {
     const grid = document.getElementById('balances-grid');
     
     try {
-        const response = await fetch(`${API_URL}/providers/balances`);
-        balanceData = await response.json();
+        balanceData = await fetchWithTimeout(`${API_URL}/providers/balances`, {}, 10000);
         
         let html = '';
         let totalUSD = 0;
@@ -708,8 +707,7 @@ let _spendLogsPromise = null;
 async function fetchSpendLogs(limit = 50) {
     if (_spendLogsPromise) return _spendLogsPromise;
     _spendLogsPromise = (async () => {
-        const resp = await fetch(`${API_URL}/litellm/spend?limit=${limit}&lite=true`);
-        const raw = await resp.json();
+        const raw = await fetchWithTimeout(`${API_URL}/litellm/spend?limit=${limit}&lite=true`);
         window._allSpendLogs = raw.logs || (Array.isArray(raw) ? raw : []);
         return window._allSpendLogs;
     })();
@@ -779,8 +777,7 @@ async function loadModels() {
     const grid = document.getElementById('models-grid');
     
     try {
-        const response = await fetch(`${API_URL}/litellm/models`);
-        const data = await response.json();
+        const data = await fetchWithTimeout(`${API_URL}/litellm/models`);
         allModels = data.data || [];
         
         // Update stat
@@ -1156,8 +1153,7 @@ async function updateCharts() {
         // If no breakdown available, try global spend
         if (inputTokens === 0 && outputTokens === 0) {
             try {
-                const globalResp = await fetch(`${API_URL}/litellm/global-spend`);
-                const globalData = await globalResp.json();
+                const globalData = await fetchWithTimeout(`${API_URL}/litellm/global-spend`);
                 inputTokens = globalData.input_tokens || 0;
                 outputTokens = globalData.output_tokens || 0;
             } catch (err) {

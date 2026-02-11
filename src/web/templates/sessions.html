@@ -225,11 +225,15 @@ function fmtDuration(startStr, endStr) {
 // ── Load Stats ──────────────────────────────────────────────────────────────
 async function loadStats() {
     try {
-        const res = await fetch(`${API_BASE_URL}/sessions/stats`);
-        _stats = await res.json();
+        _stats = await fetchWithTimeout(`${API_BASE_URL}/sessions/stats`);
         renderOverview();
         renderAgentTab();
-    } catch (e) { console.error('Stats error:', e); }
+    } catch (e) {
+        console.error('Stats error:', e);
+        showErrorState('#overview-agents-body',
+            'Could not load session stats — ' + e.message, loadStats);
+        document.querySelectorAll('.stat-card .value').forEach(el => { if (el.textContent === '-') el.textContent = '—'; });
+    }
 }
 
 // ── Load Sessions ───────────────────────────────────────────────────────────
@@ -238,13 +242,16 @@ async function loadSessions(page = 1, limit = 50) {
     let url = `${API_BASE_URL}/sessions?limit=${limit}&page=${page}`;
     if (status) url += `&status=${status}`;
     try {
-        const res = await fetch(url);
-        const data = await res.json();
+        const data = await fetchWithTimeout(url);
         _sessions = data.items || data.sessions || [];
         renderRecent();
         renderHourlyChart();
         if (sessionsPager && data.pages) sessionsPager.update(data);
-    } catch (e) { console.error('Sessions error:', e); }
+    } catch (e) {
+        console.error('Sessions error:', e);
+        showErrorState('#sessions-body',
+            'Could not load sessions — ' + e.message, () => loadSessions(page, limit));
+    }
 }
 
 // ════════════════════════════════════════════════════════════════════════════

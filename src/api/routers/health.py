@@ -138,4 +138,17 @@ async def api_stats(db: AsyncSession = Depends(get_db)):
     )
 
 
-
+@router.get("/health/db")
+async def database_health():
+    """Database health check — reports missing tables, pgvector status, extensions."""
+    try:
+        from db.session import check_database_health
+        return await check_database_health()
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e)[:200],
+            "tables": {},
+            "missing": [],
+            "pgvector_installed": False,
+        }

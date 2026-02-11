@@ -26,7 +26,7 @@ async def _fetch_litellm_spend_logs(limit: int = 200) -> list[dict]:
     litellm_base = SERVICE_URLS.get("litellm", ("http://litellm:4000",))[0]
     try:
         headers = {"Authorization": f"Bearer {LITELLM_MASTER_KEY}"} if LITELLM_MASTER_KEY else {}
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.get(f"{litellm_base}/spend/logs", headers=headers)
             if resp.status_code != 200:
                 return []

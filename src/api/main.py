@@ -11,11 +11,13 @@ Modular API with:
 import logging
 import os
 import time as _time
+import traceback
 import uuid as _uuid
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from prometheus_fastapi_instrumentator import Instrumentator
 
 try:
@@ -26,6 +28,8 @@ except ImportError:
 
 from config import API_VERSION
 from db import async_engine, ensure_schema
+
+_logger = logging.getLogger("aria.api")
 
 
 # ── Lifespan ─────────────────────────────────────────────────────────────────
@@ -106,6 +110,58 @@ app.add_middleware(
 Instrumentator().instrument(app).expose(app)
 
 _perf_logger = logging.getLogger("aria.perf")
+
+
+# ── Global Exception Handlers (S6-07) ────────────────────────────────────────
+# Catch SQLAlchemy errors globally so missing tables return clean 503 JSON
+# instead of crashing the connection (server disconnect).
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Catch-all for unhandled exceptions — return 500 JSON instead of disconnect."""
+    exc_type = type(exc).__name__
+    exc_module = type(exc).__module__ or ""
+
+    # SQLAlchemy ProgrammingError (missing table, bad column, etc.)
+    if "ProgrammingError" in exc_type or "UndefinedTableError" in exc_type:
+        _logger.error("Database schema error on %s %s: %s",
+                       request.method, request.url.path, exc)
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "Database table not available",
+                "detail": str(exc).split("\n")[0][:200],
+                "path": request.url.path,
+                "hint": "Run ensure_schema() or check pgvector extension",
+            },
+        )
+
+    # SQLAlchemy OperationalError (connection issues, etc.)
+    if "OperationalError" in exc_type:
+        _logger.error("Database connection error on %s %s: %s",
+                       request.method, request.url.path, exc)
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "Database connection error",
+                "detail": str(exc).split("\n")[0][:200],
+                "path": request.url.path,
+            },
+        )
+
+    # Everything else — log full traceback but return clean JSON
+    _logger.error("Unhandled exception on %s %s: %s\n%s",
+                   request.method, request.url.path, exc,
+                   traceback.format_exc())
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "Internal server error",
+            "detail": str(exc)[:200],
+            "type": exc_type,
+            "path": request.url.path,
+        },
+    )
 
 
 @app.middleware("http")

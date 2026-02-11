@@ -150,7 +150,7 @@ async def get_session_stats(db: AsyncSession = Depends(get_db)):
     try:
         litellm_base = SERVICE_URLS.get("litellm", ("http://litellm:4000",))[0]
         headers = {"Authorization": f"Bearer {LITELLM_MASTER_KEY}"} if LITELLM_MASTER_KEY else {}
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.get(f"{litellm_base}/global/spend", headers=headers)
             if resp.status_code == 200:
                 gdata = resp.json()

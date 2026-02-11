@@ -411,21 +411,22 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 async function loadStats() {
     const hours = document.getElementById('hours-filter').value;
     try {
-        const res = await fetch(`${API_BASE_URL}/model-usage/stats?hours=${hours}`);
-        _statsData = await res.json();
+        _statsData = await fetchWithTimeout(`${API_BASE_URL}/model-usage/stats?hours=${hours}`);
         renderOverview();
         renderLLMTab();
         renderSkillsTab();
     } catch (e) {
         console.error('Error loading stats:', e);
+        document.querySelectorAll('.stat-card .value').forEach(el => { if (el.textContent === '-') el.textContent = '—'; });
+        showErrorState('#overview-llm-body',
+            'Could not load model usage stats — ' + e.message, loadStats);
     }
 }
 
 // ── Load Recent Usage ───────────────────────────────────────────────────────
 async function loadUsage(page = 1, limit = 50) {
     try {
-        const res = await fetch(`${API_BASE_URL}/model-usage?limit=${limit}&page=${page}`);
-        _usageData = await res.json();
+        _usageData = await fetchWithTimeout(`${API_BASE_URL}/model-usage?limit=${limit}&page=${page}`);
         const items = _usageData.items || _usageData.usage || [];
         _usageData._allItems = items;
         renderRecentLLM();
@@ -433,6 +434,8 @@ async function loadUsage(page = 1, limit = 50) {
         if (usagePager && _usageData.pages) usagePager.update(_usageData);
     } catch (e) {
         console.error('Error loading usage:', e);
+        showErrorState('#llm-recent-body',
+            'Could not load usage data — ' + e.message, () => loadUsage(page, limit));
     }
 }
 

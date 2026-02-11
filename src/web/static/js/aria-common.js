@@ -1,7 +1,49 @@
 /**
- * Shared balance + spend fetching for Aria Blue pages.
+ * Shared helpers for Aria Blue pages.
  * Depends on pricing.js (AriaModels, calculateLogCost, formatMoney).
  */
+
+/**
+ * Fetch with timeout and HTTP status check.
+ * Returns response JSON or throws with useful error message.
+ */
+async function fetchWithTimeout(url, options = {}, timeout = 15000) {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    try {
+        const resp = await fetch(url, { ...options, signal: controller.signal });
+        clearTimeout(id);
+        if (!resp.ok) {
+            const text = await resp.text().catch(() => '');
+            throw new Error(`HTTP ${resp.status}: ${text.slice(0, 100)}`);
+        }
+        return await resp.json();
+    } catch (e) {
+        clearTimeout(id);
+        if (e.name === 'AbortError') throw new Error('Request timed out');
+        throw e;
+    }
+}
+
+/**
+ * Show an error state with optional retry button in a container.
+ * @param {string|Element} container - CSS selector or DOM element
+ * @param {string} message - Error message to display
+ * @param {Function} [retryFn] - Optional callback for retry button
+ */
+function showErrorState(container, message, retryFn) {
+    const el = typeof container === 'string' ? document.querySelector(container) : container;
+    if (!el) return;
+    const retryBtn = retryFn
+        ? `<button onclick="(${retryFn.toString()})()" class="btn btn-sm btn-outline-primary mt-2">⟳ Retry</button>`
+        : '';
+    el.innerHTML = `
+        <div class="text-center text-muted py-3">
+            <div class="mb-2">⚠️ ${message}</div>
+            ${retryBtn}
+        </div>
+    `;
+}
 
 /**
  * Fetch provider balances and return { data, totalUSD }.

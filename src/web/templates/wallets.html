@@ -538,8 +538,7 @@ let balanceChart = null;
 
 async function loadBalances() {
     try {
-        const response = await fetch(`${API_URL}/providers/balances`);
-        const data = await response.json();
+        const data = await fetchWithTimeout(`${API_URL}/providers/balances`, {}, 10000);
         
         let totalUSD = 0;
         
@@ -625,6 +624,12 @@ async function loadBalances() {
     } catch (error) {
         console.error('Error loading balances:', error);
         document.getElementById('total-balance').textContent = 'Error';
+        document.getElementById('kimi-status').textContent = 'Offline';
+        document.getElementById('kimi-status').className = 'wallet-status error';
+        document.getElementById('kimi-balance').textContent = '--';
+        document.getElementById('openrouter-status').textContent = 'Offline';
+        document.getElementById('openrouter-status').className = 'wallet-status error';
+        document.getElementById('openrouter-balance').textContent = '--';
     }
 }
 

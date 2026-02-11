@@ -5,6 +5,7 @@ Driver: psycopg 3 (postgresql+psycopg)
 ORM:    SQLAlchemy 2.0 async
 """
 
+import logging
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -15,6 +16,8 @@ from sqlalchemy.schema import CreateIndex, CreateTable
 
 from config import DATABASE_URL
 from .models import Base
+
+logger = logging.getLogger("aria.db")
 
 
 # ── URL helpers ──────────────────────────────────────────────────────────────
@@ -53,12 +56,71 @@ AsyncSessionLocal = async_sessionmaker(
 # ── Schema bootstrapping ────────────────────────────────────────────────────
 
 async def ensure_schema() -> None:
-    """Create all tables and indexes if they don't exist."""
+    """Create all tables and indexes if they don't exist.
+
+    Installs required extensions (uuid-ossp, pg_trgm, pgvector) first,
+    then creates each table individually so one failure doesn't cascade.
+    """
     async with async_engine.begin() as conn:
-        await conn.execute(text('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"'))
-        await conn.execute(text('CREATE EXTENSION IF NOT EXISTS "pg_trgm"'))
+        # Extensions — pgvector MUST be installed before SemanticMemory table
+        for ext in ("uuid-ossp", "pg_trgm", "vector"):
+            try:
+                await conn.execute(text(f'CREATE EXTENSION IF NOT EXISTS "{ext}"'))
+                logger.info("Extension '%s' ensured", ext)
+            except Exception as e:
+                logger.warning("Extension '%s' not available: %s", ext, e)
+
+        # Tables — create each individually so one failure doesn't block others
+        created = []
+        failed = []
         for table in Base.metadata.sorted_tables:
-            await conn.execute(CreateTable(table, if_not_exists=True))
+            try:
+                await conn.execute(CreateTable(table, if_not_exists=True))
+                created.append(table.name)
+            except Exception as e:
+                failed.append(table.name)
+                logger.error("Failed to create table '%s': %s", table.name, e)
+
+        # Indexes — same per-index error isolation
         for table in Base.metadata.sorted_tables:
             for index in table.indexes:
-                await conn.execute(CreateIndex(index, if_not_exists=True))
+                try:
+                    await conn.execute(CreateIndex(index, if_not_exists=True))
+                except Exception as e:
+                    logger.warning("Failed to create index '%s': %s", index.name, e)
+
+        if failed:
+            logger.warning("Schema bootstrap: %d tables created, %d failed: %s",
+                           len(created), len(failed), failed)
+        else:
+            logger.info("Schema bootstrap: all %d tables ensured", len(created))
+
+
+async def check_database_health() -> dict:
+    """Return database health info: existing tables, missing tables, extensions."""
+    expected_tables = {t.name for t in Base.metadata.sorted_tables}
+    async with async_engine.connect() as conn:
+        # Existing tables
+        result = await conn.execute(text(
+            "SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname = 'public'"
+        ))
+        existing_tables = {row[0] for row in result.all()}
+
+        # Extensions
+        result = await conn.execute(text(
+            "SELECT extname FROM pg_extension"
+        ))
+        extensions = [row[0] for row in result.all()]
+
+        missing = expected_tables - existing_tables
+        table_status = {t: t in existing_tables for t in sorted(expected_tables)}
+
+        return {
+            "status": "ok" if not missing else "degraded",
+            "tables": table_status,
+            "missing": sorted(missing),
+            "existing_count": len(existing_tables & expected_tables),
+            "expected_count": len(expected_tables),
+            "pgvector_installed": "vector" in extensions,
+            "extensions": extensions,
+        }

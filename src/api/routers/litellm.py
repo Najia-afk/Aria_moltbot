@@ -41,7 +41,7 @@ async def api_litellm_health():
 @router.get("/litellm/spend")
 async def api_litellm_spend(limit: int = 50, offset: int = 0, lite: bool = False):
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.get(f"{_litellm_base()}/spend/logs", headers=_auth_headers())
             logs = resp.json()
             if isinstance(logs, list):
@@ -71,7 +71,7 @@ async def api_litellm_spend(limit: int = 50, offset: int = 0, lite: bool = False
 async def api_litellm_global_spend():
     try:
         headers = _auth_headers()
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=5.0) as client:
             global_resp = await client.get(f"{_litellm_base()}/global/spend", headers=headers)
             global_data = global_resp.json() if global_resp.status_code == 200 else {}
 
