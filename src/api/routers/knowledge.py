@@ -52,7 +52,51 @@ async def _log_query(db: AsyncSession, query_type: str, params: dict, result_cou
         await db.rollback()  # Restore session to usable state
 
 
-# ── S4-07: Sync skills endpoint ──────────────────────────────────────────────
+# ── Skill Graph (dedicated tables) ───────────────────────────────────────────
+
+@router.get("/skill-graph")
+async def get_skill_graph(
+    limit: int = Query(1000, ge=1, le=5000),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return all skill graph entities + relations (from dedicated tables)."""
+    entities = (await db.execute(
+        select(SkillGraphEntity).order_by(SkillGraphEntity.name)
+        .limit(limit).offset(offset)
+    )).scalars().all()
+
+    from sqlalchemy.orm import aliased
+    E1 = aliased(SkillGraphEntity)
+    E2 = aliased(SkillGraphEntity)
+    relations_result = await db.execute(
+        select(
+            SkillGraphRelation,
+            E1.name.label("from_name"), E1.type.label("from_type"),
+            E2.name.label("to_name"), E2.type.label("to_type"),
+        )
+        .join(E1, SkillGraphRelation.from_entity == E1.id)
+        .join(E2, SkillGraphRelation.to_entity == E2.id)
+        .limit(limit).offset(offset)
+    )
+    relation_rows = relations_result.all()
+
+    return {
+        "entities": [e.to_dict() for e in entities],
+        "relations": [
+            {
+                **r[0].to_dict(),
+                "from_name": r[1], "from_type": r[2],
+                "to_name": r[3], "to_type": r[4],
+            }
+            for r in relation_rows
+        ],
+        "stats": {
+            "entity_count": len(entities),
+            "relation_count": len(relation_rows),
+        },
+    }
+
 
 @router.post("/knowledge-graph/sync-skills")
 async def sync_skills():

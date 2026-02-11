@@ -354,7 +354,7 @@ const TYPE_SIZES = {
 
 async function loadGraph() {
     try {
-        const resp = await fetch(`${API_BASE}/knowledge-graph?limit=1000`);
+        const resp = await fetch(`${API_BASE}/skill-graph?limit=2000`);
         const data = await resp.json();
         allEntities = data.entities || [];
         allRelations = data.relations || [];
@@ -478,8 +478,7 @@ function onNodeClick(params) {
         (outgoing.length && incoming.length ? '<br>' : '') +
         incoming.map(r => `← ${esc(r.from_name || r.from_entity)} <em>${esc(r.relation_type)}</em> ←`).join('<br>');
 
-    const {auto_generated, ...safeProps} = entity.properties || {};
-    document.getElementById('detail-props').textContent = JSON.stringify(safeProps, null, 2);
+    document.getElementById('detail-props').textContent = JSON.stringify(entity.properties || {}, null, 2);
 }
 
 function applyFilter() {
