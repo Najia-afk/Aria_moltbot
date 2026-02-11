@@ -520,6 +520,80 @@ class AriaAPIClient(BaseSkill):
         except Exception as e:
             return SkillResult.fail(f"Failed to create relation: {e}")
     
+    async def graph_traverse(
+        self,
+        start: str,
+        relation_type: Optional[str] = None,
+        max_depth: int = 3,
+        direction: str = "outgoing",
+    ) -> SkillResult:
+        """BFS traversal from a starting entity. Token-efficient graph exploration."""
+        try:
+            params = {"start": start, "max_depth": max_depth, "direction": direction}
+            if relation_type:
+                params["relation_type"] = relation_type
+            resp = await self._client.get("/knowledge-graph/traverse", params=params)
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to traverse graph: {e}")
+
+    async def graph_search(
+        self,
+        query: str,
+        entity_type: Optional[str] = None,
+        limit: int = 25,
+    ) -> SkillResult:
+        """ILIKE text search for entities matching a query string."""
+        try:
+            params: Dict[str, Any] = {"q": query, "limit": limit}
+            if entity_type:
+                params["entity_type"] = entity_type
+            resp = await self._client.get("/knowledge-graph/search", params=params)
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to search graph: {e}")
+
+    async def find_skill_for_task(self, task: str, limit: int = 5) -> SkillResult:
+        """Find the best skill for a given task description. ~100-200 tokens."""
+        try:
+            resp = await self._client.get(
+                "/knowledge-graph/skill-for-task",
+                params={"task": task, "limit": limit},
+            )
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to find skill for task: {e}")
+
+    async def delete_auto_generated_graph(self) -> SkillResult:
+        """Delete all auto-generated knowledge graph entities + relations."""
+        try:
+            resp = await self._client.delete("/knowledge-graph/auto-generated")
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to delete auto-generated graph: {e}")
+
+    async def sync_skill_graph(self) -> SkillResult:
+        """Trigger skill graph sync (idempotent regeneration)."""
+        try:
+            resp = await self._client.post("/knowledge-graph/sync-skills")
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to sync skill graph: {e}")
+
+    async def get_query_log(self, limit: int = 50) -> SkillResult:
+        """Get recent knowledge graph query log entries."""
+        try:
+            resp = await self._client.get("/knowledge-graph/query-log", params={"limit": limit})
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to get query log: {e}")
+    
     # ========================================
     # Social Posts
     # ========================================

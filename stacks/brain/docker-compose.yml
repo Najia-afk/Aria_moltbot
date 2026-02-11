@@ -418,6 +418,8 @@ services:
       - openclaw_data:/openclaw:ro
       # Mount aria_mind for soul/identity file access (read-only)
       - ../../aria_mind:/aria_mind:ro
+      # Mount aria_skills for knowledge graph sync (read-only)
+      - ../../aria_skills:/aria_skills:ro
       # Mount aria_memories for live memory view (read-only)
       - ../../aria_memories:/aria_memories:ro
       # Docker socket for service control (admin actions)

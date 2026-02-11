@@ -38,6 +38,15 @@ async def lifespan(app: FastAPI):
         print("✅ Database schema ensured (SQLAlchemy 2 + psycopg3)")
     except Exception as e:
         print(f"⚠️  Database init failed: {e}")
+
+    # S4-07: Auto-sync skill graph on startup
+    try:
+        from graph_sync import sync_skill_graph
+        stats = await sync_skill_graph()
+        print(f"✅ Skill graph synced: {stats['entities']} entities, {stats['relations']} relations")
+    except Exception as e:
+        print(f"⚠️  Skill graph sync failed (non-fatal): {e}")
+
     yield
     await async_engine.dispose()
     print("🔌 Database engine disposed")
@@ -185,4 +194,4 @@ app.include_router(gql_router, prefix="/graphql")
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("API_PORT", "8000")))

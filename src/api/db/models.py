@@ -213,6 +213,25 @@ Index("idx_kg_relation_to", KnowledgeRelation.to_entity)
 Index("idx_kg_relation_type", KnowledgeRelation.relation_type)
 
 
+# S4-05: Knowledge Query Log
+class KnowledgeQueryLog(Base):
+    __tablename__ = "knowledge_query_log"
+
+    id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
+    query_type: Mapped[str] = mapped_column(String(50), nullable=False)  # traverse, search, skill_for_task
+    params: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    result_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    tokens_saved: Mapped[int | None] = mapped_column(Integer)
+    used_result: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    source: Mapped[str | None] = mapped_column(String(100))  # api, graphql, cognitive_loop
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
+
+
+Index("idx_kql_query_type", KnowledgeQueryLog.query_type)
+Index("idx_kql_created", KnowledgeQueryLog.created_at.desc())
+Index("idx_kql_source", KnowledgeQueryLog.source)
+
+
 # ── Performance / Review ─────────────────────────────────────────────────────
 
 class PerformanceLog(Base):

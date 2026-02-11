@@ -23,12 +23,17 @@ from .types import (
     ActivityType,
     GoalType,
     GoalUpdateInput,
+    GraphTraversalEdgeType,
+    GraphTraversalNodeType,
+    GraphTraversalResult,
     KnowledgeEntityType,
     KnowledgeRelationType,
     MemoryInput,
     MemoryType,
     ModelUsageType,
     SessionType,
+    SkillCandidate,
+    SkillForTaskResult,
     StatsType,
     ThoughtType,
 )
@@ -268,4 +273,150 @@ async def resolve_update_goal(goal_id: str, input: GoalUpdateInput) -> GoalType:
             position=g.position or 0, assigned_to=g.assigned_to,
             tags=g.tags,
             updated_at=g.updated_at.isoformat() if g.updated_at else None,
+        )
+
+
+# ── S4-08: Graph traversal + skill-for-task resolvers ────────────────────────
+
+async def resolve_graph_traverse(
+    start: str,
+    relation_type: Optional[str] = None,
+    max_depth: int = 3,
+    direction: str = "outgoing",
+) -> GraphTraversalResult:
+    from collections import deque
+    async with AsyncSessionLocal() as db:
+        start_entity = None
+        try:
+            start_uuid = uuid.UUID(start)
+            result = await db.execute(select(KnowledgeEntity).where(KnowledgeEntity.id == start_uuid))
+            start_entity = result.scalar_one_or_none()
+        except ValueError:
+            pass
+        if not start_entity:
+            result = await db.execute(select(KnowledgeEntity).where(KnowledgeEntity.name == start))
+            start_entity = result.scalar_one_or_none()
+        if not start_entity:
+            return GraphTraversalResult(nodes=[], edges=[], total_nodes=0, total_edges=0, traversal_depth=max_depth)
+
+        visited: set[str] = set()
+        queue: deque[tuple] = deque()
+        queue.append((start_entity.id, 0))
+        visited.add(str(start_entity.id))
+
+        nodes = [GraphTraversalNodeType(
+            id=str(start_entity.id), name=start_entity.name,
+            entity_type=start_entity.type, properties=start_entity.properties,
+        )]
+        edges_list: list[GraphTraversalEdgeType] = []
+
+        while queue:
+            current_id, depth = queue.popleft()
+            if depth >= max_depth:
+                continue
+            stmts = []
+            if direction in ("outgoing", "both"):
+                stmt = select(KnowledgeRelation).where(KnowledgeRelation.from_entity == current_id)
+                if relation_type:
+                    stmt = stmt.where(KnowledgeRelation.relation_type == relation_type)
+                stmts.append(("outgoing", stmt))
+            if direction in ("incoming", "both"):
+                stmt = select(KnowledgeRelation).where(KnowledgeRelation.to_entity == current_id)
+                if relation_type:
+                    stmt = stmt.where(KnowledgeRelation.relation_type == relation_type)
+                stmts.append(("incoming", stmt))
+
+            for dir_label, s in stmts:
+                result = await db.execute(s)
+                for rel in result.scalars().all():
+                    edges_list.append(GraphTraversalEdgeType(
+                        id=str(rel.id), from_entity=str(rel.from_entity),
+                        to_entity=str(rel.to_entity), relation_type=rel.relation_type,
+                        properties=rel.properties,
+                    ))
+                    next_id = rel.to_entity if dir_label == "outgoing" else rel.from_entity
+                    if str(next_id) not in visited:
+                        visited.add(str(next_id))
+                        nr = await db.execute(select(KnowledgeEntity).where(KnowledgeEntity.id == next_id))
+                        node = nr.scalar_one_or_none()
+                        if node:
+                            nodes.append(GraphTraversalNodeType(
+                                id=str(node.id), name=node.name,
+                                entity_type=node.type, properties=node.properties,
+                            ))
+                            queue.append((next_id, depth + 1))
+
+        return GraphTraversalResult(
+            nodes=nodes, edges=edges_list,
+            total_nodes=len(nodes), total_edges=len(edges_list),
+            traversal_depth=max_depth,
+        )
+
+
+async def resolve_skill_for_task(task: str, limit: int = 5) -> SkillForTaskResult:
+    from sqlalchemy import or_
+    async with AsyncSessionLocal() as db:
+        pattern = f"%{task}%"
+        skill_stmt = select(KnowledgeEntity).where(
+            KnowledgeEntity.type == "skill",
+            or_(
+                KnowledgeEntity.name.ilike(pattern),
+                KnowledgeEntity.properties["description"].astext.ilike(pattern),
+            ),
+        ).limit(limit)
+        skill_result = await db.execute(skill_stmt)
+        skill_matches = skill_result.scalars().all()
+
+        tool_stmt = select(KnowledgeEntity).where(
+            KnowledgeEntity.type == "tool",
+            or_(
+                KnowledgeEntity.name.ilike(pattern),
+                KnowledgeEntity.properties["description"].astext.ilike(pattern),
+            ),
+        ).limit(20)
+        tool_result = await db.execute(tool_stmt)
+        tool_matches = tool_result.scalars().all()
+
+        tool_skill_ids: set[str] = set()
+        for tool in tool_matches:
+            rel_result = await db.execute(
+                select(KnowledgeRelation).where(
+                    KnowledgeRelation.to_entity == tool.id,
+                    KnowledgeRelation.relation_type == "provides",
+                )
+            )
+            for rel in rel_result.scalars().all():
+                tool_skill_ids.add(str(rel.from_entity))
+
+        indirect_skills = []
+        if tool_skill_ids:
+            indirect_result = await db.execute(
+                select(KnowledgeEntity).where(
+                    KnowledgeEntity.id.in_([uuid.UUID(sid) for sid in tool_skill_ids])
+                )
+            )
+            indirect_skills = indirect_result.scalars().all()
+
+        seen: set[str] = set()
+        candidates: list[SkillCandidate] = []
+        for sk in skill_matches:
+            sid = str(sk.id)
+            if sid not in seen:
+                seen.add(sid)
+                candidates.append(SkillCandidate(
+                    id=sid, name=sk.name, entity_type=sk.type,
+                    properties=sk.properties, match_type="direct", relevance="high",
+                ))
+        for sk in indirect_skills:
+            sid = str(sk.id)
+            if sid not in seen:
+                seen.add(sid)
+                candidates.append(SkillCandidate(
+                    id=sid, name=sk.name, entity_type=sk.type,
+                    properties=sk.properties, match_type="via_tool", relevance="medium",
+                ))
+
+        return SkillForTaskResult(
+            task=task, candidates=candidates[:limit],
+            count=len(candidates[:limit]), tools_searched=len(tool_matches),
         )

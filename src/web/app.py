@@ -152,6 +152,10 @@ def create_app():
     def knowledge():
         return render_template('knowledge.html')
 
+    @app.route('/skill-graph')
+    def skill_graph():
+        return render_template('skill_graph.html')
+
     @app.route('/social')
     def social():
         return render_template('social.html')
@@ -206,4 +210,4 @@ def create_app():
 
 if __name__ == '__main__':
     app = create_app()
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=int(os.environ.get('WEB_PORT', '5000')), debug=True)

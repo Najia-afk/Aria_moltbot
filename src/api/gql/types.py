@@ -128,3 +128,49 @@ class GoalUpdateInput:
     status: Optional[str] = None
     progress: Optional[float] = None
     priority: Optional[int] = None
+
+
+# S4-08: Knowledge Graph query types
+
+@strawberry.type
+class GraphTraversalNodeType:
+    id: str
+    name: str
+    entity_type: str
+    properties: Optional[JSON]
+
+
+@strawberry.type
+class GraphTraversalEdgeType:
+    id: str
+    from_entity: str
+    to_entity: str
+    relation_type: str
+    properties: Optional[JSON]
+
+
+@strawberry.type 
+class GraphTraversalResult:
+    nodes: list[GraphTraversalNodeType]
+    edges: list[GraphTraversalEdgeType]
+    total_nodes: int
+    total_edges: int
+    traversal_depth: int
+
+
+@strawberry.type
+class SkillCandidate:
+    id: str
+    name: str
+    entity_type: str
+    properties: Optional[JSON]
+    match_type: str
+    relevance: str
+
+
+@strawberry.type
+class SkillForTaskResult:
+    task: str
+    candidates: list[SkillCandidate]
+    count: int
+    tools_searched: int

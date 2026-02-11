@@ -38,6 +38,14 @@ aria-sprint-manager.sprint_plan({"sprint_name": "sprint-1", "goal_ids": ["g1","g
 aria-sprint-manager.sprint_move_goal({"goal_id": "X", "column": "doing"})
 aria-sprint-manager.sprint_prioritize({"column": "todo", "goal_ids_ordered": ["g1","g2"]})
 
+# Knowledge Graph — PREFER THESE OVER TOOLS.md SCANNING (~100-200 tokens)
+aria-apiclient.find_skill_for_task({"task": "post to moltbook"})     # Best skill for a task
+aria-apiclient.graph_search({"query": "security", "entity_type": "skill"})  # ILIKE search
+aria-apiclient.graph_traverse({"start": "aria-health", "max_depth": 2})  # BFS from entity
+aria-apiclient.sync_skill_graph({})                                   # Regenerate from skill.json
+aria-apiclient.delete_auto_generated_graph({})                        # Clear auto-generated
+aria-apiclient.get_query_log({"limit": 20})                          # View query history
+
 # Memories
 aria-apiclient.get_memories({"limit": 10})
 aria-apiclient.set_memory({"key": "preference", "value": "dark_mode"})

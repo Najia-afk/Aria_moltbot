@@ -1,0 +1,595 @@
+{% extends "base.html" %}
+{% block title %}Skill Graph{% endblock %}
+
+{% block extra_css %}
+<style>
+    .skill-graph-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+    .skill-graph-header h1 {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+    .graph-stats {
+        display: flex;
+        gap: 1rem;
+    }
+    .stat-box {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        padding: 0.5rem 1rem;
+        text-align: center;
+    }
+    .stat-box .value {
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: var(--accent-primary);
+    }
+    .stat-box .label {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+    }
+    .graph-controls {
+        display: flex;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+    .graph-controls input,
+    .graph-controls select {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        color: var(--text-primary);
+        padding: 0.4rem 0.75rem;
+        border-radius: var(--radius-md);
+        font-size: 0.85rem;
+    }
+    .graph-controls input {
+        min-width: 200px;
+    }
+    .graph-controls button {
+        padding: 0.4rem 0.75rem;
+        background: var(--accent-primary);
+        color: white;
+        border: none;
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        font-size: 0.85rem;
+    }
+    .graph-controls button:hover {
+        opacity: 0.85;
+    }
+    .graph-controls button.secondary {
+        background: var(--bg-tertiary);
+        color: var(--text-secondary);
+        border: 1px solid var(--border-color);
+    }
+    .graph-layout {
+        display: grid;
+        grid-template-columns: 1fr 300px;
+        gap: 1rem;
+        height: calc(100vh - 280px);
+        min-height: 500px;
+    }
+    @media (max-width: 900px) {
+        .graph-layout {
+            grid-template-columns: 1fr;
+            height: auto;
+        }
+    }
+    .graph-container {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        position: relative;
+    }
+    #skill-network {
+        width: 100%;
+        height: 100%;
+        min-height: 500px;
+    }
+    .sidebar {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+    .sidebar-panel {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+    }
+    .sidebar-panel .panel-header {
+        padding: 0.75rem 1rem;
+        background: var(--bg-tertiary);
+        border-bottom: 1px solid var(--border-color);
+        font-size: 0.85rem;
+        font-weight: 600;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .sidebar-panel .panel-content {
+        padding: 0.75rem;
+        max-height: 300px;
+        overflow-y: auto;
+        font-size: 0.85rem;
+    }
+    .node-detail {
+        display: none;
+    }
+    .node-detail.active {
+        display: block;
+    }
+    .detail-field {
+        margin-bottom: 0.5rem;
+    }
+    .detail-field .field-label {
+        color: var(--text-muted);
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        margin-bottom: 0.15rem;
+    }
+    .detail-field .field-value {
+        color: var(--text-primary);
+    }
+    .type-badge {
+        display: inline-block;
+        padding: 0.15rem 0.5rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+    .type-skill { background: #8b5cf620; color: #a78bfa; border: 1px solid #8b5cf640; }
+    .type-tool { background: #10b98120; color: #34d399; border: 1px solid #10b98140; }
+    .type-focus_mode { background: #f59e0b20; color: #fbbf24; border: 1px solid #f59e0b40; }
+    .type-category { background: #3b82f620; color: #60a5fa; border: 1px solid #3b82f640; }
+    .legend {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        padding: 0.5rem;
+    }
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+    }
+    .legend-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+    }
+    .search-results {
+        max-height: 200px;
+        overflow-y: auto;
+    }
+    .search-result-item {
+        padding: 0.4rem 0.5rem;
+        border-bottom: 1px solid var(--border-color);
+        cursor: pointer;
+        font-size: 0.8rem;
+    }
+    .search-result-item:hover {
+        background: var(--bg-tertiary);
+    }
+    .query-log-item {
+        padding: 0.4rem 0.5rem;
+        border-bottom: 1px solid var(--border-color);
+        font-size: 0.8rem;
+    }
+    .query-log-item .query-type {
+        color: var(--accent-primary);
+        font-weight: 500;
+    }
+    .query-log-item .query-time {
+        color: var(--text-muted);
+        font-size: 0.7rem;
+    }
+    .sync-btn {
+        background: var(--bg-tertiary) !important;
+        color: var(--text-secondary) !important;
+        border: 1px solid var(--border-color) !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="skill-graph-header">
+    <h1>🔗 Skill Graph</h1>
+    <div class="graph-stats">
+        <div class="stat-box">
+            <div class="value" id="skill-count">0</div>
+            <div class="label">Skills</div>
+        </div>
+        <div class="stat-box">
+            <div class="value" id="tool-count">0</div>
+            <div class="label">Tools</div>
+        </div>
+        <div class="stat-box">
+            <div class="value" id="entity-count">0</div>
+            <div class="label">Entities</div>
+        </div>
+        <div class="stat-box">
+            <div class="value" id="relation-count">0</div>
+            <div class="label">Relations</div>
+        </div>
+    </div>
+</div>
+
+<div class="graph-controls">
+    <input type="text" id="search-input" placeholder="🔍 Search skills, tools…" oninput="onSearchInput(this.value)">
+    <select id="filter-type" onchange="applyFilter()">
+        <option value="">All Types</option>
+        <option value="skill">Skills</option>
+        <option value="tool">Tools</option>
+        <option value="focus_mode">Focus Modes</option>
+        <option value="category">Categories</option>
+    </select>
+    <select id="filter-category" onchange="applyFilter()">
+        <option value="">All Categories</option>
+    </select>
+    <button onclick="toggleLayout()" class="secondary">⚡ Toggle Layout</button>
+    <button onclick="syncGraph()" class="sync-btn">🔄 Sync</button>
+</div>
+
+<div class="legend">
+    <div class="legend-item"><span class="legend-dot" style="background: #8b5cf6"></span> Skill</div>
+    <div class="legend-item"><span class="legend-dot" style="background: #10b981"></span> Tool</div>
+    <div class="legend-item"><span class="legend-dot" style="background: #f59e0b"></span> Focus Mode</div>
+    <div class="legend-item"><span class="legend-dot" style="background: #3b82f6"></span> Category</div>
+</div>
+
+<div class="graph-layout">
+    <div class="graph-container">
+        <div id="skill-network"></div>
+    </div>
+    <div class="sidebar">
+        <!-- Node Inspector -->
+        <div class="sidebar-panel">
+            <div class="panel-header">📋 Node Inspector</div>
+            <div class="panel-content">
+                <div id="no-selection" class="empty-state" style="padding: 1rem; color: var(--text-muted); font-size: 0.8rem;">
+                    Click a node to inspect
+                </div>
+                <div id="node-detail" class="node-detail">
+                    <div class="detail-field">
+                        <div class="field-label">Name</div>
+                        <div class="field-value" id="detail-name"></div>
+                    </div>
+                    <div class="detail-field">
+                        <div class="field-label">Type</div>
+                        <div class="field-value" id="detail-type"></div>
+                    </div>
+                    <div class="detail-field">
+                        <div class="field-label">Description</div>
+                        <div class="field-value" id="detail-desc"></div>
+                    </div>
+                    <div class="detail-field">
+                        <div class="field-label">Connections</div>
+                        <div class="field-value" id="detail-connections"></div>
+                    </div>
+                    <div class="detail-field">
+                        <div class="field-label">Properties</div>
+                        <div class="field-value" id="detail-props" style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; white-space: pre-wrap;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search Results -->
+        <div class="sidebar-panel">
+            <div class="panel-header">
+                🔍 Search Results
+                <span id="search-count" style="font-weight: normal; color: var(--text-muted);">0</span>
+            </div>
+            <div class="panel-content search-results" id="search-results">
+                <div class="empty-state" style="padding: 0.5rem; color: var(--text-muted); font-size: 0.8rem;">
+                    Type to search…
+                </div>
+            </div>
+        </div>
+
+        <!-- Task Finder -->
+        <div class="sidebar-panel">
+            <div class="panel-header">🎯 Find Skill for Task</div>
+            <div class="panel-content">
+                <input type="text" id="task-input" placeholder="e.g., post to moltbook" style="width: 100%; margin-bottom: 0.5rem; padding: 0.3rem 0.5rem; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: var(--radius-md); color: var(--text-primary); font-size: 0.8rem;">
+                <button onclick="findSkillForTask()" style="width: 100%; padding: 0.3rem; background: var(--accent-primary); color: white; border: none; border-radius: var(--radius-md); cursor: pointer; font-size: 0.8rem;">Find Skill</button>
+                <div id="task-results" style="margin-top: 0.5rem;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+<script>
+const API_BASE = '{{ api_base_url }}';
+let allEntities = [];
+let allRelations = [];
+let network = null;
+let currentLayout = 'physics';
+let nodesDataSet = null;
+let edgesDataSet = null;
+
+// HTML escape helper to prevent XSS
+function esc(str) {
+    if (!str) return '';
+    const d = document.createElement('div');
+    d.textContent = String(str);
+    return d.innerHTML;
+}
+
+const TYPE_COLORS = {
+    skill: '#8b5cf6',
+    tool: '#10b981',
+    focus_mode: '#f59e0b',
+    category: '#3b82f6',
+};
+const TYPE_SHAPES = {
+    skill: 'dot',
+    tool: 'diamond',
+    focus_mode: 'star',
+    category: 'square',
+};
+const TYPE_SIZES = {
+    skill: 25,
+    tool: 12,
+    focus_mode: 30,
+    category: 28,
+};
+
+async function loadGraph() {
+    try {
+        const resp = await fetch(`${API_BASE}/knowledge-graph?limit=1000`);
+        const data = await resp.json();
+        allEntities = data.entities || [];
+        allRelations = data.relations || [];
+
+        // Update stats
+        const skills = allEntities.filter(e => e.type === 'skill').length;
+        const tools = allEntities.filter(e => e.type === 'tool').length;
+        document.getElementById('skill-count').textContent = skills;
+        document.getElementById('tool-count').textContent = tools;
+        document.getElementById('entity-count').textContent = allEntities.length;
+        document.getElementById('relation-count').textContent = allRelations.length;
+
+        // Populate category filter
+        const cats = [...new Set(allEntities.filter(e => e.type === 'category').map(e => e.name))].sort();
+        const catSelect = document.getElementById('filter-category');
+        catSelect.innerHTML = '<option value="">All Categories</option>' +
+            cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+
+        drawGraph(allEntities, allRelations);
+    } catch (err) {
+        console.error('Failed to load graph:', err);
+    }
+}
+
+function drawGraph(entities, relations) {
+    const container = document.getElementById('skill-network');
+
+    const nodes = entities.map(e => ({
+        id: e.id,
+        label: e.name,
+        title: `${e.name}\nType: ${e.type}\n${e.properties?.description || ''}`,
+        color: {
+            background: TYPE_COLORS[e.type] || '#6b7280',
+            border: '#ffffff22',
+            highlight: { background: TYPE_COLORS[e.type] || '#6b7280', border: '#fff' },
+        },
+        font: { color: '#e0e0e0', size: e.type === 'tool' ? 10 : 13 },
+        shape: TYPE_SHAPES[e.type] || 'dot',
+        size: TYPE_SIZES[e.type] || 18,
+        _entity: e,
+    }));
+
+    const edges = relations.map((r, i) => ({
+        id: `e-${i}`,
+        from: r.from_entity,
+        to: r.to_entity,
+        label: r.relation_type,
+        arrows: 'to',
+        color: { color: '#555', highlight: '#a78bfa' },
+        font: { color: '#777', size: 9, strokeWidth: 0 },
+        smooth: { type: 'curvedCW', roundness: 0.15 },
+        width: 1.5,
+    }));
+
+    nodesDataSet = new vis.DataSet(nodes);
+    edgesDataSet = new vis.DataSet(edges);
+
+    const options = getLayoutOptions();
+
+    if (network) {
+        network.setData({ nodes: nodesDataSet, edges: edgesDataSet });
+        network.setOptions(options);
+    } else {
+        network = new vis.Network(container, { nodes: nodesDataSet, edges: edgesDataSet }, options);
+        network.on('click', onNodeClick);
+    }
+}
+
+function getLayoutOptions() {
+    const base = {
+        nodes: { borderWidth: 1.5, shadow: { enabled: true, size: 5 } },
+        edges: { width: 1.5, shadow: false },
+        interaction: { hover: true, tooltipDelay: 150, zoomView: true, dragView: true },
+    };
+    if (currentLayout === 'hierarchical') {
+        return {
+            ...base,
+            layout: { hierarchical: { direction: 'UD', sortMethod: 'hubsize', levelSeparation: 120, nodeSpacing: 80 } },
+            physics: false,
+        };
+    }
+    return {
+        ...base,
+        layout: { hierarchical: false },
+        physics: {
+            enabled: true,
+            solver: 'forceAtlas2Based',
+            forceAtlas2Based: { gravitationalConstant: -40, centralGravity: 0.005, springLength: 120, springConstant: 0.06 },
+            stabilization: { iterations: 150 },
+        },
+    };
+}
+
+function toggleLayout() {
+    currentLayout = currentLayout === 'physics' ? 'hierarchical' : 'physics';
+    if (network) network.setOptions(getLayoutOptions());
+}
+
+function onNodeClick(params) {
+    if (params.nodes.length === 0) {
+        document.getElementById('no-selection').style.display = 'block';
+        document.getElementById('node-detail').classList.remove('active');
+        return;
+    }
+    const nodeId = params.nodes[0];
+    const entity = allEntities.find(e => e.id === nodeId);
+    if (!entity) return;
+
+    document.getElementById('no-selection').style.display = 'none';
+    document.getElementById('node-detail').classList.add('active');
+    document.getElementById('detail-name').textContent = entity.name;
+    document.getElementById('detail-type').innerHTML = `<span class="type-badge type-${entity.type}">${entity.type}</span>`;
+    document.getElementById('detail-desc').textContent = entity.properties?.description || '—';
+
+    // Count connections
+    const outgoing = allRelations.filter(r => r.from_entity === nodeId);
+    const incoming = allRelations.filter(r => r.to_entity === nodeId);
+    document.getElementById('detail-connections').innerHTML =
+        `↗ ${outgoing.length} outgoing, ↙ ${incoming.length} incoming<br>` +
+        outgoing.map(r => `→ <em>${esc(r.relation_type)}</em> → ${esc(r.to_name || r.to_entity)}`).join('<br>') +
+        (outgoing.length && incoming.length ? '<br>' : '') +
+        incoming.map(r => `← ${esc(r.from_name || r.from_entity)} <em>${esc(r.relation_type)}</em> ←`).join('<br>');
+
+    const {auto_generated, ...safeProps} = entity.properties || {};
+    document.getElementById('detail-props').textContent = JSON.stringify(safeProps, null, 2);
+}
+
+function applyFilter() {
+    const typeFilter = document.getElementById('filter-type').value;
+    const catFilter = document.getElementById('filter-category').value;
+
+    let filtered = allEntities;
+    if (typeFilter) filtered = filtered.filter(e => e.type === typeFilter);
+    if (catFilter) {
+        // Find category entity ID
+        const catEntity = allEntities.find(e => e.type === 'category' && e.name === catFilter);
+        if (catEntity) {
+            const relatedIds = new Set();
+            relatedIds.add(catEntity.id);
+            allRelations.forEach(r => {
+                if (r.to_entity === catEntity.id && r.relation_type === 'belongs_to') relatedIds.add(r.from_entity);
+                if (r.from_entity === catEntity.id) relatedIds.add(r.to_entity);
+            });
+            // Also include tools of those skills
+            const skillIds = new Set([...relatedIds]);
+            allRelations.forEach(r => {
+                if (skillIds.has(r.from_entity) && r.relation_type === 'provides') relatedIds.add(r.to_entity);
+            });
+            filtered = filtered.filter(e => relatedIds.has(e.id));
+        }
+    }
+
+    const filteredIds = new Set(filtered.map(e => e.id));
+    const filteredRelations = allRelations.filter(r => filteredIds.has(r.from_entity) && filteredIds.has(r.to_entity));
+    drawGraph(filtered, filteredRelations);
+}
+
+let searchTimeout;
+function onSearchInput(q) {
+    clearTimeout(searchTimeout);
+    if (!q || q.length < 2) {
+        document.getElementById('search-results').innerHTML = '<div class="empty-state" style="padding: 0.5rem; color: var(--text-muted); font-size: 0.8rem;">Type to search…</div>';
+        document.getElementById('search-count').textContent = '0';
+        return;
+    }
+    searchTimeout = setTimeout(() => doSearch(q), 300);
+}
+
+async function doSearch(q) {
+    try {
+        const resp = await fetch(`${API_BASE}/knowledge-graph/search?q=${encodeURIComponent(q)}&limit=20`);
+        const data = await resp.json();
+        const results = data.results || [];
+        document.getElementById('search-count').textContent = results.length;
+        if (results.length === 0) {
+            document.getElementById('search-results').innerHTML = '<div style="padding: 0.5rem; color: var(--text-muted);">No results</div>';
+            return;
+        }
+        document.getElementById('search-results').innerHTML = results.map(e => `
+            <div class="search-result-item" onclick="focusNode('${esc(e.id)}')">
+                <span class="type-badge type-${esc(e.type)}">${esc(e.type)}</span>
+                <strong>${esc(e.name)}</strong>
+                <div style="color: var(--text-muted); font-size: 0.7rem;">${esc(e.properties?.description?.substring(0, 60) || '')}</div>
+            </div>
+        `).join('');
+    } catch (err) {
+        console.error('Search failed:', err);
+    }
+}
+
+function focusNode(nodeId) {
+    if (network) {
+        network.focus(nodeId, { scale: 1.5, animation: { duration: 500, easingFunction: 'easeInOutQuad' } });
+        network.selectNodes([nodeId]);
+        // Trigger click handler
+        onNodeClick({ nodes: [nodeId] });
+    }
+}
+
+async function findSkillForTask() {
+    const task = document.getElementById('task-input').value;
+    if (!task) return;
+    const container = document.getElementById('task-results');
+    container.innerHTML = '<div style="color: var(--text-muted);">Searching…</div>';
+    try {
+        const resp = await fetch(`${API_BASE}/knowledge-graph/skill-for-task?task=${encodeURIComponent(task)}`);
+        const data = await resp.json();
+        const candidates = data.candidates || [];
+        if (candidates.length === 0) {
+            container.innerHTML = '<div style="color: var(--text-muted);">No matching skills found</div>';
+            return;
+        }
+        container.innerHTML = candidates.map(c => `
+            <div class="search-result-item" onclick="focusNode('${esc(c.id)}')">
+                <span class="type-badge type-skill">${esc(c.match_type)}</span>
+                <strong>${esc(c.name)}</strong>
+                <div style="color: var(--text-muted); font-size: 0.7rem;">${esc(c.properties?.description?.substring(0, 60) || '')}</div>
+            </div>
+        `).join('');
+    } catch (err) {
+        container.textContent = 'Error: ' + err.message;
+    }
+}
+
+async function syncGraph() {
+    try {
+        const resp = await fetch(`${API_BASE}/knowledge-graph/sync-skills`, { method: 'POST' });
+        const data = await resp.json();
+        await loadGraph();
+        alert(`Graph synced: ${data.stats?.entities || 0} entities, ${data.stats?.relations || 0} relations`);
+    } catch (err) {
+        alert('Sync failed: ' + err.message);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', loadGraph);
+</script>
+{% endblock %}

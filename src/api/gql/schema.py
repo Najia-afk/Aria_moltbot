@@ -10,11 +10,13 @@ from strawberry.fastapi import GraphQLRouter
 from .resolvers import (
     resolve_activities,
     resolve_goals,
+    resolve_graph_traverse,
     resolve_knowledge_entities,
     resolve_knowledge_relations,
     resolve_memories,
     resolve_memory,
     resolve_sessions,
+    resolve_skill_for_task,
     resolve_stats,
     resolve_thoughts,
     resolve_update_goal,
@@ -24,11 +26,13 @@ from .types import (
     ActivityType,
     GoalType,
     GoalUpdateInput,
+    GraphTraversalResult,
     KnowledgeEntityType,
     KnowledgeRelationType,
     MemoryInput,
     MemoryType,
     SessionType,
+    SkillForTaskResult,
     StatsType,
     ThoughtType,
 )
@@ -83,6 +87,23 @@ class Query:
     @strawberry.field
     async def stats(self) -> StatsType:
         return await resolve_stats()
+
+    # S4-08: Knowledge graph traversal + skill discovery
+    @strawberry.field
+    async def graph_traverse(
+        self, start: str, relation_type: Optional[str] = None,
+        max_depth: int = 3, direction: str = "outgoing",
+    ) -> GraphTraversalResult:
+        return await resolve_graph_traverse(
+            start=start, relation_type=relation_type,
+            max_depth=max_depth, direction=direction,
+        )
+
+    @strawberry.field
+    async def skill_for_task(
+        self, task: str, limit: int = 5,
+    ) -> SkillForTaskResult:
+        return await resolve_skill_for_task(task=task, limit=limit)
 
 
 @strawberry.type
