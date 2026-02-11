@@ -38,7 +38,7 @@ class Heartbeat:
         self._task: Optional[asyncio.Task] = None
         self._last_beat: Optional[datetime] = None
         self._beat_count = 0
-        self._interval = int(os.environ.get("HEARTBEAT_INTERVAL_SECONDS", "60"))
+        self._interval = int(os.environ.get("HEARTBEAT_INTERVAL_SECONDS", "3600"))
         self._health_status: Dict[str, Any] = {}
         self.logger = logging.getLogger("aria.heartbeat")
         
@@ -51,13 +51,13 @@ class Heartbeat:
             "cognition": False,
         }
         
-        # Autonomous action scheduling
+        # Autonomous action scheduling (1 beat = 1 hour)
         self._beats_since_reflection = 0
         self._beats_since_consolidation = 0
         self._beats_since_goal_check = 0
-        self._reflection_interval = 30    # every 30 beats = 30min
-        self._consolidation_interval = 60  # every 60 beats = 1hr
-        self._goal_check_interval = 5      # every 5 beats = 5min (matches GOALS.md work cycle)
+        self._reflection_interval = 6      # every 6 beats = 6hr (matches six_hour_review cron)
+        self._consolidation_interval = 24  # every 24 beats = 24hr (daily)
+        self._goal_check_interval = 1      # every beat = 1hr (matches hourly_goal_check cron)
     
     @property
     def is_healthy(self) -> bool:
