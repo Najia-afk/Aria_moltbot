@@ -1,0 +1,49 @@
+{
+  "name": "aria-conversation-summary",
+  "version": "1.0.0",
+  "description": "📝 Summarize conversations into durable semantic memories",
+  "author": "Aria Blue",
+  "layer": 3,
+  "dependencies": ["api_client"],
+  "focus_affinity": ["memory", "cognitive"],
+  "tools": [
+    {
+      "name": "summarize_session",
+      "description": "Summarize a recent work session and store as episodic/decision memories",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "hours_back": {
+            "type": "integer",
+            "description": "How many hours back to look for activities (default: 24)",
+            "default": 24
+          },
+          "session_id": {
+            "type": "string",
+            "description": "Optional session ID to scope the summary"
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "summarize_topic",
+      "description": "Summarize all memories related to a specific topic",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "topic": {
+            "type": "string",
+            "description": "The topic to summarize"
+          },
+          "max_memories": {
+            "type": "integer",
+            "description": "Maximum number of memories to include",
+            "default": 20
+          }
+        },
+        "required": ["topic"]
+      }
+    }
+  ]
+}

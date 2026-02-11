@@ -1146,6 +1146,185 @@ class AriaAPIClient(BaseSkill):
             page += 1
         return SkillResult.ok({"items": all_items, "total": len(all_items)})
 
+    # ========================================
+    # Semantic Memory (S5-01)
+    # ========================================
+    async def store_memory_semantic(
+        self, content: str, category: str = "general",
+        importance: float = 0.5, source: str = "aria",
+        summary: str = None, metadata: Optional[Dict] = None,
+    ) -> SkillResult:
+        """Store a memory with vector embedding for semantic search."""
+        try:
+            data = {
+                "content": content, "category": category,
+                "importance": importance, "source": source,
+            }
+            if summary:
+                data["summary"] = summary
+            if metadata:
+                data["metadata"] = metadata
+            resp = await self._client.post("/memories/semantic", json=data)
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to store semantic memory: {e}")
+
+    async def search_memories_semantic(
+        self, query: str, limit: int = 5,
+        category: str = None, min_importance: float = 0.0,
+    ) -> SkillResult:
+        """Search memories by semantic similarity."""
+        try:
+            params: Dict[str, Any] = {"query": query, "limit": limit}
+            if category:
+                params["category"] = category
+            if min_importance > 0:
+                params["min_importance"] = min_importance
+            resp = await self._client.get("/memories/search", params=params)
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to search semantic memories: {e}")
+
+    async def summarize_session(self, hours_back: int = 24) -> SkillResult:
+        """Summarize recent session into episodic memory."""
+        try:
+            resp = await self._client.post(
+                "/memories/summarize-session", json={"hours_back": hours_back}
+            )
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to summarize session: {e}")
+
+    # ========================================
+    # Lessons Learned (S5-02)
+    # ========================================
+    async def record_lesson(
+        self, error_pattern: str, error_type: str,
+        resolution: str, skill_name: str = None,
+        context: Optional[Dict] = None,
+    ) -> SkillResult:
+        """Record a lesson learned from an error."""
+        try:
+            data = {
+                "error_pattern": error_pattern, "error_type": error_type,
+                "resolution": resolution,
+            }
+            if skill_name:
+                data["skill_name"] = skill_name
+            if context:
+                data["context"] = context
+            resp = await self._client.post("/lessons", json=data)
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to record lesson: {e}")
+
+    async def check_known_errors(
+        self, error_type: str = None, skill_name: str = None,
+    ) -> SkillResult:
+        """Check if a known resolution exists for an error type."""
+        try:
+            params: Dict[str, Any] = {}
+            if error_type:
+                params["error_type"] = error_type
+            if skill_name:
+                params["skill_name"] = skill_name
+            resp = await self._client.get("/lessons/check", params=params)
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to check known errors: {e}")
+
+    async def get_lessons(self, page: int = 1, per_page: int = 25) -> SkillResult:
+        """List lessons learned."""
+        try:
+            resp = await self._client.get(
+                "/lessons", params={"page": page, "per_page": per_page}
+            )
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to get lessons: {e}")
+
+    # ========================================
+    # Improvement Proposals (S5-06)
+    # ========================================
+    async def propose_improvement(
+        self, title: str, description: str, category: str = "general",
+        risk_level: str = "low", file_path: str = None,
+        current_code: str = None, proposed_code: str = None,
+        rationale: str = "",
+    ) -> SkillResult:
+        """Submit an improvement proposal."""
+        try:
+            data: Dict[str, Any] = {
+                "title": title, "description": description,
+                "category": category, "risk_level": risk_level,
+                "rationale": rationale,
+            }
+            if file_path:
+                data["file_path"] = file_path
+            if current_code is not None:
+                data["current_code"] = current_code
+            if proposed_code is not None:
+                data["proposed_code"] = proposed_code
+            resp = await self._client.post("/proposals", json=data)
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to propose improvement: {e}")
+
+    async def get_proposals(self, status: str = None, page: int = 1) -> SkillResult:
+        """List improvement proposals."""
+        try:
+            params: Dict[str, Any] = {"page": page}
+            if status:
+                params["status"] = status
+            resp = await self._client.get("/proposals", params=params)
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to get proposals: {e}")
+
+    # ========================================
+    # Skill Invocations (S5-07)
+    # ========================================
+    async def record_invocation(
+        self, skill_name: str, tool_name: str,
+        duration_ms: int = 0, success: bool = True,
+        error_type: str = None, tokens_used: int = None,
+        model_used: str = None,
+    ) -> SkillResult:
+        """Record a skill invocation for observability."""
+        try:
+            data: Dict[str, Any] = {
+                "skill_name": skill_name, "tool_name": tool_name,
+                "duration_ms": duration_ms, "success": success,
+            }
+            if error_type:
+                data["error_type"] = error_type
+            if tokens_used is not None:
+                data["tokens_used"] = tokens_used
+            if model_used:
+                data["model_used"] = model_used
+            resp = await self._client.post("/skills/invocations", json=data)
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to record invocation: {e}")
+
+    async def get_skill_stats(self, hours: int = 24) -> SkillResult:
+        """Get skill performance stats."""
+        try:
+            resp = await self._client.get("/skills/stats", params={"hours": hours})
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to get skill stats: {e}")
+
 
 # Singleton instance for convenience
 _client: Optional[AriaAPIClient] = None

@@ -187,6 +187,14 @@ def create_app():
     def skills():
         return render_template('skills.html')
 
+    @app.route('/proposals')
+    def proposals():
+        return render_template('proposals.html')
+
+    @app.route('/skill-stats')
+    def skill_stats():
+        return render_template('skill_stats.html')
+
     @app.route('/soul')
     def soul():
         return render_template('soul.html')

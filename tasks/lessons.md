@@ -56,3 +56,11 @@
 - **Token-efficient endpoints save 10x context.** `sprint-summary` returns ~460 bytes vs ~5000 for `get_goals(limit=100)`. Always provide compact alternatives for Aria's cognitive loop.
 - **Vanilla drag-and-drop is sufficient for Kanban.** HTML5 `draggable="true"` + `ondragstart/ondrop` events work cleanly without libraries. The `PATCH /goals/{id}/move` endpoint handles column + position + status sync atomically.
 - **GraphQL pagination should default to 25, not 100.** Large default limits waste tokens and DB resources. Adding `offset: int = 0` to all resolvers enables cursor-free pagination matching REST endpoints.
+
+## Sprint 5 Execution (2026-02-11)
+- **pgvector needs a dedicated Docker image.** `postgres:16-alpine` does not include pgvector. Use `pgvector/pgvector:pg16` instead. Init-scripts only run on first volume creation — use `patch/*.sql` + `docker cp`/`psql -f` for existing databases.
+- **FastAPI route order matters for parameterized paths.** `/memories/{key}` intercepted `/memories/search` because it was registered first. Always place specific-path routes BEFORE parameterized `{key}` or `{id}` routes.
+- **Integration tests must match actual API response shapes.** Don't guess — read the router to find exact payload format (`{key, value}` not `{content}`), response keys (`{created: true, id}` not the full object), and route prefixes (`/knowledge-graph/` not `/knowledge/`).
+- **No `/api` prefix in runtime.** Despite `root_path="/api"`, internal container requests use bare paths (`/goals`, `/memories`). The `/api` prefix is only for reverse-proxy rewriting.
+- **Embedding-dependent endpoints should accept 502 in tests.** When the embedding model isn't configured in LiteLLM, semantic endpoints return 502. Tests should `assert status in (200, 502)` rather than hard-failing.
+- **DB user comes from `.env`, not convention.** Don't assume `postgres` or `admin` — always check `stacks/brain/.env` for actual credentials (`aria_admin`).

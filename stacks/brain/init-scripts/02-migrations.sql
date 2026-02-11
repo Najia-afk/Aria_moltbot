@@ -418,6 +418,128 @@ BEGIN
     END IF;
 END $$;
 
+-- ============================================================================
+-- Migration 12: Enable pgvector extension + semantic_memories table (S5-01)
+-- ============================================================================
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM schema_migrations WHERE version = 12) THEN
+        CREATE EXTENSION IF NOT EXISTS vector;
+
+        CREATE TABLE IF NOT EXISTS semantic_memories (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            content TEXT NOT NULL,
+            summary TEXT,
+            category VARCHAR(50) DEFAULT 'general',
+            embedding vector(768) NOT NULL,
+            metadata JSONB DEFAULT '{}',
+            importance FLOAT DEFAULT 0.5,
+            source VARCHAR(100),
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            accessed_at TIMESTAMP WITH TIME ZONE,
+            access_count INTEGER DEFAULT 0
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_semantic_category ON semantic_memories(category);
+        CREATE INDEX IF NOT EXISTS idx_semantic_importance ON semantic_memories(importance);
+        CREATE INDEX IF NOT EXISTS idx_semantic_created ON semantic_memories(created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_semantic_source ON semantic_memories(source);
+        -- IVFFlat index for cosine similarity search (created after data exists)
+        -- CREATE INDEX IF NOT EXISTS idx_semantic_embedding ON semantic_memories USING ivfflat (embedding vector_cosine_ops) WITH (lists = 10);
+
+        INSERT INTO schema_migrations (version, description) VALUES (12, 'S5-01: pgvector + semantic_memories table');
+        RAISE NOTICE 'Migration 12 applied: pgvector + semantic_memories';
+    END IF;
+END $$;
+
+-- ============================================================================
+-- Migration 13: Lessons learned table (S5-02)
+-- ============================================================================
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM schema_migrations WHERE version = 13) THEN
+        CREATE TABLE IF NOT EXISTS lessons_learned (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            error_pattern VARCHAR(200) NOT NULL,
+            error_type VARCHAR(100) NOT NULL,
+            skill_name VARCHAR(100),
+            context JSONB DEFAULT '{}',
+            resolution TEXT NOT NULL,
+            resolution_code TEXT,
+            occurrences INTEGER DEFAULT 1,
+            last_occurred TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            effectiveness FLOAT DEFAULT 1.0,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            CONSTRAINT uq_lesson_pattern UNIQUE (error_pattern)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_lesson_pattern ON lessons_learned(error_pattern);
+        CREATE INDEX IF NOT EXISTS idx_lesson_type ON lessons_learned(error_type);
+        CREATE INDEX IF NOT EXISTS idx_lesson_skill ON lessons_learned(skill_name);
+
+        INSERT INTO schema_migrations (version, description) VALUES (13, 'S5-02: lessons_learned table');
+        RAISE NOTICE 'Migration 13 applied: lessons_learned table';
+    END IF;
+END $$;
+
+-- ============================================================================
+-- Migration 14: Improvement proposals table (S5-06)
+-- ============================================================================
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM schema_migrations WHERE version = 14) THEN
+        CREATE TABLE IF NOT EXISTS improvement_proposals (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            title VARCHAR(200) NOT NULL,
+            description TEXT NOT NULL,
+            category VARCHAR(50),
+            risk_level VARCHAR(20) DEFAULT 'low',
+            file_path VARCHAR(500),
+            current_code TEXT,
+            proposed_code TEXT,
+            rationale TEXT,
+            status VARCHAR(20) DEFAULT 'proposed',
+            reviewed_by VARCHAR(100),
+            reviewed_at TIMESTAMP WITH TIME ZONE,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_proposal_status ON improvement_proposals(status);
+        CREATE INDEX IF NOT EXISTS idx_proposal_risk ON improvement_proposals(risk_level);
+        CREATE INDEX IF NOT EXISTS idx_proposal_category ON improvement_proposals(category);
+
+        INSERT INTO schema_migrations (version, description) VALUES (14, 'S5-06: improvement_proposals table');
+        RAISE NOTICE 'Migration 14 applied: improvement_proposals table';
+    END IF;
+END $$;
+
+-- ============================================================================
+-- Migration 15: Skill invocations table (S5-07)
+-- ============================================================================
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM schema_migrations WHERE version = 15) THEN
+        CREATE TABLE IF NOT EXISTS skill_invocations (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            skill_name VARCHAR(100) NOT NULL,
+            tool_name VARCHAR(100) NOT NULL,
+            duration_ms INTEGER,
+            success BOOLEAN DEFAULT true,
+            error_type VARCHAR(100),
+            tokens_used INTEGER,
+            model_used VARCHAR(100),
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_invocation_skill ON skill_invocations(skill_name);
+        CREATE INDEX IF NOT EXISTS idx_invocation_created ON skill_invocations(created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_invocation_success ON skill_invocations(success);
+
+        INSERT INTO schema_migrations (version, description) VALUES (15, 'S5-07: skill_invocations table');
+        RAISE NOTICE 'Migration 15 applied: skill_invocations table';
+    END IF;
+END $$;
+
 -- Print migration summary
 DO $$
 DECLARE

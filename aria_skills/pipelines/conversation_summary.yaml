@@ -1,0 +1,22 @@
+# conversation_summary.yaml — Session summarization pipeline
+name: conversation_summary
+description: "Summarize recent activity into episodic + decision memories"
+
+steps:
+  - name: summarize
+    skill: conversation_summary
+    method: summarize_session
+    params:
+      hours_back: "{{hours_back | default(24)}}"
+    on_failure: stop
+    timeout_seconds: 120
+
+  - name: log_result
+    skill: moltbook
+    method: post_status
+    params:
+      message: "📝 Session summarized: {{context.summarize.data.summary | default('complete')}}"
+    depends_on:
+      - summarize
+    on_failure: skip
+    timeout_seconds: 30

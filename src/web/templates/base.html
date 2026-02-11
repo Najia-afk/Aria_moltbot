@@ -200,8 +200,15 @@
                             <a href="/working-memory" class="{% if '/working-memory' in request.path %}active{% endif %}">
                                 🧠 Working Memory
                             </a>
-                            <a href="/skills" class="{% if '/skills' in request.path %}active{% endif %}">
+                            <a href="/skills" class="{% if '/skills' == request.path %}active{% endif %}">
                                 🔧 Skills
+                            </a>
+                            <div class="divider"></div>
+                            <a href="/proposals" class="{% if '/proposals' in request.path %}active{% endif %}">
+                                💡 Proposals
+                            </a>
+                            <a href="/skill-stats" class="{% if '/skill-stats' in request.path %}active{% endif %}">
+                                📊 Skill Stats
                             </a>
                         </div>
                     </div>

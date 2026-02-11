@@ -164,6 +164,8 @@ from routers.admin import router as admin_router
 from routers.models_config import router as models_config_router
 from routers.working_memory import router as working_memory_router
 from routers.skills import router as skills_router
+from routers.lessons import router as lessons_router
+from routers.proposals import router as proposals_router
 
 app.include_router(health_router)
 app.include_router(activities_router)
@@ -183,6 +185,8 @@ app.include_router(admin_router)
 app.include_router(models_config_router)
 app.include_router(working_memory_router)
 app.include_router(skills_router)
+app.include_router(lessons_router)
+app.include_router(proposals_router)
 
 # ── GraphQL ──────────────────────────────────────────────────────────────────
 

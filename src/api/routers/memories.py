@@ -69,24 +69,9 @@ async def create_or_update_memory(
     return {"id": str(memory.id), "key": key, "upserted": True}
 
 
-@router.get("/memories/{key}")
-async def get_memory_by_key(key: str, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Memory).where(Memory.key == key))
-    memory = result.scalar_one_or_none()
-    if not memory:
-        raise HTTPException(status_code=404, detail="Memory not found")
-    return memory.to_dict()
-
-
-@router.delete("/memories/{key}")
-async def delete_memory(key: str, db: AsyncSession = Depends(get_db)):
-    await db.execute(delete(Memory).where(Memory.key == key))
-    await db.commit()
-    return {"deleted": True, "key": key}
-
-
 # ===========================================================================
 # Semantic Memory (S5-01 — pgvector)
+# Must be registered BEFORE /memories/{key} to avoid route collision
 # ===========================================================================
 
 async def generate_embedding(text: str) -> list[float]:
@@ -282,3 +267,24 @@ async def summarize_session(
 
     await db.commit()
     return {"summary": summary_text, "decisions": decisions, "stored": bool(stored_ids), "ids": stored_ids}
+
+
+# ===========================================================================
+# Key-value memory by key (MUST be after /memories/search to avoid collision)
+# ===========================================================================
+
+
+@router.get("/memories/{key}")
+async def get_memory_by_key(key: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Memory).where(Memory.key == key))
+    memory = result.scalar_one_or_none()
+    if not memory:
+        raise HTTPException(status_code=404, detail="Memory not found")
+    return memory.to_dict()
+
+
+@router.delete("/memories/{key}")
+async def delete_memory(key: str, db: AsyncSession = Depends(get_db)):
+    await db.execute(delete(Memory).where(Memory.key == key))
+    await db.commit()
+    return {"deleted": True, "key": key}

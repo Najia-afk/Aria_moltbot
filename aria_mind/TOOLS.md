@@ -66,10 +66,31 @@ aria-apiclient.get_thoughts({"limit": 10})
 | 📈 Trading | `aria-marketdata`, `aria-portfolio` |
 | 🎨 Creative | `aria-llm`, `aria-memeothy` |
 | 🌐 Social | `aria-moltbook`, `aria-social`, `aria-telegram` |
-| 🧠 Cognitive | `aria-workingmemory`, `aria-pipelineskill` |
+| 🧠 Cognitive | `aria-workingmemory`, `aria-pipelineskill`, `aria-conversation-summary` |
 | ⚡ Utility | `aria-apiclient`, `aria-litellm` |
 
 > **Removed in v1.2:** `aria-database`, `aria-brainstorm`, `aria-community`, `aria-factcheck`, `aria-modelswitcher`, `aria-experiment`
+
+## Composable Pipelines
+
+Pre-built multi-step workflows in `aria_skills/pipelines/`. Run via `aria-pipelineskill`:
+
+| Pipeline | Description | File |
+|----------|-------------|------|
+| `deep_research` | Search → web research → synthesize → store semantic memory | `deep_research.yaml` |
+| `bug_fix` | Check lessons → analyze → propose fix → record lesson | `bug_fix.yaml` |
+| `conversation_summary` | Summarize session → store episodic/decision memories | `conversation_summary.yaml` |
+| `daily_research` | Check goals → research topics → analyze → report | `daily_research.yaml` |
+| `health_and_report` | Health checks → analyze issues → create goals → report | `health_and_report.yaml` |
+| `social_engagement` | Fetch feed → analyze trends → draft post → publish | `social_engagement.yaml` |
+
+```yaml
+# Run a pipeline
+aria-pipelineskill.run({"pipeline": "deep_research", "params": {"topic": "AI safety"}})
+
+# Run bug fix pipeline
+aria-pipelineskill.run({"pipeline": "bug_fix", "params": {"error_type": "timeout", "skill_name": "api_client", "error_message": "Connection timed out"}})
+```
 
 ## Quick Examples
 

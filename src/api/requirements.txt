@@ -12,3 +12,4 @@ httpx>=0.26.0
 python-dotenv>=1.0.0
 prometheus-fastapi-instrumentator>=6.1.0
 strawberry-graphql[fastapi]>=0.220.0
+pgvector>=0.3.0

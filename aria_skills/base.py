@@ -222,6 +222,7 @@ class BaseSkill(ABC):
     ) -> T:
         """
         Execute a function with automatic retry on transient failures.
+        Checks lessons_learned for known resolutions before retrying (S5-02).
         
         Args:
             func: The async function to execute
@@ -244,7 +245,11 @@ class BaseSkill(ABC):
             async def _retry_wrapper():
                 return await func(*args, **kwargs)
             
-            return await _retry_wrapper()
+            try:
+                return await _retry_wrapper()
+            except Exception as e:
+                await self._handle_error(e)
+                raise
         else:
             # Fallback without tenacity
             last_error = None
@@ -256,7 +261,34 @@ class BaseSkill(ABC):
                     if attempt < max_attempts - 1:
                         import asyncio
                         await asyncio.sleep(2 ** attempt)  # Exponential backoff
+            await self._handle_error(last_error)
             raise last_error
+
+    async def _handle_error(self, error: Exception):
+        """Check lessons_learned for known resolutions (S5-02)."""
+        try:
+            from aria_skills.api_client import get_api_client
+            client = await get_api_client()
+            error_type = type(error).__name__
+
+            lessons = await client.check_known_errors(
+                error_type=error_type, skill_name=self.name
+            )
+            if lessons.success and lessons.data.get("has_resolution"):
+                resolution = lessons.data["lessons"][0].get("resolution", "")
+                self.logger.info(
+                    f"Known error pattern found. Resolution: {resolution}"
+                )
+            else:
+                # Record new error for future learning
+                await client.record_lesson(
+                    error_pattern=f"{self.name}_{error_type}",
+                    error_type=error_type,
+                    resolution="unresolved — needs investigation",
+                    skill_name=self.name,
+                )
+        except Exception:
+            pass  # Never let error handling break the skill
     
     async def execute_with_metrics(
         self, 
@@ -305,6 +337,24 @@ class BaseSkill(ABC):
                 (self._avg_latency_ms * (self._use_count - 1) + latency_ms) 
                 / self._use_count
             )
+            
+            # Record skill invocation via API (S5-07)
+            if self.name != "api_client":
+                try:
+                    from aria_skills.api_client import get_api_client
+                    import asyncio
+                    client = await get_api_client()
+                    asyncio.ensure_future(
+                        client.record_invocation(
+                            skill_name=self.name,
+                            tool_name=operation_name,
+                            duration_ms=int(latency_ms),
+                            success=success,
+                            error_type=error_type,
+                        )
+                    )
+                except Exception:
+                    pass  # Never let observability break the skill
             
             # Prometheus metrics
             if HAS_PROMETHEUS:

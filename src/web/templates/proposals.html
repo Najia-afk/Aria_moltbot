@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}Improvement Proposals — Aria Blue{% endblock %}
+
+{% block extra_css %}
+<style>
+.proposals-grid { display: grid; gap: 1rem; margin-top: 1rem; }
+.proposal-card { background: var(--surface, #1e1e2e); border: 1px solid var(--border, #3a3a5e); border-radius: 12px; padding: 1.5rem; }
+.proposal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem; }
+.proposal-title { font-size: 1.1rem; font-weight: 600; color: var(--text, #e0e0e0); }
+.proposal-meta { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+.badge { padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 500; }
+.badge-proposed { background: rgba(108, 92, 231, 0.2); color: #a78bfa; }
+.badge-approved { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
+.badge-rejected { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+.badge-implemented { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+.badge-low { background: rgba(34, 197, 94, 0.15); color: #4ade80; }
+.badge-medium { background: rgba(234, 179, 8, 0.15); color: #facc15; }
+.badge-high { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+.proposal-desc { color: var(--text-muted, #888); font-size: 0.9rem; margin-bottom: 1rem; }
+.diff-view { background: #0d1117; border-radius: 8px; padding: 1rem; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; margin: 0.75rem 0; max-height: 300px; overflow: auto; }
+.diff-current { color: #f87171; }
+.diff-proposed { color: #4ade80; }
+.diff-label { color: #888; font-size: 0.7rem; text-transform: uppercase; margin-bottom: 0.25rem; }
+.proposal-actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
+.btn-approve { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); padding: 6px 16px; border-radius: 8px; cursor: pointer; }
+.btn-reject { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 6px 16px; border-radius: 8px; cursor: pointer; }
+.btn-approve:hover { background: rgba(34, 197, 94, 0.35); }
+.btn-reject:hover { background: rgba(239, 68, 68, 0.35); }
+.stats-bar { display: flex; gap: 1.5rem; margin-bottom: 1rem; }
+.stat-item { text-align: center; }
+.stat-value { font-size: 1.5rem; font-weight: 700; color: var(--text, #e0e0e0); }
+.stat-label { font-size: 0.75rem; color: var(--text-muted, #888); }
+.filter-bar { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+.filter-btn { padding: 6px 14px; border-radius: 20px; border: 1px solid var(--border, #3a3a5e); background: transparent; color: var(--text-muted, #888); cursor: pointer; font-size: 0.8rem; }
+.filter-btn.active { background: var(--primary, #6c5ce7); color: white; border-color: var(--primary, #6c5ce7); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 1000px; margin: 2rem auto; padding: 0 1rem;">
+    <h1>💡 Improvement Proposals</h1>
+    <p style="color: var(--text-muted);">Aria's self-improvement suggestions — review, approve, or reject.</p>
+
+    <div class="stats-bar" id="stats-bar"></div>
+
+    <div class="filter-bar">
+        <button class="filter-btn active" onclick="filterProposals(null)">All</button>
+        <button class="filter-btn" onclick="filterProposals('proposed')">Proposed</button>
+        <button class="filter-btn" onclick="filterProposals('approved')">Approved</button>
+        <button class="filter-btn" onclick="filterProposals('rejected')">Rejected</button>
+        <button class="filter-btn" onclick="filterProposals('implemented')">Implemented</button>
+    </div>
+
+    <div class="proposals-grid" id="proposals-list">
+        <p style="color: var(--text-muted);">Loading proposals...</p>
+    </div>
+</div>
+
+<script>
+let allProposals = [];
+let currentFilter = null;
+
+async function loadProposals(status) {
+    const params = new URLSearchParams({page: 1, per_page: 50});
+    if (status) params.set('status', status);
+    const resp = await fetch(`/api/proposals?${params}`);
+    const data = await resp.json();
+    return data.items || [];
+}
+
+function renderProposals(proposals) {
+    const el = document.getElementById('proposals-list');
+    if (!proposals.length) {
+        el.innerHTML = '<p style="color: var(--text-muted);">No proposals found.</p>';
+        return;
+    }
+    el.innerHTML = proposals.map(p => `
+        <div class="proposal-card" data-id="${p.id}">
+            <div class="proposal-header">
+                <div class="proposal-title">${escapeHtml(p.title)}</div>
+            </div>
+            <div class="proposal-meta">
+                <span class="badge badge-${p.status}">${p.status}</span>
+                <span class="badge badge-${p.risk_level}">${p.risk_level} risk</span>
+                ${p.category ? `<span class="badge" style="background: rgba(108,92,231,0.15); color: #a78bfa;">${p.category}</span>` : ''}
+            </div>
+            <div class="proposal-desc">${escapeHtml(p.description)}</div>
+            ${p.file_path ? `<div style="font-size: 0.8rem; color: var(--text-muted);">📄 ${escapeHtml(p.file_path)}</div>` : ''}
+            ${p.current_code || p.proposed_code ? `
+                <div class="diff-view">
+                    ${p.current_code ? `<div class="diff-label">Current</div><pre class="diff-current">${escapeHtml(p.current_code)}</pre>` : ''}
+                    ${p.proposed_code ? `<div class="diff-label">Proposed</div><pre class="diff-proposed">${escapeHtml(p.proposed_code)}</pre>` : ''}
+                </div>
+            ` : ''}
+            ${p.rationale ? `<div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem;"><strong>Rationale:</strong> ${escapeHtml(p.rationale)}</div>` : ''}
+            ${p.status === 'proposed' ? `
+                <div class="proposal-actions">
+                    <button class="btn-approve" onclick="reviewProposal('${p.id}', 'approved')">✅ Approve</button>
+                    <button class="btn-reject" onclick="reviewProposal('${p.id}', 'rejected')">❌ Reject</button>
+                </div>
+            ` : ''}
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.75rem;">
+                Created: ${new Date(p.created_at).toLocaleString()}
+                ${p.reviewed_by ? ` · Reviewed by ${p.reviewed_by}` : ''}
+            </div>
+        </div>
+    `).join('');
+}
+
+function updateStats(proposals) {
+    const counts = {proposed: 0, approved: 0, rejected: 0, implemented: 0};
+    proposals.forEach(p => { counts[p.status] = (counts[p.status] || 0) + 1; });
+    document.getElementById('stats-bar').innerHTML = Object.entries(counts).map(([k, v]) => `
+        <div class="stat-item"><div class="stat-value">${v}</div><div class="stat-label">${k}</div></div>
+    `).join('');
+}
+
+async function filterProposals(status) {
+    currentFilter = status;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+    const proposals = await loadProposals(status);
+    renderProposals(proposals);
+}
+
+async function reviewProposal(id, status) {
+    await fetch(`/api/proposals/${id}`, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({status, reviewed_by: 'najia'})
+    });
+    const proposals = await loadProposals(currentFilter);
+    allProposals = proposals;
+    renderProposals(proposals);
+    updateStats(await loadProposals(null));
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+(async () => {
+    allProposals = await loadProposals(null);
+    renderProposals(allProposals);
+    updateStats(allProposals);
+})();
+</script>
+{% endblock %}

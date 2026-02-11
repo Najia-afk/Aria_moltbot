@@ -1,7 +1,7 @@
 services:
-  # PostgreSQL Database
+  # PostgreSQL Database (pgvector enabled for semantic memory)
   aria-db:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     container_name: aria-db
     restart: unless-stopped
     environment:

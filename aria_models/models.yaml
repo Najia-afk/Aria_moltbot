@@ -267,6 +267,25 @@
         "model": "ollama/qwen3:8b",
         "api_base": "http://host.docker.internal:11434"
       }
+    },
+    "nomic-embed-text": {
+      "provider": "litellm",
+      "name": "Nomic Embed Text (Ollama Local)",
+      "type": "embedding",
+      "reasoning": false,
+      "input": ["text"],
+      "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+      "dimensions": 768,
+      "contextWindow": 8192,
+      "maxTokens": 0,
+      "tier": "local",
+      "routeSkill": "litellm",
+      "purpose": "semantic memory search",
+      "use_for": ["embedding"],
+      "litellm": {
+        "model": "ollama/nomic-embed-text",
+        "api_base": "http://host.docker.internal:11434"
+      }
     }
   },
   "criteria": {

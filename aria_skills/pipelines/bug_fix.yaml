@@ -1,0 +1,71 @@
+# bug_fix.yaml — Bug investigation and remediation pipeline
+name: bug_fix
+description: "Check lessons → reproduce → analyze → fix → test → record lesson"
+
+steps:
+  - name: check_lessons
+    skill: api_client
+    method: check_known_errors
+    params:
+      error_type: "{{error_type}}"
+      skill_name: "{{skill_name}}"
+    on_failure: skip
+    timeout_seconds: 15
+
+  - name: analyze_error
+    skill: llm
+    method: generate
+    params:
+      prompt: |
+        Analyze this error and suggest a fix:
+        Error type: {{error_type}}
+        Error message: {{error_message}}
+        Skill: {{skill_name}}
+        Known resolution: {{context.check_lessons.resolution | default('none')}}
+
+        Provide:
+        1. Root cause analysis
+        2. Suggested fix (code if applicable)
+        3. Prevention strategy
+      max_tokens: 600
+    depends_on:
+      - check_lessons
+    on_failure: stop
+    timeout_seconds: 90
+
+  - name: propose_fix
+    skill: api_client
+    method: propose_improvement
+    params:
+      title: "Fix: {{error_type}} in {{skill_name}}"
+      description: "{{context.analyze_error.text}}"
+      category: bugfix
+      risk_level: medium
+    depends_on:
+      - analyze_error
+    condition: "not context.check_lessons.get('resolution')"
+    on_failure: skip
+    timeout_seconds: 30
+
+  - name: record_lesson
+    skill: api_client
+    method: record_lesson
+    params:
+      error_pattern: "{{error_type}}_{{skill_name}}"
+      error_type: "{{error_type}}"
+      skill_name: "{{skill_name}}"
+      resolution: "{{context.analyze_error.text[:500]}}"
+    depends_on:
+      - analyze_error
+    on_failure: "retry:2"
+    timeout_seconds: 30
+
+  - name: notify
+    skill: moltbook
+    method: post_status
+    params:
+      message: "🐛 Bug analyzed: {{error_type}} in {{skill_name}} — fix proposed"
+    depends_on:
+      - record_lesson
+    on_failure: skip
+    timeout_seconds: 30

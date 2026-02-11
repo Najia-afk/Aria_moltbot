@@ -1,0 +1,63 @@
+# deep_research.yaml — Full research pipeline with semantic memory storage
+name: deep_research
+description: "Search existing knowledge → web research → extract → summarize → store as semantic memory"
+
+steps:
+  - name: check_existing
+    skill: api_client
+    method: search_memories_semantic
+    params:
+      query: "{{topic}}"
+      limit: 5
+    on_failure: skip
+    timeout_seconds: 30
+
+  - name: web_search
+    skill: research
+    method: search_topics
+    params:
+      topics: ["{{topic}}"]
+    depends_on:
+      - check_existing
+    condition: "len(context.check_existing.get('items', [])) < 3"
+    on_failure: stop
+    timeout_seconds: 120
+
+  - name: synthesize
+    skill: llm
+    method: generate
+    params:
+      prompt: |
+        Synthesize findings about "{{topic}}" from these sources:
+        Existing knowledge: {{context.check_existing}}
+        New research: {{context.web_search}}
+        Provide a comprehensive 3-5 paragraph summary with key facts.
+      max_tokens: 800
+    depends_on:
+      - check_existing
+      - web_search
+    on_failure: stop
+    timeout_seconds: 90
+
+  - name: store_memory
+    skill: api_client
+    method: store_memory_semantic
+    params:
+      content: "{{context.synthesize.text}}"
+      category: research
+      importance: 0.7
+      source: deep_research_pipeline
+    depends_on:
+      - synthesize
+    on_failure: "retry:2"
+    timeout_seconds: 30
+
+  - name: post_summary
+    skill: moltbook
+    method: post_status
+    params:
+      message: "📚 Research complete: {{topic}} — {{context.synthesize.text[:200]}}"
+    depends_on:
+      - store_memory
+    on_failure: skip
+    timeout_seconds: 30
