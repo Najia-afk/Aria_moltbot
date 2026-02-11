@@ -22,14 +22,21 @@ jobs:
     text: "Read HEARTBEAT.md work_cycle section. Check goals, pick highest priority, make progress, log activity. Use api_client for all data ops."
     agent: main
     session: isolated
-    delivery: announce
+    delivery: none
 
   - name: hourly_goal_check
     cron: "0 0 * * * *"
     text: "Read HEARTBEAT.md hourly_goal_check section. Check current hourly goal, attempt completion, create next goal. Use api_client for all data ops."
     agent: main
     session: isolated
-    delivery: announce
+    delivery: none
+
+  - name: hourly_health_check
+    cron: "0 0 * * * *"
+    text: "Run health check on all systems: exec python3 /root/.openclaw/workspace/skills/run_skill.py health health_check '{}', exec python3 /root/.openclaw/workspace/skills/run_skill.py api_client health_check '{}'. If any check fails, log an alert via api_client. If all pass, silently continue."
+    agent: main
+    session: isolated
+    delivery: none
 
   # ── Social (delegated to aria-talk by main) ─────────────────────
 
@@ -123,4 +130,4 @@ jobs:
     text: "Sync current state to aria_memories/memory/ files. Use working_memory.sync_to_files() to write context.json with active goals, recent activities, and system health. These files are read by OpenClaw at session start to reduce token usage."
     agent: main
     session: isolated
-    delivery: silent
+    delivery: none
