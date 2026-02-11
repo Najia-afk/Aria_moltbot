@@ -18,6 +18,13 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy import inspect as sa_inspect
 
+try:
+    from pgvector.sqlalchemy import Vector
+    HAS_PGVECTOR = True
+except ImportError:
+    HAS_PGVECTOR = False
+    Vector = None  # type: ignore
+
 
 # ── Base ─────────────────────────────────────────────────────────────────────
 
@@ -577,3 +584,100 @@ class SkillStatusRecord(Base):
 Index("idx_skill_status_name", SkillStatusRecord.skill_name)
 Index("idx_skill_status_status", SkillStatusRecord.status)
 Index("idx_skill_status_layer", SkillStatusRecord.layer)
+
+
+# ── Semantic Memory (S5-01: pgvector) ────────────────────────────────────────
+
+class SemanticMemory(Base):
+    __tablename__ = "semantic_memories"
+
+    id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    summary: Mapped[str | None] = mapped_column(Text)
+    category: Mapped[str] = mapped_column(String(50), server_default=text("'general'"))
+    embedding: Mapped[Any] = mapped_column(Vector(768), nullable=False) if HAS_PGVECTOR else mapped_column(JSONB, nullable=False)
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSONB, server_default=text("'{}'::jsonb"))
+    importance: Mapped[float] = mapped_column(Float, server_default=text("0.5"))
+    source: Mapped[str | None] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
+    accessed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    access_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+
+
+Index("idx_semantic_category", SemanticMemory.category)
+Index("idx_semantic_importance", SemanticMemory.importance)
+Index("idx_semantic_created", SemanticMemory.created_at.desc())
+Index("idx_semantic_source", SemanticMemory.source)
+
+
+# ── Lessons Learned (S5-02) ──────────────────────────────────────────────────
+
+class LessonLearned(Base):
+    __tablename__ = "lessons_learned"
+
+    id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
+    error_pattern: Mapped[str] = mapped_column(String(200), nullable=False)
+    error_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    skill_name: Mapped[str | None] = mapped_column(String(100))
+    context: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    resolution: Mapped[str] = mapped_column(Text, nullable=False)
+    resolution_code: Mapped[str | None] = mapped_column(Text)
+    occurrences: Mapped[int] = mapped_column(Integer, server_default=text("1"))
+    last_occurred: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
+    effectiveness: Mapped[float] = mapped_column(Float, server_default=text("1.0"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
+
+    __table_args__ = (
+        UniqueConstraint("error_pattern", name="uq_lesson_pattern"),
+    )
+
+
+Index("idx_lesson_pattern", LessonLearned.error_pattern)
+Index("idx_lesson_type", LessonLearned.error_type)
+Index("idx_lesson_skill", LessonLearned.skill_name)
+
+
+# ── Improvement Proposals (S5-06) ────────────────────────────────────────────
+
+class ImprovementProposal(Base):
+    __tablename__ = "improvement_proposals"
+
+    id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    category: Mapped[str | None] = mapped_column(String(50))
+    risk_level: Mapped[str] = mapped_column(String(20), server_default=text("'low'"))
+    file_path: Mapped[str | None] = mapped_column(String(500))
+    current_code: Mapped[str | None] = mapped_column(Text)
+    proposed_code: Mapped[str | None] = mapped_column(Text)
+    rationale: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), server_default=text("'proposed'"))
+    reviewed_by: Mapped[str | None] = mapped_column(String(100))
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
+
+
+Index("idx_proposal_status", ImprovementProposal.status)
+Index("idx_proposal_risk", ImprovementProposal.risk_level)
+Index("idx_proposal_category", ImprovementProposal.category)
+
+
+# ── Skill Invocations (S5-07) ────────────────────────────────────────────────
+
+class SkillInvocation(Base):
+    __tablename__ = "skill_invocations"
+
+    id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
+    skill_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    tool_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    duration_ms: Mapped[int | None] = mapped_column(Integer)
+    success: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
+    error_type: Mapped[str | None] = mapped_column(String(100))
+    tokens_used: Mapped[int | None] = mapped_column(Integer)
+    model_used: Mapped[str | None] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
+
+
+Index("idx_invocation_skill", SkillInvocation.skill_name)
+Index("idx_invocation_created", SkillInvocation.created_at.desc())
+Index("idx_invocation_success", SkillInvocation.success)
