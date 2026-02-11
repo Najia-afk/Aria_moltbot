@@ -6,27 +6,34 @@ import json as json_lib
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy import select, delete
+from sqlalchemy import func, select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import Memory
 from deps import get_db
+from pagination import paginate_query, build_paginated_response
 
 router = APIRouter(tags=["Memories"])
 
 
 @router.get("/memories")
 async def get_memories(
-    limit: int = 20,
+    page: int = 1,
+    limit: int = 25,
     category: str = None,
     db: AsyncSession = Depends(get_db),
 ):
-    stmt = select(Memory).order_by(Memory.updated_at.desc()).limit(limit)
+    base = select(Memory).order_by(Memory.updated_at.desc())
     if category:
-        stmt = stmt.where(Memory.category == category)
-    result = await db.execute(stmt)
-    rows = result.scalars().all()
-    return {"memories": [m.to_dict() for m in rows], "count": len(rows)}
+        base = base.where(Memory.category == category)
+
+    count_stmt = select(func.count()).select_from(base.subquery())
+    total = (await db.execute(count_stmt)).scalar() or 0
+
+    stmt, _ = paginate_query(base, page, limit)
+    rows = (await db.execute(stmt)).scalars().all()
+    items = [m.to_dict() for m in rows]
+    return build_paginated_response(items, total, page, limit)
 
 
 @router.post("/memories")

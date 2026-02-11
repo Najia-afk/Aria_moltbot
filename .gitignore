@@ -32,7 +32,7 @@ aria_memory/
 aria_memory/**
 
 # plans - Sensitive strategic documents (never commit)
-plans/
+#plans/
 
 # Database dumps
 *.sql

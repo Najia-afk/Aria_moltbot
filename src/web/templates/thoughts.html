@@ -70,18 +70,22 @@
 <div class="thoughts-grid grid-2" id="thoughtsContainer">
     <div class="loading"><div class="spinner"></div></div>
 </div>
+<div id="thoughts-pagination"></div>
 {% endblock %}
 
 {% block extra_js %}
 <script data-page-script>
-async function loadThoughts() {
+let thoughtsPager;
+
+async function loadThoughts(page = 1, limit = 25) {
     const container = document.getElementById('thoughtsContainer');
     container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
     
     try {
-        const response = await fetch(`${window.ARIA_API_BASE_URL}/thoughts?limit=20`);
+        const response = await fetch(`${window.ARIA_API_BASE_URL}/thoughts?limit=${limit}&page=${page}`);
         const data = await response.json();
-        renderThoughts(data.thoughts || []);
+        renderThoughts(data.items || data.thoughts || []);
+        if (thoughtsPager && data.pages) thoughtsPager.update(data);
     } catch (error) {
         container.innerHTML = '<div class="empty-state"><p>Error loading thoughts</p></div>';
     }
@@ -129,6 +133,10 @@ function formatTime(ts) {
 }
 
 document.getElementById('searchInput').addEventListener('input', filterThoughts);
+thoughtsPager = new AriaPagination('thoughts-pagination', {
+    onPageChange: (page, limit) => loadThoughts(page, limit),
+    limit: 25
+});
 document.addEventListener('DOMContentLoaded', loadThoughts);
 </script>
 {% endblock %}

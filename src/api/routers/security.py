@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import SecurityEvent
 from deps import get_db
+from pagination import paginate_query, build_paginated_response
 
 router = APIRouter(tags=["Security"])
 
@@ -29,19 +30,23 @@ def _parse_jsonb(val, default):
 
 @router.get("/security-events")
 async def api_security_events(
-    limit: int = 100,
+    page: int = 1,
+    limit: int = 25,
     threat_level: Optional[str] = None,
     blocked_only: bool = False,
     db: AsyncSession = Depends(get_db),
 ):
-    stmt = select(SecurityEvent).order_by(SecurityEvent.created_at.desc()).limit(limit)
+    base = select(SecurityEvent).order_by(SecurityEvent.created_at.desc())
     if threat_level:
-        stmt = stmt.where(SecurityEvent.threat_level == threat_level.upper())
+        base = base.where(SecurityEvent.threat_level == threat_level.upper())
     if blocked_only:
-        stmt = stmt.where(SecurityEvent.blocked == True)  # noqa: E712
+        base = base.where(SecurityEvent.blocked == True)  # noqa: E712
 
-    result = await db.execute(stmt)
-    return [
+    count_stmt = select(func.count()).select_from(base.subquery())
+    total = (await db.execute(count_stmt)).scalar() or 0
+
+    stmt, _ = paginate_query(base, page, limit)
+    items = [
         {
             "id": str(e.id),
             "threat_level": e.threat_level,
@@ -54,8 +59,9 @@ async def api_security_events(
             "details": _parse_jsonb(e.details, {}),
             "created_at": e.created_at.isoformat() if e.created_at else None,
         }
-        for e in result.scalars().all()
+        for e in (await db.execute(stmt)).scalars().all()
     ]
+    return build_paginated_response(items, total, page, limit)
 
 
 @router.post("/security-events")

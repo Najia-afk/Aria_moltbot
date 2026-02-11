@@ -90,10 +90,10 @@ class AriaAPIClient(BaseSkill):
     # ========================================
     # Activities
     # ========================================
-    async def get_activities(self, limit: int = 100) -> SkillResult:
-        """Get recent activities."""
+    async def get_activities(self, limit: int = 50, page: int = 1) -> SkillResult:
+        """Get recent activities (paginated)."""
         try:
-            resp = await self._client.get(f"/activities?limit={limit}")
+            resp = await self._client.get(f"/activities?limit={limit}&page={page}")
             resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:
@@ -126,13 +126,14 @@ class AriaAPIClient(BaseSkill):
     # ========================================
     async def get_security_events(
         self, 
-        limit: int = 100, 
+        limit: int = 25, 
+        page: int = 1,
         threat_level: Optional[str] = None,
         blocked_only: bool = False
     ) -> SkillResult:
-        """Get security events."""
+        """Get security events (paginated)."""
         try:
-            url = f"/security-events?limit={limit}"
+            url = f"/security-events?limit={limit}&page={page}"
             if threat_level:
                 url += f"&threat_level={threat_level}"
             if blocked_only:
@@ -183,10 +184,10 @@ class AriaAPIClient(BaseSkill):
     # ========================================
     # Thoughts
     # ========================================
-    async def get_thoughts(self, limit: int = 100) -> SkillResult:
-        """Get recent thoughts."""
+    async def get_thoughts(self, limit: int = 25, page: int = 1) -> SkillResult:
+        """Get recent thoughts (paginated)."""
         try:
-            resp = await self._client.get(f"/thoughts?limit={limit}")
+            resp = await self._client.get(f"/thoughts?limit={limit}&page={page}")
             resp.raise_for_status()
             data = resp.json()
             return SkillResult.ok(data.get("thoughts", data))
@@ -216,12 +217,13 @@ class AriaAPIClient(BaseSkill):
     # ========================================
     async def get_memories(
         self, 
-        limit: int = 100, 
+        limit: int = 25, 
+        page: int = 1,
         category: Optional[str] = None
     ) -> SkillResult:
-        """Get memories."""
+        """Get memories (paginated)."""
         try:
-            url = f"/memories?limit={limit}"
+            url = f"/memories?limit={limit}&page={page}"
             if category:
                 url += f"&category={category}"
             resp = await self._client.get(url)
@@ -274,12 +276,13 @@ class AriaAPIClient(BaseSkill):
     # ========================================
     async def get_goals(
         self, 
-        limit: int = 100, 
+        limit: int = 25, 
+        page: int = 1,
         status: Optional[str] = None
     ) -> SkillResult:
-        """Get goals."""
+        """Get goals (paginated)."""
         try:
-            url = f"/goals?limit={limit}"
+            url = f"/goals?limit={limit}&page={page}"
             if status:
                 url += f"&status={status}"
             resp = await self._client.get(url)
@@ -471,12 +474,13 @@ class AriaAPIClient(BaseSkill):
     # ========================================
     async def get_social_posts(
         self, 
-        limit: int = 50, 
+        limit: int = 25, 
+        page: int = 1,
         platform: Optional[str] = None
     ) -> SkillResult:
-        """Get social posts."""
+        """Get social posts (paginated)."""
         try:
-            url = f"/social?limit={limit}"
+            url = f"/social?limit={limit}&page={page}"
             if platform:
                 url += f"&platform={platform}"
             resp = await self._client.get(url)
@@ -695,12 +699,13 @@ class AriaAPIClient(BaseSkill):
     # ========================================
     async def get_sessions(
         self,
-        limit: int = 100,
+        limit: int = 25,
+        page: int = 1,
         status: Optional[str] = None,
     ) -> SkillResult:
-        """Get agent sessions."""
+        """Get agent sessions (paginated)."""
         try:
-            url = f"/sessions?limit={limit}"
+            url = f"/sessions?limit={limit}&page={page}"
             if status:
                 url += f"&status={status}"
             resp = await self._client.get(url)
@@ -764,10 +769,10 @@ class AriaAPIClient(BaseSkill):
     # ========================================
     # Model Usage
     # ========================================
-    async def get_model_usage(self, limit: int = 100) -> SkillResult:
-        """Get model usage records."""
+    async def get_model_usage(self, limit: int = 50, page: int = 1) -> SkillResult:
+        """Get model usage records (paginated)."""
         try:
-            resp = await self._client.get(f"/model-usage?limit={limit}")
+            resp = await self._client.get(f"/model-usage?limit={limit}&page={page}")
             resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:
@@ -877,10 +882,10 @@ class AriaAPIClient(BaseSkill):
 
     async def recall(self, key: Optional[str] = None,
                      category: Optional[str] = None,
-                     limit: int = 50) -> SkillResult:
-        """Retrieve working memory items."""
+                     limit: int = 25, page: int = 1) -> SkillResult:
+        """Retrieve working memory items (paginated)."""
         try:
-            params: Dict[str, Any] = {"limit": limit}
+            params: Dict[str, Any] = {"limit": limit, "page": page}
             if key:
                 params["key"] = key
             if category:
@@ -996,6 +1001,25 @@ class AriaAPIClient(BaseSkill):
         if result.success:
             return result.data.get("records", []) if isinstance(result.data, dict) else []
         return []
+
+    async def get_all_pages(self, method_name: str, **kwargs) -> SkillResult:
+        """Fetch all pages of a paginated endpoint."""
+        all_items: list = []
+        page = 1
+        while True:
+            result = await getattr(self, method_name)(page=page, **kwargs)
+            if not result.success:
+                return result
+            data = result.data
+            if isinstance(data, dict):
+                all_items.extend(data.get("items", []))
+                if page >= data.get("pages", 1):
+                    break
+            else:
+                all_items.extend(data if isinstance(data, list) else [])
+                break
+            page += 1
+        return SkillResult.ok({"items": all_items, "total": len(all_items)})
 
 
 # Singleton instance for convenience

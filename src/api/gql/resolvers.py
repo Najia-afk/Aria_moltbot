@@ -105,7 +105,7 @@ async def resolve_memory(key: str) -> Optional[MemoryType]:
 
 async def resolve_goals(limit: int = 100, status: Optional[str] = None) -> list[GoalType]:
     async with AsyncSessionLocal() as db:
-        stmt = select(Goal).order_by(Goal.priority.desc(), Goal.created_at.desc()).limit(limit)
+        stmt = select(Goal).order_by(Goal.priority.asc(), Goal.created_at.desc()).limit(limit)
         if status:
             stmt = stmt.where(Goal.status == status)
         result = await db.execute(stmt)
@@ -207,18 +207,19 @@ async def resolve_stats() -> StatsType:
 
 async def resolve_upsert_memory(input: MemoryInput) -> MemoryType:
     async with AsyncSessionLocal() as db:
-        result = await db.execute(select(Memory).where(Memory.key == input.key))
-        existing = result.scalar_one_or_none()
-        if existing:
-            existing.value = input.value
-            existing.category = input.category
-            await db.commit()
-            m = existing
-        else:
-            m = Memory(key=input.key, value=input.value, category=input.category)
-            db.add(m)
-            await db.commit()
-            await db.refresh(m)
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
+        from sqlalchemy import text as sa_text
+        stmt = pg_insert(Memory).values(
+            key=input.key,
+            value=input.value,
+            category=input.category,
+        ).on_conflict_do_update(
+            index_elements=["key"],
+            set_={"value": input.value, "category": input.category, "updated_at": sa_text("NOW()")},
+        ).returning(Memory)
+        result = await db.execute(stmt)
+        m = result.scalar_one()
+        await db.commit()
         return MemoryType(
             id=str(m.id), key=m.key, value=m.value, category=m.category,
             created_at=m.created_at.isoformat() if m.created_at else None,
@@ -231,6 +232,9 @@ async def resolve_update_goal(goal_id: str, input: GoalUpdateInput) -> GoalType:
         values: dict = {}
         if input.status is not None:
             values["status"] = input.status
+            if input.status == "completed":
+                from sqlalchemy import text as sa_text
+                values["completed_at"] = sa_text("NOW()")
         if input.progress is not None:
             values["progress"] = input.progress
         if input.priority is not None:

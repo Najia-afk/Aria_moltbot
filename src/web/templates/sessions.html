@@ -186,6 +186,7 @@
             <tr><td colspan="8" class="empty-state">Loading...</td></tr>
         </tbody>
     </table>
+    <div id="sessions-pagination"></div>
 </div>
 {% endblock %}
 
@@ -196,6 +197,7 @@
 let _stats = null;
 let _sessions = [];
 let _charts = {};
+let sessionsPager;
 
 // ── Tabs ────────────────────────────────────────────────────────────────────
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -231,16 +233,17 @@ async function loadStats() {
 }
 
 // ── Load Sessions ───────────────────────────────────────────────────────────
-async function loadSessions() {
+async function loadSessions(page = 1, limit = 50) {
     const status = document.getElementById('status-filter').value;
-    let url = `${API_BASE_URL}/sessions?limit=50`;
+    let url = `${API_BASE_URL}/sessions?limit=${limit}&page=${page}`;
     if (status) url += `&status=${status}`;
     try {
         const res = await fetch(url);
         const data = await res.json();
-        _sessions = data.sessions || [];
+        _sessions = data.items || data.sessions || [];
         renderRecent();
         renderHourlyChart();
+        if (sessionsPager && data.pages) sessionsPager.update(data);
     } catch (e) { console.error('Sessions error:', e); }
 }
 
@@ -459,9 +462,13 @@ async function loadAll() {
     loadSessions();
 }
 
-document.getElementById('status-filter').addEventListener('change', loadSessions);
+document.getElementById('status-filter').addEventListener('change', () => loadSessions());
 document.getElementById('search-input').addEventListener('input', renderRecent);
 
+sessionsPager = new AriaPagination('sessions-pagination', {
+    onPageChange: (page, limit) => loadSessions(page, limit),
+    limit: 50
+});
 loadAll();
 setInterval(loadAll, 30000);
 </script>

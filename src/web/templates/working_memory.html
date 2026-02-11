@@ -173,6 +173,7 @@
         <tr><td colspan="7" class="empty-state">Loading...</td></tr>
     </tbody>
 </table>
+<div id="items-pagination"></div>
 
 <!-- Context Panel -->
 <div class="context-panel">
@@ -196,6 +197,7 @@
 // ── State ───────────────────────────────────────────────────────────────────
 let _items = [];
 let _categories = new Set();
+let itemsPager;
 
 // ── Toggle Create Form ──────────────────────────────────────────────────────
 function toggleCreateForm() {
@@ -203,9 +205,9 @@ function toggleCreateForm() {
 }
 
 // ── Load Items ──────────────────────────────────────────────────────────────
-async function loadItems() {
+async function loadItems(page = 1, limit = 25) {
     try {
-        const res = await fetch(`${API_BASE_URL}/working-memory`);
+        const res = await fetch(`${API_BASE_URL}/working-memory?limit=${limit}&page=${page}`);
         const data = await res.json();
         _items = data.items || data || [];
 
@@ -214,7 +216,7 @@ async function loadItems() {
         populateCategoryFilter();
 
         // Stats
-        document.getElementById('stat-total').textContent = _items.length;
+        document.getElementById('stat-total').textContent = data.total || _items.length;
         document.getElementById('stat-categories').textContent = _categories.size;
         const avgImp = _items.length > 0
             ? (_items.reduce((s, i) => s + (i.importance || 0), 0) / _items.length).toFixed(2)
@@ -222,6 +224,7 @@ async function loadItems() {
         document.getElementById('stat-avg-importance').textContent = avgImp;
 
         renderItems();
+        if (itemsPager && data.pages) itemsPager.update(data);
     } catch (e) {
         console.error('Load items error:', e);
         document.getElementById('items-body').innerHTML =
@@ -403,6 +406,11 @@ async function loadCheckpoint() {
 
 // ── Init ────────────────────────────────────────────────────────────────────
 document.getElementById('category-filter').addEventListener('change', renderItems);
+
+itemsPager = new AriaPagination('items-pagination', {
+    onPageChange: (page, limit) => loadItems(page, limit),
+    limit: 25
+});
 
 async function init() {
     loadItems();

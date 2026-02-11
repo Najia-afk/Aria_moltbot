@@ -14,43 +14,46 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from config import LITELLM_MASTER_KEY, SERVICE_URLS
 from db.models import AgentSession
 from deps import get_db
+from pagination import paginate_query, build_paginated_response
 
 router = APIRouter(tags=["Sessions"])
 
 
 @router.get("/sessions")
 async def get_agent_sessions(
-    limit: int = 50,
+    page: int = 1,
+    limit: int = 25,
     status: Optional[str] = None,
     agent_id: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
 ):
-    stmt = select(AgentSession).order_by(AgentSession.started_at.desc()).limit(limit)
+    base = select(AgentSession).order_by(AgentSession.started_at.desc())
     if status:
-        stmt = stmt.where(AgentSession.status == status)
+        base = base.where(AgentSession.status == status)
     if agent_id:
-        stmt = stmt.where(AgentSession.agent_id == agent_id)
+        base = base.where(AgentSession.agent_id == agent_id)
 
-    result = await db.execute(stmt)
-    rows = result.scalars().all()
-    return {
-        "sessions": [
-            {
-                "id": str(s.id),
-                "agent_id": s.agent_id,
-                "session_type": s.session_type,
-                "started_at": s.started_at.isoformat() if s.started_at else None,
-                "ended_at": s.ended_at.isoformat() if s.ended_at else None,
-                "messages_count": s.messages_count,
-                "tokens_used": s.tokens_used,
-                "cost_usd": float(s.cost_usd) if s.cost_usd else 0,
-                "status": s.status,
-                "metadata": s.metadata_json or {},
-            }
-            for s in rows
-        ],
-        "count": len(rows),
-    }
+    count_stmt = select(func.count()).select_from(base.subquery())
+    total = (await db.execute(count_stmt)).scalar() or 0
+
+    stmt, _ = paginate_query(base, page, limit)
+    rows = (await db.execute(stmt)).scalars().all()
+    items = [
+        {
+            "id": str(s.id),
+            "agent_id": s.agent_id,
+            "session_type": s.session_type,
+            "started_at": s.started_at.isoformat() if s.started_at else None,
+            "ended_at": s.ended_at.isoformat() if s.ended_at else None,
+            "messages_count": s.messages_count,
+            "tokens_used": s.tokens_used,
+            "cost_usd": float(s.cost_usd) if s.cost_usd else 0,
+            "status": s.status,
+            "metadata": s.metadata_json or {},
+        }
+        for s in rows
+    ]
+    return build_paginated_response(items, total, page, limit)
 
 
 @router.post("/sessions")

@@ -220,6 +220,7 @@
             <tr><td colspan="7" class="empty-state">Loading...</td></tr>
         </tbody>
     </table>
+    <div id="events-pagination"></div>
 </div>
 {% endblock %}
 
@@ -242,16 +243,18 @@
                 console.error('Failed to load stats:', e);
             });
     }
+    let eventsPager;
 
-    function loadSecurityEvents() {
+    function loadSecurityEvents(page = 1, limit = 25) {
         document.getElementById('events-body').innerHTML = '<tr><td colspan="7" class="empty-state">Loading...</td></tr>';
         
-        fetch(`${window.ARIA_API_BASE_URL}/security-events?limit=200`)
+        fetch(`${window.ARIA_API_BASE_URL}/security-events?limit=${limit}&page=${page}`)
             .then(r => r.json())
             .then(data => {
-                allEvents = data;
-                renderEvents(data);
+                allEvents = data.items || data;
+                renderEvents(allEvents);
                 loadStats();
+                if (eventsPager && data.pages) eventsPager.update(data);
             })
             .catch(e => {
                 document.getElementById('events-body').innerHTML = `
@@ -260,13 +263,6 @@
                         <div style="font-size:12px;margin-top:10px">${e.message}</div>
                     </td></tr>`;
             });
-    }
-
-    function escapeHtml(text) {
-        if (!text) return '';
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
     }
 
     function renderEvents(data) {
@@ -299,7 +295,7 @@
                 <td>${patterns || '-'}</td>
                 <td>${escapeHtml(e.source) || '-'}</td>
                 <td><span class="blocked-badge ${blockedClass}">${blockedText}</span></td>
-                <td><div class="input-preview" title="${preview}">${preview || '-'}</div></td>
+                <td><div class="input-preview" title="${escapeHtml(preview)}">${preview || '-'}</div></td>
             </tr>`;
         });
         document.getElementById('events-body').innerHTML = html;
@@ -338,6 +334,10 @@
     document.getElementById('level-filter').addEventListener('change', filterEvents);
     document.getElementById('blocked-filter').addEventListener('change', filterEvents);
 
+    eventsPager = new AriaPagination('events-pagination', {
+        onPageChange: (page, limit) => loadSecurityEvents(page, limit),
+        limit: 25
+    });
     loadSecurityEvents();
 </script>
 {% endblock %}

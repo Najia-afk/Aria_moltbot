@@ -6,11 +6,12 @@ import uuid
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy import select, update, delete
+from sqlalchemy import func, select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import Goal, HourlyGoal
 from deps import get_db
+from pagination import paginate_query, build_paginated_response
 
 router = APIRouter(tags=["Goals"])
 
@@ -19,15 +20,23 @@ router = APIRouter(tags=["Goals"])
 
 @router.get("/goals")
 async def list_goals(
-    limit: int = 100,
+    page: int = 1,
+    limit: int = 25,
     status: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
 ):
-    stmt = select(Goal).order_by(Goal.priority.desc(), Goal.created_at.desc()).limit(limit)
+    base = select(Goal).order_by(Goal.priority.asc(), Goal.created_at.desc())
     if status:
-        stmt = stmt.where(Goal.status == status)
+        base = base.where(Goal.status == status)
+
+    count_stmt = select(func.count()).select_from(base.subquery())
+    total = (await db.execute(count_stmt)).scalar() or 0
+
+    stmt, _ = paginate_query(base, page, limit)
     result = await db.execute(stmt)
-    return [g.to_dict() for g in result.scalars().all()]
+    items = [g.to_dict() for g in result.scalars().all()]
+
+    return build_paginated_response(items, total, page, limit)
 
 
 @router.post("/goals")
@@ -53,9 +62,11 @@ async def create_goal(request: Request, db: AsyncSession = Depends(get_db)):
 async def delete_goal(goal_id: str, db: AsyncSession = Depends(get_db)):
     try:
         uid = uuid.UUID(goal_id)
-        await db.execute(delete(Goal).where(Goal.id == uid))
+        result = await db.execute(delete(Goal).where(Goal.id == uid))
     except ValueError:
-        await db.execute(delete(Goal).where(Goal.goal_id == goal_id))
+        result = await db.execute(delete(Goal).where(Goal.goal_id == goal_id))
+    if result.rowcount == 0:
+        raise HTTPException(status_code=404, detail=f"Goal {goal_id} not found")
     await db.commit()
     return {"deleted": True}
 
@@ -79,9 +90,11 @@ async def update_goal(
     if values:
         try:
             uid = uuid.UUID(goal_id)
-            await db.execute(update(Goal).where(Goal.id == uid).values(**values))
+            result = await db.execute(update(Goal).where(Goal.id == uid).values(**values))
         except ValueError:
-            await db.execute(update(Goal).where(Goal.goal_id == goal_id).values(**values))
+            result = await db.execute(update(Goal).where(Goal.goal_id == goal_id).values(**values))
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail=f"Goal {goal_id} not found")
         await db.commit()
     return {"updated": True}
 

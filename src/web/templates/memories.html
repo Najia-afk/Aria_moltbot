@@ -142,23 +142,25 @@
 <div class="memories-grid grid-2" id="memoriesContainer">
     <div class="loading"><div class="spinner"></div></div>
 </div>
+<div id="memories-pagination"></div>
 {% endblock %}
 
 {% block extra_js %}
 <script data-page-script>
 let allMemories = [];
+let memoriesPager;
 
-async function loadMemories() {
+async function loadMemories(page = 1, limit = 25) {
     const container = document.getElementById('memoriesContainer');
     container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
     
     try {
-        const response = await fetch(`${window.ARIA_API_BASE_URL}/memories?limit=20`);
+        const response = await fetch(`${window.ARIA_API_BASE_URL}/memories?limit=${limit}&page=${page}`);
         const data = await response.json();
-        allMemories = data.memories || [];
+        allMemories = data.items || data.memories || [];
         
         // Update stats
-        document.getElementById('totalMemories').textContent = allMemories.length;
+        document.getElementById('totalMemories').textContent = data.total || allMemories.length;
         const categories = [...new Set(allMemories.map(m => m.category))];
         document.getElementById('uniqueCategories').textContent = categories.length;
         
@@ -170,6 +172,7 @@ async function loadMemories() {
         });
         
         renderMemories(allMemories);
+        if (memoriesPager && data.pages) memoriesPager.update(data);
     } catch (error) {
         container.innerHTML = '<div class="empty-state"><p>Error loading memories</p></div>';
     }
@@ -273,6 +276,10 @@ function formatTime(ts) {
 }
 
 document.getElementById('searchInput').addEventListener('input', filterMemories);
+memoriesPager = new AriaPagination('memories-pagination', {
+    onPageChange: (page, limit) => loadMemories(page, limit),
+    limit: 25
+});
 document.addEventListener('DOMContentLoaded', loadMemories);
 </script>
 {% endblock %}

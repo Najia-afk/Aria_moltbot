@@ -840,38 +840,6 @@ async function triggerTick() {
     }
 }
 
-function formatRelativeTime(date) {
-    const now = new Date();
-    const diff = now - date;
-    
-    // Future dates (for Next Run)
-    if (diff < 0) {
-        const absDiff = Math.abs(diff);
-        const seconds = Math.floor(absDiff / 1000);
-        const minutes = Math.floor(seconds / 60);
-        const hours = Math.floor(minutes / 60);
-        const days = Math.floor(hours / 24);
-        
-        if (seconds < 60) return 'in <1m';
-        if (minutes < 60) return `in ${minutes}m`;
-        if (hours < 24) return `in ${hours}h ${minutes % 60}m`;
-        if (days < 7) return `in ${days}d ${hours % 24}h`;
-        return date.toLocaleDateString();
-    }
-    
-    // Past dates (for Last Run)
-    const seconds = Math.floor(diff / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-    
-    if (seconds < 60) return 'Just now';
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    if (days < 7) return `${days}d ago`;
-    return date.toLocaleDateString();
-}
-
 function formatDuration(ms) {
     if (!ms) return '-';
     const seconds = Math.floor(ms / 1000);
@@ -880,13 +848,6 @@ function formatDuration(ms) {
     if (hours > 0) return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
     if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
     return `${seconds}s`;
-}
-
-function escapeHtml(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
 }
 
 function showToast(message, type = 'info') {

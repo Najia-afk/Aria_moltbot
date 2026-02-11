@@ -108,6 +108,7 @@
         <p>Loading goals...</p>
     </div>
 </div>
+<div id="goals-pagination"></div>
 
 <!-- New Goal Modal -->
 <div class="modal-overlay" id="newGoalModal" onclick="closeModalOnOverlay(event)">
@@ -918,6 +919,7 @@ loadGoalCategoryChart();
 </script>
 <script data-page-script>
 let allGoals = [];
+let goalsPager;
 
 const priorityLabels = {
     1: { text: 'Urgent', emoji: '🔴' },
@@ -927,7 +929,7 @@ const priorityLabels = {
     5: { text: 'Background', emoji: '⚪' }
 };
 
-async function loadGoals() {
+async function loadGoals(page = 1, limit = 25) {
     const container = document.getElementById('goalsContainer');
     container.innerHTML = `
         <div class="goals-loading">
@@ -937,12 +939,13 @@ async function loadGoals() {
     `;
 
     try {
-        const response = await fetch(`${window.ARIA_API_BASE_URL}/goals?limit=100`);
+        const response = await fetch(`${window.ARIA_API_BASE_URL}/goals?limit=${limit}&page=${page}`);
         const data = await response.json();
-        allGoals = data || [];
+        allGoals = data.items || data || [];
         
         updateStats();
         filterGoals();
+        if (goalsPager && data.pages) goalsPager.update(data);
     } catch (error) {
         container.innerHTML = `
             <div class="empty-goals">
@@ -966,8 +969,8 @@ function updateStats() {
     const now = new Date();
     const threeDays = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
     const dueSoon = activeGoals.filter(g => {
-        if (!g.target_date) return false;
-        const target = new Date(g.target_date);
+        if (!g.due_date) return false;
+        const target = new Date(g.due_date);
         return target <= threeDays && target >= now;
     }).length;
 
@@ -1035,8 +1038,8 @@ function renderGoalCard(goal) {
     // Calculate due date status
     let dueDateClass = '';
     let dueDateText = '';
-    if (goal.target_date) {
-        const target = new Date(goal.target_date);
+    if (goal.due_date) {
+        const target = new Date(goal.due_date);
         const now = new Date();
         const daysUntil = Math.ceil((target - now) / (1000 * 60 * 60 * 24));
         
@@ -1100,12 +1103,6 @@ function renderGoalCard(goal) {
     `;
 }
 
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
 // Modal Functions
 function openNewGoalModal() {
     document.getElementById('newGoalModal').classList.add('active');
@@ -1157,7 +1154,7 @@ async function createGoal(event) {
         title: formData.get('title'),
         description: formData.get('description'),
         priority: parseInt(formData.get('priority')),
-        target_date: formData.get('target_date') || null,
+        due_date: formData.get('target_date') || null,
         category: formData.get('category'),
         status: 'active',
         progress: 0
@@ -1391,6 +1388,10 @@ async function completeHourlyGoal(goalId) {
 }
 
 // Initialize
+goalsPager = new AriaPagination('goals-pagination', {
+    onPageChange: (page, limit) => loadGoals(page, limit),
+    limit: 25
+});
 document.addEventListener('DOMContentLoaded', loadGoals);
 </script>
 {% endblock %}

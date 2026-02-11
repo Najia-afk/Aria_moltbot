@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from config import LITELLM_MASTER_KEY, SERVICE_URLS
 from db.models import ModelUsage
 from deps import get_db
+from pagination import build_paginated_response
 
 router = APIRouter(tags=["Model Usage"])
 
@@ -67,7 +68,8 @@ async def _fetch_litellm_spend_logs(limit: int = 200) -> list[dict]:
 
 @router.get("/model-usage")
 async def get_model_usage(
-    limit: int = 100,
+    page: int = 1,
+    limit: int = 50,
     model: Optional[str] = None,
     provider: Optional[str] = None,
     source: Optional[str] = None,
@@ -111,7 +113,12 @@ async def get_model_usage(
         results.extend(litellm_logs)
 
     results.sort(key=lambda x: x.get("created_at") or "", reverse=True)
-    return {"usage": results[:limit], "count": min(len(results), limit)}
+
+    # Paginate the merged results
+    total = len(results)
+    offset = (max(1, page) - 1) * limit
+    page_items = results[offset:offset + limit]
+    return build_paginated_response(page_items, total, page, limit)
 
 
 @router.post("/model-usage")

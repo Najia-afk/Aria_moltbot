@@ -269,6 +269,7 @@
         <h3>Loading posts...</h3>
     </div>
 </div>
+<div id="posts-pagination"></div>
 
 <!-- Compose Modal -->
 <div class="modal" id="compose-modal">
@@ -312,20 +313,22 @@
 const API_BASE = API_BASE_URL;
 let allPosts = [];
 let currentPlatform = 'all';
+let postsPager;
 
-async function loadPosts() {
+async function loadPosts(page = 1, limit = 25) {
     try {
-        const url = currentPlatform === 'all' 
-            ? `${API_BASE}/social`
-            : `${API_BASE}/social?platform=${currentPlatform}`;
+        let url = currentPlatform === 'all' 
+            ? `${API_BASE}/social?limit=${limit}&page=${page}`
+            : `${API_BASE}/social?platform=${currentPlatform}&limit=${limit}&page=${page}`;
         
         const response = await fetch(url);
         const data = await response.json();
         
-        allPosts = data.posts || [];
-        document.getElementById('post-count').textContent = data.count || 0;
+        allPosts = data.items || data.posts || [];
+        document.getElementById('post-count').textContent = data.total || allPosts.length;
         
         renderPosts();
+        if (postsPager && data.pages) postsPager.update(data);
     } catch (error) {
         console.error('Failed to load posts:', error);
         document.getElementById('posts-list').innerHTML = `
@@ -387,12 +390,6 @@ function getVisibilityIcon(visibility) {
     return icons[visibility] || '📄';
 }
 
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
 function filterPlatform(platform, btn) {
     currentPlatform = platform;
     
@@ -447,6 +444,10 @@ async function createPost(event) {
 }
 
 // Initialize
+postsPager = new AriaPagination('posts-pagination', {
+    onPageChange: (page, limit) => loadPosts(page, limit),
+    limit: 25
+});
 document.addEventListener('DOMContentLoaded', loadPosts);
 </script>
 {% endblock %}

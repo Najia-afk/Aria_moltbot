@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import WorkingMemory
 from deps import get_db
+from pagination import paginate_query, build_paginated_response
 
 router = APIRouter(tags=["Working Memory"])
 
@@ -21,20 +22,26 @@ router = APIRouter(tags=["Working Memory"])
 
 @router.get("/working-memory")
 async def list_working_memory(
+    page: int = 1,
     category: str = None,
     key: str = None,
-    limit: int = 50,
+    limit: int = 25,
     db: AsyncSession = Depends(get_db),
 ):
     """List working memory items with optional category/key filters."""
-    stmt = select(WorkingMemory).order_by(WorkingMemory.created_at.desc()).limit(limit)
+    base = select(WorkingMemory).order_by(WorkingMemory.created_at.desc())
     if category:
-        stmt = stmt.where(WorkingMemory.category == category)
+        base = base.where(WorkingMemory.category == category)
     if key:
-        stmt = stmt.where(WorkingMemory.key == key)
-    result = await db.execute(stmt)
-    rows = result.scalars().all()
-    return {"items": [r.to_dict() for r in rows], "count": len(rows)}
+        base = base.where(WorkingMemory.key == key)
+
+    count_stmt = select(func.count()).select_from(base.subquery())
+    total = (await db.execute(count_stmt)).scalar() or 0
+
+    stmt, _ = paginate_query(base, page, limit)
+    rows = (await db.execute(stmt)).scalars().all()
+    items = [r.to_dict() for r in rows]
+    return build_paginated_response(items, total, page, limit)
 
 
 # ── Weighted Context Retrieval ───────────────────────────────────────────────

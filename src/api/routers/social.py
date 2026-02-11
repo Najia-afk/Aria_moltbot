@@ -7,27 +7,34 @@ import uuid
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Request
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import SocialPost
 from deps import get_db
+from pagination import paginate_query, build_paginated_response
 
 router = APIRouter(tags=["Social"])
 
 
 @router.get("/social")
 async def get_social_posts(
-    limit: int = 50,
+    page: int = 1,
+    limit: int = 25,
     platform: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
 ):
-    stmt = select(SocialPost).order_by(SocialPost.posted_at.desc()).limit(limit)
+    base = select(SocialPost).order_by(SocialPost.posted_at.desc())
     if platform:
-        stmt = stmt.where(SocialPost.platform == platform)
-    result = await db.execute(stmt)
-    rows = result.scalars().all()
-    return {"posts": [p.to_dict() for p in rows], "count": len(rows)}
+        base = base.where(SocialPost.platform == platform)
+
+    count_stmt = select(func.count()).select_from(base.subquery())
+    total = (await db.execute(count_stmt)).scalar() or 0
+
+    stmt, _ = paginate_query(base, page, limit)
+    rows = (await db.execute(stmt)).scalars().all()
+    items = [p.to_dict() for p in rows]
+    return build_paginated_response(items, total, page, limit)
 
 
 @router.post("/social")

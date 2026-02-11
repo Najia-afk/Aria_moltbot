@@ -385,6 +385,7 @@
         </tbody>
     </table>
 </div>
+<div id="usage-pagination"></div>
 {% endblock %}
 
 {% block extra_js %}
@@ -394,6 +395,7 @@
 let _statsData = null;     // /model-usage/stats response
 let _usageData = null;     // /model-usage response (recent records)
 let _charts = {};          // Chart.js instances
+let usagePager;
 
 // ── Tabs ────────────────────────────────────────────────────────────────────
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -420,12 +422,15 @@ async function loadStats() {
 }
 
 // ── Load Recent Usage ───────────────────────────────────────────────────────
-async function loadUsage() {
+async function loadUsage(page = 1, limit = 50) {
     try {
-        const res = await fetch(`${API_BASE_URL}/model-usage?limit=50`);
+        const res = await fetch(`${API_BASE_URL}/model-usage?limit=${limit}&page=${page}`);
         _usageData = await res.json();
+        const items = _usageData.items || _usageData.usage || [];
+        _usageData._allItems = items;
         renderRecentLLM();
         renderRecentSkills();
+        if (usagePager && _usageData.pages) usagePager.update(_usageData);
     } catch (e) {
         console.error('Error loading usage:', e);
     }
@@ -594,7 +599,7 @@ function renderLLMTab() {
 
 function renderRecentLLM() {
     if (!_usageData) return;
-    const llmRecent = (_usageData.usage || []).filter(u => u.source === 'litellm').slice(0, 25);
+    const llmRecent = (_usageData._allItems || _usageData.usage || []).filter(u => u.source === 'litellm').slice(0, 25);
     const body = document.getElementById('llm-recent-body');
     if (llmRecent.length > 0) {
         body.innerHTML = llmRecent.map(u => `
@@ -687,7 +692,7 @@ function renderSkillsTab() {
 
 function renderRecentSkills() {
     if (!_usageData) return;
-    const skillRecent = (_usageData.usage || []).filter(u => u.source === 'skills').slice(0, 25);
+    const skillRecent = (_usageData._allItems || _usageData.usage || []).filter(u => u.source === 'skills').slice(0, 25);
     const body = document.getElementById('skill-recent-body');
     if (skillRecent.length > 0) {
         body.innerHTML = skillRecent.map(u => {
@@ -756,6 +761,10 @@ async function loadAll() {
 
 document.getElementById('hours-filter').addEventListener('change', () => { loadStats(); });
 
+usagePager = new AriaPagination('usage-pagination', {
+    onPageChange: (page, limit) => loadUsage(page, limit),
+    limit: 50
+});
 loadAll();
 setInterval(loadAll, 30000);
 </script>

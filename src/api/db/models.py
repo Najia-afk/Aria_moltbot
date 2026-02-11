@@ -61,6 +61,7 @@ class Memory(Base):
 Index("idx_memories_key", Memory.key)
 Index("idx_memories_category", Memory.category)
 Index("idx_memories_updated", Memory.updated_at.desc())
+Index("idx_memories_created", Memory.created_at.desc())
 Index("idx_memories_value_gin", Memory.value, postgresql_using="gin")
 
 
@@ -467,6 +468,7 @@ Index("idx_wm_category", WorkingMemory.category)
 Index("idx_wm_key", WorkingMemory.key)
 Index("idx_wm_importance", WorkingMemory.importance.desc())
 Index("idx_wm_checkpoint", WorkingMemory.checkpoint_id)
+Index("idx_wm_importance_created", WorkingMemory.importance.desc(), WorkingMemory.created_at.desc())
 Index("uq_wm_category_key", WorkingMemory.category, WorkingMemory.key, unique=True)
 
 
