@@ -102,12 +102,98 @@ async def read_soul_file(filename: str):
     ]
     if filename not in allowed:
         raise HTTPException(status_code=404, detail="Soul file not found")
-    soul_path = f"/app/memory/soul/{filename}"
+    soul_path = f"/aria_mind/{filename}"
     try:
         with open(soul_path, "r", encoding="utf-8") as f:
             return {"filename": filename, "content": f.read()}
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Soul file not found")
+
+
+# ── File Browsers (aria_mind & aria_memories) ────────────────────────────────
+
+def _list_tree(base: str, rel: str = "") -> list[dict]:
+    """Recursively list files/dirs under *base*, returning a flat list."""
+    full = os.path.join(base, rel) if rel else base
+    if not os.path.isdir(full):
+        return []
+    entries: list[dict] = []
+    try:
+        items = sorted(os.listdir(full))
+    except PermissionError:
+        return []
+    for name in items:
+        if name.startswith(".") or name == "__pycache__":
+            continue
+        child_rel = f"{rel}/{name}" if rel else name
+        child_full = os.path.join(full, name)
+        if os.path.isdir(child_full):
+            entries.append({"path": child_rel, "type": "dir"})
+            entries.extend(_list_tree(base, child_rel))
+        else:
+            try:
+                size = os.path.getsize(child_full)
+                mtime = os.path.getmtime(child_full)
+            except OSError:
+                size, mtime = 0, 0
+            entries.append({"path": child_rel, "type": "file", "size": size, "mtime": mtime})
+    return entries
+
+
+_SAFE_EXTENSIONS = {
+    ".md", ".txt", ".yaml", ".yml", ".json", ".py", ".sh", ".toml",
+    ".cfg", ".ini", ".log", ".csv", ".html", ".css", ".js",
+}
+
+
+@router.get("/admin/files/mind")
+async def list_mind_files():
+    """List all files under /aria_mind (read-only)."""
+    return _list_tree("/aria_mind")
+
+
+@router.get("/admin/files/memories")
+async def list_memories_files():
+    """List all files under /aria_memories (read-only)."""
+    return _list_tree("/aria_memories")
+
+
+@router.get("/admin/files/mind/{path:path}")
+async def read_mind_file(path: str):
+    """Read a text file from /aria_mind."""
+    safe = os.path.normpath(path)
+    if ".." in safe:
+        raise HTTPException(status_code=400, detail="Invalid path")
+    full = f"/aria_mind/{safe}"
+    if not os.path.isfile(full):
+        raise HTTPException(status_code=404, detail="File not found")
+    ext = os.path.splitext(full)[1].lower()
+    if ext not in _SAFE_EXTENSIONS:
+        raise HTTPException(status_code=415, detail=f"Cannot render {ext} files")
+    try:
+        with open(full, "r", encoding="utf-8", errors="replace") as f:
+            return {"path": safe, "content": f.read()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/admin/files/memories/{path:path}")
+async def read_memories_file(path: str):
+    """Read a text file from /aria_memories."""
+    safe = os.path.normpath(path)
+    if ".." in safe:
+        raise HTTPException(status_code=400, detail="Invalid path")
+    full = f"/aria_memories/{safe}"
+    if not os.path.isfile(full):
+        raise HTTPException(status_code=404, detail="File not found")
+    ext = os.path.splitext(full)[1].lower()
+    if ext not in _SAFE_EXTENSIONS:
+        raise HTTPException(status_code=415, detail=f"Cannot render {ext} files")
+    try:
+        with open(full, "r", encoding="utf-8", errors="replace") as f:
+            return {"path": safe, "content": f.read()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ── DB Maintenance ───────────────────────────────────────────────────────────

@@ -81,13 +81,13 @@
       },
       "memorySearch": { "enabled": false, "fallback": "none" },
       "model": {
-        "primary": "litellm/qwen3-mlx",
+        "primary": "litellm/kimi",
         "fallbacks": [
           "litellm/qwen3-next-free",
           "litellm/trinity-free",
           "litellm/chimera-free",
           "litellm/deepseek-free",
-          "litellm/kimi"
+          "litellm/gpt-oss-free"
         ]
       }
     },
@@ -113,7 +113,7 @@
       },
       "model": {
         "primary": "litellm/trinity-free",
-        "fallbacks": ["litellm/qwen3-mlx", "litellm/chimera-free", "litellm/deepseek-free"]
+        "fallbacks": ["litellm/kimi", "litellm/chimera-free", "litellm/deepseek-free"]
       },
       "heartbeat": {
         "every": "6h",
@@ -131,7 +131,7 @@
         "avatar": "💬"
       },
       "model": {
-        "primary": "litellm/qwen3-mlx",
+        "primary": "litellm/kimi",
         "fallbacks": ["litellm/qwen3-next-free", "litellm/trinity-free"]
       },
       "heartbeat": {
@@ -150,8 +150,8 @@
         "avatar": "🦞"
       },
       "model": {
-        "primary": "litellm/qwen3-mlx",
-        "fallbacks": ["litellm/trinity-free", "litellm/kimi"]
+        "primary": "litellm/kimi",
+        "fallbacks": ["litellm/trinity-free", "litellm/qwen3-next-free"]
       },
       "heartbeat": {
         "every": "48h",

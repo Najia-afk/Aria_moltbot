@@ -847,11 +847,18 @@ function renderModels(filter) {
 // Load spend logs
 async function loadSpendLogs() {
     const tbody = document.getElementById('spend-logs-tbody');
-    const limit = document.getElementById('logs-limit')?.value || 25;
+    const limit = parseInt(document.getElementById('logs-limit')?.value || '25', 10);
     
     try {
-        const response = await fetch(`${API_URL}/litellm/spend?limit=${limit}`);
-        const logs = await response.json();
+        // Reuse cached logs if available and limit fits
+        let logs;
+        const cached = window._allSpendLogs;
+        if (Array.isArray(cached) && cached.length > 0 && limit <= cached.length) {
+            logs = cached.slice(0, limit);
+        } else {
+            const response = await fetch(`${API_URL}/litellm/spend?limit=${limit}`);
+            logs = await response.json();
+        }
         
         if (!logs || logs.length === 0) {
             tbody.innerHTML = `
@@ -927,12 +934,17 @@ function filterLogsByPeriod(logs, days) {
 async function updateCharts() {
     const periodDays = getPeriodDays();
     
-    // Fetch all spend logs once
+    // Reuse logs already fetched by loadGlobalSpend (cached in window._allSpendLogs)
     let allLogs = [];
     try {
-        const logsResp = await fetch(`${API_URL}/litellm/spend?limit=500&lite=true`);
-        const logsData = await logsResp.json();
-        allLogs = Array.isArray(logsData) ? filterLogsByPeriod(logsData, periodDays) : [];
+        const cached = window._allSpendLogs;
+        if (Array.isArray(cached) && cached.length > 0) {
+            allLogs = filterLogsByPeriod(cached, periodDays);
+        } else {
+            const logsResp = await fetch(`${API_URL}/litellm/spend?limit=500&lite=true`);
+            const logsData = await logsResp.json();
+            allLogs = Array.isArray(logsData) ? filterLogsByPeriod(logsData, periodDays) : [];
+        }
     } catch (err) {
         console.error('Failed to fetch spend logs:', err);
     }
@@ -1214,7 +1226,7 @@ document.querySelectorAll('.filter-tab').forEach(tab => {
 document.addEventListener('DOMContentLoaded', async () => {
     await AriaModels.init();
     loadBalances();
-    loadGlobalSpend();
+    await loadGlobalSpend();  // must complete before charts use cached logs
     loadModels();
     loadSpendLogs();
 });

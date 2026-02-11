@@ -352,6 +352,10 @@ prepare_awakening &
     done
 ) &
 
+# Auto-fix any unrecognized config keys (e.g. stale systemPrompt)
+echo "=== Running openclaw doctor --fix to clean config ==="
+openclaw doctor --fix 2>/dev/null || true
+
 # Start the gateway
 exec /usr/local/bin/openclaw gateway run \
     --port 18789 \

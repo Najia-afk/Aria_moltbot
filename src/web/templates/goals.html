@@ -57,10 +57,10 @@
 <!-- Goal Category Chart -->
 <div class="card" style="margin-bottom: 1.5rem;">
     <div class="card-header">
-        <h3>Goal Category Balance</h3>
+        <h3>Weekly Goal Activity</h3>
     </div>
-    <div class="card-body" style="display: flex; justify-content: center; padding: 1.5rem;">
-        <canvas id="goalCategoryChart" width="350" height="350"></canvas>
+    <div class="card-body" style="padding: 1rem;">
+        <canvas id="goalCategoryChart" style="max-height: 220px;"></canvas>
     </div>
 </div>
 
@@ -858,37 +858,55 @@ textarea.form-input {
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>
 async function loadGoalCategoryChart() {
-    const CATEGORIES = ['Learn', 'Create', 'Connect', 'Reflect', 'Optimize', 'Help'];
+    const TYPES  = ['task', 'check-in', 'reflection', 'learning', 'social', 'maintenance'];
+    const LABELS = ['📋 Task', '👋 Check-in', '🪞 Reflection', '📚 Learning', '💬 Social', '🔧 Maintenance'];
     const COLORS = ['#7c3aed', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899'];
     try {
         const resp = await fetch(`${API_BASE_URL}/hourly-goals`);
         const data = await resp.json();
-        const goals = data.goals || data || [];
-        const counts = {};
-        CATEGORIES.forEach(c => counts[c] = 0);
-        (Array.isArray(goals) ? goals : []).forEach(g => {
-            const type = (g.goal_type || '').toLowerCase();
-            const matched = CATEGORIES.find(c => type.includes(c.toLowerCase()));
-            if (matched) counts[matched]++;
+        const goals = data.goals || [];
+
+        // Build last 7 day labels
+        const days = [];
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date(); d.setDate(d.getDate() - i);
+            days.push(d.toISOString().slice(0, 10));
+        }
+        const dayLabels = days.map(d => {
+            const dt = new Date(d + 'T00:00:00');
+            return dt.toLocaleDateString('en', { weekday: 'short', day: 'numeric' });
         });
+
+        // Bucket goals by day and type
+        const buckets = {};
+        days.forEach(d => { buckets[d] = {}; TYPES.forEach(t => buckets[d][t] = 0); });
+        (Array.isArray(goals) ? goals : []).forEach(g => {
+            const day  = (g.created_at || '').slice(0, 10);
+            const type = (g.goal_type || 'task').toLowerCase();
+            if (buckets[day] && TYPES.includes(type)) buckets[day][type]++;
+        });
+
+        const datasets = TYPES.map((t, idx) => ({
+            label: LABELS[idx],
+            data: days.map(d => buckets[d][t]),
+            backgroundColor: COLORS[idx],
+            borderRadius: 3,
+        }));
+
         const ctx = document.getElementById('goalCategoryChart').getContext('2d');
         new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: CATEGORIES,
-                datasets: [{
-                    data: CATEGORIES.map(c => counts[c]),
-                    backgroundColor: COLORS,
-                    borderWidth: 2,
-                    borderColor: '#1a1a2e',
-                }]
-            },
+            type: 'bar',
+            data: { labels: dayLabels, datasets },
             options: {
                 responsive: true,
-                maintainAspectRatio: true,
+                maintainAspectRatio: false,
                 plugins: {
-                    legend: { position: 'bottom', labels: { color: '#a0a0b8', padding: 16, font: { size: 13 } } },
-                    title: { display: true, text: 'Hourly Goals by Category', color: '#e0e0f0', font: { size: 15 } }
+                    legend: { position: 'bottom', labels: { color: '#a0a0b8', padding: 10, font: { size: 11 } } },
+                    title: { display: true, text: 'Hourly Goals — Last 7 Days', color: '#e0e0f0', font: { size: 14 } }
+                },
+                scales: {
+                    x: { stacked: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af', font: { size: 11 } } },
+                    y: { stacked: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af', stepSize: 1 } }
                 }
             }
         });

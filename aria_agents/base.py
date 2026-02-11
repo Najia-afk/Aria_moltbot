@@ -26,6 +26,8 @@ class AgentRole(str, Enum):
     SOCIAL = "social"            # Social media + community
     JOURNALIST = "journalist"    # Research + investigation
     MEMORY = "memory"            # Memory management (support role)
+    RESEARCHER = "researcher"    # Research + analysis
+    CODER = "coder"              # Code generation + review
 
 
 ROLE_TO_FOCUS_MAP = {

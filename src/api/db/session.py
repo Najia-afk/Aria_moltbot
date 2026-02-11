@@ -56,7 +56,9 @@ async def ensure_schema() -> None:
     """Create all tables and indexes if they don't exist."""
     async with async_engine.begin() as conn:
         await conn.execute(text('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"'))
+        await conn.execute(text('CREATE EXTENSION IF NOT EXISTS "pg_trgm"'))
         for table in Base.metadata.sorted_tables:
             await conn.execute(CreateTable(table, if_not_exists=True))
+        for table in Base.metadata.sorted_tables:
             for index in table.indexes:
                 await conn.execute(CreateIndex(index, if_not_exists=True))

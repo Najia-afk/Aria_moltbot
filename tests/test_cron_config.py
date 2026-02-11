@@ -69,11 +69,11 @@ class TestSocialPost:
     def test_exists(self, jobs):
         assert "social_post" in jobs
 
-    def test_fires_at_6h_intervals(self, jobs):
+    def test_fires_daily(self, jobs):
         job = jobs["social_post"]
         assert "cron" in job, "social_post should use 'cron' not 'every'"
-        assert job["cron"] == "0 0 0,6,12,18 * * *", (
-            f"Expected 6-hour cron schedule, got: {job['cron']}"
+        assert job["cron"] == "0 0 18 * * *", (
+            f"Expected daily 18:00 UTC cron schedule, got: {job['cron']}"
         )
 
 

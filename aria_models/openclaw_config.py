@@ -31,13 +31,10 @@ def render_openclaw_config(template_path: Path, models_path: Path, output_path: 
     # Set timeoutSeconds at agents.defaults level (not in model object)
     agents_defaults["timeoutSeconds"] = get_timeout_seconds(catalog)
 
-    # Inject custom system prompt if configured
-    import os as _os
-    prompt_file = _os.environ.get("OPENCLAW_SYSTEM_PROMPT_FILE")
-    if prompt_file:
-        prompt_path = Path(prompt_file)
-        if prompt_path.exists():
-            agents_defaults["systemPrompt"] = prompt_path.read_text(encoding="utf-8").strip()
+    # NOTE: Do NOT inject systemPrompt into agents.defaults — OpenClaw 2026.2.6+
+    # rejects it as an unrecognized key and crashes. The system identity is
+    # already in agents.list[].identity.theme (the supported config path).
+    # The BOOTSTRAP.md content is read by Aria at runtime via the theme directive.
 
     # Providers config
     providers = template.setdefault("models", {}).setdefault("providers", {})

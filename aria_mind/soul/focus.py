@@ -49,7 +49,7 @@ class FocusType(Enum):
 
 # CATASTROPHIC FALLBACK ONLY — models.yaml is truth
 _FALLBACK_MODEL_HINTS: Dict[str, str] = {
-    "orchestrator": "qwen3-mlx",
+    "orchestrator": "kimi",
     "devsecops": "qwen3-coder-free",
     "data": "chimera-free",
     "trader": "deepseek-free",
@@ -72,7 +72,7 @@ def _get_model_hint(focus_type: str) -> str:
     _focus_log.warning(
         "Catalog lookup failed for focus '%s'; using hardcoded fallback", focus_type
     )
-    return _FALLBACK_MODEL_HINTS.get(focus_type, "qwen3-mlx")
+    return _FALLBACK_MODEL_HINTS.get(focus_type, "kimi")
 
 
 def get_focus_default_with_profile(focus_type: str) -> Tuple[str, float, int]:

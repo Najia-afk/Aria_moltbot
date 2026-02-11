@@ -51,9 +51,9 @@ def test_import_aria_agents():
 def test_import_aria_skills():
     """Test aria_skills imports."""
     from aria_skills import SkillRegistry
-    from aria_skills.database import DatabaseSkill
+    from aria_skills import MoonshotSkill
     assert SkillRegistry is not None
-    assert DatabaseSkill is not None
+    assert MoonshotSkill is not None
 
 
 def test_import_aria_models():

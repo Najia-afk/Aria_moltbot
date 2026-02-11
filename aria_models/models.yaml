@@ -14,10 +14,10 @@
     }
   },
   "routing": {
-    "primary": "litellm/qwen3-mlx",
+    "primary": "litellm/kimi",
     "timeout": 300,
     "retries": 2,
-    "fallbacks": ["litellm/qwen3-next-free", "litellm/qwen-cpu-fallback", "litellm/trinity-free", "litellm/chimera-free", "litellm/deepseek-free", "litellm/kimi"]
+    "fallbacks": ["litellm/qwen3-next-free", "litellm/trinity-free", "litellm/chimera-free", "litellm/deepseek-free", "litellm/gpt-oss-free"]
   },
   "agent_aliases": {
     "litellm/qwen3-mlx": "Qwen3 4B Instruct (MLX Local)",
@@ -268,9 +268,9 @@
     }
   },
   "criteria": {
-    "priority": ["qwen3-mlx", "qwen-cpu-fallback", "trinity-free", "chimera-free", "kimi"],
+    "priority": ["kimi", "trinity-free", "chimera-free", "qwen3-next-free", "deepseek-free"],
     "tiers": {
-      "local": ["qwen3-mlx", "qwen-cpu-fallback"],
+      "local": ["qwen3-mlx", "qwen-cpu-fallback", "phi4-mini-local", "qwen3-local"],
       "free": ["trinity-free", "qwen3-coder-free", "chimera-free", "qwen3-next-free", "glm-free", "deepseek-free", "nemotron-free", "gpt-oss-free", "gpt-oss-small-free"],
       "paid": ["kimi", "kimi-k2-thinking"]
     },
@@ -279,11 +279,11 @@
       "complex_reasoning": ["chimera-free", "deepseek-free", "kimi-k2-thinking"],
       "creative_writing": ["trinity-free"],
       "long_context": ["qwen3-next-free", "nemotron-free", "kimi"],
-      "fast_simple": ["gpt-oss-small-free", "qwen3-mlx"],
-      "default": ["qwen3-mlx"]
+      "fast_simple": ["gpt-oss-small-free", "kimi"],
+      "default": ["kimi"]
     },
     "focus_defaults": {
-      "orchestrator": "qwen3-mlx",
+      "orchestrator": "kimi",
       "devsecops": "qwen3-coder-free",
       "data": "chimera-free",
       "trader": "deepseek-free",
@@ -293,8 +293,8 @@
     }
   },
   "profiles": {
-    "routing":  { "model": "qwen3-mlx",        "temperature": 0.3, "max_tokens": 512 },
-    "analysis": { "model": "qwen3-mlx",        "temperature": 0.7, "max_tokens": 4096 },
+    "routing":  { "model": "kimi",             "temperature": 0.3, "max_tokens": 512 },
+    "analysis": { "model": "kimi",             "temperature": 0.7, "max_tokens": 4096 },
     "creative": { "model": "trinity-free",     "temperature": 0.9, "max_tokens": 2048 },
     "code":     { "model": "qwen3-coder-free", "temperature": 0.2, "max_tokens": 8192 },
     "social":   { "model": "trinity-free",     "temperature": 0.8, "max_tokens": 1024 }

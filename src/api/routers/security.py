@@ -7,7 +7,7 @@ import uuid
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Request
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import SecurityEvent
@@ -100,17 +100,7 @@ async def api_security_stats(db: AsyncSession = Depends(get_db)):
         .order_by(func.count(SecurityEvent.id).desc())
         .limit(10)
     )
-    recent = (
-        await db.execute(
-            select(func.count(SecurityEvent.id)).where(
-                SecurityEvent.created_at > func.now() - func.cast("24 hours", func.literal_column("interval"))
-            )
-        )
-    ).scalar()
-
-    # Safer approach for the 24h filter using text
-    from sqlalchemy import text
-    recent = (
+    recent = (  # noqa: E712
         await db.execute(
             select(func.count(SecurityEvent.id)).where(
                 SecurityEvent.created_at > text("NOW() - INTERVAL '24 hours'")

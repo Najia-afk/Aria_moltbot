@@ -35,7 +35,6 @@ from aria_skills.registry import SkillRegistry
 
 # Import skill implementations from subdirectories
 from aria_skills.moltbook import MoltbookSkill
-from aria_skills.llm import MoonshotSkill, OllamaSkill  # legacy alias
 from aria_skills.moonshot import MoonshotSkill          # v2 canonical
 from aria_skills.ollama import OllamaSkill              # v2 canonical
 from aria_skills.health import HealthMonitorSkill

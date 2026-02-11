@@ -82,9 +82,9 @@ class KnowledgeGraphSkill(BaseSkill):
     ) -> SkillResult:
         """Add a relationship between entities."""
         rel = {
-            "from": from_entity,
-            "relation": relation,
-            "to": to_entity,
+            "from_entity": from_entity,
+            "relation_type": relation,
+            "to_entity": to_entity,
             "properties": properties or {},
             "created_at": datetime.now(timezone.utc).isoformat(),
         }

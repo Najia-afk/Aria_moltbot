@@ -45,8 +45,10 @@ async def agent_manager(skill_config, mock_httpx_client):
     from aria_skills.agent_manager import AgentManagerSkill
     skill = AgentManagerSkill(skill_config)
     await skill.initialize()
-    skill._client = mock_httpx_client  # Replace real client with mock
-    return skill
+    original_client = skill._api._client
+    skill._api._client = mock_httpx_client  # Replace real client with mock
+    yield skill
+    skill._api._client = original_client  # Restore original for singleton safety
 
 
 class TestAgentManagerInit:

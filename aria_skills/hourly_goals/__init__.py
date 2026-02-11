@@ -117,7 +117,7 @@ class HourlyGoalsSkill(BaseSkill):
             "completed_at": datetime.now(timezone.utc).isoformat(),
         }
         try:
-            resp = await self._api._client.put(f"/hourly-goals/{goal_id}", json=update_data)
+            resp = await self._api._client.patch(f"/hourly-goals/{goal_id}", json=update_data)
             resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:

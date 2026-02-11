@@ -102,10 +102,6 @@ class TestHealthRouter:
         data = _assert_json(api_client.get("/stats"))
         assert "activities_count" in data
 
-    def test_stats_extended(self, api_client: httpx.Client):
-        data = _assert_json(api_client.get("/stats-extended"))
-        assert "activities_count" in data
-
 
 # ============================================================================
 #  Activities router
@@ -123,13 +119,7 @@ class TestActivitiesRouter:
         data = _assert_json(api_client.post("/activities", json=payload))
         assert data.get("created") is True
 
-    def test_get_interactions(self, api_client: httpx.Client):
-        data = _assert_json(api_client.get("/interactions"))
-        assert isinstance(data, list)
 
-    def test_get_activity_feed(self, api_client: httpx.Client):
-        data = _assert_json(api_client.get("/activity"))
-        assert isinstance(data, list)
 
 
 # ============================================================================

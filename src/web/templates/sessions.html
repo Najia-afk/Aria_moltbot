@@ -119,7 +119,7 @@
 
     <div class="charts-row">
         <div class="chart-card">
-            <h4>📊 Session Status Distribution</h4>
+            <h4>📊 24h Activity by Agent</h4>
             <canvas id="chart-status"></canvas>
         </div>
         <div class="chart-card">
@@ -233,13 +233,14 @@ async function loadStats() {
 // ── Load Sessions ───────────────────────────────────────────────────────────
 async function loadSessions() {
     const status = document.getElementById('status-filter').value;
-    let url = `${API_BASE_URL}/sessions?limit=100`;
+    let url = `${API_BASE_URL}/sessions?limit=50`;
     if (status) url += `&status=${status}`;
     try {
         const res = await fetch(url);
         const data = await res.json();
         _sessions = data.sessions || [];
         renderRecent();
+        renderHourlyChart();
     } catch (e) { console.error('Sessions error:', e); }
 }
 
@@ -273,18 +274,8 @@ function renderOverview() {
     document.getElementById('stat-errors').textContent = errorCount;
     document.getElementById('stat-errors-sub').textContent = `${errorRate}% error rate`;
 
-    // ── Chart: Status Distribution (doughnut) ──
-    const statusColors = { active:'#22c55e', completed:'#3b82f6', ended:'#6b7280', error:'#ef4444' };
-    if (byStatus.length > 0) {
-        renderChart('chart-status', 'doughnut', {
-            labels: byStatus.map(x => x.status),
-            datasets: [{
-                data: byStatus.map(x => x.count),
-                backgroundColor: byStatus.map(x => statusColors[x.status] || '#6b7280'),
-                borderWidth: 0,
-            }]
-        });
-    }
+    // ── Chart: 24h Activity by Agent (stacked bar) ──
+    // Rendered from loadSessions → renderHourlyChart() below
 
     // ── Chart: Session Types (bar) ──
     const byType = s.by_type || [];
@@ -412,16 +403,51 @@ function renderChart(canvasId, type, data, extra = {}) {
     const ctx = document.getElementById(canvasId)?.getContext('2d');
     if (!ctx) return;
     const isDoughnut = type === 'doughnut';
+    const stacked = !!extra.stacked;
     const options = {
         responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: isDoughnut, position: 'bottom', labels: { color: '#9ca3af', font: { size: 12 } } } },
+        plugins: { legend: { display: isDoughnut || stacked, position: 'bottom', labels: { color: '#9ca3af', font: { size: 11 } } } },
         scales: isDoughnut ? {} : {
-            x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af', font: { size: 11 } } },
-            y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af', font: { size: 11 } } },
+            x: { stacked, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af', font: { size: 11 } } },
+            y: { stacked, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af', font: { size: 11 } } },
         },
     };
     if (extra.indexAxis) options.indexAxis = extra.indexAxis;
     _charts[canvasId] = new Chart(ctx, { type, data, options });
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 24H HOURLY CHART BY AGENT
+// ════════════════════════════════════════════════════════════════════════════
+function renderHourlyChart() {
+    if (!_sessions || _sessions.length === 0) return;
+    const now = new Date();
+    const cutoff = new Date(now.getTime() - 24 * 3600000);
+    const recent = _sessions.filter(s => s.started_at && new Date(s.started_at) >= cutoff);
+    const agents = [...new Set(recent.map(s => s.agent_id))];
+    const agentColors = ['#3b82f6','#22c55e','#a855f7','#f59e0b','#ef4444','#ec4899','#06b6d4','#84cc16'];
+
+    // Build 24 hourly buckets from now backwards
+    const hours = [];
+    for (let i = 23; i >= 0; i--) {
+        const h = new Date(now.getTime() - i * 3600000);
+        hours.push({
+            label: h.toLocaleTimeString('en', { hour: '2-digit', hour12: false }) + ':00',
+            start: new Date(h.getFullYear(), h.getMonth(), h.getDate(), h.getHours()),
+            end:   new Date(h.getFullYear(), h.getMonth(), h.getDate(), h.getHours() + 1),
+        });
+    }
+    const datasets = agents.map((agent, idx) => ({
+        label: agent,
+        data: hours.map(h => recent.filter(s =>
+            s.agent_id === agent &&
+            new Date(s.started_at) >= h.start &&
+            new Date(s.started_at) < h.end
+        ).length),
+        backgroundColor: agentColors[idx % agentColors.length],
+        borderRadius: 3,
+    }));
+    renderChart('chart-status', 'bar', { labels: hours.map(h => h.label), datasets }, { stacked: true });
 }
 
 // ════════════════════════════════════════════════════════════════════════════

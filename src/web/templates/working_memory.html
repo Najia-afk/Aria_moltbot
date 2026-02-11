@@ -262,7 +262,7 @@ function renderItems() {
             ? (item.value || '').substring(0, 80) + '…'
             : (item.value || '');
         const ttlDisplay = item.ttl_hours ? `${item.ttl_hours}h` : '∞';
-        const accessed = item.last_accessed ? formatDate(item.last_accessed) : '-';
+        const accessed = item.accessed_at ? formatDate(item.accessed_at) : '-';
 
         return `<tr>
             <td><span class="category-badge">${item.category || '-'}</span></td>
@@ -328,7 +328,7 @@ async function loadContext() {
     try {
         const res = await fetch(`${API_BASE_URL}/working-memory/context?limit=20`);
         const data = await res.json();
-        const items = data.items || data || [];
+        const items = data.context || data.items || [];
 
         const container = document.getElementById('context-list');
         if (items.length === 0) {
@@ -336,10 +336,10 @@ async function loadContext() {
             return;
         }
 
-        const maxScore = Math.max(...items.map(i => i.relevance_score || i.importance || 0), 0.01);
+        const maxScore = Math.max(...items.map(i => i.relevance || i.importance || 0), 0.01);
 
         container.innerHTML = items.map(item => {
-            const score = item.relevance_score || item.importance || 0;
+            const score = item.relevance || item.importance || 0;
             const pct = (score / maxScore * 100).toFixed(0);
             const hue = Math.round(score / maxScore * 120); // 0=red, 120=green
             return `<div class="context-item">
@@ -377,23 +377,20 @@ async function loadCheckpoint() {
         const data = await res.json();
 
         const container = document.getElementById('checkpoint-info');
-        const cp = data.checkpoint || data;
 
-        if (!cp || !cp.id) {
+        if (!data.checkpoint_id) {
             container.innerHTML = '<div class="checkpoint-info" style="color:var(--text-muted);">No checkpoints yet</div>';
             document.getElementById('stat-checkpoints').textContent = '0';
             return;
         }
 
-        document.getElementById('stat-checkpoints').textContent = data.total || '1';
+        document.getElementById('stat-checkpoints').textContent = '1';
 
         container.innerHTML = `
             <div class="checkpoint-info">
-                <strong>Latest Checkpoint:</strong> <code>${cp.id}</code>
+                <strong>Latest Checkpoint:</strong> <code>${data.checkpoint_id}</code>
                 <div class="checkpoint-meta">
-                    <span>📅 ${cp.created_at ? formatDate(cp.created_at) : '-'}</span>
-                    <span>📦 ${cp.item_count || '-'} items</span>
-                    ${cp.description ? `<span>📝 ${cp.description}</span>` : ''}
+                    <span>📦 ${data.count || data.items?.length || 0} items</span>
                 </div>
             </div>`;
     } catch (e) {

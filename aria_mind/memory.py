@@ -18,10 +18,7 @@ import os
 from collections import deque, Counter
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from aria_skills.database import DatabaseSkill
+from typing import Any, Dict, List, Optional
 
 # File-based storage paths (inside container)
 ARIA_MEMORIES_PATH = os.environ.get("ARIA_MEMORIES_PATH", "/root/.openclaw/aria_memories")

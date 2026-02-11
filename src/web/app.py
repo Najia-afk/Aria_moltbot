@@ -3,8 +3,9 @@
 # Flask app with GraphQL, Grid, Search for Aria activities and records
 # =============================================================================
 
-from flask import Flask, render_template, make_response
+from flask import Flask, render_template, make_response, request, Response
 import os
+import requests as http_requests
 
 def create_app():
     app = Flask(__name__,
@@ -18,6 +19,9 @@ def create_app():
     clawdbot_public_url = os.environ['CLAWDBOT_PUBLIC_URL']
     # Extract token from clawdbot URL for dynamic URL generation
     clawdbot_token = os.environ.get('CLAWDBOT_TOKEN', '')
+
+    # Internal API service URL (Docker network or localhost fallback)
+    _api_internal_url = os.environ.get('API_INTERNAL_URL', 'http://aria-api:8000')
 
     @app.context_processor
     def inject_config():
@@ -34,6 +38,54 @@ def create_app():
         response.headers['Supports-Loading-Mode'] = 'fenced-frame'
         return response
     
+    # =========================================================================
+    # API Reverse Proxy - forwards /api/* to aria-api backend
+    # Enables dashboard to work when accessed directly (port 5000)
+    # without requiring Traefik (port 80)
+    # =========================================================================
+    @app.route('/api/', defaults={'path': ''}, methods=['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'])
+    @app.route('/api/<path:path>', methods=['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'])
+    def api_proxy(path):
+        url = f"{_api_internal_url}/{path}"
+        resp = http_requests.request(
+            method=request.method,
+            url=url,
+            params=request.args,
+            headers={k: v for k, v in request.headers if k.lower() not in ('host', 'transfer-encoding')},
+            data=request.get_data(),
+            timeout=30,
+        )
+        # Build Flask response from upstream
+        excluded_headers = {'content-encoding', 'transfer-encoding', 'connection', 'content-length'}
+        headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded_headers}
+        return Response(resp.content, status=resp.status_code, headers=headers)
+
+    # =========================================================================
+    # Clawdbot Reverse Proxy - forwards /clawdbot/* to clawdbot service
+    # Injects auth token like Traefik does
+    # =========================================================================
+    _clawdbot_internal_url = os.environ.get('CLAWDBOT_URL', 'http://clawdbot:18789')
+
+    @app.route('/clawdbot/', defaults={'path': ''}, methods=['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'])
+    @app.route('/clawdbot/<path:path>', methods=['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'])
+    def clawdbot_proxy(path):
+        url = f"{_clawdbot_internal_url}/clawdbot/{path}"
+        fwd_headers = {k: v for k, v in request.headers if k.lower() not in ('host', 'transfer-encoding')}
+        # Inject Bearer token (same as Traefik clawdbot-auth middleware)
+        if clawdbot_token:
+            fwd_headers['Authorization'] = f'Bearer {clawdbot_token}'
+        resp = http_requests.request(
+            method=request.method,
+            url=url,
+            params=request.args,
+            headers=fwd_headers,
+            data=request.get_data(),
+            timeout=30,
+        )
+        excluded_headers = {'content-encoding', 'transfer-encoding', 'connection', 'content-length'}
+        headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded_headers}
+        return Response(resp.content, status=resp.status_code, headers=headers)
+
     # =========================================================================
     # Routes - Pages
     # =========================================================================

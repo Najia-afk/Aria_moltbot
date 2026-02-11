@@ -39,16 +39,15 @@ class TestGoalSkillPersistence:
     def test_has_api_url_and_client_attrs(self):
         from aria_skills.goals import GoalSchedulerSkill
         skill = GoalSchedulerSkill(_cfg("goals"))
-        assert hasattr(skill, "_api_url")
-        assert hasattr(skill, "_client")
-        assert skill._client is None  # before initialize
+        assert hasattr(skill, "_api")
+        assert skill._api is None  # before initialize
 
     @pytest.mark.asyncio
     async def test_initialize_creates_httpx_client(self):
         from aria_skills.goals import GoalSchedulerSkill
         skill = GoalSchedulerSkill(_cfg("goals"))
         await skill.initialize()
-        assert isinstance(skill._client, httpx.AsyncClient)
+        assert skill._api is not None and skill._api._client is not None
         await skill.close()
 
     @pytest.mark.asyncio
@@ -61,7 +60,7 @@ class TestGoalSkillPersistence:
         mock_resp.raise_for_status = MagicMock()
         mock_resp.json.return_value = {"id": "goal_1", "title": "test"}
 
-        with patch.object(skill._client, "post", new_callable=AsyncMock, return_value=mock_resp) as m:
+        with patch.object(skill._api._client, "post", new_callable=AsyncMock, return_value=mock_resp) as m:
             result = await skill.create_goal(title="test goal")
             m.assert_called_once()
             assert result.success
@@ -78,7 +77,7 @@ class TestGoalSkillPersistence:
         mock_resp.raise_for_status = MagicMock()
         mock_resp.json.return_value = [{"id": "g1", "status": "active"}]
 
-        with patch.object(skill._client, "get", new_callable=AsyncMock, return_value=mock_resp) as m:
+        with patch.object(skill._api._client, "get", new_callable=AsyncMock, return_value=mock_resp) as m:
             result = await skill.list_goals()
             m.assert_called_once()
             assert result.success
@@ -95,7 +94,7 @@ class TestGoalSkillPersistence:
         mock_resp.raise_for_status = MagicMock()
         mock_resp.json.return_value = {"id": "goal_1", "status": "completed"}
 
-        with patch.object(skill._client, "put", new_callable=AsyncMock, return_value=mock_resp) as m:
+        with patch.object(skill._api._client, "patch", new_callable=AsyncMock, return_value=mock_resp) as m:
             result = await skill.update_goal("goal_1", status="completed")
             m.assert_called_once()
             assert result.success
@@ -109,7 +108,7 @@ class TestGoalSkillPersistence:
         await skill.initialize()
 
         # Make API call raise
-        with patch.object(skill._client, "post", new_callable=AsyncMock, side_effect=httpx.ConnectError("down")):
+        with patch.object(skill._api._client, "post", new_callable=AsyncMock, side_effect=httpx.ConnectError("down")):
             result = await skill.create_goal(title="fallback test")
             assert result.success  # should succeed via fallback
             assert result.data.get("title") == "fallback test"  # data preserved
@@ -130,15 +129,14 @@ class TestSocialSkillPersistence:
     def test_has_api_attrs(self):
         from aria_skills.social import SocialSkill
         skill = SocialSkill(_cfg("social"))
-        assert hasattr(skill, "_api_url")
-        assert hasattr(skill, "_client")
+        assert hasattr(skill, "_api")
 
     @pytest.mark.asyncio
     async def test_initialize_creates_client(self):
         from aria_skills.social import SocialSkill
         skill = SocialSkill(_cfg("social"))
         await skill.initialize()
-        assert isinstance(skill._client, httpx.AsyncClient)
+        assert skill._api is not None and skill._api._client is not None
         await skill.close()
 
     @pytest.mark.asyncio
@@ -151,7 +149,7 @@ class TestSocialSkillPersistence:
         mock_resp.raise_for_status = MagicMock()
         mock_resp.json.return_value = {"id": "post_1"}
 
-        with patch.object(skill._client, "post", new_callable=AsyncMock, return_value=mock_resp) as m:
+        with patch.object(skill._api._client, "post", new_callable=AsyncMock, return_value=mock_resp) as m:
             result = await skill.create_post(content="hello")
             m.assert_called_once()
             assert result.success
@@ -168,7 +166,7 @@ class TestSocialSkillPersistence:
         mock_resp.raise_for_status = MagicMock()
         mock_resp.json.return_value = [{"id": "post_1"}]
 
-        with patch.object(skill._client, "get", new_callable=AsyncMock, return_value=mock_resp) as m:
+        with patch.object(skill._api._client, "get", new_callable=AsyncMock, return_value=mock_resp) as m:
             result = await skill.get_posts()
             m.assert_called_once()
             assert result.success
@@ -188,15 +186,14 @@ class TestHourlyGoalsSkillPersistence:
     def test_has_api_attrs(self):
         from aria_skills.hourly_goals import HourlyGoalsSkill
         skill = HourlyGoalsSkill(_cfg("hourly_goals"))
-        assert hasattr(skill, "_api_url")
-        assert hasattr(skill, "_client")
+        assert hasattr(skill, "_api")
 
     @pytest.mark.asyncio
     async def test_initialize_creates_client(self):
         from aria_skills.hourly_goals import HourlyGoalsSkill
         skill = HourlyGoalsSkill(_cfg("hourly_goals"))
         await skill.initialize()
-        assert isinstance(skill._client, httpx.AsyncClient)
+        assert skill._api is not None and skill._api._client is not None
         await skill.close()
 
     @pytest.mark.asyncio
@@ -209,7 +206,7 @@ class TestHourlyGoalsSkillPersistence:
         mock_resp.raise_for_status = MagicMock()
         mock_resp.json.return_value = {"id": "hg_10_0"}
 
-        with patch.object(skill._client, "post", new_callable=AsyncMock, return_value=mock_resp) as m:
+        with patch.object(skill._api._client, "post", new_callable=AsyncMock, return_value=mock_resp) as m:
             result = await skill.set_goal(hour=10, goal="test")
             m.assert_called_once()
             assert result.success
@@ -228,15 +225,14 @@ class TestScheduleSkillPersistence:
     def test_has_api_attrs(self):
         from aria_skills.schedule import ScheduleSkill
         skill = ScheduleSkill(_cfg("schedule"))
-        assert hasattr(skill, "_api_url")
-        assert hasattr(skill, "_client")
+        assert hasattr(skill, "_api")
 
     @pytest.mark.asyncio
     async def test_initialize_creates_client(self):
         from aria_skills.schedule import ScheduleSkill
         skill = ScheduleSkill(_cfg("schedule"))
         await skill.initialize()
-        assert isinstance(skill._client, httpx.AsyncClient)
+        assert skill._api is not None and skill._api._client is not None
         await skill.close()
 
     @pytest.mark.asyncio
@@ -249,7 +245,7 @@ class TestScheduleSkillPersistence:
         mock_resp.raise_for_status = MagicMock()
         mock_resp.json.return_value = {"id": "job_1"}
 
-        with patch.object(skill._client, "post", new_callable=AsyncMock, return_value=mock_resp) as m:
+        with patch.object(skill._api._client, "post", new_callable=AsyncMock, return_value=mock_resp) as m:
             result = await skill.create_job(name="test", schedule="every 1 hours", action="test")
             m.assert_called_once()
             assert result.success
@@ -266,7 +262,7 @@ class TestScheduleSkillPersistence:
         mock_resp.raise_for_status = MagicMock()
         mock_resp.json.return_value = [{"id": "job_1", "enabled": True}]
 
-        with patch.object(skill._client, "get", new_callable=AsyncMock, return_value=mock_resp) as m:
+        with patch.object(skill._api._client, "get", new_callable=AsyncMock, return_value=mock_resp) as m:
             result = await skill.list_jobs()
             m.assert_called_once()
             assert result.success
@@ -285,15 +281,14 @@ class TestPerformanceSkillPersistence:
     def test_has_api_attrs(self):
         from aria_skills.performance import PerformanceSkill
         skill = PerformanceSkill(_cfg("performance"))
-        assert hasattr(skill, "_api_url")
-        assert hasattr(skill, "_client")
+        assert hasattr(skill, "_api")
 
     @pytest.mark.asyncio
     async def test_initialize_creates_client(self):
         from aria_skills.performance import PerformanceSkill
         skill = PerformanceSkill(_cfg("performance"))
         await skill.initialize()
-        assert isinstance(skill._client, httpx.AsyncClient)
+        assert skill._api is not None and skill._api._client is not None
         await skill.close()
 
     @pytest.mark.asyncio
@@ -306,7 +301,7 @@ class TestPerformanceSkillPersistence:
         mock_resp.raise_for_status = MagicMock()
         mock_resp.json.return_value = {"id": "perf_1"}
 
-        with patch.object(skill._client, "post", new_callable=AsyncMock, return_value=mock_resp) as m:
+        with patch.object(skill._api._client, "post", new_callable=AsyncMock, return_value=mock_resp) as m:
             result = await skill.log_review(
                 period="2026-02-09",
                 successes=["ok"],
@@ -328,7 +323,7 @@ class TestPerformanceSkillPersistence:
         mock_resp.raise_for_status = MagicMock()
         mock_resp.json.return_value = [{"id": "perf_1"}]
 
-        with patch.object(skill._client, "get", new_callable=AsyncMock, return_value=mock_resp) as m:
+        with patch.object(skill._api._client, "get", new_callable=AsyncMock, return_value=mock_resp) as m:
             result = await skill.get_reviews()
             m.assert_called_once()
             assert result.success
@@ -347,15 +342,14 @@ class TestKnowledgeGraphSkillPersistence:
     def test_has_api_attrs(self):
         from aria_skills.knowledge_graph import KnowledgeGraphSkill
         skill = KnowledgeGraphSkill(_cfg("knowledge_graph"))
-        assert hasattr(skill, "_api_url")
-        assert hasattr(skill, "_client")
+        assert hasattr(skill, "_api")
 
     @pytest.mark.asyncio
     async def test_initialize_creates_client(self):
         from aria_skills.knowledge_graph import KnowledgeGraphSkill
         skill = KnowledgeGraphSkill(_cfg("knowledge_graph"))
         await skill.initialize()
-        assert isinstance(skill._client, httpx.AsyncClient)
+        assert skill._api is not None and skill._api._client is not None
         await skill.close()
 
     @pytest.mark.asyncio
@@ -368,7 +362,7 @@ class TestKnowledgeGraphSkillPersistence:
         mock_resp.raise_for_status = MagicMock()
         mock_resp.json.return_value = {"id": "concept:test"}
 
-        with patch.object(skill._client, "post", new_callable=AsyncMock, return_value=mock_resp) as m:
+        with patch.object(skill._api._client, "post", new_callable=AsyncMock, return_value=mock_resp) as m:
             result = await skill.add_entity(name="test", entity_type="concept")
             m.assert_called_once()
             assert result.success
@@ -385,7 +379,7 @@ class TestKnowledgeGraphSkillPersistence:
         mock_resp.raise_for_status = MagicMock()
         mock_resp.json.return_value = {"from": "a", "to": "b"}
 
-        with patch.object(skill._client, "post", new_callable=AsyncMock, return_value=mock_resp) as m:
+        with patch.object(skill._api._client, "post", new_callable=AsyncMock, return_value=mock_resp) as m:
             result = await skill.add_relation(from_entity="a", relation="related", to_entity="b")
             m.assert_called_once()
             assert result.success
@@ -402,7 +396,7 @@ class TestKnowledgeGraphSkillPersistence:
         mock_resp.raise_for_status = MagicMock()
         mock_resp.json.return_value = [{"id": "concept:test"}]
 
-        with patch.object(skill._client, "get", new_callable=AsyncMock, return_value=mock_resp) as m:
+        with patch.object(skill._api._client, "get", new_callable=AsyncMock, return_value=mock_resp) as m:
             result = await skill.query(entity_type="concept")
             m.assert_called_once()
             assert result.success
@@ -424,7 +418,7 @@ class TestResearchSkillPersistence:
         from aria_skills.research import ResearchSkill
         skill = ResearchSkill(_cfg("research"))
         await skill.initialize()
-        assert isinstance(skill._client, httpx.AsyncClient)
+        assert skill._api is not None and skill._api._client is not None
         await skill.close()
 
     @pytest.mark.asyncio
@@ -437,7 +431,7 @@ class TestResearchSkillPersistence:
         mock_resp.raise_for_status = MagicMock()
         mock_resp.json.return_value = {"success": True}
 
-        with patch.object(skill._client, "post", new_callable=AsyncMock, return_value=mock_resp) as m:
+        with patch.object(skill._api._client, "post", new_callable=AsyncMock, return_value=mock_resp) as m:
             result = await skill.start_project(topic="AI Safety")
             assert result.success
             assert m.called  # post to /memories
@@ -454,7 +448,7 @@ class TestResearchSkillPersistence:
         mock_resp.raise_for_status = MagicMock()
         mock_resp.json.return_value = []
 
-        with patch.object(skill._client, "get", new_callable=AsyncMock, return_value=mock_resp) as m:
+        with patch.object(skill._api._client, "get", new_callable=AsyncMock, return_value=mock_resp) as m:
             result = await skill.list_projects()
             m.assert_called_once()
             assert result.success
@@ -469,55 +463,37 @@ class TestResearchSkillPersistence:
 
 
 # ===========================================================================
-# BUCKET C — Deprecation warnings
+# BUCKET C — Deprecated skills (removed in v1.2 — __init__.py deleted)
+# These skills no longer exist as importable modules.
+# Only skill.json manifests remain for historical reference.
 # ===========================================================================
 
 class TestBucketCDeprecations:
-    """Bucket C skills should emit DeprecationWarning on initialize()."""
+    """Bucket C skills have been fully removed. Verify they are NOT importable."""
 
-    @pytest.mark.asyncio
-    async def test_brainstorm_deprecation(self):
-        from aria_skills.brainstorm import BrainstormSkill
-        skill = BrainstormSkill(_cfg("brainstorm"))
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            await skill.initialize()
-            deprecation_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
-            assert len(deprecation_warnings) >= 1
-            assert "research" in str(deprecation_warnings[0].message).lower()
+    def test_brainstorm_not_importable(self):
+        with pytest.raises(ImportError):
+            from aria_skills.brainstorm import BrainstormSkill  # noqa: F401
 
-    @pytest.mark.asyncio
-    async def test_community_deprecation(self):
-        from aria_skills.community import CommunitySkill
-        skill = CommunitySkill(_cfg("community"))
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            await skill.initialize()
-            deprecation_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
-            assert len(deprecation_warnings) >= 1
-            assert "social" in str(deprecation_warnings[0].message).lower()
+    def test_community_not_importable(self):
+        with pytest.raises(ImportError):
+            from aria_skills.community import CommunitySkill  # noqa: F401
 
-    @pytest.mark.asyncio
-    async def test_model_switcher_deprecation(self):
-        from aria_skills.model_switcher import ModelSwitcherSkill
-        skill = ModelSwitcherSkill(_cfg("model_switcher"))
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            await skill.initialize()
-            deprecation_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
-            assert len(deprecation_warnings) >= 1
-            assert "litellm" in str(deprecation_warnings[0].message).lower()
+    def test_model_switcher_not_importable(self):
+        with pytest.raises(ImportError):
+            from aria_skills.model_switcher import ModelSwitcherSkill  # noqa: F401
 
-    @pytest.mark.asyncio
-    async def test_fact_check_deprecation(self):
-        from aria_skills.fact_check import FactCheckSkill
-        skill = FactCheckSkill(_cfg("fact_check"))
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            await skill.initialize()
-            deprecation_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
-            assert len(deprecation_warnings) >= 1
-            assert "research" in str(deprecation_warnings[0].message).lower()
+    def test_fact_check_not_importable(self):
+        with pytest.raises(ImportError):
+            from aria_skills.fact_check import FactCheckSkill  # noqa: F401
+
+    def test_database_not_importable(self):
+        with pytest.raises(ImportError):
+            from aria_skills.database import DatabaseSkill  # noqa: F401
+
+    def test_experiment_not_importable(self):
+        with pytest.raises(ImportError):
+            from aria_skills.experiment import ExperimentSkill  # noqa: F401
 
 
 # ===========================================================================
@@ -531,13 +507,6 @@ class TestBucketBStubs:
     async def test_portfolio_initializes(self):
         from aria_skills.portfolio import PortfolioSkill
         skill = PortfolioSkill(_cfg("portfolio"))
-        result = await skill.initialize()
-        assert result is True
-
-    @pytest.mark.asyncio
-    async def test_experiment_initializes(self):
-        from aria_skills.experiment import ExperimentSkill
-        skill = ExperimentSkill(_cfg("experiment"))
         result = await skill.initialize()
         assert result is True
 

@@ -30,7 +30,7 @@ class TestMemoryManagerInit:
         assert mm._db is None
         assert mm._connected is False
         assert isinstance(mm._short_term, deque)
-        assert mm._max_short_term == 100
+        assert mm._max_short_term == 200
 
     def test_set_database(self):
         mm = _make_manager()

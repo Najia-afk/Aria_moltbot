@@ -392,7 +392,7 @@ class BaseSkill(ABC):
             api_client = registry.get("api_client")
             if api_client:
                 await api_client.execute(action="post", params={
-                    "endpoint": "/activity",
+                    "endpoint": "/activities",
                     "data": {
                         "action": action,
                         "details": details,

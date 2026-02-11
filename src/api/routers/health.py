@@ -5,6 +5,7 @@ Health, status, and stats endpoints.
 from datetime import datetime, timezone
 from typing import Optional
 
+import asyncio
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -72,14 +73,23 @@ async def host_stats():
 @router.get("/status")
 async def api_status():
     results = {}
-    async with httpx.AsyncClient(timeout=5.0) as client:
-        for name, (base_url, health_path) in SERVICE_URLS.items():
-            try:
+
+    async def check_service(name, base_url, health_path):
+        try:
+            async with httpx.AsyncClient(timeout=3.0) as client:
                 url = base_url.rstrip("/") + health_path
                 resp = await client.get(url)
-                results[name] = {"status": "up", "code": resp.status_code}
-            except Exception as e:
-                results[name] = {"status": "down", "code": None, "error": str(e)[:50]}
+                return name, {"status": "up", "code": resp.status_code}
+        except Exception as e:
+            return name, {"status": "down", "code": None, "error": str(e)[:50]}
+
+    tasks = [
+        check_service(name, base_url, health_path)
+        for name, (base_url, health_path) in SERVICE_URLS.items()
+    ]
+    service_results = await asyncio.gather(*tasks)
+    for name, result in service_results:
+        results[name] = result
 
     # Check PostgreSQL via SQLAlchemy engine
     try:

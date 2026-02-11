@@ -115,8 +115,9 @@ class TestHealthCheck:
     @pytest.mark.asyncio
     async def test_health_check_available(self):
         skill = _make_skill()
-        skill._client = AsyncMock()
-        skill._client.get = AsyncMock(return_value=_make_response(200))
+        skill._api = MagicMock()
+        skill._api._client = AsyncMock()
+        skill._api._client.get = AsyncMock(return_value=_make_response(200))
         skill._status = SkillStatus.AVAILABLE
 
         status = await skill.health_check()
@@ -125,15 +126,16 @@ class TestHealthCheck:
     @pytest.mark.asyncio
     async def test_health_check_unavailable_no_client(self):
         skill = _make_skill()
-        skill._client = None
+        skill._api = None
         status = await skill.health_check()
         assert status == SkillStatus.UNAVAILABLE
 
     @pytest.mark.asyncio
     async def test_health_check_error(self):
         skill = _make_skill()
-        skill._client = AsyncMock()
-        skill._client.get = AsyncMock(side_effect=Exception("timeout"))
+        skill._api = MagicMock()
+        skill._api._client = AsyncMock()
+        skill._api._client.get = AsyncMock(side_effect=Exception("timeout"))
         status = await skill.health_check()
         assert status == SkillStatus.ERROR
 
@@ -148,10 +150,11 @@ class TestRememberAndRecall:
     async def test_remember_and_recall(self):
         """Mock API: store then retrieve."""
         skill = _make_skill()
-        skill._client = AsyncMock()
+        skill._api = MagicMock()
+        skill._api._client = AsyncMock()
 
         # remember
-        skill._client.post = AsyncMock(
+        skill._api._client.post = AsyncMock(
             return_value=_make_response(200, {"id": "abc-123", "key": "greeting", "upserted": True})
         )
         result = await skill.remember("greeting", {"text": "hello"}, category="social")
@@ -159,7 +162,7 @@ class TestRememberAndRecall:
         assert result.data["upserted"] is True
 
         # recall
-        skill._client.get = AsyncMock(
+        skill._api._client.get = AsyncMock(
             return_value=_make_response(200, {
                 "items": [{"key": "greeting", "value": {"text": "hello"}, "category": "social"}],
                 "count": 1,
@@ -172,7 +175,7 @@ class TestRememberAndRecall:
     @pytest.mark.asyncio
     async def test_remember_not_initialized(self):
         skill = _make_skill()
-        skill._client = None
+        skill._api = None
         result = await skill.remember("k", "v")
         assert not result.success
         assert "not initialized" in result.error
@@ -188,7 +191,8 @@ class TestContextRanking:
     async def test_context_ranking(self):
         """Store items with different importance and verify they come back scored."""
         skill = _make_skill()
-        skill._client = AsyncMock()
+        skill._api = MagicMock()
+        skill._api._client = AsyncMock()
 
         mock_context = {
             "context": [
@@ -198,7 +202,7 @@ class TestContextRanking:
             ],
             "count": 3,
         }
-        skill._client.get = AsyncMock(return_value=_make_response(200, mock_context))
+        skill._api._client.get = AsyncMock(return_value=_make_response(200, mock_context))
 
         result = await skill.get_context(limit=10)
         assert result.success
@@ -218,11 +222,12 @@ class TestCheckpointRestore:
     @pytest.mark.asyncio
     async def test_checkpoint_restore(self):
         skill = _make_skill()
-        skill._client = AsyncMock()
+        skill._api = MagicMock()
+        skill._api._client = AsyncMock()
 
         # checkpoint
         ckpt_data = {"checkpoint_id": "ckpt-20260209T120000-abc123", "items_checkpointed": 5}
-        skill._client.post = AsyncMock(return_value=_make_response(200, ckpt_data))
+        skill._api._client.post = AsyncMock(return_value=_make_response(200, ckpt_data))
         result = await skill.checkpoint()
         assert result.success
         assert "ckpt-" in result.data["checkpoint_id"]
@@ -233,7 +238,7 @@ class TestCheckpointRestore:
             "items": [{"key": "a"}, {"key": "b"}],
             "count": 2,
         }
-        skill._client.get = AsyncMock(return_value=_make_response(200, restore_data))
+        skill._api._client.get = AsyncMock(return_value=_make_response(200, restore_data))
         result = await skill.restore_checkpoint()
         assert result.success
         assert result.data["count"] == 2
@@ -248,9 +253,10 @@ class TestReflect:
     @pytest.mark.asyncio
     async def test_reflect_output(self):
         skill = _make_skill()
-        skill._client = AsyncMock()
+        skill._api = MagicMock()
+        skill._api._client = AsyncMock()
 
-        skill._client.get = AsyncMock(return_value=_make_response(200, {
+        skill._api._client.get = AsyncMock(return_value=_make_response(200, {
             "items": [
                 {"key": "k1", "category": "social", "importance": 0.8},
                 {"key": "k2", "category": "cognition", "importance": 0.3},
@@ -269,8 +275,9 @@ class TestReflect:
     @pytest.mark.asyncio
     async def test_reflect_empty(self):
         skill = _make_skill()
-        skill._client = AsyncMock()
-        skill._client.get = AsyncMock(return_value=_make_response(200, {"items": [], "count": 0}))
+        skill._api = MagicMock()
+        skill._api._client = AsyncMock()
+        skill._api._client.get = AsyncMock(return_value=_make_response(200, {"items": [], "count": 0}))
         result = await skill.reflect()
         assert result.success
         assert "empty" in result.data["summary"].lower()
@@ -286,11 +293,12 @@ class TestCategoryFilter:
     async def test_category_filter(self):
         """Recall with category should pass param through."""
         skill = _make_skill()
-        skill._client = AsyncMock()
-        skill._client.get = AsyncMock(return_value=_make_response(200, {"items": [], "count": 0}))
+        skill._api = MagicMock()
+        skill._api._client = AsyncMock()
+        skill._api._client.get = AsyncMock(return_value=_make_response(200, {"items": [], "count": 0}))
 
         await skill.recall(category="social")
-        call_kwargs = skill._client.get.call_args
+        call_kwargs = skill._api._client.get.call_args
         assert "social" in str(call_kwargs)
 
 
@@ -304,12 +312,13 @@ class TestTTLHandling:
     async def test_ttl_handling(self):
         """Items stored with ttl_hours should pass the value to the API."""
         skill = _make_skill()
-        skill._client = AsyncMock()
-        skill._client.post = AsyncMock(
+        skill._api = MagicMock()
+        skill._api._client = AsyncMock()
+        skill._api._client.post = AsyncMock(
             return_value=_make_response(200, {"id": "x", "key": "tmp", "upserted": True})
         )
         await skill.remember("tmp", {"v": 1}, ttl_hours=2)
-        call_json = skill._client.post.call_args
+        call_json = skill._api._client.post.call_args
         body = call_json.kwargs.get("json") or call_json[1].get("json")
         assert body["ttl_hours"] == 2
 
@@ -323,8 +332,9 @@ class TestForget:
     @pytest.mark.asyncio
     async def test_forget_operation(self):
         skill = _make_skill()
-        skill._client = AsyncMock()
-        skill._client.delete = AsyncMock(
+        skill._api = MagicMock()
+        skill._api._client = AsyncMock()
+        skill._api._client.delete = AsyncMock(
             return_value=_make_response(200, {"deleted": True, "id": "some-uuid"})
         )
         result = await skill.forget("some-uuid")
@@ -341,8 +351,9 @@ class TestUpdate:
     @pytest.mark.asyncio
     async def test_update_importance(self):
         skill = _make_skill()
-        skill._client = AsyncMock()
-        skill._client.patch = AsyncMock(
+        skill._api = MagicMock()
+        skill._api._client = AsyncMock()
+        skill._api._client.patch = AsyncMock(
             return_value=_make_response(200, {"id": "x", "importance": 0.9})
         )
         result = await skill.update("x", importance=0.9)

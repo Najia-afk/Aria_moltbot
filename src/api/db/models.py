@@ -127,7 +127,7 @@ class SocialPost(Base):
 
     id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
     platform: Mapped[str] = mapped_column(String(50), server_default=text("'moltbook'"))
-    post_id: Mapped[str | None] = mapped_column(String(100))
+    post_id: Mapped[str | None] = mapped_column(String(100), unique=True)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     visibility: Mapped[str] = mapped_column(String(50), server_default=text("'public'"))
     reply_to: Mapped[str | None] = mapped_column(String(100), ForeignKey("social_posts.post_id", ondelete="SET NULL"))

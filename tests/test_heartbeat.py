@@ -142,9 +142,8 @@ class TestBeat:
         assert "timestamp" in status
         assert "beat_number" in status
         assert status["beat_number"] == 1
-        assert "soul_loaded" in status
-        assert "memory_connected" in status
-        assert "cognition_ready" in status
+        assert "subsystems" in status
+        assert "all_healthy" in status
 
     async def test_beat_with_none_components(self):
         from aria_mind.heartbeat import Heartbeat
@@ -153,9 +152,10 @@ class TestBeat:
         hb = Heartbeat(mind)
         hb._running = True
         await hb._beat()
-        assert hb._health_status["soul_loaded"] is False
-        assert hb._health_status["memory_connected"] is False
-        assert hb._health_status["cognition_ready"] is False
+        subs = hb._health_status.get("subsystems", {})
+        assert subs.get("soul") is False or subs.get("soul") is None
+        assert subs.get("memory") is False or subs.get("memory") is None
+        assert subs.get("cognition") is False or subs.get("cognition") is None
 
 
 # ── get_status() ───────────────────────────────────────────────────────

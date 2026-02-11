@@ -99,6 +99,24 @@
         <tr><td colspan="6" class="empty-state">Loading...</td></tr>
     </tbody>
 </table>
+
+<!-- Model Limits from models.yaml -->
+<h3 class="section-title" style="margin-top:30px">🤖 Model Configuration (models.yaml)</h3>
+<table class="data-table" id="model-config-table">
+    <thead>
+        <tr>
+            <th>Model</th>
+            <th>Tier</th>
+            <th>Context Window</th>
+            <th>Max Tokens</th>
+            <th>Cost (in/out per 1M)</th>
+            <th>Reasoning</th>
+        </tr>
+    </thead>
+    <tbody id="model-config-body">
+        <tr><td colspan="6" class="empty-state">Loading...</td></tr>
+    </tbody>
+</table>
 {% endblock %}
 
 {% block extra_js %}
@@ -181,7 +199,38 @@ document.getElementById('search-input').addEventListener('input', filterLimits);
 async function init() {
     await AriaModels.init();
     loadRateLimits();
+    loadModelConfig();
 }
+
+async function loadModelConfig() {
+    const tbody = document.getElementById('model-config-body');
+    try {
+        const res = await fetch(`${API_BASE_URL}/models/config`);
+        const data = await res.json();
+        const models = data.models || {};
+        const entries = Object.values(models);
+        if (entries.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No models configured</td></tr>';
+            return;
+        }
+        const tierColors = { local: '#22c55e', free: '#3b82f6', paid: '#f59e0b' };
+        tbody.innerHTML = entries.map(m => {
+            const cost = m.cost || {};
+            const tierColor = tierColors[m.tier] || '#9ca3af';
+            return `<tr>
+                <td><strong>${m.name || m.id}</strong></td>
+                <td><span style="color:${tierColor};font-weight:600">${(m.tier || '-').toUpperCase()}</span></td>
+                <td>${formatNumber(m.contextWindow || 0)}</td>
+                <td>${formatNumber(m.maxTokens || 0)}</td>
+                <td>$${(cost.input || 0).toFixed(3)} / $${(cost.output || 0).toFixed(3)}</td>
+                <td>${m.reasoning ? '✅' : '—'}</td>
+            </tr>`;
+        }).join('');
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="6" class="empty-state">Failed to load: ${e.message}</td></tr>`;
+    }
+}
+
 init();
 setInterval(loadRateLimits, 30000);
 </script>

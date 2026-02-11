@@ -13,7 +13,7 @@ if not DATABASE_URL:
 
 # ── Networking ────────────────────────────────────────────────────────────────
 DOCKER_HOST_IP = os.getenv("DOCKER_HOST_IP", "host.docker.internal")
-MLX_ENABLED = os.getenv("MLX_ENABLED", "true").lower() == "true"
+MLX_ENABLED = os.getenv("MLX_ENABLED", "false").lower() == "true"
 
 # ── Service discovery (name → (base_url, health_path)) ───────────────────────
 SERVICE_URLS: dict[str, tuple[str, str]] = {

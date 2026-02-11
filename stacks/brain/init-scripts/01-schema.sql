@@ -228,31 +228,31 @@ CREATE INDEX IF NOT EXISTS idx_api_rotation_rotated ON api_key_rotations(rotated
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS knowledge_entities (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(255) NOT NULL,
-    entity_type VARCHAR(100) NOT NULL,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL,
     properties JSONB DEFAULT '{}',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_kg_entities_name ON knowledge_entities(name);
-CREATE INDEX IF NOT EXISTS idx_kg_entities_type ON knowledge_entities(entity_type);
+CREATE INDEX IF NOT EXISTS idx_kg_entity_name ON knowledge_entities(name);
+CREATE INDEX IF NOT EXISTS idx_kg_entity_type ON knowledge_entities(type);
 
 -- ============================================================================
 -- Knowledge Relations - Edges in knowledge graph
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS knowledge_relations (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    from_entity_id UUID REFERENCES knowledge_entities(id) ON DELETE CASCADE,
-    to_entity_id UUID REFERENCES knowledge_entities(id) ON DELETE CASCADE,
-    relation_type VARCHAR(100) NOT NULL,
+    from_entity UUID REFERENCES knowledge_entities(id) ON DELETE CASCADE NOT NULL,
+    to_entity UUID REFERENCES knowledge_entities(id) ON DELETE CASCADE NOT NULL,
+    relation_type TEXT NOT NULL,
     properties JSONB DEFAULT '{}',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_kg_relations_from ON knowledge_relations(from_entity_id);
-CREATE INDEX IF NOT EXISTS idx_kg_relations_to ON knowledge_relations(to_entity_id);
-CREATE INDEX IF NOT EXISTS idx_kg_relations_type ON knowledge_relations(relation_type);
+CREATE INDEX IF NOT EXISTS idx_kg_relation_from ON knowledge_relations(from_entity);
+CREATE INDEX IF NOT EXISTS idx_kg_relation_to ON knowledge_relations(to_entity);
+CREATE INDEX IF NOT EXISTS idx_kg_relation_type ON knowledge_relations(relation_type);
 
 -- ============================================================================
 -- Key-Value Memory - Fast key-value store with TTL support
@@ -366,3 +366,162 @@ COMMENT ON TABLE api_key_rotations IS 'Track API key rotation history';
 COMMENT ON TABLE knowledge_entities IS 'Knowledge graph entity nodes';
 COMMENT ON TABLE knowledge_relations IS 'Knowledge graph relationship edges';
 COMMENT ON TABLE key_value_memory IS 'Fast key-value store with TTL support';
+
+-- ============================================================================
+-- TABLES ADDED FOR ORM PARITY (Sprint v3)
+-- ============================================================================
+
+-- Hourly Goals
+CREATE TABLE IF NOT EXISTS hourly_goals (
+    id SERIAL PRIMARY KEY,
+    hour_slot INTEGER NOT NULL,
+    goal_type VARCHAR(50) NOT NULL,
+    description TEXT NOT NULL,
+    status VARCHAR(20) DEFAULT 'pending',
+    completed_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_hourly_status ON hourly_goals(status);
+CREATE INDEX IF NOT EXISTS idx_hourly_hour_slot ON hourly_goals(hour_slot);
+CREATE INDEX IF NOT EXISTS idx_hourly_created ON hourly_goals(created_at DESC);
+
+-- Performance Log
+CREATE TABLE IF NOT EXISTS performance_log (
+    id SERIAL PRIMARY KEY,
+    review_period VARCHAR(20) NOT NULL,
+    successes TEXT,
+    failures TEXT,
+    improvements TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_perflog_created ON performance_log(created_at DESC);
+
+-- Pending Complex Tasks
+CREATE TABLE IF NOT EXISTS pending_complex_tasks (
+    id SERIAL PRIMARY KEY,
+    task_id VARCHAR(50) UNIQUE NOT NULL,
+    task_type VARCHAR(50) NOT NULL,
+    description TEXT NOT NULL,
+    agent_type VARCHAR(50) NOT NULL,
+    priority VARCHAR(20) DEFAULT 'medium',
+    status VARCHAR(20) DEFAULT 'pending',
+    result TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    completed_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE INDEX IF NOT EXISTS idx_pct_status ON pending_complex_tasks(status);
+CREATE INDEX IF NOT EXISTS idx_pct_task_id ON pending_complex_tasks(task_id);
+CREATE INDEX IF NOT EXISTS idx_pct_created ON pending_complex_tasks(created_at DESC);
+
+-- Schedule Tick
+CREATE TABLE IF NOT EXISTS schedule_tick (
+    id INTEGER PRIMARY KEY,
+    last_tick TIMESTAMP WITH TIME ZONE,
+    tick_count INTEGER DEFAULT 0,
+    heartbeat_interval INTEGER DEFAULT 3600,
+    enabled BOOLEAN DEFAULT true,
+    jobs_total INTEGER DEFAULT 0,
+    jobs_successful INTEGER DEFAULT 0,
+    jobs_failed INTEGER DEFAULT 0,
+    last_job_name VARCHAR(255),
+    last_job_status VARCHAR(50),
+    next_job_at TIMESTAMP WITH TIME ZONE,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Scheduled Jobs
+CREATE TABLE IF NOT EXISTS scheduled_jobs (
+    id VARCHAR(50) PRIMARY KEY,
+    agent_id VARCHAR(50) DEFAULT 'main',
+    name VARCHAR(100) NOT NULL,
+    enabled BOOLEAN DEFAULT true,
+    schedule_kind VARCHAR(20) DEFAULT 'cron',
+    schedule_expr VARCHAR(50) NOT NULL,
+    session_target VARCHAR(50),
+    wake_mode VARCHAR(50),
+    payload_kind VARCHAR(50),
+    payload_text TEXT,
+    next_run_at TIMESTAMP WITH TIME ZONE,
+    last_run_at TIMESTAMP WITH TIME ZONE,
+    last_status VARCHAR(20),
+    last_duration_ms INTEGER,
+    run_count INTEGER DEFAULT 0,
+    success_count INTEGER DEFAULT 0,
+    fail_count INTEGER DEFAULT 0,
+    created_at_ms INTEGER,
+    updated_at_ms INTEGER,
+    synced_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_jobs_name ON scheduled_jobs(name);
+CREATE INDEX IF NOT EXISTS idx_jobs_enabled ON scheduled_jobs(enabled);
+CREATE INDEX IF NOT EXISTS idx_jobs_next_run ON scheduled_jobs(next_run_at);
+
+-- Skill Status
+CREATE TABLE IF NOT EXISTS skill_status (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    skill_name VARCHAR(100) NOT NULL UNIQUE,
+    canonical_name VARCHAR(100) NOT NULL,
+    layer VARCHAR(20),
+    status VARCHAR(20) NOT NULL DEFAULT 'unavailable',
+    last_health_check TIMESTAMP WITH TIME ZONE,
+    last_execution TIMESTAMP WITH TIME ZONE,
+    use_count INTEGER DEFAULT 0,
+    error_count INTEGER DEFAULT 0,
+    metadata JSONB,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_skill_status_name ON skill_status(skill_name);
+CREATE INDEX IF NOT EXISTS idx_skill_status_status ON skill_status(status);
+CREATE INDEX IF NOT EXISTS idx_skill_status_layer ON skill_status(layer);
+
+-- Agent Performance (pheromone scoring)
+CREATE TABLE IF NOT EXISTS agent_performance (
+    id SERIAL PRIMARY KEY,
+    agent_id VARCHAR(100) NOT NULL,
+    task_type VARCHAR(100) NOT NULL,
+    success BOOLEAN NOT NULL,
+    duration_ms INTEGER,
+    token_cost NUMERIC(10, 6),
+    pheromone_score NUMERIC(5, 3) DEFAULT 0.500,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_perf_agent ON agent_performance(agent_id);
+CREATE INDEX IF NOT EXISTS idx_agent_perf_task ON agent_performance(task_type);
+CREATE INDEX IF NOT EXISTS idx_agent_perf_created ON agent_performance(created_at DESC);
+
+-- Working Memory
+CREATE TABLE IF NOT EXISTS working_memory (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    category VARCHAR(50) NOT NULL,
+    key VARCHAR(200) NOT NULL,
+    value JSONB NOT NULL,
+    importance FLOAT DEFAULT 0.5,
+    ttl_hours INTEGER,
+    source VARCHAR(100),
+    checkpoint_id VARCHAR(100),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    accessed_at TIMESTAMP WITH TIME ZONE,
+    access_count INTEGER DEFAULT 0,
+    CONSTRAINT uq_wm_category_key UNIQUE (category, key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_wm_category ON working_memory(category);
+CREATE INDEX IF NOT EXISTS idx_wm_key ON working_memory(key);
+CREATE INDEX IF NOT EXISTS idx_wm_importance ON working_memory(importance DESC);
+CREATE INDEX IF NOT EXISTS idx_wm_checkpoint ON working_memory(checkpoint_id);
+
+COMMENT ON TABLE hourly_goals IS 'Hourly goal tracking for Aria scheduling';
+COMMENT ON TABLE performance_log IS 'Periodic performance reviews';
+COMMENT ON TABLE pending_complex_tasks IS 'Queue for complex multi-step tasks';
+COMMENT ON TABLE schedule_tick IS 'Scheduler state singleton';
+COMMENT ON TABLE scheduled_jobs IS 'Cron-style scheduled jobs synced from OpenClaw';
+COMMENT ON TABLE skill_status IS 'Runtime status of registered skills';
+COMMENT ON TABLE agent_performance IS 'Pheromone scoring for agent task routing';
+COMMENT ON TABLE working_memory IS 'Short-term working memory with TTL and importance';

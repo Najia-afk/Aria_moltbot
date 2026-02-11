@@ -21,15 +21,15 @@ class TestDequePreservation:
         from aria_mind.memory import MemoryManager
         mm = MemoryManager()
         mm.clear_short()
-        assert mm._short_term.maxlen == 100, "clear_short() must preserve maxlen=100"
+        assert mm._short_term.maxlen == mm._max_short_term, "clear_short() must preserve maxlen"
 
     def test_maxlen_enforced_after_clear(self):
         from aria_mind.memory import MemoryManager
         mm = MemoryManager()
         mm.clear_short()
-        for i in range(200):
+        for i in range(300):
             mm.remember_short(f"item-{i}")
-        assert len(mm._short_term) == 100, "deque maxlen should cap at 100"
+        assert len(mm._short_term) == mm._max_short_term, "deque maxlen should cap at _max_short_term"
 
     def test_timestamps_are_timezone_aware(self):
         from aria_mind.memory import MemoryManager

@@ -90,6 +90,7 @@
         <option value="unavailable">Unavailable</option>
     </select>
     <button class="refresh-btn" onclick="loadSkills()">↻ Refresh</button>
+    <button class="refresh-btn" style="background:#22c55e" onclick="seedSkills()">🌱 Seed Skills</button>
 </div>
 
 <!-- Skill Cards -->
@@ -187,6 +188,17 @@
         const d = document.createElement('div');
         d.textContent = str;
         return d.innerHTML;
+    }
+
+    async function seedSkills() {
+        try {
+            const resp = await fetch(`${API_BASE_URL}/skills/seed`, { method: 'POST' });
+            const data = await resp.json();
+            alert(`Seeded ${data.seeded} new skills (${data.total} total known)`);
+            loadSkills();
+        } catch (err) {
+            alert('Seed failed: ' + err.message);
+        }
     }
 
     // Initial load

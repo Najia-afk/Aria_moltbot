@@ -144,28 +144,6 @@ class TestMoltbookSkill:
         assert skill.name == "moltbook"
 
 
-class TestDatabaseSkill:
-    """Tests for DatabaseSkill."""
-    
-    def test_unavailable_without_sqlalchemy(self):
-        """Test skill starts as unavailable before initialization."""
-        from aria_skills.database import DatabaseSkill, HAS_SQLALCHEMY
-        
-        config = SkillConfig(name="database", config={"dsn": "test"})
-        skill = DatabaseSkill(config)
-        
-        # Before initialize(), skill is always UNAVAILABLE
-        assert skill._status == SkillStatus.UNAVAILABLE
-    
-    def test_skill_name(self):
-        """Test DatabaseSkill has correct name."""
-        from aria_skills.database import DatabaseSkill
-        
-        config = SkillConfig(name="database", config={"dsn": "test"})
-        skill = DatabaseSkill(config)
-        assert skill.name == "database"
-
-
 class TestLLMSkills:
     """Tests for LLM skills."""
     
