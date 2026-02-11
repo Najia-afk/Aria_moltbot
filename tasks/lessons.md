@@ -39,3 +39,13 @@
 - **Brain→API communication via shared DB table.** SkillStatusRecord pattern (S-40) — brain writes, API reads — is the correct cross-container data sharing approach.
 - **AA+ ticket format with Constraints table is essential.** Tickets without explicit constraint evaluation led to architecture violations in v1.1. The full template (Problem, Root Cause, Fix, Constraints, Dependencies, Verification, Prompt) is now the standard.
 - **Gateway abstraction (S-31) enables future LLM provider swaps.** GatewayInterface ABC + OpenClawGateway isolates vendor-specific logic.
+
+## Sprint 1 Execution (2026-02-11)
+- **Token counting formula: prefer `total_tokens || (prompt + completion)`.** Never add all three — `total_tokens` already equals `prompt + completion`. Copy-paste bugs made this 3× inflated in two locations.
+- **API response shape changes need frontend + backend in same commit.** Changing from bare array to `{logs, total, offset, limit}` broke frontends until both sides deployed together.
+- **Shared JS extraction (`aria-common.js`) eliminates template drift.** Balance/spend logic was duplicated across models.html and wallets.html with subtle differences. Centralizing into `fetchBalances()` / `fetchSpendSummary()` ensures consistency.
+- **Deduplicate fetch with promise caching pattern.** Store the in-flight promise, return it for concurrent callers, expire after 30s. Reduced 3 `/litellm/spend` calls per page load to 1.
+- **Dead code from API migrations lingers.** CNY_TO_USD constant survived months after Kimi switched to USD international API. Always grep for removed-feature references.
+- **`tool_calling: false` must be explicit in models.yaml.** Without it, the coordinator assigns tool-needing tasks to models that 404 on tool calls. Chimera-free and trinity-free now marked.
+- **DB garbage cleanup via SQL file, not inline shell quotes.** Complex SQL with single quotes inside double-quoted docker exec commands causes shell escaping chaos. Use `docker cp` + `psql -f` instead.
+- **`console.log` in production templates leaks internal state.** Gate debug logs behind `window.ARIA_DEBUG` flag so developers can re-enable when needed.
