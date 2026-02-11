@@ -115,7 +115,7 @@ Data analysis, MLOps, market research. Combines analytical focuses.
 id: analyst
 focus: data  # Also handles trader tasks
 model: deepseek-free
-fallback: chimera-free
+fallback: qwen3-next-free
 parent: aria
 skills: [database, knowledge_graph, performance, llm]
 capabilities: [data_analysis, market_analysis, experiment_tracking, metrics]

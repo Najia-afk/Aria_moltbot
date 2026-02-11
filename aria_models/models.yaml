@@ -17,7 +17,7 @@
     "primary": "litellm/kimi",
     "timeout": 300,
     "retries": 2,
-    "fallbacks": ["litellm/qwen3-next-free", "litellm/trinity-free", "litellm/chimera-free", "litellm/deepseek-free", "litellm/gpt-oss-free"]
+    "fallbacks": ["litellm/qwen3-next-free", "litellm/deepseek-free", "litellm/gpt-oss-free", "litellm/trinity-free", "litellm/chimera-free"]
   },
   "agent_aliases": {
     "litellm/qwen3-mlx": "Qwen3 4B Instruct (MLX Local)",
@@ -54,6 +54,7 @@
       "provider": "litellm",
       "name": "Trinity 400B MoE (OpenRouter FREE)",
       "reasoning": true,
+      "tool_calling": false,
       "input": ["text"],
       "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
       "contextWindow": 131072,
@@ -69,6 +70,7 @@
       "provider": "litellm",
       "name": "Chimera 671B (OpenRouter FREE)",
       "reasoning": true,
+      "tool_calling": false,
       "input": ["text"],
       "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
       "contextWindow": 164000,
@@ -91,7 +93,7 @@
       "tier": "free",
       "routeSkill": "litellm",
       "litellm": {
-        "model": "openrouter/qwen/qwen3-coder-480b-a35b:free",
+        "model": "openrouter/qwen/qwen3-coder:free",
         "api_key": "os.environ/OPEN_ROUTER_KEY"
       }
     },
@@ -268,7 +270,7 @@
     }
   },
   "criteria": {
-    "priority": ["kimi", "trinity-free", "chimera-free", "qwen3-next-free", "deepseek-free"],
+    "priority": ["kimi", "qwen3-next-free", "deepseek-free", "trinity-free", "chimera-free"],
     "tiers": {
       "local": ["qwen3-mlx", "qwen-cpu-fallback", "phi4-mini-local", "qwen3-local"],
       "free": ["trinity-free", "qwen3-coder-free", "chimera-free", "qwen3-next-free", "glm-free", "deepseek-free", "nemotron-free", "gpt-oss-free", "gpt-oss-small-free"],

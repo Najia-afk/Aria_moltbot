@@ -529,7 +529,7 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script data-page-script>
-const API_URL = window.ARIA_API_BASE_URL;
+const API_URL = window.ARIA_API_BASE_URL;\n\n// Debug mode: set window.ARIA_DEBUG = true in console to enable verbose logging\nwindow.ARIA_DEBUG = window.ARIA_DEBUG || false;
 
 let balanceChart = null;
 
@@ -548,9 +548,7 @@ async function loadBalances() {
             const kimi = data.kimi;
             if (kimi.status === 'ok') {
                 const available = kimi.available || 0;
-                const currency = kimi.currency || 'USD';
-                const availableUSD = currency === 'CNY' ? available * CNY_TO_USD : available;
-                totalUSD += availableUSD;
+                totalUSD += available;
                 
                 document.getElementById('kimi-status').textContent = 'Active';
                 document.getElementById('kimi-status').className = 'wallet-status ok';
@@ -633,52 +631,13 @@ async function loadBalances() {
 async function loadSpend() {
     try {
         // Fetch all spend logs to calculate real spend from tokens
-        console.log('loadSpend: Fetching from', `${API_URL}/litellm/spend?limit=500&lite=true`);
-        const logsResp = await fetch(`${API_URL}/litellm/spend?limit=500&lite=true`);
-        const spendLogs = await logsResp.json();
-        console.log('loadSpend: Got', Array.isArray(spendLogs) ? spendLogs.length : 0, 'logs');
+        const summary = await fetchSpendSummary(API_URL, 50);
+        window._walletSpendLogs = summary.logs;
         
-        // Calculate period boundaries
-        const now = new Date();
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const weekStart = new Date(now);
-        weekStart.setDate(now.getDate() - 7);
-        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-        
-        let totalSpend = 0;
-        let todaySpend = 0;
-        let weekSpend = 0;
-        let monthSpend = 0;
-        
-        if (Array.isArray(spendLogs)) {
-            spendLogs.forEach(log => {
-                const logDate = new Date(log.startTime || log.created_at);
-                // Calculate actual cost from tokens
-                const cost = calculateLogCost(log);
-                
-                totalSpend += cost;
-                
-                if (logDate >= todayStart) {
-                    todaySpend += cost;
-                }
-                if (logDate >= weekStart) {
-                    weekSpend += cost;
-                }
-                if (logDate >= monthStart) {
-                    monthSpend += cost;
-                }
-            });
-        }
-        
-        console.log('loadSpend: Total spend calculated:', totalSpend);
-        
-        // Store logs for chart
-        window._walletSpendLogs = spendLogs;
-        
-        document.getElementById('spend-total').textContent = formatMoney(totalSpend);
-        document.getElementById('spend-today').textContent = formatMoney(todaySpend);
-        document.getElementById('spend-week').textContent = formatMoney(weekSpend);
-        document.getElementById('spend-month').textContent = formatMoney(monthSpend);
+        document.getElementById('spend-total').textContent = formatMoney(summary.totalSpend);
+        document.getElementById('spend-today').textContent = formatMoney(summary.todaySpend);
+        document.getElementById('spend-week').textContent = formatMoney(summary.weekSpend);
+        document.getElementById('spend-month').textContent = formatMoney(summary.monthSpend);
         
     } catch (error) {
         console.error('Error loading spend:', error);
@@ -692,15 +651,12 @@ async function loadSpend() {
 async function createBalanceChart() {
     const ctx = document.getElementById('balance-history-chart').getContext('2d');
     
-    // Use cached logs or fetch
-    let spendLogs = window._walletSpendLogs;
-    if (!spendLogs) {
-        try {
-            const logsResp = await fetch(`${API_URL}/litellm/spend?limit=500&lite=true`);
-            spendLogs = await logsResp.json();
-        } catch (e) {
-            spendLogs = [];
-        }
+    // Use cached logs from loadSpend
+    let spendLogs;
+    try {
+        spendLogs = window._walletSpendLogs || [];
+    } catch (e) {
+        spendLogs = [];
     }
     
     // Build daily spend data for the last 30 days
@@ -934,7 +890,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Update countdown every second
     countdownInterval = setInterval(updateCountdown, 1000);
     
-    console.log('💰 Wallet auto-refresh enabled (every 60s)');
+    if (window.ARIA_DEBUG) console.log('💰 Wallet auto-refresh enabled (every 60s)');
 });
 </script>
 {% endblock %}

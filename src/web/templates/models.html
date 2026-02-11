@@ -703,30 +703,33 @@ async function loadBalances() {
     }
 }
 
+// === Shared Spend Log Fetcher (deduplicates all spend requests) ===
+let _spendLogsPromise = null;
+async function fetchSpendLogs(limit = 50) {
+    if (_spendLogsPromise) return _spendLogsPromise;
+    _spendLogsPromise = (async () => {
+        const resp = await fetch(`${API_URL}/litellm/spend?limit=${limit}&lite=true`);
+        const raw = await resp.json();
+        window._allSpendLogs = raw.logs || (Array.isArray(raw) ? raw : []);
+        return window._allSpendLogs;
+    })();
+    try {
+        return await _spendLogsPromise;
+    } finally {
+        // Allow re-fetch after 30s staleness
+        setTimeout(() => { _spendLogsPromise = null; }, 30000);
+    }
+}
+
 // Load global spend - calculate from tokens using pricing
 async function loadGlobalSpend() {
     const container = document.getElementById('spend-cards');
     
     try {
-        // Fetch all logs to calculate real spend
-        const logsResp = await fetch(`${API_URL}/litellm/spend?limit=500&lite=true`);
-        const logs = await logsResp.json();
+        const summary = await fetchSpendSummary(API_URL, 50);
+        window._allSpendLogs = summary.logs;
         
-        let totalSpend = 0;
-        let totalTokens = 0;
-        let inputTokens = 0;
-        let outputTokens = 0;
-        const requestCount = Array.isArray(logs) ? logs.length : 0;
-        
-        if (Array.isArray(logs)) {
-            logs.forEach(log => {
-                const cost = calculateLogCost(log);
-                totalSpend += cost;
-                inputTokens += log.prompt_tokens || 0;
-                outputTokens += log.completion_tokens || 0;
-                totalTokens += (log.prompt_tokens || 0) + (log.completion_tokens || 0) + (log.total_tokens || 0);
-            });
-        }
+        const { totalSpend, inputTokens, outputTokens, totalTokens, requestCount } = summary;
         
         // Store for other uses
         spendData = { spend: totalSpend, total_tokens: totalTokens, input_tokens: inputTokens, output_tokens: outputTokens, api_requests: requestCount };
@@ -757,9 +760,6 @@ async function loadGlobalSpend() {
         // Update stats
         document.getElementById('stat-tokens').textContent = formatNumber(totalTokens);
         document.getElementById('stat-spend').textContent = formatMoney(totalSpend);
-        
-        // Store logs for chart use
-        window._allSpendLogs = logs;
         
     } catch (error) {
         console.error('Error loading spend:', error);
@@ -852,13 +852,8 @@ async function loadSpendLogs() {
     try {
         // Reuse cached logs if available and limit fits
         let logs;
-        const cached = window._allSpendLogs;
-        if (Array.isArray(cached) && cached.length > 0 && limit <= cached.length) {
-            logs = cached.slice(0, limit);
-        } else {
-            const response = await fetch(`${API_URL}/litellm/spend?limit=${limit}`);
-            logs = await response.json();
-        }
+        const allLogs = await fetchSpendLogs();
+        logs = allLogs.slice(0, limit);
         
         if (!logs || logs.length === 0) {
             tbody.innerHTML = `
@@ -875,7 +870,7 @@ async function loadSpendLogs() {
         tbody.innerHTML = logs.map(log => {
             const date = new Date(log.startTime || log.created_at);
             const tokens = (log.prompt_tokens || log.promptTokens || 0) + (log.completion_tokens || log.completionTokens || 0);
-            const cost = log.spend || 0;
+            const cost = (typeof calculateLogCost === 'function') ? calculateLogCost(log) : (log.spend || 0);
             // Calculate duration from startTime and endTime
             let duration = 0;
             if (log.startTime && log.endTime) {
@@ -937,16 +932,10 @@ async function updateCharts() {
     // Reuse logs already fetched by loadGlobalSpend (cached in window._allSpendLogs)
     let allLogs = [];
     try {
-        const cached = window._allSpendLogs;
-        if (Array.isArray(cached) && cached.length > 0) {
-            allLogs = filterLogsByPeriod(cached, periodDays);
-        } else {
-            const logsResp = await fetch(`${API_URL}/litellm/spend?limit=500&lite=true`);
-            const logsData = await logsResp.json();
-            allLogs = Array.isArray(logsData) ? filterLogsByPeriod(logsData, periodDays) : [];
-        }
+        const logs = await fetchSpendLogs();
+        allLogs = filterLogsByPeriod(logs, periodDays);
     } catch (err) {
-        console.error('Failed to fetch spend logs:', err);
+        if (window.ARIA_DEBUG) console.error('Failed to fetch spend logs:', err);
     }
     
     // === TOKENS BY PROVIDER (Doughnut) - Real token usage, not model counts ===
@@ -1103,7 +1092,7 @@ async function updateCharts() {
         const modelTokens = {};
         allLogs.forEach(log => {
             const model = (log.model || 'unknown').split('/').pop();
-            const tokens = (log.prompt_tokens || 0) + (log.completion_tokens || 0) + (log.total_tokens || 0);
+            const tokens = log.total_tokens || ((log.prompt_tokens || 0) + (log.completion_tokens || 0));
             modelTokens[model] = (modelTokens[model] || 0) + tokens;
         });
         

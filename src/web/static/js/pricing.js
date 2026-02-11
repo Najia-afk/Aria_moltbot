@@ -203,8 +203,6 @@ function formatPrice(price) {
 // Templates call these as global functions; they delegate to AriaModels.
 // Ensure `await AriaModels.init()` has been called before using pricing functions.
 
-const CNY_TO_USD = 0.137;
-
 function calculateLogCost(log) {
     return AriaModels.calculateLogCost(log);
 }

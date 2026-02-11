@@ -39,15 +39,16 @@ async def api_litellm_health():
 
 
 @router.get("/litellm/spend")
-async def api_litellm_spend(limit: int = 20, lite: bool = False):
+async def api_litellm_spend(limit: int = 50, offset: int = 0, lite: bool = False):
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.get(f"{_litellm_base()}/spend/logs", headers=_auth_headers())
             logs = resp.json()
             if isinstance(logs, list):
-                logs = logs[:limit]
+                total = len(logs)
+                logs = logs[offset:offset + limit]
                 if lite:
-                    return [
+                    lite_logs = [
                         {
                             "model": log.get("model", ""),
                             "prompt_tokens": log.get("prompt_tokens", 0),
@@ -55,11 +56,13 @@ async def api_litellm_spend(limit: int = 20, lite: bool = False):
                             "total_tokens": log.get("total_tokens", 0),
                             "spend": log.get("spend", 0),
                             "startTime": log.get("startTime"),
+                            "endTime": log.get("endTime"),
                             "status": log.get("status", "success"),
                         }
                         for log in logs
                     ]
-            return logs
+                    return {"logs": lite_logs, "total": total, "offset": offset, "limit": limit}
+            return {"logs": logs, "total": len(logs) if isinstance(logs, list) else 0, "offset": offset, "limit": limit}
     except Exception as e:
         return {"logs": [], "error": str(e)}
 
