@@ -385,7 +385,7 @@
     fetch(`${API_BASE}/activities?limit=500`)
         .then(r => r.json())
         .then(data => {
-            _activitiesCache = Array.isArray(data) ? data : [];
+            _activitiesCache = Array.isArray(data) ? data : (data.items || data.activities || []);
 
             // ── Recent Activity List (top 10) ──
             if (_activitiesCache.length === 0) {
@@ -416,7 +416,7 @@
     fetch(`${API_BASE}/thoughts?limit=100`)
         .then(r => r.json())
         .then(data => {
-            const thoughts = data?.thoughts || [];
+            const thoughts = data?.items || data?.thoughts || [];
             const counts = {};
             thoughts.forEach(t => {
                 const key = t.category || 'uncategorized';
