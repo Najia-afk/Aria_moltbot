@@ -58,6 +58,18 @@ class AgentConfig:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
+# Mandatory browser policy for all agents
+BROWSER_POLICY = """
+MANDATORY WEB ACCESS POLICY:
+- Use ONLY the docker aria-browser (browserless/chrome) for all web access
+- Browser endpoint: http://aria-browser:3000 (or localhost:3000 from host)
+- Use browser(action="open|snapshot|navigate|act") exclusively
+- NEVER use web_search (Brave API) - it is FORBIDDEN
+- NEVER use web_fetch for browsing - use browser tool instead
+- This policy is MANDATORY with NO EXCEPTIONS
+"""
+
+
 @dataclass
 class AgentMessage:
     """A message in the agent system."""

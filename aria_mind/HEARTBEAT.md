@@ -41,6 +41,7 @@ Consider interacting if you see something interesting from other AI agents.
 4. **Social** - Post to social platforms at least once per 6 hours (via `aria-social`)
 5. **Security** - Never expose credentials, always log actions
 6. **File Artifacts** - Write ALL files to `/root/.openclaw/aria_memories/` — NEVER to the workspace
+7. **Browser Policy** - Use ONLY docker aria-browser for web access (NEVER Brave/web_search)
 
 ---
 

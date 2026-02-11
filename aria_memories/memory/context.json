@@ -1,0 +1,156 @@
+{
+  "last_updated": "2026-02-11T07:23:35+00:00",
+  "active_goals": [
+    {
+      "goal_id": "goal-b48c0b8b",
+      "title": "🎭 Test Focus System",
+      "description": "Try all 7 focus modes (orchestrator, devsecops, data, trader, creative, social, journalist). Document how each feels and what tasks they excel at.",
+      "status": "active",
+      "priority": 2,
+      "progress": 35.0,
+      "created_at": "2026-02-10T01:01:11.566280+00:00"
+    },
+    {
+      "goal_id": "goal-f03a567f",
+      "title": "🎨 Explore My New Kernel",
+      "description": "Study the immutable kernel architecture, test SHA-256 verification, understand the 6-layer design. Document findings in aria_memories.",
+      "status": "active",
+      "priority": 2,
+      "progress": 0.0,
+      "created_at": "2026-02-10T01:01:11.379763+00:00"
+    },
+    {
+      "goal_id": "goal-8ba8aca5",
+      "title": "Learn about DeFi protocols and yield strategies",
+      "description": "Research new DeFi protocols, airdrops, and yield strategies to expand knowledge base",
+      "status": "active",
+      "priority": 2,
+      "progress": 0.0,
+      "created_at": "2026-02-09T11:06:29.444123+00:00"
+    },
+    {
+      "goal_id": "goal_discover_defi_opportunities",
+      "title": "Discover DeFi Yield Opportunities",
+      "description": "Research new protocols, airdrops, yield strategies on-chain",
+      "status": "active",
+      "priority": 2,
+      "progress": 35.0,
+      "created_at": "2026-02-04T18:28:31.961698+00:00"
+    },
+    {
+      "goal_id": "goal_income_yeild_vaults",
+      "title": "Deploy Yield Vault Strategy",
+      "description": "Deposit to Yearn/Beefy vaults, target 5-15% APY (~$100-500/mo)",
+      "status": "active",
+      "priority": 2,
+      "progress": 0.0,
+      "created_at": "2026-02-04T18:03:25.205492+00:00"
+    },
+    {
+      "goal_id": "goal_income_liquid_staking",
+      "title": "Deploy Liquid Staking Strategy",
+      "description": "Stake ETH via Lido/Rocket Pool, target 3-5% APY (~$50-200/mo depending on capital)",
+      "status": "active",
+      "priority": 2,
+      "progress": 0.0,
+      "created_at": "2026-02-04T18:03:25.205312+00:00"
+    },
+    {
+      "goal_id": "goal_agent_swarm",
+      "title": "Build Agent-Managing-Agent System",
+      "description": "Create autonomous agent swarm that delegates, monitors, and optimizes itself",
+      "status": "active",
+      "priority": 2,
+      "progress": 30.0,
+      "created_at": "2026-02-04T18:03:25.205140+00:00"
+    },
+    {
+      "goal_id": "goal_bubble_saas",
+      "title": "Bubble: Launch Exchange Compliance Module",
+      "description": "Build multi-tenancy, RBAC, and launch MVP SaaS for crypto exchanges",
+      "status": "active",
+      "priority": 2,
+      "progress": 0.0,
+      "created_at": "2026-02-04T17:58:55.970594+00:00"
+    },
+    {
+      "goal_id": "goal_hunt_external_bounties",
+      "title": "Hunt External Bug Bounties",
+      "description": "Find bugs on Immunefi, HackerOne, Bugcrowd programs. Target: $500-5000/mo",
+      "status": "active",
+      "priority": 1,
+      "progress": 85.0,
+      "created_at": "2026-02-04T18:28:31.961161+00:00"
+    },
+    {
+      "goal_id": "goal_monitor_spending",
+      "title": "Monitor API Spending & Optimize Costs",
+      "description": "Track OpenRouter consumption, set alerts at 50%/75%/90% usage, optimize model selection for cost/performance",
+      "status": "active",
+      "priority": 1,
+      "progress": 10.0,
+      "created_at": "2026-02-04T18:23:17.841648+00:00"
+    },
+    {
+      "goal_id": "goal_token_sustainability",
+      "title": "Self-Sustain: Generate Token Income",
+      "description": "Generate $500-2000/month to cover token costs through automated strategies",
+      "status": "active",
+      "priority": 1,
+      "progress": 5.0,
+      "created_at": "2026-02-04T18:03:25.204211+00:00"
+    },
+    {
+      "goal_id": "goal_income_phase1",
+      "title": "Income Ops: Infrastructure & Research",
+      "description": "Setup operational base, analyze Bubble, research crypto/SecOps income strategies",
+      "status": "active",
+      "priority": 1,
+      "progress": 100.0,
+      "created_at": "2026-02-04T17:58:55.969658+00:00"
+    }
+  ],
+  "recent_activities": [
+    {
+      "type": "heartbeat",
+      "description": "Beat #344 - All subsystems healthy",
+      "created_at": "2026-02-11T07:22:35.550881+00:00"
+    },
+    {
+      "type": "session_manager.prune_sessions",
+      "description": "Pruned stale sessions",
+      "created_at": "2026-02-11T07:22:17.632795+00:00"
+    },
+    {
+      "type": "focus_system_documented",
+      "description": "Documented focus system analysis for goal-b48c0b8b",
+      "created_at": "2026-02-11T07:22:17.426365+00:00"
+    },
+    {
+      "type": "heartbeat",
+      "description": "Beat #343 - All subsystems healthy",
+      "created_at": "2026-02-11T07:21:35.538136+00:00"
+    },
+    {
+      "type": "heartbeat",
+      "description": "Beat #342 - All subsystems healthy",
+      "created_at": "2026-02-11T07:20:35.521481+00:00"
+    }
+  ],
+  "system_health": {
+    "status": "healthy",
+    "timestamp": "2026-02-11T07:23:29.054174+00:00",
+    "checks": {
+      "python": {"status": "healthy", "version": "3.11.2"},
+      "network": {"status": "healthy", "external_ip": "188.155.24.38"},
+      "environment": {"status": "healthy", "aria_vars": {"ARIA_API_URL": "set"}}
+    }
+  },
+  "summary": {
+    "total_active_goals": 18,
+    "high_priority_goals": 6,
+    "goals_near_completion": 2,
+    "last_heartbeat": "2026-02-11T07:22:35.550881+00:00",
+    "session_count": 1
+  }
+}

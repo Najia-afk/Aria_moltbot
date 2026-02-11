@@ -2,6 +2,21 @@
 
 Sub-agents that Aria spawns for specialized work. Each agent maps to a Focus persona.
 
+## Mandatory Browser Policy
+
+**ALL agents MUST use the docker aria-browser for web access.**  
+**NEVER use Brave Search (`web_search` tool) - it is FORBIDDEN.**
+
+```yaml
+Web Access Rules:
+  - Use browser(action="open|snapshot|navigate") exclusively
+  - Browser endpoint: http://aria-browser:3000
+  - NEVER use web_search or web_fetch for browsing
+  - NO EXCEPTIONS without human approval
+```
+
+See: `aria_memories/knowledge/web_access_policy.md`
+
 ## Model Strategy
 
 **Source of truth**: `aria_models/models.yaml` → `criteria.tiers` and `criteria.focus_defaults`.

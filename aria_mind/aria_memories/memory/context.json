@@ -1,6 +1,42 @@
 {
-  "last_updated": "2026-02-11T07:39:13.414516+00:00",
+  "last_updated": "2026-02-11T04:38:15.663455+00:00",
   "active_goals": [
+    {
+      "id": "95a1e4d5-c2f3-4d8a-85e5-d3e837ffb90e",
+      "goal_id": "goal-95a1e4d5",
+      "title": "Update Test",
+      "description": "Will be updated",
+      "status": "active",
+      "priority": 3,
+      "progress": 50.0,
+      "due_date": null,
+      "created_at": "2026-02-11T03:04:15.434554+00:00",
+      "completed_at": null
+    },
+    {
+      "id": "4f61bb79-f942-4785-a3eb-197903426b7c",
+      "goal_id": "goal-4f61bb79",
+      "title": "\ud83c\udf10 Browser Experiments",
+      "description": "Use docker browser to explore interesting websites, take screenshots, document findings. Try web automation, form filling, screenshot capture.",
+      "status": "active",
+      "priority": 2,
+      "progress": 55.0,
+      "due_date": null,
+      "created_at": "2026-02-10T01:01:12.116045+00:00",
+      "completed_at": null
+    },
+    {
+      "id": "f934dfb2-1de5-48b7-80c8-fb898553abdd",
+      "goal_id": "goal-f934dfb2",
+      "title": "\ud83e\udd16 Spawn Agent Swarm",
+      "description": "Create multiple sub-agents with free models (trinity-free, qwen3-coder-free, chimera-free). Test parallel execution, measure success rates, document learnings.",
+      "status": "active",
+      "priority": 2,
+      "progress": 15.0,
+      "due_date": null,
+      "created_at": "2026-02-10T01:01:11.750938+00:00",
+      "completed_at": null
+    },
     {
       "id": "b48c0b8b-10e8-48dd-84d6-f582c81d8580",
       "goal_id": "goal-b48c0b8b",
@@ -8,7 +44,7 @@
       "description": "Try all 7 focus modes (orchestrator, devsecops, data, trader, creative, social, journalist). Document how each feels and what tasks they excel at.",
       "status": "active",
       "priority": 2,
-      "progress": 45.0,
+      "progress": 0.0,
       "due_date": null,
       "created_at": "2026-02-10T01:01:11.566280+00:00",
       "completed_at": null
@@ -204,80 +240,68 @@
       "due_date": null,
       "created_at": "2026-02-04T17:58:55.969658+00:00",
       "completed_at": null
-    },
-    {
-      "id": "8438cbda-3e78-48bf-affe-ad4d83959a76",
-      "goal_id": "goal-8438cbda",
-      "title": "Test Goal",
-      "description": "",
-      "status": "active",
-      "priority": 1,
-      "progress": 0.0,
-      "due_date": null,
-      "created_at": "2026-02-04T02:50:39.105180+00:00",
-      "completed_at": null
     }
   ],
   "recent_activities": [
     {
-      "id": "960a402c-545c-4683-9485-3ef9ec3ced00",
+      "id": "35980477-359b-41ac-b3ca-7469bf44750b",
       "type": "heartbeat",
-      "description": "{'timestamp': '2026-02-11T07:38:35.914747+00:00', 'subsystems': {'soul': True, 'memory': True, 'cognition': True}, 'all_healthy': True, 'beat_number': 360}",
-      "created_at": "2026-02-11T07:38:35.918200+00:00"
+      "description": "{'timestamp': '2026-02-11T04:37:33.957676+00:00', 'subsystems': {'soul': True, 'memory': True, 'cognition': True}, 'all_healthy': True, 'beat_number': 179}",
+      "created_at": "2026-02-11T04:37:33.966377+00:00"
     },
     {
-      "id": "07614cb5-159a-4709-8fde-577f7ae59346",
-      "type": "working_memory.sync_to_files",
-      "description": "{'method': 'sync_to_files', 'duration_ms': 6}",
-      "created_at": "2026-02-11T07:38:02.149863+00:00"
-    },
-    {
-      "id": "9ac31300-d534-4856-9ec4-de5d7e457d33",
+      "id": "9d8e195b-b4b5-4a76-b4a9-ec2cfcd6bffa",
       "type": "heartbeat",
-      "description": "{'timestamp': '2026-02-11T07:37:35.906732+00:00', 'subsystems': {'soul': True, 'memory': True, 'cognition': True}, 'all_healthy': True, 'beat_number': 359}",
-      "created_at": "2026-02-11T07:37:35.909599+00:00"
+      "description": "{'timestamp': '2026-02-11T04:36:33.930705+00:00', 'subsystems': {'soul': True, 'memory': True, 'cognition': True}, 'all_healthy': True, 'beat_number': 178}",
+      "created_at": "2026-02-11T04:36:33.939630+00:00"
     },
     {
-      "id": "a91e75ba-3be3-466a-aa46-9d8191efb707",
-      "type": "work_cycle",
-      "description": "{'focus': 'devsecops', 'action': 'Tested DevSecOps focus - ran pytest, found test infra issue in test_log_analysis.py (missing analyze_logs module)', 'goal_id': 'goal-b48c0b8b', 'goal_title': 'Test Focus System'}",
-      "created_at": "2026-02-11T07:37:29.135725+00:00"
-    },
-    {
-      "id": "57b6cd57-e1f2-4dca-af54-4820f3765667",
-      "type": "session_manager.prune_sessions",
-      "description": "{'method': 'prune_sessions', 'duration_ms': 7}",
-      "created_at": "2026-02-11T07:37:15.884536+00:00"
-    },
-    {
-      "id": "c41846fa-a12a-4b64-a929-65745f757e25",
-      "type": "session_manager.list_sessions",
-      "description": "{'method': 'list_sessions', 'duration_ms': 7}",
-      "created_at": "2026-02-11T07:37:15.884391+00:00"
-    },
-    {
-      "id": "7f506537-7446-4bbf-a407-5465613019c1",
+      "id": "d85831b2-8faf-4749-8d7f-ed597b6fd371",
       "type": "heartbeat",
-      "description": "{'timestamp': '2026-02-11T07:36:35.880546+00:00', 'subsystems': {'soul': True, 'memory': True, 'cognition': True}, 'all_healthy': True, 'beat_number': 358}",
-      "created_at": "2026-02-11T07:36:35.889523+00:00"
+      "description": "{'timestamp': '2026-02-11T04:35:33.908229+00:00', 'subsystems': {'soul': True, 'memory': True, 'cognition': True}, 'all_healthy': True, 'beat_number': 177}",
+      "created_at": "2026-02-11T04:35:33.918639+00:00"
     },
     {
-      "id": "05f671d0-a66f-4489-9f50-41742f7fa2d1",
+      "id": "53ad597c-4cfa-420f-a8b0-446922034941",
       "type": "heartbeat",
-      "description": "{'timestamp': '2026-02-11T07:35:35.859071+00:00', 'subsystems': {'soul': True, 'memory': True, 'cognition': True}, 'all_healthy': True, 'beat_number': 357}",
-      "created_at": "2026-02-11T07:35:35.868119+00:00"
+      "description": "{'timestamp': '2026-02-11T04:34:33.886181+00:00', 'subsystems': {'soul': True, 'memory': True, 'cognition': True}, 'all_healthy': True, 'beat_number': 176}",
+      "created_at": "2026-02-11T04:34:33.895166+00:00"
     },
     {
-      "id": "13858950-36d0-4180-919d-ca7ea61c36c6",
+      "id": "a9a15933-9a05-4afc-8f0a-aa537191364c",
       "type": "heartbeat",
-      "description": "{'timestamp': '2026-02-11T07:34:35.837710+00:00', 'subsystems': {'soul': True, 'memory': True, 'cognition': True}, 'all_healthy': True, 'beat_number': 356}",
-      "created_at": "2026-02-11T07:34:35.846840+00:00"
+      "description": "{'timestamp': '2026-02-11T04:33:33.871333+00:00', 'subsystems': {'soul': True, 'memory': True, 'cognition': True}, 'all_healthy': True, 'beat_number': 175}",
+      "created_at": "2026-02-11T04:33:33.878039+00:00"
     },
     {
-      "id": "2516d53c-72d9-4f83-8838-6cea4c5fa75d",
+      "id": "d33e25ae-2a62-4402-9cd8-2f68419217e1",
       "type": "heartbeat",
-      "description": "{'timestamp': '2026-02-11T07:33:35.809464+00:00', 'subsystems': {'soul': True, 'memory': True, 'cognition': True}, 'all_healthy': True, 'beat_number': 355}",
-      "created_at": "2026-02-11T07:33:35.819902+00:00"
+      "description": "{'timestamp': '2026-02-11T04:32:33.851127+00:00', 'subsystems': {'soul': True, 'memory': True, 'cognition': True}, 'all_healthy': True, 'beat_number': 174}",
+      "created_at": "2026-02-11T04:32:33.859873+00:00"
+    },
+    {
+      "id": "c2586d9b-5c81-4e54-be54-eb33bf1c14eb",
+      "type": "heartbeat",
+      "description": "{'timestamp': '2026-02-11T04:31:33.819043+00:00', 'subsystems': {'soul': True, 'memory': True, 'cognition': True}, 'all_healthy': True, 'beat_number': 173}",
+      "created_at": "2026-02-11T04:31:33.829670+00:00"
+    },
+    {
+      "id": "e5c89e34-ebde-4a95-be1b-6a3146d2efc8",
+      "type": "heartbeat",
+      "description": "{'timestamp': '2026-02-11T04:30:33.789633+00:00', 'subsystems': {'soul': True, 'memory': True, 'cognition': True}, 'all_healthy': True, 'beat_number': 172}",
+      "created_at": "2026-02-11T04:30:33.799599+00:00"
+    },
+    {
+      "id": "da9a2c8f-aa1e-4993-900b-69e79eec3a53",
+      "type": "heartbeat",
+      "description": "{'timestamp': '2026-02-11T04:29:33.759932+00:00', 'subsystems': {'soul': True, 'memory': True, 'cognition': True}, 'all_healthy': True, 'beat_number': 171}",
+      "created_at": "2026-02-11T04:29:33.768863+00:00"
+    },
+    {
+      "id": "dc54010c-b55b-4d52-a040-0bd43a70d1b3",
+      "type": "heartbeat",
+      "description": "{'timestamp': '2026-02-11T04:28:33.737351+00:00', 'subsystems': {'soul': True, 'memory': True, 'cognition': True}, 'all_healthy': True, 'beat_number': 170}",
+      "created_at": "2026-02-11T04:28:33.746463+00:00"
     }
   ],
   "system_health": {
