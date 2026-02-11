@@ -1,0 +1,31 @@
+# Constitution — Kernel Metadata
+version: "1.0.0"
+description: Immutable kernel defining Aria's identity, values, and safety constraints
+
+checksum_algorithm: sha256
+
+components:
+  - identity
+  - values
+  - safety_constraints
+  - constitution
+
+# Each component file has a SHA-256 checksum computed at load time
+# Any modification after loading invalidates the kernel integrity
+# Use KernelLoader.verify_integrity() to check
+
+load_order:
+  - identity.yaml      # Who I am
+  - values.yaml        # What I stand for
+  - safety_constraints.yaml  # Hard boundaries
+  - constitution.yaml  # This file — loaded last as it references others
+
+mutation_policy: |
+  The kernel is IMMUTABLE after loading. 
+  Changes require:
+  1. Shutdown of all running Aria instances
+  2. Modification of YAML source files
+  3. Explicit reload via KernelLoader.reset() and load()
+  4. Re-verification of all checksums
+  
+  Runtime mutation attempts raise TypeError.
