@@ -1,4 +1,4 @@
-# Aria v2 Sprint Master Overview — 2026-02-11 (Revised)
+# Aria v2 Sprint Master Overview — 2026-02-11 (Revised v3)
 
 > **Product Owner:** Najia (Shiva) | **Sprint Agent:** Claude Opus 4.6
 > **Created:** 2026-02-11 | **Revised:** 2026-02-11 | **Environment:** Mac Mini M4 (Production)
@@ -7,11 +7,12 @@
 
 ## Executive Summary
 
-**5 sprints, 54 tickets, ~191 story points** across four phases:
+**6 sprints, 64 tickets, ~227 story points** across five phases:
 1. **Phase 1** — Stabilize: Fix frontend bugs, critical backend bugs, add global pagination (Sprints 1 + 2)
 2. **Phase 2** — Enhance: Goals sprint board with Kanban, PO skill, stacked chart (Sprint 3)
 3. **Phase 3** — Scale: Knowledge graph auto-generation, skill pathfinding RAG, vis.js visualization (Sprint 4)
 4. **Phase 4** — Evolve: Semantic memory (pgvector), error recovery, composable pipelines, self-improvement loop (Sprint 5)
+5. **Phase 5** — Harden: Production stabilization — fix 18 broken endpoints, frontend error handling, DB resilience (Sprint 6)
 
 ---
 
@@ -143,6 +144,38 @@
 
 ---
 
+## Sprint 6 — Production Stabilization & Endpoint Fixes
+
+**Phase:** 5 | **Tickets:** 10 | **Points:** ~36 | **Risk:** Medium
+**Focus:** Fix 18 broken endpoints (server disconnects, 500s, timeouts), add frontend error handling, DB health checks. Root cause: pgvector extension missing → ensure_schema() fails → 12+ tables not created.
+**Origin:** Post-Sprint-5 production audit — 83 endpoints tested, 18 broken.
+
+| # | Ticket | Priority | Pts | Description |
+|---|--------|----------|-----|-------------|
+| S6-01 | Install pgvector & fix ensure_schema | P0 | 5 | pgvector extension + per-table error handling in ensure_schema() — unblocks 12 endpoints |
+| S6-02 | Fix LiteLLM proxy timeouts | P1 | 5 | Reduce httpx timeouts (30s→5s), graceful fallback when LiteLLM down |
+| S6-03 | Fix move_goal 500 error | P1 | 3 | Add board_column validation, fix PATCH /goals/{id}/move |
+| S6-04 | Frontend error handling | P1 | 5 | Visible error states + retry buttons for 8 broken pages |
+| S6-05 | Fix external API resilience | P2 | 3 | Parallelize provider balance calls, add cache |
+| S6-06 | Database health check endpoint | P2 | 3 | Startup table audit + GET /health/db diagnostic |
+| S6-07 | Router-level exception handlers | P1 | 3 | Global SQLAlchemy error handlers → clean 503 instead of disconnect |
+| S6-08 | Fix working memory endpoints | P1 | 3 | Verify 4 working_memory endpoints after table creation |
+| S6-09 | Fix rate limits & API key endpoints | P2 | 3 | Verify 5 operations endpoints after table creation |
+| S6-10 | Full endpoint verification pass | P1 | 3 | Test all 83 endpoints, verify all pages load, Docker smoke test |
+
+**Dependency:** S6-01 first (unblocks S6-08, S6-09). S6-07 independent (immediate value). S6-02/S6-03/S6-05 parallel. S6-04 after backend fixes. S6-10 last.
+
+**Root Cause Analysis:**
+| Root Cause | Endpoints Affected | Fix Ticket |
+|---|---|---|
+| pgvector missing → ensure_schema() cascade fail | 12 (working_memory, rate_limits, api_key_rotations, heartbeat/latest) | S6-01 |
+| LiteLLM unreachable + excessive timeouts | 5 (sessions/stats, litellm/spend, litellm/global-spend, model-usage×2) | S6-02 |
+| External API sequential calls + no cache | 1 (providers/balances) | S6-05 |
+| Missing input validation | 1 (goals/{id}/move) | S6-03 |
+| Embedding model not configured + pgvector | 2 (memories/semantic, memories/search) | S6-01 |
+
+---
+
 ## Global Dependency Map
 
 ```
@@ -181,6 +214,17 @@ Sprint 5 (Phase 4 — Memory v2 + Future-Proofing)
   ├── S5-02 (lessons), S5-05 (tests), S5-06 (proposals) — standalone
   ├── S5-07 (observability, after S5-02)
   └── S5-08 (verify) last
+
+    ↓ Complete S5 before S6
+
+Sprint 6 (Phase 5 — Production Stabilization)
+  ├── S6-01 (pgvector + ensure_schema) — FIRST, unblocks 12 endpoints
+  ├── S6-07 (exception handlers) — independent, immediate value
+  ├── S6-02, S6-03, S6-05 (parallel — timeouts, move_goal, providers)
+  ├── S6-08, S6-09 (after S6-01 — verify tables work)
+  ├── S6-04 (frontend resilience — after backend fixes)
+  ├── S6-06 (health check — after S6-01)
+  └── S6-10 (full verification) last
 ```
 
 ---
@@ -194,7 +238,8 @@ Sprint 5 (Phase 4 — Memory v2 + Future-Proofing)
 | Sprint 3 | 10 | ~37 | 12-16h | Medium — new feature, DB migration |
 | Sprint 4 | 10 | ~42 | 14-20h | Medium-High — new subsystem + audit |
 | Sprint 5 | 8 | ~42 | 16-24h | High — new memory layer + pgvector |
-| **Total** | **54** | **~191** | **60-86h** | |
+| Sprint 6 | 10 | ~36 | 10-14h | Medium — fixes known issues, mostly backend |
+| **Total** | **64** | **~227** | **70-100h** | |
 
 ---
 
@@ -206,9 +251,10 @@ Sprint 5 (Phase 4 — Memory v2 + Future-Proofing)
 4. **Sprint 3 after S2 verified** — needs pagination in place
 5. **Sprint 4 starts S4-06/S4-09 anytime** — code review is independent
 6. **Sprint 5 after S4 verified** — needs knowledge graph + compliance checker
-7. **Each ticket has a self-contained agent prompt** — one subagent per ticket
-7. **Test locally in Docker** before marking done
-8. **Update tasks/lessons.md** after each sprint
+7. **Sprint 6 after S5 deployed** — production stabilization, fix all broken endpoints
+8. **Each ticket has a self-contained agent prompt** — one subagent per ticket
+9. **Test locally in Docker** before marking done
+10. **Update tasks/lessons.md** after each sprint
 
 ---
 

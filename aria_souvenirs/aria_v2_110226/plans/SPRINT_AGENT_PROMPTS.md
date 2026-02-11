@@ -327,6 +327,108 @@ Proposals CANNOT modify soul/ directory.
 
 ---
 
+## Sprint 6 Prompt
+
+```
+You are an expert AI coding agent. Execute Sprint 6 for the Aria project.
+
+## CONTEXT
+- Workspace: /Users/najia/aria
+- Stack: FastAPI (API), Flask (Web), PostgreSQL 16, Docker Compose, LiteLLM
+- 5-Layer: DB → SQLAlchemy ORM → FastAPI API → api_client (httpx) → Skills → ARIA
+- Sprint tickets: aria_souvenirs/aria_v2_110226/plans/sprint6/S6-01 through S6-10
+- THIS IS A PRODUCTION STABILIZATION SPRINT — fix broken endpoints, not add features
+
+## PROBLEM STATEMENT
+After deploying Sprints 1-5, 18 of 83 API endpoints are broken:
+- 12 endpoints disconnect because ensure_schema() failed (pgvector missing → cascade table creation failure)
+- 5 endpoints timeout (LiteLLM proxy calls with 10-30s timeouts)
+- 1 endpoint returns 500 (move_goal missing validation)
+- 8 frontend pages show "Loading..." forever (silent fetch failures)
+
+## ROOT CAUSE (CRITICAL — READ THIS)
+The #1 root cause is: pgvector extension is NOT installed in PostgreSQL.
+When ensure_schema() tries to CREATE TABLE semantic_memories (which uses Vector(768)),
+it fails. Since tables are created in sorted order, ALL tables that come after
+semantic_memories in alphabetical order are NOT created:
+- api_key_rotations ❌
+- rate_limits ❌ 
+- working_memory ❌
+(Plus heartbeat_log and model_usage may also be affected)
+
+Fix S6-01 FIRST — this unblocks 12 endpoints at once.
+
+## YOUR TASK
+1. Read ALL ticket files in aria_souvenirs/aria_v2_110226/plans/sprint6/ (S6-01 through S6-10)
+2. Read tasks/lessons.md for project rules and patterns
+3. Execute tickets in this order:
+   A. FIRST: S6-01 (pgvector + ensure_schema) — this unblocks everything
+   B. PARALLEL: S6-07 (global exception handlers — immediate value)
+   C. PARALLEL: S6-02 (LiteLLM timeouts), S6-03 (move_goal fix), S6-05 (provider resilience)
+   D. VERIFY: S6-08 (working memory), S6-09 (rate limits + API keys)
+   E. THEN: S6-04 (frontend error handling — after backend is stable)
+   F. THEN: S6-06 (health check endpoint)
+   G. LAST: S6-10 (full verification pass — test all 83 endpoints)
+4. For each ticket: read ticket → implement fix → verify the endpoint(s) respond correctly
+5. After all tickets: docker compose build && docker compose up -d
+6. Test ALL 83 endpoints — no disconnects, no 500s, no stuck "Loading..."
+7. Git commit: "Sprint 6: Production stabilization — fix 18 broken endpoints (S6-01→S6-10)"
+
+## HARD CONSTRAINTS
+1. 5-layer architecture — skills use api_client, never SQLAlchemy
+2. ZERO secrets in code — .env only
+3. models.yaml is SSOT for model names
+4. Test in Docker before marking done
+5. aria_memories/ is Aria's only writable path
+6. NEVER modify aria_mind/soul/
+
+## KEY FILES
+- src/api/db/session.py (S6-01 — ensure_schema, pgvector extension)
+- src/api/db/models.py (S6-01 — verify all model definitions)
+- src/api/main.py (S6-07 — global exception handlers)
+- src/api/routers/sessions.py (S6-02 — reduce LiteLLM timeouts)
+- src/api/routers/litellm.py (S6-02 — reduce spend/global-spend timeouts)
+- src/api/routers/model_usage.py (S6-02 — reduce timeout, separate DB from LiteLLM)
+- src/api/routers/goals.py (S6-03 — fix move_goal validation)
+- src/api/routers/providers.py (S6-05 — parallelize, cache)
+- src/api/routers/operations.py (S6-08, S6-09 — rate_limits, api_key_rotations, heartbeat)
+- src/api/routers/working_memory.py (S6-08 — verify CRUD)
+- src/api/routers/memories.py (S6-01 — semantic memory after pgvector)
+- src/web/static/js/aria-common.js (S6-04 — fetchWithTimeout, showErrorState)
+- src/web/templates/sessions.html (S6-04 — error states)
+- src/web/templates/model_usage.html (S6-04 — error states)
+- src/web/templates/wallets.html (S6-04 — error states)
+- src/web/templates/working_memory.html (S6-04 — verify)
+- src/web/templates/sprint_board.html (S6-03 — drag-drop error improvement)
+- stacks/brain/docker-compose.yml (S6-01 — pgvector postgres image)
+
+## BROKEN ENDPOINTS CHECKLIST
+After sprint completion, ALL of these must return valid responses (not disconnect/500):
+- [ ] GET /working-memory
+- [ ] POST /working-memory
+- [ ] GET /working-memory/context
+- [ ] POST /working-memory/checkpoint
+- [ ] GET /rate-limits
+- [ ] POST /rate-limits/check
+- [ ] POST /rate-limits/increment
+- [ ] GET /api-key-rotations
+- [ ] POST /api-key-rotations
+- [ ] GET /sessions/stats (may have empty LiteLLM fields — that's OK)
+- [ ] GET /model-usage
+- [ ] GET /model-usage/stats
+- [ ] GET /litellm/spend (returns error JSON if LiteLLM down — that's OK)
+- [ ] GET /litellm/global-spend
+- [ ] GET /providers/balances (returns partial data — that's OK)
+- [ ] GET /heartbeat/latest
+- [ ] PATCH /goals/{id}/move (with valid board_column)
+- [ ] POST /memories/semantic (requires pgvector + embedding model)
+- [ ] GET /memories/search (requires pgvector + embedding model)
+
+After completion, update tasks/lessons.md with any new patterns discovered.
+```
+
+---
+
 ## Quick Reference — Running a Sprint
 
 ```bash
