@@ -41,9 +41,9 @@ async def _get_session():
 
 # ── Query resolvers ──────────────────────────────────────────────────────────
 
-async def resolve_activities(limit: int = 25, action: Optional[str] = None) -> list[ActivityType]:
+async def resolve_activities(limit: int = 25, offset: int = 0, action: Optional[str] = None) -> list[ActivityType]:
     async with AsyncSessionLocal() as db:
-        stmt = select(ActivityLog).order_by(ActivityLog.created_at.desc()).limit(limit)
+        stmt = select(ActivityLog).order_by(ActivityLog.created_at.desc()).offset(offset).limit(limit)
         if action:
             stmt = stmt.where(ActivityLog.action == action)
         result = await db.execute(stmt)
@@ -58,9 +58,9 @@ async def resolve_activities(limit: int = 25, action: Optional[str] = None) -> l
         ]
 
 
-async def resolve_thoughts(limit: int = 20, category: Optional[str] = None) -> list[ThoughtType]:
+async def resolve_thoughts(limit: int = 20, offset: int = 0, category: Optional[str] = None) -> list[ThoughtType]:
     async with AsyncSessionLocal() as db:
-        stmt = select(Thought).order_by(Thought.created_at.desc()).limit(limit)
+        stmt = select(Thought).order_by(Thought.created_at.desc()).offset(offset).limit(limit)
         if category:
             stmt = stmt.where(Thought.category == category)
         result = await db.execute(stmt)
@@ -74,9 +74,9 @@ async def resolve_thoughts(limit: int = 20, category: Optional[str] = None) -> l
         ]
 
 
-async def resolve_memories(limit: int = 20, category: Optional[str] = None) -> list[MemoryType]:
+async def resolve_memories(limit: int = 20, offset: int = 0, category: Optional[str] = None) -> list[MemoryType]:
     async with AsyncSessionLocal() as db:
-        stmt = select(Memory).order_by(Memory.updated_at.desc()).limit(limit)
+        stmt = select(Memory).order_by(Memory.updated_at.desc()).offset(offset).limit(limit)
         if category:
             stmt = stmt.where(Memory.category == category)
         result = await db.execute(stmt)
@@ -103,9 +103,9 @@ async def resolve_memory(key: str) -> Optional[MemoryType]:
         )
 
 
-async def resolve_goals(limit: int = 100, status: Optional[str] = None) -> list[GoalType]:
+async def resolve_goals(limit: int = 25, offset: int = 0, status: Optional[str] = None) -> list[GoalType]:
     async with AsyncSessionLocal() as db:
-        stmt = select(Goal).order_by(Goal.priority.asc(), Goal.created_at.desc()).limit(limit)
+        stmt = select(Goal).order_by(Goal.priority.asc(), Goal.created_at.desc()).offset(offset).limit(limit)
         if status:
             stmt = stmt.where(Goal.status == status)
         result = await db.execute(stmt)
@@ -117,16 +117,20 @@ async def resolve_goals(limit: int = 100, status: Optional[str] = None) -> list[
                 due_date=g.due_date.isoformat() if g.due_date else None,
                 created_at=g.created_at.isoformat() if g.created_at else None,
                 completed_at=g.completed_at.isoformat() if g.completed_at else None,
+                sprint=g.sprint, board_column=g.board_column,
+                position=g.position or 0, assigned_to=g.assigned_to,
+                tags=g.tags,
+                updated_at=g.updated_at.isoformat() if g.updated_at else None,
             )
             for g in result.scalars().all()
         ]
 
 
 async def resolve_knowledge_entities(
-    limit: int = 100, entity_type: Optional[str] = None,
+    limit: int = 25, offset: int = 0, entity_type: Optional[str] = None,
 ) -> list[KnowledgeEntityType]:
     async with AsyncSessionLocal() as db:
-        stmt = select(KnowledgeEntity).order_by(KnowledgeEntity.created_at.desc()).limit(limit)
+        stmt = select(KnowledgeEntity).order_by(KnowledgeEntity.created_at.desc()).offset(offset).limit(limit)
         if entity_type:
             stmt = stmt.where(KnowledgeEntity.type == entity_type)
         result = await db.execute(stmt)
@@ -141,7 +145,7 @@ async def resolve_knowledge_entities(
         ]
 
 
-async def resolve_knowledge_relations(limit: int = 100) -> list[KnowledgeRelationType]:
+async def resolve_knowledge_relations(limit: int = 25, offset: int = 0) -> list[KnowledgeRelationType]:
     async with AsyncSessionLocal() as db:
         E1 = aliased(KnowledgeEntity)
         E2 = aliased(KnowledgeEntity)
@@ -154,6 +158,7 @@ async def resolve_knowledge_relations(limit: int = 100) -> list[KnowledgeRelatio
             .join(E1, KnowledgeRelation.from_entity == E1.id)
             .join(E2, KnowledgeRelation.to_entity == E2.id)
             .order_by(KnowledgeRelation.created_at.desc())
+            .offset(offset)
             .limit(limit)
         )
         return [
@@ -170,9 +175,9 @@ async def resolve_knowledge_relations(limit: int = 100) -> list[KnowledgeRelatio
         ]
 
 
-async def resolve_sessions(limit: int = 50, status: Optional[str] = None) -> list[SessionType]:
+async def resolve_sessions(limit: int = 25, offset: int = 0, status: Optional[str] = None) -> list[SessionType]:
     async with AsyncSessionLocal() as db:
-        stmt = select(AgentSession).order_by(AgentSession.started_at.desc()).limit(limit)
+        stmt = select(AgentSession).order_by(AgentSession.started_at.desc()).offset(offset).limit(limit)
         if status:
             stmt = stmt.where(AgentSession.status == status)
         result = await db.execute(stmt)
@@ -259,4 +264,8 @@ async def resolve_update_goal(goal_id: str, input: GoalUpdateInput) -> GoalType:
             due_date=g.due_date.isoformat() if g.due_date else None,
             created_at=g.created_at.isoformat() if g.created_at else None,
             completed_at=g.completed_at.isoformat() if g.completed_at else None,
+            sprint=g.sprint, board_column=g.board_column,
+            position=g.position or 0, assigned_to=g.assigned_to,
+            tags=g.tags,
+            updated_at=g.updated_at.isoformat() if g.updated_at else None,
         )

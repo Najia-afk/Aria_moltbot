@@ -49,3 +49,10 @@
 - **`tool_calling: false` must be explicit in models.yaml.** Without it, the coordinator assigns tool-needing tasks to models that 404 on tool calls. Chimera-free and trinity-free now marked.
 - **DB garbage cleanup via SQL file, not inline shell quotes.** Complex SQL with single quotes inside double-quoted docker exec commands causes shell escaping chaos. Use `docker cp` + `psql -f` instead.
 - **`console.log` in production templates leaks internal state.** Gate debug logs behind `window.ARIA_DEBUG` flag so developers can re-enable when needed.
+
+## Sprint 3 Execution (2026-02-11)
+- **Direct SQL ALTER TABLE for running containers beats Alembic rebuild.** When containers are up, adding columns via `docker compose exec aria-db psql -c "ALTER TABLE..."` is instant. Save Alembic for cold-start scenarios.
+- **Board column mapping must be canonical.** Sprint board uses 5 fixed columns (backlog, todo, doing, on_hold, done). Status-to-column mapping lives in the move endpoint, not the frontend.
+- **Token-efficient endpoints save 10x context.** `sprint-summary` returns ~460 bytes vs ~5000 for `get_goals(limit=100)`. Always provide compact alternatives for Aria's cognitive loop.
+- **Vanilla drag-and-drop is sufficient for Kanban.** HTML5 `draggable="true"` + `ondragstart/ondrop` events work cleanly without libraries. The `PATCH /goals/{id}/move` endpoint handles column + position + status sync atomically.
+- **GraphQL pagination should default to 25, not 100.** Large default limits waste tokens and DB resources. Adding `offset: int = 0` to all resolvers enables cursor-free pagination matching REST endpoints.

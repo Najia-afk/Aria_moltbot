@@ -26,6 +26,18 @@ aria-apiclient.get_goals({"status": "active", "limit": 5})
 aria-apiclient.create_goal({"title": "...", "description": "...", "priority": 2})
 aria-apiclient.update_goal({"goal_id": "X", "progress": 50})
 
+# Sprint Board (token-efficient — ~200 tokens vs ~5000)
+aria-apiclient.get_sprint_summary({"sprint": "current"})
+aria-apiclient.get_goal_board({"sprint": "current"})
+aria-apiclient.move_goal({"goal_id": "X", "board_column": "doing"})
+aria-apiclient.get_goal_archive({"page": 1, "limit": 25})
+aria-apiclient.get_goal_history({"days": 14})
+aria-sprint-manager.sprint_status({})
+aria-sprint-manager.sprint_report({})
+aria-sprint-manager.sprint_plan({"sprint_name": "sprint-1", "goal_ids": ["g1","g2"]})
+aria-sprint-manager.sprint_move_goal({"goal_id": "X", "column": "doing"})
+aria-sprint-manager.sprint_prioritize({"column": "todo", "goal_ids_ordered": ["g1","g2"]})
+
 # Memories
 aria-apiclient.get_memories({"limit": 10})
 aria-apiclient.set_memory({"key": "preference", "value": "dark_mode"})
@@ -40,7 +52,7 @@ aria-apiclient.get_thoughts({"limit": 10})
 
 | Category | Skills |
 |----------|--------|
-| 🎯 Orchestrator | `aria-goals`, `aria-schedule`, `aria-health`, `aria-hourlygoals`, `aria-performance`, `aria-agentmanager`, `aria-sessionmanager` |
+| 🎯 Orchestrator | `aria-goals`, `aria-schedule`, `aria-health`, `aria-hourlygoals`, `aria-performance`, `aria-agentmanager`, `aria-sessionmanager`, `aria-sprint-manager` |
 | 🔒 DevSecOps | `aria-securityscan`, `aria-cicd`, `aria-pytest`, `aria-inputguard`, `aria-sandbox` |
 | 📊 Data | `aria-datapipeline`, `aria-knowledgegraph` |
 | 📈 Trading | `aria-marketdata`, `aria-portfolio` |

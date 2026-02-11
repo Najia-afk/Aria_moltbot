@@ -1,0 +1,17 @@
+{
+  "name": "sprint_manager",
+  "canonical": "aria-sprint-manager",
+  "version": "1.0.0",
+  "layer": 3,
+  "category": "orchestrator",
+  "description": "Sprint planning and goal management as Product Owner",
+  "focus_affinity": ["orchestrator"],
+  "dependencies": ["api_client"],
+  "tools": [
+    {"name": "sprint_plan", "description": "Plan a new sprint by selecting goals from backlog"},
+    {"name": "sprint_status", "description": "Get compact sprint status (token-efficient)"},
+    {"name": "sprint_move_goal", "description": "Move a goal to a different board column"},
+    {"name": "sprint_report", "description": "Generate sprint progress report"},
+    {"name": "sprint_prioritize", "description": "Reorder goals by priority within a column"}
+  ]
+}

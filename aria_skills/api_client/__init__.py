@@ -350,6 +350,57 @@ class AriaAPIClient(BaseSkill):
             return SkillResult.ok({"deleted": True})
         except Exception as e:
             return SkillResult.fail(f"Failed to delete goal: {e}")
+
+    # ========================================
+    # Sprint Board (S3-05)
+    # ========================================
+    async def get_goal_board(self, sprint: str = "current") -> SkillResult:
+        """Get goals organized by board column."""
+        try:
+            resp = await self._client.get(f"/goals/board?sprint={sprint}")
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to get goal board: {e}")
+
+    async def get_goal_archive(self, page: int = 1, limit: int = 25) -> SkillResult:
+        """Get completed/cancelled goals archive."""
+        try:
+            resp = await self._client.get(f"/goals/archive?page={page}&limit={limit}")
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to get goal archive: {e}")
+
+    async def move_goal(self, goal_id: str, board_column: str, position: int = 0) -> SkillResult:
+        """Move goal to a different board column."""
+        try:
+            resp = await self._client.patch(f"/goals/{goal_id}/move", json={
+                "board_column": board_column,
+                "position": position,
+            })
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to move goal: {e}")
+
+    async def get_sprint_summary(self, sprint: str = "current") -> SkillResult:
+        """Get lightweight sprint summary (token-efficient)."""
+        try:
+            resp = await self._client.get(f"/goals/sprint-summary?sprint={sprint}")
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to get sprint summary: {e}")
+
+    async def get_goal_history(self, days: int = 14) -> SkillResult:
+        """Get goal status distribution by day for charts."""
+        try:
+            resp = await self._client.get(f"/goals/history?days={days}")
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to get goal history: {e}")
     
     # ========================================
     # Hourly Goals

@@ -178,15 +178,18 @@
 
                     <!-- Intelligence Dropdown -->
                     <div class="nav-dropdown">
-                        <button class="nav-dropdown-toggle {% if '/goals' in request.path or '/knowledge' in request.path or '/working-memory' in request.path or '/skills' in request.path %}active{% endif %}">
+                        <button class="nav-dropdown-toggle {% if '/goals' in request.path or '/sprint-board' in request.path or '/knowledge' in request.path or '/working-memory' in request.path or '/skills' in request.path %}active{% endif %}">
                             Intelligence
                             <svg class="chevron" viewBox="0 0 16 16" fill="currentColor">
                                 <path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
                             </svg>
                         </button>
                         <div class="nav-dropdown-menu">
-                            <a href="/goals" class="{% if '/goals' in request.path %}active{% endif %}">
+                            <a href="/goals" class="{% if '/goals' == request.path %}active{% endif %}">
                                 🎯 Goals
+                            </a>
+                            <a href="/sprint-board" class="{% if '/sprint-board' in request.path %}active{% endif %}">
+                                📋 Sprint Board
                             </a>
                             <a href="/knowledge" class="{% if '/knowledge' in request.path %}active{% endif %}">
                                 🕸️ Knowledge

@@ -1,0 +1,488 @@
+{% extends "base.html" %}
+{% block title %}Sprint Board - Aria Blue{% endblock %}
+
+{% block page_title %}📋 Sprint Board{% endblock %}
+{% block page_subtitle %}Kanban workflow for goal management{% endblock %}
+
+{% block header_actions %}
+<div style="display:flex; gap:0.5rem; align-items:center;">
+    <select id="sprintSelector" class="input" style="width:180px; padding:0.4rem 0.6rem;" onchange="loadBoard()">
+        <option value="current">Current Sprint</option>
+        <option value="backlog">Backlog Only</option>
+    </select>
+    <button class="btn btn-primary" onclick="openQuickAdd()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 5v14M5 12h14"/>
+        </svg>
+        Quick Add
+    </button>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Board Tabs */
+    .board-tabs { display:flex; gap:0.5rem; margin-bottom:1rem; }
+    .board-tab { padding:0.5rem 1rem; border:none; background:var(--bg-secondary); color:var(--text-secondary); border-radius:8px; cursor:pointer; font-size:0.85rem; font-weight:500; transition:all 0.2s; }
+    .board-tab.active { background:var(--accent-primary); color:#fff; }
+    .board-tab:hover:not(.active) { background:var(--bg-tertiary); color:var(--text-primary); }
+
+    /* Kanban Board */
+    .kanban-board { display:grid; grid-template-columns:repeat(5,1fr); gap:0.75rem; min-height:500px; margin-bottom:1.5rem; }
+    .kanban-column { background:var(--bg-secondary); border-radius:12px; padding:0.75rem; min-height:400px; display:flex; flex-direction:column; }
+    .kanban-column.drag-over { outline:2px dashed var(--accent-primary); outline-offset:-2px; }
+    .column-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem; padding-bottom:0.5rem; border-bottom:2px solid var(--border-color); }
+    .column-title { font-weight:600; font-size:0.85rem; color:var(--text-primary); display:flex; align-items:center; gap:0.4rem; }
+    .column-count { background:var(--bg-tertiary); color:var(--text-secondary); padding:0.15rem 0.5rem; border-radius:10px; font-size:0.75rem; font-weight:600; }
+    .column-cards { flex:1; display:flex; flex-direction:column; gap:0.5rem; min-height:50px; }
+
+    /* Column accent colors */
+    .kanban-column[data-column="backlog"] .column-header { border-color:#78909c; }
+    .kanban-column[data-column="todo"] .column-header { border-color:#42a5f5; }
+    .kanban-column[data-column="doing"] .column-header { border-color:#ffa726; }
+    .kanban-column[data-column="on_hold"] .column-header { border-color:#ef5350; }
+    .kanban-column[data-column="done"] .column-header { border-color:#66bb6a; }
+
+    /* Goal Cards */
+    .goal-card { background:var(--bg-primary); border:1px solid var(--border-color); border-radius:8px; padding:0.65rem; cursor:grab; transition:all 0.2s; }
+    .goal-card:hover { border-color:var(--accent-primary); transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,0.3); }
+    .goal-card.dragging { opacity:0.5; transform:rotate(2deg); }
+    .goal-card-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.35rem; }
+    .goal-card-title { font-size:0.8rem; font-weight:600; color:var(--text-primary); line-height:1.3; margin-bottom:0.25rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .goal-card-meta { display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap; }
+    .priority-badge { font-size:0.7rem; padding:0.1rem 0.35rem; border-radius:4px; font-weight:600; }
+    .priority-1 { background:rgba(244,67,54,0.2); color:#ef5350; }
+    .priority-2 { background:rgba(255,152,0,0.2); color:#ffa726; }
+    .priority-3 { background:rgba(255,235,59,0.2); color:#ffee58; }
+    .priority-4 { background:rgba(76,175,80,0.2); color:#66bb6a; }
+    .priority-5 { background:rgba(158,158,158,0.2); color:#9e9e9e; }
+    .due-badge { font-size:0.65rem; color:var(--text-muted); }
+    .due-badge.overdue { color:#ef5350; }
+
+    /* Progress bar */
+    .progress-bar-mini { height:4px; background:var(--bg-tertiary); border-radius:2px; margin-top:0.35rem; overflow:hidden; }
+    .progress-bar-mini .fill { height:100%; border-radius:2px; background:var(--accent-primary); transition:width 0.3s; }
+
+    /* Tags */
+    .goal-tags { display:flex; gap:0.25rem; margin-top:0.3rem; flex-wrap:wrap; }
+    .goal-tag { font-size:0.6rem; padding:0.1rem 0.3rem; background:var(--bg-tertiary); color:var(--text-muted); border-radius:3px; }
+
+    /* Archive Tab */
+    .archive-container { display:none; }
+    .archive-container.active { display:block; }
+    .archive-table { width:100%; border-collapse:collapse; }
+    .archive-table th, .archive-table td { padding:0.6rem 0.8rem; text-align:left; border-bottom:1px solid var(--border-color); font-size:0.8rem; }
+    .archive-table th { color:var(--text-muted); font-weight:600; text-transform:uppercase; font-size:0.7rem; }
+    .archive-table tr:hover { background:var(--bg-secondary); }
+    .status-completed { color:#66bb6a; }
+    .status-cancelled { color:#78909c; }
+
+    /* Chart */
+    .chart-container { margin-bottom:1.5rem; }
+    .chart-container canvas { max-height:250px; }
+
+    /* Quick Add Modal */
+    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:1000; align-items:center; justify-content:center; }
+    .modal-overlay.active { display:flex; }
+    .modal-content { background:var(--bg-secondary); border-radius:12px; padding:1.5rem; width:90%; max-width:450px; }
+    .modal-content h3 { margin:0 0 1rem; color:var(--text-primary); }
+    .modal-content .form-group { margin-bottom:0.75rem; }
+    .modal-content label { display:block; font-size:0.8rem; color:var(--text-secondary); margin-bottom:0.25rem; }
+    .modal-content input, .modal-content select, .modal-content textarea { width:100%; padding:0.5rem; background:var(--bg-primary); border:1px solid var(--border-color); border-radius:6px; color:var(--text-primary); font-size:0.85rem; box-sizing:border-box; }
+    .modal-content textarea { resize:vertical; min-height:60px; }
+    .modal-actions { display:flex; gap:0.5rem; justify-content:flex-end; margin-top:1rem; }
+
+    /* Stats row */
+    .board-stats { display:grid; grid-template-columns:repeat(5,1fr); gap:0.5rem; margin-bottom:1rem; }
+    .board-stat { background:var(--bg-secondary); border-radius:8px; padding:0.6rem; text-align:center; }
+    .board-stat .stat-num { font-size:1.3rem; font-weight:700; color:var(--text-primary); }
+    .board-stat .stat-lbl { font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; }
+
+    @media (max-width:1024px) {
+        .kanban-board { grid-template-columns:repeat(3,1fr); }
+    }
+    @media (max-width:768px) {
+        .kanban-board { grid-template-columns:1fr; }
+        .board-stats { grid-template-columns:repeat(3,1fr); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Board Tabs -->
+<div class="board-tabs">
+    <button class="board-tab active" onclick="switchBoardTab('board', this)">📋 Board</button>
+    <button class="board-tab" onclick="switchBoardTab('archive', this)">📦 Archive</button>
+    <button class="board-tab" onclick="switchBoardTab('chart', this)">📊 Trends</button>
+</div>
+
+<!-- Stats Row -->
+<div class="board-stats" id="boardStats">
+    <div class="board-stat"><div class="stat-num" id="stat-backlog">-</div><div class="stat-lbl">Backlog</div></div>
+    <div class="board-stat"><div class="stat-num" id="stat-todo">-</div><div class="stat-lbl">To Do</div></div>
+    <div class="board-stat"><div class="stat-num" id="stat-doing">-</div><div class="stat-lbl">Doing</div></div>
+    <div class="board-stat"><div class="stat-num" id="stat-on_hold">-</div><div class="stat-lbl">On Hold</div></div>
+    <div class="board-stat"><div class="stat-num" id="stat-done">-</div><div class="stat-lbl">Done</div></div>
+</div>
+
+<!-- Kanban Board -->
+<div class="kanban-board" id="kanbanBoard">
+    <div class="kanban-column" data-column="backlog" ondragover="onDragOver(event)" ondrop="onDrop(event, 'backlog')" ondragleave="onDragLeave(event)">
+        <div class="column-header">
+            <span class="column-title">📥 Backlog</span>
+            <span class="column-count" id="count-backlog">0</span>
+        </div>
+        <div class="column-cards" id="cards-backlog"></div>
+    </div>
+    <div class="kanban-column" data-column="todo" ondragover="onDragOver(event)" ondrop="onDrop(event, 'todo')" ondragleave="onDragLeave(event)">
+        <div class="column-header">
+            <span class="column-title">📝 To Do</span>
+            <span class="column-count" id="count-todo">0</span>
+        </div>
+        <div class="column-cards" id="cards-todo"></div>
+    </div>
+    <div class="kanban-column" data-column="doing" ondragover="onDragOver(event)" ondrop="onDrop(event, 'doing')" ondragleave="onDragLeave(event)">
+        <div class="column-header">
+            <span class="column-title">🔨 Doing</span>
+            <span class="column-count" id="count-doing">0</span>
+        </div>
+        <div class="column-cards" id="cards-doing"></div>
+    </div>
+    <div class="kanban-column" data-column="on_hold" ondragover="onDragOver(event)" ondrop="onDrop(event, 'on_hold')" ondragleave="onDragLeave(event)">
+        <div class="column-header">
+            <span class="column-title">⏸️ On Hold</span>
+            <span class="column-count" id="count-on_hold">0</span>
+        </div>
+        <div class="column-cards" id="cards-on_hold"></div>
+    </div>
+    <div class="kanban-column" data-column="done" ondragover="onDragOver(event)" ondrop="onDrop(event, 'done')" ondragleave="onDragLeave(event)">
+        <div class="column-header">
+            <span class="column-title">✅ Done</span>
+            <span class="column-count" id="count-done">0</span>
+        </div>
+        <div class="column-cards" id="cards-done"></div>
+    </div>
+</div>
+
+<!-- Archive Tab -->
+<div class="archive-container" id="archiveContainer">
+    <div class="card">
+        <div class="card-header"><h3>📦 Archived Goals</h3></div>
+        <div class="card-body">
+            <table class="archive-table">
+                <thead>
+                    <tr><th>Title</th><th>Status</th><th>Priority</th><th>Completed</th></tr>
+                </thead>
+                <tbody id="archiveBody"></tbody>
+            </table>
+            <div id="archivePagination" style="margin-top:1rem; text-align:center;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Chart Tab -->
+<div class="chart-container" id="chartContainer" style="display:none;">
+    <div class="card">
+        <div class="card-header"><h3>📊 Goal Status Trends (14 days)</h3></div>
+        <div class="card-body" style="padding:1rem;">
+            <canvas id="goalStatusChart" style="max-height:300px;"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Add Modal -->
+<div class="modal-overlay" id="quickAddModal">
+    <div class="modal-content">
+        <h3>Quick Add Goal</h3>
+        <div class="form-group">
+            <label>Title</label>
+            <input type="text" id="qaTitle" placeholder="Goal title...">
+        </div>
+        <div class="form-group">
+            <label>Description</label>
+            <textarea id="qaDescription" placeholder="Description (optional)"></textarea>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
+            <div class="form-group">
+                <label>Priority</label>
+                <select id="qaPriority">
+                    <option value="1">🔴 Urgent</option>
+                    <option value="2" selected>🟠 High</option>
+                    <option value="3">🟡 Medium</option>
+                    <option value="4">🟢 Low</option>
+                    <option value="5">⚪ Background</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Column</label>
+                <select id="qaColumn">
+                    <option value="backlog">Backlog</option>
+                    <option value="todo" selected>To Do</option>
+                    <option value="doing">Doing</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Sprint</label>
+            <input type="text" id="qaSprint" placeholder="e.g., sprint-1">
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeQuickAdd()">Cancel</button>
+            <button class="btn btn-primary" onclick="submitQuickAdd()">Create Goal</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script>
+const API_BASE = API_BASE_URL;
+let currentSprint = 'current';
+let goalChart = null;
+
+// ── Board Loading ────────────────────────────────────────────────────
+async function loadBoard() {
+    const sprint = document.getElementById('sprintSelector').value;
+    currentSprint = sprint;
+    try {
+        const resp = await fetch(`${API_BASE}/goals/board?sprint=${sprint}`);
+        const data = await resp.json();
+
+        const columns = ['backlog', 'todo', 'doing', 'on_hold', 'done'];
+        columns.forEach(col => {
+            const container = document.getElementById(`cards-${col}`);
+            const goals = data.columns[col] || [];
+            container.innerHTML = goals.map(g => renderGoalCard(g)).join('');
+            document.getElementById(`count-${col}`).textContent = goals.length;
+            document.getElementById(`stat-${col}`).textContent = goals.length;
+        });
+    } catch (err) {
+        showNotification('Failed to load board: ' + err.message, 'error');
+    }
+}
+
+function renderGoalCard(g) {
+    const priorityLabels = {1:'P1',2:'P2',3:'P3',4:'P4',5:'P5'};
+    const progress = Math.round(g.progress || 0);
+    const tags = (g.tags || []).map(t => `<span class="goal-tag">#${escapeHtml(t)}</span>`).join('');
+    const dueBadge = g.due_date ? formatDueBadge(g.due_date) : '';
+
+    return `<div class="goal-card" draggable="true" data-goal-id="${escapeHtml(g.goal_id)}"
+                ondragstart="onDragStart(event)" ondragend="onDragEnd(event)">
+        <div class="goal-card-header">
+            <span class="priority-badge priority-${g.priority}">${priorityLabels[g.priority] || 'P?'}</span>
+            ${dueBadge}
+        </div>
+        <div class="goal-card-title" title="${escapeHtml(g.title)}">${escapeHtml(g.title)}</div>
+        <div class="progress-bar-mini"><div class="fill" style="width:${progress}%"></div></div>
+        <div class="goal-card-meta">
+            <span style="font-size:0.65rem; color:var(--text-muted)">${progress}%</span>
+            ${g.assigned_to ? `<span style="font-size:0.65rem; color:var(--text-muted)">👤 ${escapeHtml(g.assigned_to)}</span>` : ''}
+        </div>
+        ${tags ? `<div class="goal-tags">${tags}</div>` : ''}
+    </div>`;
+}
+
+function formatDueBadge(dateStr) {
+    const due = new Date(dateStr);
+    const now = new Date();
+    const diff = (due - now) / (1000 * 60 * 60);
+    const cls = diff < 0 ? 'overdue' : '';
+    let label;
+    if (diff < 0) label = 'Overdue';
+    else if (diff < 24) label = `${Math.round(diff)}h`;
+    else label = `${Math.round(diff / 24)}d`;
+    return `<span class="due-badge ${cls}">⏰ ${label}</span>`;
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+}
+
+// ── Drag & Drop ──────────────────────────────────────────────────────
+let draggedGoalId = null;
+
+function onDragStart(e) {
+    draggedGoalId = e.target.dataset.goalId;
+    e.target.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', draggedGoalId);
+}
+
+function onDragEnd(e) {
+    e.target.classList.remove('dragging');
+    document.querySelectorAll('.kanban-column').forEach(c => c.classList.remove('drag-over'));
+}
+
+function onDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    e.currentTarget.classList.add('drag-over');
+}
+
+function onDragLeave(e) {
+    e.currentTarget.classList.remove('drag-over');
+}
+
+async function onDrop(e, column) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('drag-over');
+    const goalId = e.dataTransfer.getData('text/plain');
+    if (!goalId) return;
+
+    try {
+        const resp = await fetch(`${API_BASE}/goals/${goalId}/move`, {
+            method: 'PATCH',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({board_column: column, position: 0}),
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        showNotification(`Moved to ${column.replace('_',' ')}`, 'success');
+        loadBoard();
+    } catch (err) {
+        showNotification('Move failed: ' + err.message, 'error');
+    }
+}
+
+// ── Archive ──────────────────────────────────────────────────────────
+let archivePage = 1;
+async function loadArchive(page = 1) {
+    archivePage = page;
+    try {
+        const resp = await fetch(`${API_BASE}/goals/archive?page=${page}&limit=15`);
+        const data = await resp.json();
+        const body = document.getElementById('archiveBody');
+        body.innerHTML = (data.items || []).map(g => `
+            <tr>
+                <td>${escapeHtml(g.title)}</td>
+                <td><span class="status-${g.status}">${g.status}</span></td>
+                <td>${g.priority}</td>
+                <td>${g.completed_at ? new Date(g.completed_at).toLocaleDateString() : '-'}</td>
+            </tr>
+        `).join('') || '<tr><td colspan="4" style="text-align:center; color:var(--text-muted)">No archived goals</td></tr>';
+
+        const pagination = document.getElementById('archivePagination');
+        if (data.pages > 1) {
+            let btns = '';
+            for (let i = 1; i <= data.pages; i++) {
+                btns += `<button class="btn btn-${i===page?'primary':'secondary'}" style="margin:0 2px; padding:0.3rem 0.6rem; font-size:0.75rem;" onclick="loadArchive(${i})">${i}</button>`;
+            }
+            pagination.innerHTML = btns;
+        } else {
+            pagination.innerHTML = '';
+        }
+    } catch (err) {
+        showNotification('Failed to load archive: ' + err.message, 'error');
+    }
+}
+
+// ── Chart ────────────────────────────────────────────────────────────
+async function loadGoalChart() {
+    try {
+        const resp = await fetch(`${API_BASE}/goals/history?days=14`);
+        const data = await resp.json();
+        const labels = data.labels || [];
+        const statuses = ['pending', 'active', 'completed', 'paused', 'cancelled'];
+        const colors = { pending:'#ffa726', active:'#42a5f5', completed:'#66bb6a', paused:'#ef5350', cancelled:'#78909c' };
+
+        const datasets = statuses.map(s => ({
+            label: s.charAt(0).toUpperCase() + s.slice(1),
+            data: labels.map(day => (data.data[day] || {})[s] || 0),
+            backgroundColor: colors[s],
+            borderWidth: 0,
+            borderRadius: 2,
+        }));
+
+        const ctx = document.getElementById('goalStatusChart').getContext('2d');
+        if (goalChart) goalChart.destroy();
+        goalChart = new Chart(ctx, {
+            type: 'bar',
+            data: { labels, datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { color: '#e0e0e0' } },
+                    title: { display: true, text: 'Goal Status by Day', color: '#e0e0e0' },
+                },
+                scales: {
+                    x: { stacked: true, ticks: { color: '#9e9e9e' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                    y: { stacked: true, ticks: { color: '#9e9e9e', stepSize: 1 }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                },
+            },
+        });
+    } catch (err) {
+        showNotification('Failed to load chart: ' + err.message, 'error');
+    }
+}
+
+// ── Tab Switching ────────────────────────────────────────────────────
+function switchBoardTab(tab, btn) {
+    document.querySelectorAll('.board-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    document.getElementById('kanbanBoard').style.display = tab === 'board' ? 'grid' : 'none';
+    document.getElementById('boardStats').style.display = (tab === 'board') ? 'grid' : 'none';
+    document.getElementById('archiveContainer').style.display = tab === 'archive' ? 'block' : 'none';
+    document.getElementById('chartContainer').style.display = tab === 'chart' ? 'block' : 'none';
+
+    if (tab === 'archive') loadArchive();
+    if (tab === 'chart') loadGoalChart();
+}
+
+// ── Quick Add ────────────────────────────────────────────────────────
+function openQuickAdd() {
+    document.getElementById('quickAddModal').classList.add('active');
+    document.getElementById('qaTitle').focus();
+    // Pre-fill sprint from selector
+    const sprint = document.getElementById('sprintSelector').value;
+    document.getElementById('qaSprint').value = sprint === 'current' ? '' : sprint;
+}
+
+function closeQuickAdd() {
+    document.getElementById('quickAddModal').classList.remove('active');
+}
+
+async function submitQuickAdd() {
+    const title = document.getElementById('qaTitle').value.trim();
+    if (!title) { showNotification('Title is required', 'error'); return; }
+
+    const body = {
+        title,
+        description: document.getElementById('qaDescription').value.trim(),
+        priority: parseInt(document.getElementById('qaPriority').value),
+        board_column: document.getElementById('qaColumn').value,
+        sprint: document.getElementById('qaSprint').value.trim() || 'backlog',
+        status: document.getElementById('qaColumn').value === 'doing' ? 'active' : 'pending',
+    };
+
+    try {
+        const resp = await fetch(`${API_BASE}/goals`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body),
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        showNotification('Goal created!', 'success');
+        closeQuickAdd();
+        document.getElementById('qaTitle').value = '';
+        document.getElementById('qaDescription').value = '';
+        loadBoard();
+    } catch (err) {
+        showNotification('Failed to create goal: ' + err.message, 'error');
+    }
+}
+
+// Close modal on overlay click
+document.getElementById('quickAddModal').addEventListener('click', function(e) {
+    if (e.target === this) closeQuickAdd();
+});
+
+// ── Init ─────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', loadBoard);
+</script>
+{% endblock %}

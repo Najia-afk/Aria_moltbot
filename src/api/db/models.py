@@ -93,12 +93,22 @@ class Goal(Base):
     due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Sprint Board fields (S3-01)
+    sprint: Mapped[str | None] = mapped_column(String(100), server_default=text("'backlog'"))
+    board_column: Mapped[str | None] = mapped_column(String(50), server_default=text("'backlog'"))
+    position: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    assigned_to: Mapped[str | None] = mapped_column(String(100))
+    tags: Mapped[dict | None] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
 
 
 Index("idx_goals_status", Goal.status)
 Index("idx_goals_priority", Goal.priority.desc())
 Index("idx_goals_created", Goal.created_at.desc())
 Index("idx_goals_status_priority_created", Goal.status, Goal.priority.desc(), Goal.created_at.desc())
+Index("idx_goals_sprint", Goal.sprint)
+Index("idx_goals_board_column", Goal.board_column)
+Index("idx_goals_sprint_column_position", Goal.sprint, Goal.board_column, Goal.position)
 
 
 class ActivityLog(Base):

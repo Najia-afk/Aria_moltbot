@@ -49,6 +49,13 @@ class GoalType:
     due_date: Optional[str]
     created_at: Optional[str]
     completed_at: Optional[str]
+    # Sprint Board fields (S3-08)
+    sprint: Optional[str] = None
+    board_column: Optional[str] = None
+    position: int = 0
+    assigned_to: Optional[str] = None
+    tags: Optional[JSON] = None
+    updated_at: Optional[str] = None
 
 
 @strawberry.type

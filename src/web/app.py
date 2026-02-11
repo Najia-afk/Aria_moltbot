@@ -140,6 +140,10 @@ def create_app():
     def goals():
         return render_template('goals.html')
 
+    @app.route('/sprint-board')
+    def sprint_board():
+        return render_template('sprint_board.html')
+
     @app.route('/heartbeat')
     def heartbeat():
         return render_template('heartbeat.html')
