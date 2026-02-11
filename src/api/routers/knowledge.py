@@ -14,7 +14,7 @@ from sqlalchemy import delete, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
-from db.models import KnowledgeEntity, KnowledgeRelation, KnowledgeQueryLog
+from db.models import KnowledgeEntity, KnowledgeRelation, KnowledgeQueryLog, SkillGraphEntity, SkillGraphRelation
 from deps import get_db
 
 router = APIRouter(tags=["Knowledge Graph"])
@@ -194,40 +194,11 @@ async def create_knowledge_relation(body: RelationCreate, db: AsyncSession = Dep
 
 @router.delete("/knowledge-graph/auto-generated")
 async def delete_auto_generated(db: AsyncSession = Depends(get_db)):
-    """Delete all entities (+ cascaded relations) where properties.auto_generated = true."""
-    # Find auto-generated entities
-    stmt = select(KnowledgeEntity).where(
-        KnowledgeEntity.properties["auto_generated"].as_boolean() == True  # noqa: E712
-    )
-    result = await db.execute(stmt)
-    entities = result.scalars().all()
-    count = len(entities)
-
-    if count > 0:
-        # Delete relations first (both directions), then entities
-        entity_ids = [e.id for e in entities]
-        await db.execute(
-            delete(KnowledgeRelation).where(
-                or_(
-                    KnowledgeRelation.from_entity.in_(entity_ids),
-                    KnowledgeRelation.to_entity.in_(entity_ids),
-                )
-            )
-        )
-        # Also delete relations tagged auto_generated
-        await db.execute(
-            delete(KnowledgeRelation).where(
-                KnowledgeRelation.properties["auto_generated"].as_boolean() == True  # noqa: E712
-            )
-        )
-        await db.execute(
-            delete(KnowledgeEntity).where(
-                KnowledgeEntity.properties["auto_generated"].as_boolean() == True  # noqa: E712
-            )
-        )
-        await db.commit()
-
-    return {"deleted_entities": count, "status": "ok"}
+    """Delete all skill graph data (separate tables, safe from organic knowledge)."""
+    rel_result = await db.execute(delete(SkillGraphRelation))
+    ent_result = await db.execute(delete(SkillGraphEntity))
+    await db.commit()
+    return {"deleted_entities": ent_result.rowcount, "deleted_relations": rel_result.rowcount, "status": "ok"}
 
 
 # ── S4-02: Graph traversal (BFS) ─────────────────────────────────────────────
@@ -240,17 +211,17 @@ async def graph_traverse(
     direction: str = Query("outgoing", regex="^(outgoing|incoming|both)$"),
     db: AsyncSession = Depends(get_db),
 ):
-    """BFS traversal from a starting entity."""
+    """BFS traversal from a starting entity in the skill graph."""
     # Resolve start entity by ID or name
     start_entity = None
     try:
         start_uuid = uuid.UUID(start)
-        result = await db.execute(select(KnowledgeEntity).where(KnowledgeEntity.id == start_uuid))
+        result = await db.execute(select(SkillGraphEntity).where(SkillGraphEntity.id == start_uuid))
         start_entity = result.scalar_one_or_none()
     except ValueError:
         pass
     if not start_entity:
-        result = await db.execute(select(KnowledgeEntity).where(KnowledgeEntity.name == start))
+        result = await db.execute(select(SkillGraphEntity).where(SkillGraphEntity.name == start))
         start_entity = result.scalar_one_or_none()
     if not start_entity:
         return {"error": f"Entity not found: {start}", "nodes": [], "edges": []}
@@ -272,14 +243,14 @@ async def graph_traverse(
         # Build relation query based on direction
         stmts = []
         if direction in ("outgoing", "both"):
-            stmt = select(KnowledgeRelation).where(KnowledgeRelation.from_entity == current_id)
+            stmt = select(SkillGraphRelation).where(SkillGraphRelation.from_entity == current_id)
             if relation_type:
-                stmt = stmt.where(KnowledgeRelation.relation_type == relation_type)
+                stmt = stmt.where(SkillGraphRelation.relation_type == relation_type)
             stmts.append(("outgoing", stmt))
         if direction in ("incoming", "both"):
-            stmt = select(KnowledgeRelation).where(KnowledgeRelation.to_entity == current_id)
+            stmt = select(SkillGraphRelation).where(SkillGraphRelation.to_entity == current_id)
             if relation_type:
-                stmt = stmt.where(KnowledgeRelation.relation_type == relation_type)
+                stmt = stmt.where(SkillGraphRelation.relation_type == relation_type)
             stmts.append(("incoming", stmt))
 
         for dir_label, stmt in stmts:
@@ -292,7 +263,7 @@ async def graph_traverse(
                 if next_id_str not in visited:
                     visited.add(next_id_str)
                     # Fetch the node
-                    node_result = await db.execute(select(KnowledgeEntity).where(KnowledgeEntity.id == next_id))
+                    node_result = await db.execute(select(SkillGraphEntity).where(SkillGraphEntity.id == next_id))
                     node = node_result.scalar_one_or_none()
                     if node:
                         nodes.append(node.to_dict())
@@ -311,17 +282,17 @@ async def graph_search(
     limit: int = Query(25, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
 ):
-    """ILIKE text search for entities matching a query string."""
+    """ILIKE text search for entities in the skill graph."""
     pattern = f"%{q}%"
-    stmt = select(KnowledgeEntity).where(
+    stmt = select(SkillGraphEntity).where(
         or_(
-            KnowledgeEntity.name.ilike(pattern),
-            KnowledgeEntity.properties["description"].astext.ilike(pattern),
+            SkillGraphEntity.name.ilike(pattern),
+            SkillGraphEntity.properties["description"].astext.ilike(pattern),
         )
     )
     if entity_type:
-        stmt = stmt.where(KnowledgeEntity.type == entity_type)
-    stmt = stmt.order_by(KnowledgeEntity.name).limit(limit)
+        stmt = stmt.where(SkillGraphEntity.type == entity_type)
+    stmt = stmt.order_by(SkillGraphEntity.name).limit(limit)
 
     result = await db.execute(stmt)
     entities = [e.to_dict() for e in result.scalars().all()]
@@ -338,26 +309,26 @@ async def find_skill_for_task(
     limit: int = Query(5, ge=1, le=20),
     db: AsyncSession = Depends(get_db),
 ):
-    """Find the best skill for a given task by matching tool/skill descriptions."""
+    """Find the best skill for a given task from the skill graph."""
     pattern = f"%{task}%"
 
     # Search skills by name/description
-    skill_stmt = select(KnowledgeEntity).where(
-        KnowledgeEntity.type == "skill",
+    skill_stmt = select(SkillGraphEntity).where(
+        SkillGraphEntity.type == "skill",
         or_(
-            KnowledgeEntity.name.ilike(pattern),
-            KnowledgeEntity.properties["description"].astext.ilike(pattern),
+            SkillGraphEntity.name.ilike(pattern),
+            SkillGraphEntity.properties["description"].astext.ilike(pattern),
         ),
     ).limit(limit)
     skill_result = await db.execute(skill_stmt)
     skill_matches = skill_result.scalars().all()
 
     # Search tools by name/description, then trace back to skill
-    tool_stmt = select(KnowledgeEntity).where(
-        KnowledgeEntity.type == "tool",
+    tool_stmt = select(SkillGraphEntity).where(
+        SkillGraphEntity.type == "tool",
         or_(
-            KnowledgeEntity.name.ilike(pattern),
-            KnowledgeEntity.properties["description"].astext.ilike(pattern),
+            SkillGraphEntity.name.ilike(pattern),
+            SkillGraphEntity.properties["description"].astext.ilike(pattern),
         ),
     ).limit(20)
     tool_result = await db.execute(tool_stmt)
@@ -367,9 +338,9 @@ async def find_skill_for_task(
     tool_skill_ids: set[str] = set()
     for tool in tool_matches:
         rel_result = await db.execute(
-            select(KnowledgeRelation).where(
-                KnowledgeRelation.to_entity == tool.id,
-                KnowledgeRelation.relation_type == "provides",
+            select(SkillGraphRelation).where(
+                SkillGraphRelation.to_entity == tool.id,
+                SkillGraphRelation.relation_type == "provides",
             )
         )
         for rel in rel_result.scalars().all():
@@ -379,8 +350,8 @@ async def find_skill_for_task(
     indirect_skills = []
     if tool_skill_ids:
         indirect_result = await db.execute(
-            select(KnowledgeEntity).where(
-                KnowledgeEntity.id.in_([uuid.UUID(sid) for sid in tool_skill_ids])
+            select(SkillGraphEntity).where(
+                SkillGraphEntity.id.in_([uuid.UUID(sid) for sid in tool_skill_ids])
             )
         )
         indirect_skills = indirect_result.scalars().all()

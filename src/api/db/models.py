@@ -12,7 +12,7 @@ from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import (
-    Boolean, DateTime, Float, ForeignKey, Integer, Numeric, String, Text, Index, text,
+    Boolean, DateTime, Float, ForeignKey, Integer, Numeric, String, Text, Index, UniqueConstraint, text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -211,6 +211,61 @@ class KnowledgeRelation(Base):
 Index("idx_kg_relation_from", KnowledgeRelation.from_entity)
 Index("idx_kg_relation_to", KnowledgeRelation.to_entity)
 Index("idx_kg_relation_type", KnowledgeRelation.relation_type)
+
+
+# ── Skill Graph (separate from organic knowledge) ────────────────────────────
+# Dedicated tables so skill-selection logic never collides with Aria's social /
+# research / manual knowledge.  Regenerated idempotently from skill.json files.
+
+class SkillGraphEntity(Base):
+    __tablename__ = "skill_graph_entities"
+
+    id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
+    name: Mapped[str] = mapped_column(String(500), nullable=False)
+    type: Mapped[str] = mapped_column(String(100), nullable=False)  # skill, tool, focus_mode, category
+    properties: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
+
+    __table_args__ = (
+        UniqueConstraint("name", "type", name="uq_sg_entity_name_type"),
+    )
+
+    def to_dict(self) -> dict:
+        return {
+            "id": str(self.id),
+            "name": self.name,
+            "type": self.type,
+            "properties": self.properties or {},
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class SkillGraphRelation(Base):
+    __tablename__ = "skill_graph_relations"
+
+    id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
+    from_entity: Mapped[Any] = mapped_column(UUID(as_uuid=True), ForeignKey("skill_graph_entities.id", ondelete="CASCADE"), nullable=False)
+    to_entity: Mapped[Any] = mapped_column(UUID(as_uuid=True), ForeignKey("skill_graph_entities.id", ondelete="CASCADE"), nullable=False)
+    relation_type: Mapped[str] = mapped_column(String(100), nullable=False)  # provides, belongs_to, affinity, depends_on
+    properties: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
+
+    def to_dict(self) -> dict:
+        return {
+            "id": str(self.id),
+            "from_entity": str(self.from_entity),
+            "to_entity": str(self.to_entity),
+            "relation_type": self.relation_type,
+            "properties": self.properties or {},
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+Index("idx_sg_entity_name", SkillGraphEntity.name)
+Index("idx_sg_entity_type", SkillGraphEntity.type)
+Index("idx_sg_relation_from", SkillGraphRelation.from_entity)
+Index("idx_sg_relation_to", SkillGraphRelation.to_entity)
+Index("idx_sg_relation_type", SkillGraphRelation.relation_type)
 
 
 # S4-05: Knowledge Query Log

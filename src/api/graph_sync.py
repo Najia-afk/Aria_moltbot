@@ -1,8 +1,8 @@
 """
-Graph sync — auto-populate knowledge graph from skill.json files at startup.
+Graph sync — auto-populate skill graph from skill.json files at startup.
 
 ORM-based (no HTTP calls) for use inside the API container. Idempotent:
-clears auto_generated=true entities/relations before regenerating.
+clears all skill_graph_* tables before regenerating.
 """
 
 import json
@@ -10,10 +10,10 @@ import logging
 import uuid as uuid_mod
 from pathlib import Path
 
-from sqlalchemy import delete, or_, select
+from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.models import KnowledgeEntity, KnowledgeRelation
+from db.models import SkillGraphEntity, SkillGraphRelation
 from db.session import AsyncSessionLocal
 
 logger = logging.getLogger("aria.graph_sync")
@@ -61,51 +61,27 @@ def _read_skill_jsons() -> list[dict]:
     return skills
 
 
-async def _clear_auto_generated(db: AsyncSession) -> int:
-    """Delete all auto-generated entities and relations."""
-    # Delete relations tagged auto_generated
-    await db.execute(
-        delete(KnowledgeRelation).where(
-            KnowledgeRelation.properties["auto_generated"].as_boolean() == True  # noqa: E712
-        )
-    )
-    # Also delete relations referencing auto-generated entities
-    auto_entity_ids = select(KnowledgeEntity.id).where(
-        KnowledgeEntity.properties["auto_generated"].as_boolean() == True  # noqa: E712
-    )
-    await db.execute(
-        delete(KnowledgeRelation).where(
-            or_(
-                KnowledgeRelation.from_entity.in_(auto_entity_ids),
-                KnowledgeRelation.to_entity.in_(auto_entity_ids),
-            )
-        )
-    )
-    # Delete entities tagged auto_generated
-    result = await db.execute(
-        delete(KnowledgeEntity).where(
-            KnowledgeEntity.properties["auto_generated"].as_boolean() == True  # noqa: E712
-        )
-    )
+async def _clear_skill_graph(db: AsyncSession) -> int:
+    """Delete all skill graph entities and relations (dedicated tables)."""
+    await db.execute(delete(SkillGraphRelation))
+    result = await db.execute(delete(SkillGraphEntity))
     count = result.rowcount
-    # Commit the clear so new inserts don't hit unique constraints
     await db.commit()
     return count
 
 
-def _make_entity(name: str, etype: str, props: dict) -> KnowledgeEntity:
-    """Create an entity ORM instance."""
-    props["auto_generated"] = True
-    return KnowledgeEntity(
+def _make_entity(name: str, etype: str, props: dict) -> SkillGraphEntity:
+    """Create a skill graph entity ORM instance."""
+    return SkillGraphEntity(
         id=uuid_mod.uuid4(), name=name, type=etype, properties=props,
     )
 
 
-def _make_relation(from_id, to_id, rel_type: str) -> KnowledgeRelation:
-    """Create a relation ORM instance."""
-    return KnowledgeRelation(
+def _make_relation(from_id, to_id, rel_type: str) -> SkillGraphRelation:
+    """Create a skill graph relation ORM instance."""
+    return SkillGraphRelation(
         id=uuid_mod.uuid4(), from_entity=from_id, to_entity=to_id,
-        relation_type=rel_type, properties={"auto_generated": True},
+        relation_type=rel_type, properties={},
     )
 
 
@@ -121,12 +97,12 @@ async def sync_skill_graph() -> dict:
              "focus_modes": 0, "categories": 0, "cleared": 0}
 
     async with AsyncSessionLocal() as db:
-        # Clear existing
-        cleared = await _clear_auto_generated(db)
+        # Clear existing skill graph
+        cleared = await _clear_skill_graph(db)
         stats["cleared"] = cleared
-        logger.info("Cleared %d auto-generated entities", cleared)
+        logger.info("Cleared %d skill graph entities", cleared)
 
-        entity_map: dict[str, KnowledgeEntity] = {}  # key → entity
+        entity_map: dict[str, SkillGraphEntity] = {}  # key → entity
 
         # Focus modes
         for fm_name, fm_desc in FOCUS_MODES.items():

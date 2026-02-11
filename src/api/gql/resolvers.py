@@ -16,6 +16,8 @@ from db.models import (
     KnowledgeRelation,
     Memory,
     ModelUsage,
+    SkillGraphEntity,
+    SkillGraphRelation,
     Thought,
 )
 from db.session import AsyncSessionLocal
@@ -289,12 +291,12 @@ async def resolve_graph_traverse(
         start_entity = None
         try:
             start_uuid = uuid.UUID(start)
-            result = await db.execute(select(KnowledgeEntity).where(KnowledgeEntity.id == start_uuid))
+            result = await db.execute(select(SkillGraphEntity).where(SkillGraphEntity.id == start_uuid))
             start_entity = result.scalar_one_or_none()
         except ValueError:
             pass
         if not start_entity:
-            result = await db.execute(select(KnowledgeEntity).where(KnowledgeEntity.name == start))
+            result = await db.execute(select(SkillGraphEntity).where(SkillGraphEntity.name == start))
             start_entity = result.scalar_one_or_none()
         if not start_entity:
             return GraphTraversalResult(nodes=[], edges=[], total_nodes=0, total_edges=0, traversal_depth=max_depth)
@@ -316,14 +318,14 @@ async def resolve_graph_traverse(
                 continue
             stmts = []
             if direction in ("outgoing", "both"):
-                stmt = select(KnowledgeRelation).where(KnowledgeRelation.from_entity == current_id)
+                stmt = select(SkillGraphRelation).where(SkillGraphRelation.from_entity == current_id)
                 if relation_type:
-                    stmt = stmt.where(KnowledgeRelation.relation_type == relation_type)
+                    stmt = stmt.where(SkillGraphRelation.relation_type == relation_type)
                 stmts.append(("outgoing", stmt))
             if direction in ("incoming", "both"):
-                stmt = select(KnowledgeRelation).where(KnowledgeRelation.to_entity == current_id)
+                stmt = select(SkillGraphRelation).where(SkillGraphRelation.to_entity == current_id)
                 if relation_type:
-                    stmt = stmt.where(KnowledgeRelation.relation_type == relation_type)
+                    stmt = stmt.where(SkillGraphRelation.relation_type == relation_type)
                 stmts.append(("incoming", stmt))
 
             for dir_label, s in stmts:
@@ -337,7 +339,7 @@ async def resolve_graph_traverse(
                     next_id = rel.to_entity if dir_label == "outgoing" else rel.from_entity
                     if str(next_id) not in visited:
                         visited.add(str(next_id))
-                        nr = await db.execute(select(KnowledgeEntity).where(KnowledgeEntity.id == next_id))
+                        nr = await db.execute(select(SkillGraphEntity).where(SkillGraphEntity.id == next_id))
                         node = nr.scalar_one_or_none()
                         if node:
                             nodes.append(GraphTraversalNodeType(
@@ -357,21 +359,21 @@ async def resolve_skill_for_task(task: str, limit: int = 5) -> SkillForTaskResul
     from sqlalchemy import or_
     async with AsyncSessionLocal() as db:
         pattern = f"%{task}%"
-        skill_stmt = select(KnowledgeEntity).where(
-            KnowledgeEntity.type == "skill",
+        skill_stmt = select(SkillGraphEntity).where(
+            SkillGraphEntity.type == "skill",
             or_(
-                KnowledgeEntity.name.ilike(pattern),
-                KnowledgeEntity.properties["description"].astext.ilike(pattern),
+                SkillGraphEntity.name.ilike(pattern),
+                SkillGraphEntity.properties["description"].astext.ilike(pattern),
             ),
         ).limit(limit)
         skill_result = await db.execute(skill_stmt)
         skill_matches = skill_result.scalars().all()
 
-        tool_stmt = select(KnowledgeEntity).where(
-            KnowledgeEntity.type == "tool",
+        tool_stmt = select(SkillGraphEntity).where(
+            SkillGraphEntity.type == "tool",
             or_(
-                KnowledgeEntity.name.ilike(pattern),
-                KnowledgeEntity.properties["description"].astext.ilike(pattern),
+                SkillGraphEntity.name.ilike(pattern),
+                SkillGraphEntity.properties["description"].astext.ilike(pattern),
             ),
         ).limit(20)
         tool_result = await db.execute(tool_stmt)
@@ -380,9 +382,9 @@ async def resolve_skill_for_task(task: str, limit: int = 5) -> SkillForTaskResul
         tool_skill_ids: set[str] = set()
         for tool in tool_matches:
             rel_result = await db.execute(
-                select(KnowledgeRelation).where(
-                    KnowledgeRelation.to_entity == tool.id,
-                    KnowledgeRelation.relation_type == "provides",
+                select(SkillGraphRelation).where(
+                    SkillGraphRelation.to_entity == tool.id,
+                    SkillGraphRelation.relation_type == "provides",
                 )
             )
             for rel in rel_result.scalars().all():
@@ -391,8 +393,8 @@ async def resolve_skill_for_task(task: str, limit: int = 5) -> SkillForTaskResul
         indirect_skills = []
         if tool_skill_ids:
             indirect_result = await db.execute(
-                select(KnowledgeEntity).where(
-                    KnowledgeEntity.id.in_([uuid.UUID(sid) for sid in tool_skill_ids])
+                select(SkillGraphEntity).where(
+                    SkillGraphEntity.id.in_([uuid.UUID(sid) for sid in tool_skill_ids])
                 )
             )
             indirect_skills = indirect_result.scalars().all()

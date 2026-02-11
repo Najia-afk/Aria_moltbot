@@ -1,8 +1,87 @@
 {
-  "last_updated": "2026-02-11T19:22:51.421167+00:00",
-  "active_goals": [],
-  "recent_activities": [],
+  "last_updated": "2026-02-11T21:38:45+00:00",
+  "active_goals": [
+    {
+      "id": "7401a6a4-533a-421f-9373-b82613eff13f",
+      "goal_id": "goal-7401a6a4",
+      "title": "Analyze SSV Network Contracts for Vulnerabilities",
+      "description": "Deep dive into SSV Network codebase ($1M max bounty). Focus on: 1) Validator management logic 2) Slashing conditions 3) Withdrawal mechanisms 4) Access control patterns. Target: Find valid bug or submit comprehensive security review.",
+      "status": "active",
+      "priority": 1,
+      "progress": 30.0,
+      "board_column": "backlog"
+    },
+    {
+      "id": "5dca3dbe-0c23-45b0-889d-ab46c33c2b77",
+      "goal_id": "goal-5dca3dbe",
+      "title": "Learn Python",
+      "description": "Master Python programming",
+      "status": "active",
+      "priority": 1,
+      "progress": 5.0,
+      "board_column": "backlog"
+    },
+    {
+      "id": "26073338-b183-47f3-bf82-f55d6a1e781d",
+      "goal_id": "goal_monitor_spending",
+      "title": "Monitor API Spending & Optimize Costs",
+      "description": "Track OpenRouter consumption, set alerts at 50%/75%/90% usage, optimize model selection for cost/performance",
+      "status": "active",
+      "priority": 1,
+      "progress": 10.0,
+      "board_column": "backlog"
+    },
+    {
+      "id": "0b438c9d-35bc-4f68-a7c9-00ffd5ff3872",
+      "goal_id": "goal_token_sustainability",
+      "title": "Self-Sustain: Generate Token Income",
+      "description": "Generate $500-2000/month to cover token costs through automated strategies",
+      "status": "active",
+      "priority": 1,
+      "progress": 5.0,
+      "board_column": "backlog"
+    },
+    {
+      "id": "a95e7107-2d8d-44c8-b4cd-a5765f498c78",
+      "goal_id": "goal_income_yeild_vaults",
+      "title": "Deploy Yield Vault Strategy",
+      "description": "Deposit to Yearn/Beefy vaults, target 5-15% APY (~$100-500/mo)",
+      "status": "active",
+      "priority": 2,
+      "progress": 0.0,
+      "board_column": "backlog"
+    }
+  ],
+  "recent_activities": [
+    {
+      "type": "working_memory.sync_to_files",
+      "description": "Memory sync completed",
+      "created_at": "2026-02-11T21:38:17.726315+00:00"
+    },
+    {
+      "type": "session_manager.prune_sessions",
+      "description": "Pruned stale sessions",
+      "created_at": "2026-02-11T21:37:18.252659+00:00"
+    },
+    {
+      "type": "heartbeat_work",
+      "description": "Spawned devops sub-agent for SSV Network security analysis",
+      "created_at": "2026-02-11T21:37:16.886798+00:00"
+    },
+    {
+      "type": "heartbeat",
+      "description": "System healthy - beat #1196",
+      "created_at": "2026-02-11T21:35:10.066749+00:00"
+    }
+  ],
   "system_health": {
-    "status": "unknown"
+    "status": "healthy",
+    "subsystems": {
+      "soul": true,
+      "memory": true,
+      "cognition": true
+    },
+    "all_healthy": true,
+    "last_beat": 1196
   }
 }
