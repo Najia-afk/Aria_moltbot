@@ -112,9 +112,10 @@ def _local_manifest_route(task: str, limit: int, workspace_root_fn: Callable[[],
     return [candidate for _, candidate in scored[: max(1, limit)]]
 
 
-async def _api_route_candidates(task: str, limit: int) -> tuple[list[dict], str | None]:
+async def _api_route_candidates(task: str, limit: int) -> tuple[list[dict], str | None, list[dict]]:
+    diagnostics: list[dict] = []
     if not _HAS_HTTPX:
-        return [], "httpx_not_available"
+        return [], "httpx_not_available", [{"type": "dependency", "reason": "httpx_not_available"}]
 
     endpoints = (
         "/knowledge-graph/skill-for-task-semantic",
@@ -126,15 +127,43 @@ async def _api_route_candidates(task: str, limit: int) -> tuple[list[dict], str 
             try:
                 response = await client.get(f"{_API_BASE}{endpoint}", params={"task": task, "limit": limit})
                 if response.status_code >= 400:
+                    diagnostics.append({
+                        "type": "api_attempt",
+                        "endpoint": endpoint,
+                        "status_code": response.status_code,
+                        "accepted": False,
+                    })
                     continue
                 payload = response.json()
                 candidates = payload.get("candidates") if isinstance(payload, dict) else None
                 if isinstance(candidates, list):
-                    return candidates, endpoint
-            except Exception:
+                    diagnostics.append({
+                        "type": "api_attempt",
+                        "endpoint": endpoint,
+                        "status_code": response.status_code,
+                        "accepted": True,
+                        "candidate_count": len(candidates),
+                    })
+                    return candidates, endpoint, diagnostics
+                diagnostics.append({
+                    "type": "api_attempt",
+                    "endpoint": endpoint,
+                    "status_code": response.status_code,
+                    "accepted": False,
+                    "reason": "missing_candidates_list",
+                })
+            except Exception as exc:
+                diagnostics.append({
+                    "type": "api_attempt",
+                    "endpoint": endpoint,
+                    "accepted": False,
+                    "reason": str(exc),
+                })
                 continue
 
-    return [], "no_api_candidates"
+    if not diagnostics:
+        diagnostics.append({"type": "api_attempt", "reason": "no_api_candidates"})
+    return [], "no_api_candidates", diagnostics
 
 
 async def auto_route_task_to_skills(
@@ -148,13 +177,21 @@ async def auto_route_task_to_skills(
     """Auto-route a task to candidate skills using graph first, local manifests second."""
     requested_limit = max(1, limit)
 
-    api_candidates, route_source = await _api_route_candidates(task, requested_limit)
+    api_candidates, route_source, route_diagnostics = await _api_route_candidates(task, requested_limit)
     if api_candidates:
         source = f"api:{route_source}"
         candidates = api_candidates
     else:
         source = "local:manifest_overlap"
         candidates = _local_manifest_route(task, requested_limit, workspace_root_fn)
+        route_diagnostics.append(
+            {
+                "type": "fallback",
+                "source": source,
+                "candidate_count": len(candidates),
+                "reason": route_source,
+            }
+        )
 
     normalized_rows: list[dict] = []
     seen: set[str] = set()
@@ -186,6 +223,7 @@ async def auto_route_task_to_skills(
     return {
         "task": task,
         "route_source": source,
+        "route_diagnostics": route_diagnostics,
         "count": len(normalized_rows),
         "candidates": normalized_rows,
     }

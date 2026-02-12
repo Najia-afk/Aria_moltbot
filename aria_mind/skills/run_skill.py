@@ -16,6 +16,7 @@ import json
 import asyncio
 import time
 from pathlib import Path
+from typing import Optional, Tuple
 
 # Add skill modules to path
 sys.path.insert(0, '/root/.openclaw/workspace/skills')
@@ -227,6 +228,35 @@ async def run_skill(skill_name: str, function_name: str, args: dict):
         })
         return {'error': str(e), 'traceback': traceback.format_exc()}
 
+
+def _parse_args_payload(raw: Optional[str]) -> Tuple[dict, Optional[str]]:
+    """Defensive JSON parsing for CLI payloads."""
+    if raw is None:
+        return {}, None
+
+    try:
+        return json.loads(raw), None
+    except json.JSONDecodeError:
+        cleaned = raw.strip()
+        if '```' in cleaned:
+            parts = cleaned.split('```')
+            if len(parts) >= 3:
+                inner = parts[1]
+                if inner.startswith(('json', 'python', 'sql')):
+                    inner = inner.split('\n', 1)[-1] if '\n' in inner else ''
+                cleaned = inner.strip()
+
+        for start_char in ('{', '['):
+            idx = cleaned.find(start_char)
+            if idx >= 0:
+                cleaned = cleaned[idx:]
+                break
+
+        try:
+            return json.loads(cleaned), None
+        except json.JSONDecodeError:
+            return {'raw_input': raw}, 'Could not parse args as JSON, passing as raw_input'
+
 if __name__ == '__main__':
     import argparse
 
@@ -241,6 +271,9 @@ if __name__ == '__main__':
     parser.add_argument("--auto-task", type=str)
     parser.add_argument("--route-limit", type=int, default=5)
     parser.add_argument("--route-no-info", action="store_true")
+    parser.add_argument("--auto-exec", action="store_true")
+    parser.add_argument("--auto-exec-function", type=str, default="health_check")
+    parser.add_argument("--auto-exec-args", type=str, default="{}")
     cli_args, remaining = parser.parse_known_args()
 
     if cli_args.list_skills:
@@ -284,6 +317,48 @@ if __name__ == '__main__':
                 include_info=not cli_args.route_no_info,
             )
         )
+
+        if cli_args.auto_exec:
+            candidates = route.get('candidates') or []
+            if not candidates:
+                print(json.dumps({
+                    'error': 'No candidate skills available for auto execution',
+                    'task': cli_args.auto_task,
+                    'route': route,
+                }, default=str))
+                sys.exit(1)
+
+            exec_args, warning = _parse_args_payload(cli_args.auto_exec_args)
+            selected = candidates[0]
+            selected_skill = selected.get('skill_name')
+            if not selected_skill:
+                print(json.dumps({
+                    'error': 'Top candidate did not include skill_name',
+                    'task': cli_args.auto_task,
+                    'route': route,
+                }, default=str))
+                sys.exit(1)
+
+            execution = asyncio.run(
+                run_skill(
+                    selected_skill,
+                    cli_args.auto_exec_function,
+                    exec_args,
+                )
+            )
+
+            payload = {
+                'task': cli_args.auto_task,
+                'route_source': route.get('route_source'),
+                'route_diagnostics': route.get('route_diagnostics', []),
+                'selected': selected,
+                'execution': execution,
+            }
+            if warning:
+                payload['warning'] = warning
+            print(json.dumps(payload, default=str))
+            sys.exit(0)
+
         print(json.dumps(route, default=str))
         sys.exit(0)
 
@@ -301,33 +376,9 @@ if __name__ == '__main__':
     # Defensive JSON parsing - handle malformed tool call args from OpenClaw
     args = {}
     if len(remaining) > 2:
-        raw = remaining[2]
-        try:
-            args = json.loads(raw)
-        except json.JSONDecodeError:
-            # Try to extract JSON from markdown code fences or mixed content
-            cleaned = raw.strip()
-            if '```' in cleaned:
-                # Extract content between code fences
-                parts = cleaned.split('```')
-                if len(parts) >= 3:
-                    inner = parts[1]
-                    # Strip language identifier (e.g., 'json\n')
-                    if inner.startswith(('json', 'python', 'sql')):
-                        inner = inner.split('\n', 1)[-1] if '\n' in inner else ''
-                    cleaned = inner.strip()
-            # Remove leading/trailing non-JSON characters
-            for start_char in ('{', '['):
-                idx = cleaned.find(start_char)
-                if idx >= 0:
-                    cleaned = cleaned[idx:]
-                    break
-            try:
-                args = json.loads(cleaned)
-            except json.JSONDecodeError:
-                # Last resort: pass as raw input
-                args = {'raw_input': raw}
-                print(json.dumps({'warning': f'Could not parse args as JSON, passing as raw_input'}), file=sys.stderr)
+        args, warning = _parse_args_payload(remaining[2])
+        if warning:
+            print(json.dumps({'warning': warning}), file=sys.stderr)
     
     result = asyncio.run(run_skill(skill_name, function_name, args))
     print(json.dumps(result, default=str))
