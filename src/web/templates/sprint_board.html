@@ -4,28 +4,9 @@
 {% block page_title %}📋 Sprint Board{% endblock %}
 {% block page_subtitle %}Kanban workflow for goal management{% endblock %}
 
-{% block header_actions %}
-<div style="display:flex; gap:0.5rem; align-items:center;">
-    <select id="sprintSelector" class="input" style="width:180px; padding:0.4rem 0.6rem;" onchange="loadBoard()">
-        <option value="current">Current Sprint</option>
-        <option value="backlog">Backlog Only</option>
-    </select>
-    <button class="btn btn-primary" onclick="openQuickAdd()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 5v14M5 12h14"/>
-        </svg>
-        Quick Add
-    </button>
-</div>
-{% endblock %}
-
 {% block extra_css %}
 <style>
-    /* Board Tabs */
-    .board-tabs { display:flex; gap:0.5rem; margin-bottom:1rem; }
-    .board-tab { padding:0.5rem 1rem; border:none; background:var(--bg-secondary); color:var(--text-secondary); border-radius:8px; cursor:pointer; font-size:0.85rem; font-weight:500; transition:all 0.2s; }
-    .board-tab.active { background:var(--accent-primary); color:#fff; }
-    .board-tab:hover:not(.active) { background:var(--bg-tertiary); color:var(--text-primary); }
+    /* Board layout (no tabs) */
 
     /* Kanban Board */
     .kanban-board { display:grid; grid-template-columns:repeat(5,1fr); gap:0.75rem; min-height:500px; margin-bottom:1.5rem; }
@@ -67,19 +48,13 @@
     .goal-tags { display:flex; gap:0.25rem; margin-top:0.3rem; flex-wrap:wrap; }
     .goal-tag { font-size:0.6rem; padding:0.1rem 0.3rem; background:var(--bg-tertiary); color:var(--text-muted); border-radius:3px; }
 
-    /* Archive Tab */
-    .archive-container { display:none; }
-    .archive-container.active { display:block; }
+    /* Archive */
     .archive-table { width:100%; border-collapse:collapse; }
     .archive-table th, .archive-table td { padding:0.6rem 0.8rem; text-align:left; border-bottom:1px solid var(--border-color); font-size:0.8rem; }
     .archive-table th { color:var(--text-muted); font-weight:600; text-transform:uppercase; font-size:0.7rem; }
     .archive-table tr:hover { background:var(--bg-secondary); }
     .status-completed { color:#66bb6a; }
     .status-cancelled { color:#78909c; }
-
-    /* Chart */
-    .chart-container { margin-bottom:1.5rem; }
-    .chart-container canvas { max-height:250px; }
 
     /* Quick Add Modal */
     .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:1000; align-items:center; justify-content:center; }
@@ -109,14 +84,33 @@
 {% endblock %}
 
 {% block content %}
-<!-- Board Tabs -->
-<div class="board-tabs">
-    <button class="board-tab active" onclick="switchBoardTab('board', this)">📋 Board</button>
-    <button class="board-tab" onclick="switchBoardTab('archive', this)">📦 Archive</button>
-    <button class="board-tab" onclick="switchBoardTab('chart', this)">📊 Trends</button>
+<!-- ── Controls ─────────────────────────────────────────────────────── -->
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+    <div style="display:flex; gap:0.5rem; align-items:center;">
+        <select id="sprintSelector" class="input" style="width:180px; padding:0.4rem 0.6rem;" onchange="loadBoard()">
+            <option value="current">Current Sprint</option>
+            <option value="backlog">Backlog Only</option>
+        </select>
+    </div>
+    <button class="btn btn-primary" onclick="openQuickAdd()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 5v14M5 12h14"/>
+        </svg>
+        Quick Add
+    </button>
 </div>
 
-<!-- Stats Row -->
+<!-- ── Trends ──────────────────────────────────────────────────────── -->
+<div class="section-header" style="margin-bottom:0.75rem;">
+    <h3 style="margin:0; font-size:0.95rem; color:var(--text-primary);">📊 Goal Status Trends (14 days)</h3>
+</div>
+<div class="card" style="margin-bottom:1.5rem;">
+    <div class="card-body" style="padding:1rem;">
+        <canvas id="goalStatusChart" style="max-height:220px;"></canvas>
+    </div>
+</div>
+
+<!-- ── Stats Row ──────────────────────────────────────────────────── -->
 <div class="board-stats" id="boardStats">
     <div class="board-stat"><div class="stat-num" id="stat-backlog">-</div><div class="stat-lbl">Backlog</div></div>
     <div class="board-stat"><div class="stat-num" id="stat-todo">-</div><div class="stat-lbl">To Do</div></div>
@@ -125,7 +119,7 @@
     <div class="board-stat"><div class="stat-num" id="stat-done">-</div><div class="stat-lbl">Done</div></div>
 </div>
 
-<!-- Kanban Board -->
+<!-- ── Kanban Board ───────────────────────────────────────────────── -->
 <div class="kanban-board" id="kanbanBoard">
     <div class="kanban-column" data-column="backlog" ondragover="onDragOver(event)" ondrop="onDrop(event, 'backlog')" ondragleave="onDragLeave(event)">
         <div class="column-header">
@@ -164,29 +158,20 @@
     </div>
 </div>
 
-<!-- Archive Tab -->
-<div class="archive-container" id="archiveContainer">
-    <div class="card">
-        <div class="card-header"><h3>📦 Archived Goals</h3></div>
-        <div class="card-body">
-            <table class="archive-table">
-                <thead>
-                    <tr><th>Title</th><th>Status</th><th>Priority</th><th>Completed</th></tr>
-                </thead>
-                <tbody id="archiveBody"></tbody>
-            </table>
-            <div id="archivePagination" style="margin-top:1rem; text-align:center;"></div>
-        </div>
-    </div>
+<!-- ── Archive ────────────────────────────────────────────────────── -->
+<div class="section-header" style="margin:1.5rem 0 0.75rem; display:flex; justify-content:space-between; align-items:center;">
+    <h3 style="margin:0; font-size:0.95rem; color:var(--text-primary);">📦 Archived Goals</h3>
+    <span id="archiveCount" style="font-size:0.75rem; color:var(--text-muted);"></span>
 </div>
-
-<!-- Chart Tab -->
-<div class="chart-container" id="chartContainer" style="display:none;">
-    <div class="card">
-        <div class="card-header"><h3>📊 Goal Status Trends (14 days)</h3></div>
-        <div class="card-body" style="padding:1rem;">
-            <canvas id="goalStatusChart" style="max-height:300px;"></canvas>
-        </div>
+<div class="card">
+    <div class="card-body">
+        <table class="archive-table">
+            <thead>
+                <tr><th>Title</th><th>Status</th><th>Priority</th><th>Completed</th></tr>
+            </thead>
+            <tbody id="archiveBody"></tbody>
+        </table>
+        <div id="archivePagination" style="margin-top:1rem; text-align:center;"></div>
     </div>
 </div>
 
@@ -235,7 +220,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4" async></script>
 <script>
 const API_BASE = API_BASE_URL;
 let currentSprint = 'current';
@@ -243,22 +228,36 @@ let goalChart = null;
 
 // ── Board Loading ────────────────────────────────────────────────────
 async function loadBoard() {
-    const sprint = document.getElementById('sprintSelector').value;
+    const sel = document.getElementById('sprintSelector');
+    const sprint = sel ? sel.value : 'current';
     currentSprint = sprint;
     try {
         const resp = await fetch(`${API_BASE}/goals/board?sprint=${sprint}`);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
+        if (!data.columns) throw new Error('No columns in response');
 
         const columns = ['backlog', 'todo', 'doing', 'on_hold', 'done'];
         columns.forEach(col => {
             const container = document.getElementById(`cards-${col}`);
             const goals = data.columns[col] || [];
-            container.innerHTML = goals.map(g => renderGoalCard(g)).join('');
+            let html = '';
+            for (const g of goals) {
+                try {
+                    html += renderGoalCard(g);
+                } catch (cardErr) {
+                    html += `<div class="goal-card" style="color:#ef5350;font-size:0.75rem;">Error: ${cardErr.message}<br>${g.title || g.goal_id || 'unknown'}</div>`;
+                }
+            }
+            container.innerHTML = html;
             document.getElementById(`count-${col}`).textContent = goals.length;
             document.getElementById(`stat-${col}`).textContent = goals.length;
         });
     } catch (err) {
-        showNotification('Failed to load board: ' + err.message, 'error');
+        // Show error visually on the board
+        const el = document.getElementById('cards-backlog');
+        if (el) el.innerHTML = `<div style="color:#ef5350;padding:1rem;font-size:0.8rem;">Board load error: ${err.message}</div>`;
+        console.error('loadBoard error:', err);
     }
 }
 
@@ -382,10 +381,15 @@ async function loadArchive(page = 1) {
 
 // ── Chart ────────────────────────────────────────────────────────────
 async function loadGoalChart() {
+    if (typeof Chart === 'undefined') {
+        // Chart.js still loading — retry in 2s
+        setTimeout(() => loadGoalChart().catch(e => console.error('chart retry:', e)), 2000);
+        return;
+    }
     try {
         const resp = await fetch(`${API_BASE}/goals/history?days=14`);
         const data = await resp.json();
-        const labels = data.labels || [];
+        const labels = Object.keys(data.data || {}).sort();
         const statuses = ['pending', 'active', 'completed', 'paused', 'cancelled'];
         const colors = { pending:'#ffa726', active:'#42a5f5', completed:'#66bb6a', paused:'#ef5350', cancelled:'#78909c' };
 
@@ -420,19 +424,7 @@ async function loadGoalChart() {
     }
 }
 
-// ── Tab Switching ────────────────────────────────────────────────────
-function switchBoardTab(tab, btn) {
-    document.querySelectorAll('.board-tab').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-
-    document.getElementById('kanbanBoard').style.display = tab === 'board' ? 'grid' : 'none';
-    document.getElementById('boardStats').style.display = (tab === 'board') ? 'grid' : 'none';
-    document.getElementById('archiveContainer').style.display = tab === 'archive' ? 'block' : 'none';
-    document.getElementById('chartContainer').style.display = tab === 'chart' ? 'block' : 'none';
-
-    if (tab === 'archive') loadArchive();
-    if (tab === 'chart') loadGoalChart();
-}
+// ── Tab Switching (removed — all sections visible) ──────────────────
 
 // ── Quick Add ────────────────────────────────────────────────────────
 function openQuickAdd() {
@@ -478,11 +470,25 @@ async function submitQuickAdd() {
 }
 
 // Close modal on overlay click
-document.getElementById('quickAddModal').addEventListener('click', function(e) {
-    if (e.target === this) closeQuickAdd();
-});
+try {
+    const modal = document.getElementById('quickAddModal');
+    if (modal) modal.addEventListener('click', function(e) {
+        if (e.target === this) closeQuickAdd();
+    });
+} catch(e) { console.warn('modal listener:', e); }
 
 // ── Init ─────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', loadBoard);
+function boardInit() {
+    console.log('boardInit running, readyState:', document.readyState);
+    loadBoard().catch(e => console.error('board:', e));
+    loadGoalChart().catch(e => console.error('chart:', e));
+    loadArchive().catch(e => console.error('archive:', e));
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boardInit);
+} else {
+    boardInit();
+}
 </script>
 {% endblock %}

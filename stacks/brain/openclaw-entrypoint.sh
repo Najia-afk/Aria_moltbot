@@ -285,6 +285,10 @@ for job in data.get('jobs', []):
     elif delivery == 'none':
         cmd.append('--no-deliver')
     
+    # Best-effort: don't fail job if delivery target is missing (isolated sessions)
+    if job.get('best_effort_deliver'):
+        cmd.append('--best-effort-deliver')
+    
     # Check if job already exists
     check = subprocess.run(['openclaw', 'cron', 'list'], capture_output=True, text=True)
     if name in check.stdout:

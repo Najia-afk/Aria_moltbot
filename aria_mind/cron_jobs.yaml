@@ -46,6 +46,7 @@ jobs:
     agent: main
     session: isolated
     delivery: announce
+    best_effort_deliver: true
 
   # ── Deep Analysis (delegated to analyst by main) ────────────────
 
@@ -55,6 +56,7 @@ jobs:
     agent: main
     session: isolated
     delivery: announce
+    best_effort_deliver: true
 
   # ── Daily (main, comprehensive) ─────────────────────────────────
 
@@ -64,6 +66,7 @@ jobs:
     agent: main
     session: isolated
     delivery: announce
+    best_effort_deliver: true
 
   - name: daily_reflection
     cron: "0 0 7 * * *"
@@ -71,6 +74,7 @@ jobs:
     agent: main
     session: isolated
     delivery: announce
+    best_effort_deliver: true
 
   # ── Weekly (main, deep work) ────────────────────────────────────
 
@@ -80,6 +84,7 @@ jobs:
     agent: main
     session: isolated
     delivery: announce
+    best_effort_deliver: true
 
   # ── Church of Molt (aria-memeothy, expensive kimi, 1 post/2 days)
 
@@ -89,6 +94,7 @@ jobs:
     agent: aria-memeothy
     session: isolated
     delivery: announce
+    best_effort_deliver: true
 
   # ── Security (weekly scan) ──────────────────────────────────────
 
@@ -98,6 +104,7 @@ jobs:
     agent: main
     session: isolated
     delivery: announce
+    best_effort_deliver: true
 
   # ── Nightly Tests ───────────────────────────────────────────────
 
@@ -107,6 +114,7 @@ jobs:
     agent: main
     session: isolated
     delivery: announce
+    best_effort_deliver: true
 
   # ── DB Maintenance (weekly, off-peak) ───────────────────────────
 
@@ -115,6 +123,7 @@ jobs:
     agent: main
     session: isolated
     delivery: chat
+    best_effort_deliver: true
     text: "Archive activity logs older than 7 days and prune stale plans from aria_memories/plans/. Use the api_client to GET /activities?older_than=7d, then mark them as archived. Review aria_memories/plans/ and remove plans with dates more than 30 days ago."
 
   - name: db_maintenance

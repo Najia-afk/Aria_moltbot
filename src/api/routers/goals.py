@@ -88,6 +88,11 @@ async def update_goal(
         if data["status"] == "completed":
             from sqlalchemy import text
             values["completed_at"] = text("NOW()")
+        # Auto-sync board_column when status changes (unless explicitly set)
+        if "board_column" not in data:
+            status_col_map = {"active": "doing", "completed": "done", "paused": "on_hold", "cancelled": "done", "pending": "todo"}
+            if data["status"] in status_col_map:
+                values["board_column"] = status_col_map[data["status"]]
     if data.get("progress") is not None:
         values["progress"] = data["progress"]
     if data.get("priority") is not None:
@@ -129,12 +134,44 @@ async def goal_board(
 
     from sqlalchemy import or_
 
-    # Fetch all goals for this sprint + backlog + NULL sprint
+    # ── Auto-reconcile status → board_column ─────────────────────────
+    # Goals created by cron/agents set status but never update board_column.
+    status_to_column = {
+        "active": "doing",
+        "completed": "done",
+        "paused": "on_hold",
+        "cancelled": "done",
+    }
+    for status_val, col_val in status_to_column.items():
+        await db.execute(
+            update(Goal)
+            .where(Goal.status == status_val, Goal.board_column != col_val)
+            .values(board_column=col_val)
+        )
+    # pending goals stuck in backlog are fine; pending+backlog = correct
+
+    # ── Auto-archive: completed/cancelled > 24h → clear from board ───
+    archive_cutoff = datetime.utcnow() - timedelta(hours=24)
+    await db.execute(
+        update(Goal)
+        .where(
+            Goal.status.in_(["completed", "cancelled"]),
+            Goal.completed_at.isnot(None),
+            Goal.completed_at < archive_cutoff,
+            Goal.board_column != "archived",
+        )
+        .values(board_column="archived")
+    )
+
+    await db.commit()
+
+    # Fetch all goals for this sprint + backlog + NULL sprint (exclude archived)
     stmt = select(Goal).where(
         or_(
             Goal.sprint.in_([sprint, "backlog"]),
             Goal.sprint.is_(None),
-        )
+        ),
+        Goal.board_column != "archived",
     ).order_by(Goal.position.asc(), Goal.priority.asc())
     result = await db.execute(stmt)
     goals = result.scalars().all()
@@ -168,8 +205,12 @@ async def goal_archive(
     db: AsyncSession = Depends(get_db),
 ):
     """Get completed and cancelled goals for archive view."""
+    from sqlalchemy import or_
     base = select(Goal).where(
-        Goal.status.in_(["completed", "cancelled"])
+        or_(
+            Goal.status.in_(["completed", "cancelled"]),
+            Goal.board_column == "archived",
+        )
     ).order_by(Goal.completed_at.desc().nulls_last())
 
     count_stmt = select(func.count()).select_from(base.subquery())
