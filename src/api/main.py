@@ -28,6 +28,7 @@ except ImportError:
 
 from config import API_VERSION
 from db import async_engine, ensure_schema
+from startup_skill_backfill import run_skill_invocation_backfill
 
 _logger = logging.getLogger("aria.api")
 
@@ -50,6 +51,19 @@ async def lifespan(app: FastAPI):
         print(f"✅ Skill graph synced: {stats['entities']} entities, {stats['relations']} relations")
     except Exception as e:
         print(f"⚠️  Skill graph sync failed (non-fatal): {e}")
+
+    # Auto-heal skill telemetry gaps on every API startup (idempotent).
+    try:
+        summary = await run_skill_invocation_backfill()
+        print(
+            "✅ Skill invocation backfill complete: "
+            f"{summary['total']} inserted "
+            f"(sessions={summary['agent_sessions']}, "
+            f"model_usage={summary['model_usage']}, "
+            f"activity_log={summary['activity_log']})"
+        )
+    except Exception as e:
+        print(f"⚠️  Skill invocation backfill failed (non-fatal): {e}")
 
     yield
     await async_engine.dispose()
