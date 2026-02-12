@@ -176,6 +176,17 @@ class Cognition:
         
         # Inject metacognitive awareness — Aria knows how she's performing
         context["metacognitive_state"] = self._get_metacognitive_summary()
+
+        # Inject skill-routing hints for agent/runtime alignment
+        if self._agents and hasattr(self._agents, "suggest_skills_for_task"):
+            try:
+                context["skill_routing"] = await self._agents.suggest_skills_for_task(
+                    task=prompt,
+                    limit=3,
+                    include_info=False,
+                )
+            except Exception as e:
+                self.logger.debug(f"Skill routing hint injection skipped: {e}")
         
         # Step 4: Process through agents with retry logic
         result = None

@@ -31,6 +31,14 @@ ROUNDTABLE_TRIGGERS = re.compile(
 from aria_agents.loader import AgentLoader
 from aria_models.loader import get_route_skill, normalize_model_id
 
+try:
+    from aria_mind.skills._coherence import workspace_root as _skills_workspace_root
+    from aria_mind.skills._kernel_router import auto_route_task_to_skills
+
+    _HAS_SKILL_ROUTER = True
+except Exception:
+    _HAS_SKILL_ROUTER = False
+
 if TYPE_CHECKING:
     from aria_skills import SkillRegistry
 
@@ -106,6 +114,27 @@ class LLMAgent(BaseAgent):
         import os
         context_limit = int(os.getenv("AGENT_CONTEXT_LIMIT", "10"))
         messages = [{"role": "system", "content": self.get_system_prompt()}]
+        skill_routing = kwargs.get("skill_routing")
+        if isinstance(skill_routing, dict):
+            candidates = skill_routing.get("candidates") or []
+            route_source = skill_routing.get("route_source", "unknown")
+            if candidates:
+                top = []
+                for row in candidates[:3]:
+                    top_name = row.get("canonical_name") or row.get("skill_name")
+                    if top_name:
+                        top.append(str(top_name))
+                if top:
+                    messages.append(
+                        {
+                            "role": "system",
+                            "content": (
+                                "Runtime skill routing hint "
+                                f"(source: {route_source}): {', '.join(top)}"
+                            ),
+                        }
+                    )
+
         for ctx_msg in self.get_context(limit=context_limit):
             messages.append({
                 "role": ctx_msg.role,
@@ -156,7 +185,67 @@ class AgentCoordinator:
         self._hierarchy: Dict[str, List[str]] = {}
         self._main_agent_id: Optional[str] = None
         self._tracker: PerformanceTracker = get_performance_tracker()
+        self._enable_skill_routing_hints = True
         self.logger = logging.getLogger("aria.coordinator")
+
+    async def suggest_skills_for_task(
+        self,
+        task: str,
+        limit: int = 3,
+        include_info: bool = False,
+    ) -> Dict[str, Any]:
+        """Best-effort skill routing for a free-form task."""
+        if not _HAS_SKILL_ROUTER:
+            return {
+                "task": task,
+                "route_source": "disabled",
+                "route_diagnostics": [{"type": "dependency", "reason": "skill_router_unavailable"}],
+                "count": 0,
+                "candidates": [],
+            }
+
+        registry_names: set[str] = set()
+        if self._skill_registry:
+            try:
+                registry_names.update(self._skill_registry.list())
+            except Exception:
+                pass
+
+        if not registry_names:
+            for agent in self._agents.values():
+                registry_names.update(agent.config.skills or [])
+
+        registry_map = {name: None for name in registry_names if isinstance(name, str) and name}
+        if not registry_map:
+            return {
+                "task": task,
+                "route_source": "empty_registry",
+                "route_diagnostics": [{"type": "registry", "reason": "no_skills_available"}],
+                "count": 0,
+                "candidates": [],
+            }
+
+        route = await auto_route_task_to_skills(
+            task=task,
+            limit=max(1, int(limit)),
+            registry=registry_map,
+            validate_skill_coherence_fn=lambda _skill_name: {
+                "coherent": None,
+                "has_changes": None,
+                "checks": {},
+                "warnings": ["coherence_not_checked_in_agent_context"],
+                "errors": [],
+            },
+            workspace_root_fn=_skills_workspace_root,
+            include_info=include_info,
+        )
+
+        # Keep only skills known by this runtime unless none are known.
+        if registry_map:
+            filtered = [row for row in route.get("candidates", []) if row.get("skill_name") in registry_map]
+            route["candidates"] = filtered
+            route["count"] = len(filtered)
+        return route
     
     def set_skill_registry(self, registry: "SkillRegistry") -> None:
         """Inject skill registry."""
@@ -232,6 +321,16 @@ class AgentCoordinator:
         Returns:
             Response from the agent
         """
+        if self._enable_skill_routing_hints and "skill_routing" not in kwargs:
+            try:
+                kwargs["skill_routing"] = await self.suggest_skills_for_task(
+                    task=message,
+                    limit=3,
+                    include_info=False,
+                )
+            except Exception as exc:
+                self.logger.debug(f"Skill routing hint unavailable: {exc}")
+
         # Auto-detect if this needs roundtable collaboration
         if not agent_id and self.detect_roundtable_need(message):
             self.logger.info("Auto-detected roundtable need — gathering perspectives")
