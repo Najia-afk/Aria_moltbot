@@ -94,31 +94,23 @@ docker exec "${DB_CONTAINER}" pg_dump \
 BACKUP_SIZE=$(ls -lh "${BACKUP_FILE}" | awk '{print $5}')
 echo "[$(date -Iseconds)] SQL backup: ${BACKUP_FILE} (${BACKUP_SIZE})"
 
-# Also create a JSON export of key data for easy inspection
-docker exec "${DB_CONTAINER}" psql -U "${DB_USER}" -d "${DB_NAME}" -t -A -c "
+# Also create a lightweight JSON export for quick inspection.
+# Keep this schema-safe across table/column changes to avoid backup failures.
+if ! docker exec "${DB_CONTAINER}" psql -U "${DB_USER}" -d "${DB_NAME}" -t -A -c "
 SELECT json_build_object(
     'timestamp', now()::text,
-    'activities', (SELECT count(*) FROM activity_log),
-    'thoughts', (SELECT count(*) FROM thoughts),
-    'memories', (SELECT count(*) FROM memories),
-    'goals', (SELECT count(*) FROM goals),
-    'social_posts', (SELECT count(*) FROM social_posts),
-    'knowledge_entities', (SELECT count(*) FROM knowledge_entities),
-    'knowledge_relations', (SELECT count(*) FROM knowledge_relations),
-    'heartbeats', (SELECT count(*) FROM heartbeat_log),
-    'recent_activities', (
-        SELECT json_agg(row_to_json(a))
-        FROM (SELECT id, type, description, created_at FROM activity_log ORDER BY created_at DESC LIMIT 10) a
-    ),
-    'active_goals', (
-        SELECT json_agg(row_to_json(g))
-        FROM (SELECT id, name, status, priority FROM goals WHERE status = 'active' ORDER BY priority LIMIT 10) g
-    ),
-    'recent_thoughts', (
-        SELECT json_agg(row_to_json(t))
-        FROM (SELECT id, category, content, timestamp FROM thoughts ORDER BY timestamp DESC LIMIT 10) t
-    )
-);" > "${JSON_EXPORT}" 2>/dev/null
+    'activities_count', (SELECT count(*) FROM activity_log),
+    'thoughts_count', (SELECT count(*) FROM thoughts),
+    'memories_count', (SELECT count(*) FROM memories),
+    'goals_count', (SELECT count(*) FROM goals),
+    'social_posts_count', (SELECT count(*) FROM social_posts),
+    'knowledge_entities_count', (SELECT count(*) FROM knowledge_entities),
+    'knowledge_relations_count', (SELECT count(*) FROM knowledge_relations),
+    'heartbeats_count', (SELECT count(*) FROM heartbeat_log)
+);" > "${JSON_EXPORT}" 2>/dev/null; then
+    echo "[$(date -Iseconds)] WARNING: JSON export query failed; writing fallback metadata"
+    printf '{"timestamp":"%s","json_export_error":true}\n' "$(date -Iseconds)" > "${JSON_EXPORT}"
+fi
 
 echo "[$(date -Iseconds)] JSON export: ${JSON_EXPORT}"
 
