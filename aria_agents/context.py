@@ -8,7 +8,7 @@ pheromone scoring, and reproducible agent behavior.
 """
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Optional
 
 
 @dataclass
@@ -20,8 +20,8 @@ class AgentContext:
     examples: list[str] = field(default_factory=list)
     format: str = "text"
     agent_id: str = ""
-    parent_id: str | None = None
-    deadline: datetime | None = None
+    parent_id: Optional[str] = None
+    deadline: Optional[datetime] = None
 
     def validate(self) -> bool:
         """Validate that required fields are present."""

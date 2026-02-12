@@ -5,7 +5,9 @@ Aria API Client Skill.
 Centralized HTTP client for all aria-api interactions.
 Skills should use this instead of direct database access.
 """
+import asyncio
 import os
+import time
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 
@@ -33,6 +35,12 @@ class AriaAPIClient(BaseSkill):
         super().__init__(config)
         self._client: Optional["httpx.AsyncClient"] = None
         self._api_url: str = ""
+        self._max_retries: int = int(self.config.config.get("max_retries", 3))
+        self._base_backoff_seconds: float = float(self.config.config.get("base_backoff_seconds", 0.5))
+        self._circuit_failure_threshold: int = int(self.config.config.get("circuit_failure_threshold", 5))
+        self._circuit_reset_seconds: float = float(self.config.config.get("circuit_reset_seconds", 30.0))
+        self._consecutive_failures: int = 0
+        self._circuit_open_until: float = 0.0
     
     @property
     def name(self) -> str:
@@ -69,7 +77,10 @@ class AriaAPIClient(BaseSkill):
             return self._status
         
         try:
-            resp = await self._client.get("/health")
+            if self._is_circuit_open():
+                self._status = SkillStatus.ERROR
+                return self._status
+            resp = await self._request_with_retry("GET", "/health")
             if resp.status_code == 200:
                 self._status = SkillStatus.AVAILABLE
             else:
@@ -1073,11 +1084,57 @@ class AriaAPIClient(BaseSkill):
     # ========================================
     # Generic / Raw
     # ========================================
+    def _is_circuit_open(self) -> bool:
+        return time.monotonic() < self._circuit_open_until
+
+    def _record_success(self) -> None:
+        self._consecutive_failures = 0
+        self._circuit_open_until = 0.0
+
+    def _record_failure(self) -> None:
+        self._consecutive_failures += 1
+        if self._consecutive_failures >= self._circuit_failure_threshold:
+            self._circuit_open_until = time.monotonic() + self._circuit_reset_seconds
+            self.logger.warning(
+                "api_client circuit opened for %.1fs after %d failures",
+                self._circuit_reset_seconds,
+                self._consecutive_failures,
+            )
+
+    async def _request_with_retry(self, method: str, path: str, **kwargs):
+        if not self._client:
+            raise RuntimeError("API client is not initialized")
+
+        if self._is_circuit_open():
+            raise RuntimeError("API circuit breaker is open")
+
+        attempts = max(1, self._max_retries)
+        last_error: Optional[Exception] = None
+        for attempt in range(attempts):
+            try:
+                resp = await self._client.request(method, path, **kwargs)
+                if resp.status_code >= 500 and attempt < attempts - 1:
+                    delay = self._base_backoff_seconds * (2 ** attempt)
+                    await asyncio.sleep(delay)
+                    continue
+                resp.raise_for_status()
+                self._record_success()
+                return resp
+            except Exception as exc:
+                last_error = exc
+                self._record_failure()
+                if attempt < attempts - 1:
+                    delay = self._base_backoff_seconds * (2 ** attempt)
+                    await asyncio.sleep(delay)
+                    continue
+                raise
+
+        raise RuntimeError(f"request failed: {last_error}")
+
     async def get(self, path: str, params: Optional[Dict] = None) -> SkillResult:
         """Generic GET request."""
         try:
-            resp = await self._client.get(path, params=params)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", path, params=params)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"GET {path} failed: {e}")
@@ -1085,8 +1142,7 @@ class AriaAPIClient(BaseSkill):
     async def post(self, path: str, data: Optional[Dict] = None) -> SkillResult:
         """Generic POST request."""
         try:
-            resp = await self._client.post(path, json=data)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("POST", path, json=data)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"POST {path} failed: {e}")
@@ -1094,17 +1150,23 @@ class AriaAPIClient(BaseSkill):
     async def patch(self, path: str, data: Optional[Dict] = None) -> SkillResult:
         """Generic PATCH request."""
         try:
-            resp = await self._client.patch(path, json=data)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("PATCH", path, json=data)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"PATCH {path} failed: {e}")
+
+    async def put(self, path: str, data: Optional[Dict] = None) -> SkillResult:
+        """Generic PUT request."""
+        try:
+            resp = await self._request_with_retry("PUT", path, json=data)
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"PUT {path} failed: {e}")
     
     async def delete(self, path: str) -> SkillResult:
         """Generic DELETE request."""
         try:
-            resp = await self._client.delete(path)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("DELETE", path)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"DELETE {path} failed: {e}")

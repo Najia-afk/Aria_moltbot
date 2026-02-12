@@ -54,3 +54,45 @@ function formatDateTime(isoString) {
     if (!isoString) return '-';
     return new Date(isoString).toLocaleString();
 }
+
+function formatTime(ts) {
+    if (!ts) return '';
+    return new Date(ts).toLocaleString();
+}
+
+function showToast(message, type = 'info') {
+    const existingToast = document.getElementById('toast');
+    if (existingToast) {
+        existingToast.textContent = message;
+        existingToast.className = `toast ${type} show`;
+        setTimeout(() => {
+            existingToast.classList.remove('show');
+        }, 3000);
+        return;
+    }
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+    toast.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        padding: 12px 24px;
+        background: ${type === 'error' ? 'var(--danger)' : 'var(--success)'};
+        color: white;
+        border-radius: var(--radius-md);
+        z-index: 1000;
+        animation: slideIn 0.3s ease;
+    `;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+
+function closeModal(id) {
+    if (!id) return;
+    const modal = document.getElementById(id);
+    if (modal) {
+        modal.classList.remove('active');
+    }
+}

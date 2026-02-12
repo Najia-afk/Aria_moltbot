@@ -71,7 +71,7 @@
         <option value="error">Error</option>
     </select>
     <input type="text" class="search-box" id="search-input" placeholder="Search by session or agent...">
-    <button class="btn btn-primary" onclick="loadAll()">Refresh</button>
+    <button class="btn btn-primary" onclick="loadSessionDashboard()">Refresh</button>
 </div>
 
 <!-- Tabs -->
@@ -192,6 +192,7 @@
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="/static/js/chart-helpers.js"></script>
 <script data-page-script>
 // ── Globals ─────────────────────────────────────────────────────────────────
 let _stats = null;
@@ -223,15 +224,15 @@ function fmtDuration(startStr, endStr) {
 }
 
 // ── Load Stats ──────────────────────────────────────────────────────────────
-async function loadStats() {
+async function loadSessionStats() {
     try {
-        _stats = await fetchWithTimeout(`${API_BASE_URL}/sessions/stats`);
-        renderOverview();
+        _stats = await fetchAriaData(`${API_BASE_URL}/sessions/stats`);
+        renderSessionOverview();
         renderAgentTab();
     } catch (e) {
         console.error('Stats error:', e);
         showErrorState('#overview-agents-body',
-            'Could not load session stats — ' + e.message, loadStats);
+            'Could not load session stats — ' + e.message, loadSessionStats);
         document.querySelectorAll('.stat-card .value').forEach(el => { if (el.textContent === '-') el.textContent = '—'; });
     }
 }
@@ -242,7 +243,7 @@ async function loadSessions(page = 1, limit = 50) {
     let url = `${API_BASE_URL}/sessions?limit=${limit}&page=${page}`;
     if (status) url += `&status=${status}`;
     try {
-        const data = await fetchWithTimeout(url);
+        const data = await fetchAriaData(url);
         _sessions = data.items || data.sessions || [];
         renderRecent();
         renderHourlyChart();
@@ -257,7 +258,7 @@ async function loadSessions(page = 1, limit = 50) {
 // ════════════════════════════════════════════════════════════════════════════
 // OVERVIEW
 // ════════════════════════════════════════════════════════════════════════════
-function renderOverview() {
+function renderSessionOverview() {
     if (!_stats) return;
     const s = _stats;
     const lit = s.litellm || {};
@@ -290,7 +291,7 @@ function renderOverview() {
     // ── Chart: Session Types (bar) ──
     const byType = s.by_type || [];
     if (byType.length > 0) {
-        renderChart('chart-types', 'bar', {
+        ARIAChartHelpers.renderChart(_charts, 'chart-types', 'bar', {
             labels: byType.map(x => x.type || 'unknown'),
             datasets: [{
                 label: 'Sessions',
@@ -327,7 +328,7 @@ function renderAgentTab() {
     const totalSessions = _stats.total_sessions || 1;
 
     // Chart: Sessions per agent
-    renderChart('chart-agent-sessions', 'bar', {
+    ARIAChartHelpers.renderChart(_charts, 'chart-agent-sessions', 'bar', {
         labels: agents.map(a => a.agent_id),
         datasets: [{
             label: 'Sessions',
@@ -338,7 +339,7 @@ function renderAgentTab() {
     }, { indexAxis: 'y' });
 
     // Chart: Tokens per agent
-    renderChart('chart-agent-tokens', 'bar', {
+    ARIAChartHelpers.renderChart(_charts, 'chart-agent-tokens', 'bar', {
         labels: agents.map(a => a.agent_id),
         datasets: [{
             label: 'Tokens',
@@ -406,27 +407,6 @@ function renderRecent() {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// CHART HELPER
-// ════════════════════════════════════════════════════════════════════════════
-function renderChart(canvasId, type, data, extra = {}) {
-    if (_charts[canvasId]) _charts[canvasId].destroy();
-    const ctx = document.getElementById(canvasId)?.getContext('2d');
-    if (!ctx) return;
-    const isDoughnut = type === 'doughnut';
-    const stacked = !!extra.stacked;
-    const options = {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: isDoughnut || stacked, position: 'bottom', labels: { color: '#9ca3af', font: { size: 11 } } } },
-        scales: isDoughnut ? {} : {
-            x: { stacked, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af', font: { size: 11 } } },
-            y: { stacked, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af', font: { size: 11 } } },
-        },
-    };
-    if (extra.indexAxis) options.indexAxis = extra.indexAxis;
-    _charts[canvasId] = new Chart(ctx, { type, data, options });
-}
-
-// ════════════════════════════════════════════════════════════════════════════
 // 24H HOURLY CHART BY AGENT
 // ════════════════════════════════════════════════════════════════════════════
 function renderHourlyChart() {
@@ -457,15 +437,15 @@ function renderHourlyChart() {
         backgroundColor: agentColors[idx % agentColors.length],
         borderRadius: 3,
     }));
-    renderChart('chart-status', 'bar', { labels: hours.map(h => h.label), datasets }, { stacked: true });
+    ARIAChartHelpers.renderChart(_charts, 'chart-status', 'bar', { labels: hours.map(h => h.label), datasets }, { stacked: true, legendDisplay: true });
 }
 
 // ════════════════════════════════════════════════════════════════════════════
 // INIT
 // ════════════════════════════════════════════════════════════════════════════
-async function loadAll() {
+async function loadSessionDashboard() {
     await AriaModels.init();
-    loadStats();
+    loadSessionStats();
     loadSessions();
 }
 
@@ -476,7 +456,7 @@ sessionsPager = new AriaPagination('sessions-pagination', {
     onPageChange: (page, limit) => loadSessions(page, limit),
     limit: 50
 });
-loadAll();
-setInterval(loadAll, 30000);
+loadSessionDashboard();
+setInterval(loadSessionDashboard, 30000);
 </script>
 {% endblock %}

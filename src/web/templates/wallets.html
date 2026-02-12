@@ -536,9 +536,9 @@ let balanceChart = null;
 // All pricing, calculateLogCost, formatMoney, formatNumber, getProvider, etc.
 // are provided by /static/js/pricing.js (loaded in base.html)
 
-async function loadBalances() {
+async function loadWalletBalances() {
     try {
-        const data = await fetchWithTimeout(`${API_URL}/providers/balances`, {}, 10000);
+        const data = await fetchAriaData(`${API_URL}/providers/balances`, { timeout: 10000 });
         
         let totalUSD = 0;
         
@@ -816,7 +816,7 @@ function calculateEstimate() {
 }
 
 function refreshAll() {
-    loadBalances();
+    loadWalletBalances();
     loadSpend();
     updateLastRefresh();
 }
@@ -883,7 +883,7 @@ function populateEstimatorModels() {
 document.addEventListener('DOMContentLoaded', async () => {
     await AriaModels.init();
     populateEstimatorModels();
-    loadBalances();
+    loadWalletBalances();
     loadSpend();
     await createBalanceChart();
     calculateEstimate();
@@ -895,7 +895,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Update countdown every second
     countdownInterval = setInterval(updateCountdown, 1000);
     
-    if (window.ARIA_DEBUG) console.log('💰 Wallet auto-refresh enabled (every 60s)');
+    ariaLog('💰 Wallet auto-refresh enabled (every 60s)');
 });
 </script>
 {% endblock %}

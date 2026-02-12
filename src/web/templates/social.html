@@ -276,7 +276,7 @@
     <div class="modal-content">
         <div class="modal-header">
             <h3>✏️ Compose Post</h3>
-            <button class="modal-close" onclick="closeModal()">&times;</button>
+            <button class="modal-close" onclick="closeSocialComposeModal()">&times;</button>
         </div>
         <form onsubmit="createPost(event)">
             <div class="form-group">
@@ -404,8 +404,8 @@ function showComposeModal() {
     document.getElementById('compose-modal').classList.add('active');
 }
 
-function closeModal() {
-    document.getElementById('compose-modal').classList.remove('active');
+function closeSocialComposeModal() {
+    closeModal('compose-modal');
     document.getElementById('post-content').value = '';
     document.getElementById('post-reply-to').value = '';
     updateCharCount();
@@ -432,7 +432,7 @@ async function createPost(event) {
         });
         
         if (response.ok) {
-            closeModal();
+            closeSocialComposeModal();
             loadPosts();
         } else {
             alert('Failed to create post');

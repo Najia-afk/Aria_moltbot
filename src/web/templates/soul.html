@@ -106,7 +106,7 @@ async function loadDoc(filename, btn) {
         const data = await res.json();
         content.innerHTML = marked.parse(data.content);
     } catch (err) {
-        content.innerHTML = `<p style="color:var(--danger);">Failed to load ${filename}: ${err.message}</p>`;
+        content.innerHTML = `<p style="color:var(--danger);">Failed to load ${escapeHtml(filename)}: ${escapeHtml(err.message)}</p>`;
     }
 }
 
@@ -131,7 +131,7 @@ async function loadTree(kind) {
         _treeCache[kind] = items;
         renderTree(kind, items);
     } catch (err) {
-        tree.innerHTML = `<div style="padding:8px 10px;color:var(--danger);font-size:12px;">Error: ${err.message}</div>`;
+        tree.innerHTML = `<div style="padding:8px 10px;color:var(--danger);font-size:12px;">Error: ${escapeHtml(err.message)}</div>`;
     }
 }
 
@@ -197,12 +197,12 @@ async function loadFile(kind, path, btn) {
         if (ext === 'md') {
             content.innerHTML = marked.parse(data.content);
         } else if (['yaml','yml','json','py','sh','toml','cfg','ini','log','csv','html','css','js','txt'].includes(ext)) {
-            content.innerHTML = `<h2 style="font-size:14px;color:var(--text-muted);margin-bottom:12px;">📂 ${kind}/${data.path}</h2><pre><code>${escapeHtml(data.content)}</code></pre>`;
+            content.innerHTML = `<h2 style="font-size:14px;color:var(--text-muted);margin-bottom:12px;">📂 ${escapeHtml(kind)}/${escapeHtml(data.path)}</h2><pre><code>${escapeHtml(data.content)}</code></pre>`;
         } else {
-            content.innerHTML = `<p>${data.content}</p>`;
+            content.innerHTML = `<p>${escapeHtml(data.content)}</p>`;
         }
     } catch (err) {
-        content.innerHTML = `<p style="color:var(--danger);">Failed to load ${path}: ${err.message}</p>`;
+        content.innerHTML = `<p style="color:var(--danger);">Failed to load ${escapeHtml(path)}: ${escapeHtml(err.message)}</p>`;
     }
 }
 

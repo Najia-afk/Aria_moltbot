@@ -87,7 +87,7 @@ async function loadRecords() {
         
         if (data.records && data.records.length > 0) {
             const columns = Object.keys(data.records[0]);
-            thead.innerHTML = columns.map(col => `<th>${col}</th>`).join('');
+            thead.innerHTML = columns.map(col => `<th>${escapeHtml(col)}</th>`).join('');
             
             tbody.innerHTML = data.records.map(record => `
                 <tr>
@@ -102,7 +102,7 @@ async function loadRecords() {
             tbody.innerHTML = '<tr><td class="empty-state">No records found</td></tr>';
         }
     } catch (error) {
-        tbody.innerHTML = `<tr><td colspan="5" class="empty-state">Error: ${error.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" class="empty-state">Error: ${escapeHtml(error.message)}</td></tr>`;
     }
 }
 
@@ -153,6 +153,6 @@ document.getElementById('searchInput').addEventListener('input', function() {
     });
 });
 
-document.addEventListener('DOMContentLoaded', loadRecords);
+document.addEventListener('DOMContentLoaded', () => loadRecords());
 </script>
 {% endblock %}

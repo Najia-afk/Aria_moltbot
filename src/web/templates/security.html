@@ -228,41 +228,37 @@
 <script data-page-script>
     let allEvents = [];
 
-    function loadStats() {
-        fetch(`${window.ARIA_API_BASE_URL}/security-events/stats`)
-            .then(r => r.json())
-            .then(data => {
-                document.getElementById('stat-total').textContent = data.total_events || 0;
-                document.getElementById('stat-blocked').textContent = data.blocked_count || 0;
-                document.getElementById('stat-critical').textContent = data.by_level?.CRITICAL || 0;
-                document.getElementById('stat-high').textContent = data.by_level?.HIGH || 0;
-                document.getElementById('stat-medium').textContent = data.by_level?.MEDIUM || 0;
-                document.getElementById('stat-low').textContent = data.by_level?.LOW || 0;
-            })
-            .catch(e => {
-                console.error('Failed to load stats:', e);
-            });
+    async function loadSecurityStats() {
+        try {
+            const data = await fetchAriaData(`${window.ARIA_API_BASE_URL}/security-events/stats`);
+            document.getElementById('stat-total').textContent = data.total_events || 0;
+            document.getElementById('stat-blocked').textContent = data.blocked_count || 0;
+            document.getElementById('stat-critical').textContent = data.by_level?.CRITICAL || 0;
+            document.getElementById('stat-high').textContent = data.by_level?.HIGH || 0;
+            document.getElementById('stat-medium').textContent = data.by_level?.MEDIUM || 0;
+            document.getElementById('stat-low').textContent = data.by_level?.LOW || 0;
+        } catch (e) {
+            console.error('Failed to load stats:', e);
+        }
     }
     let eventsPager;
 
-    function loadSecurityEvents(page = 1, limit = 25) {
+    async function loadSecurityEvents(page = 1, limit = 25) {
         document.getElementById('events-body').innerHTML = '<tr><td colspan="7" class="empty-state">Loading...</td></tr>';
-        
-        fetch(`${window.ARIA_API_BASE_URL}/security-events?limit=${limit}&page=${page}`)
-            .then(r => r.json())
-            .then(data => {
-                allEvents = data.items || data;
-                renderEvents(allEvents);
-                loadStats();
-                if (eventsPager && data.pages) eventsPager.update(data);
-            })
-            .catch(e => {
-                document.getElementById('events-body').innerHTML = `
-                    <tr><td colspan="7" class="empty-state">
-                        <div>Could not load security events</div>
-                        <div style="font-size:12px;margin-top:10px">${e.message}</div>
-                    </td></tr>`;
-            });
+
+        try {
+            const data = await fetchAriaData(`${window.ARIA_API_BASE_URL}/security-events?limit=${limit}&page=${page}`);
+            allEvents = data.items || data;
+            renderEvents(allEvents);
+            loadSecurityStats();
+            if (eventsPager && data.pages) eventsPager.update(data);
+        } catch (e) {
+            document.getElementById('events-body').innerHTML = `
+                <tr><td colspan="7" class="empty-state">
+                    <div>Could not load security events</div>
+                    <div style="font-size:12px;margin-top:10px">${e.message}</div>
+                </td></tr>`;
+        }
     }
 
     function renderEvents(data) {

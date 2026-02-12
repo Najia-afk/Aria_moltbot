@@ -857,13 +857,14 @@ textarea.form-input {
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script src="/static/js/goals-common.js"></script>
 <script>
 async function loadGoalCategoryChart() {
     const TYPES  = ['task', 'check-in', 'reflection', 'learning', 'social', 'maintenance'];
     const LABELS = ['📋 Task', '👋 Check-in', '🪞 Reflection', '📚 Learning', '💬 Social', '🔧 Maintenance'];
     const COLORS = ['#7c3aed', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899'];
     try {
-        const resp = await fetch(`${API_BASE_URL}/hourly-goals`);
+        const resp = await fetchWithRetry(`${API_BASE_URL}/hourly-goals`);
         const data = await resp.json();
         const goals = data.goals || [];
 
@@ -939,26 +940,18 @@ async function loadGoals(page = 1, limit = 25) {
     `;
 
     try {
-        const response = await fetch(`${window.ARIA_API_BASE_URL}/goals?limit=${limit}&page=${page}`);
-        const data = await response.json();
+        const data = await fetchAriaData(`${window.ARIA_API_BASE_URL}/goals?limit=${limit}&page=${page}`);
         allGoals = data.items || data || [];
         
-        updateStats();
+        updateGoalStats();
         filterGoals();
         if (goalsPager && data.pages) goalsPager.update(data);
     } catch (error) {
-        container.innerHTML = `
-            <div class="empty-goals">
-                <div class="empty-goals-icon">⚠️</div>
-                <h3>Error Loading Goals</h3>
-                <p>${error.message}</p>
-                <button class="btn btn-primary" onclick="loadGoals()">Try Again</button>
-            </div>
-        `;
+        showErrorState('#goalsContainer', `Error loading goals: ${error.message}`, () => loadGoals(page, limit));
     }
 }
 
-function updateStats() {
+function updateGoalStats() {
     const active = allGoals.filter(g => g.status === 'active').length;
     const completed = allGoals.filter(g => g.status === 'completed').length;
     const activeGoals = allGoals.filter(g => g.status === 'active');
@@ -1026,81 +1019,7 @@ function renderGoals(goals) {
         return;
     }
 
-    container.innerHTML = goals.map(goal => renderGoalCard(goal)).join('');
-}
-
-function renderGoalCard(goal) {
-    const priority = goal.priority || 3;
-    const progress = goal.progress || 0;
-    const status = goal.status || 'active';
-    const priorityInfo = priorityLabels[priority] || priorityLabels[3];
-
-    // Calculate due date status
-    let dueDateClass = '';
-    let dueDateText = '';
-    if (goal.due_date) {
-        const target = new Date(goal.due_date);
-        const now = new Date();
-        const daysUntil = Math.ceil((target - now) / (1000 * 60 * 60 * 24));
-        
-        if (daysUntil < 0) {
-            dueDateClass = 'overdue';
-            dueDateText = `Overdue by ${Math.abs(daysUntil)} day${Math.abs(daysUntil) !== 1 ? 's' : ''}`;
-        } else if (daysUntil <= 3) {
-            dueDateClass = 'due-soon';
-            dueDateText = daysUntil === 0 ? 'Due today!' : `Due in ${daysUntil} day${daysUntil !== 1 ? 's' : ''}`;
-        } else {
-            dueDateText = `Due ${target.toLocaleDateString()}`;
-        }
-    }
-
-    const createdDate = goal.created_at ? new Date(goal.created_at).toLocaleDateString() : 'Unknown';
-
-    return `
-        <div class="goal-card priority-${priority}" data-id="${goal.id}">
-            <div class="goal-header">
-                <h3 class="goal-title">${escapeHtml(goal.title || 'Untitled Goal')}</h3>
-                <div class="goal-badges">
-                    <span class="priority-badge p${priority}">${priorityInfo.emoji} ${priorityInfo.text}</span>
-                    <span class="status-badge ${status}">${status}</span>
-                </div>
-            </div>
-            
-            ${goal.description ? `<p class="goal-description">${escapeHtml(goal.description)}</p>` : ''}
-            
-            <div class="goal-progress">
-                <div class="progress-header">
-                    <span class="progress-label">Progress</span>
-                    <span class="progress-value-display">${progress}%</span>
-                </div>
-                <div class="progress-bar">
-                    <div class="progress-fill" style="width: ${progress}%"></div>
-                </div>
-            </div>
-
-            <div class="goal-meta">
-                <div class="goal-dates">
-                    <span class="goal-date">📅 Created: ${createdDate}</span>
-                    ${dueDateText ? `<span class="goal-date ${dueDateClass}">🎯 ${dueDateText}</span>` : ''}
-                </div>
-                <div class="goal-actions">
-                    <button class="goal-action-btn" onclick="openEditGoalModal(${goal.id})" title="Edit">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
-                            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                        </svg>
-                    </button>
-                    ${status !== 'completed' ? `
-                    <button class="goal-action-btn complete" onclick="completeGoal(${goal.id})" title="Complete">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="20 6 9 17 4 12"/>
-                        </svg>
-                    </button>
-                    ` : ''}
-                </div>
-            </div>
-        </div>
-    `;
+    container.innerHTML = goals.map(goal => renderGoalCard(goal, { view: 'goals', priorityLabels })).join('');
 }
 
 // Modal Functions
@@ -1162,19 +1081,14 @@ async function createGoal(event) {
 
     try {
         // Note: This assumes a POST endpoint exists. If not, show info message.
-        const response = await fetch(`${window.ARIA_API_BASE_URL}/goals`, {
+        await fetchWithRetry(`${window.ARIA_API_BASE_URL}/goals`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(goalData)
         });
-
-        if (response.ok) {
-            showToast('Goal created successfully!', 'success');
-            closeNewGoalModal();
-            loadGoals();
-        } else {
-            throw new Error('Failed to create goal');
-        }
+        showToast('Goal created successfully!', 'success');
+        closeNewGoalModal();
+        loadGoals();
     } catch (error) {
         // If endpoint doesn't exist, show helpful message
         showToast('Goal creation API not available. Use database directly.', 'error');
@@ -1195,19 +1109,14 @@ async function updateGoal(event) {
     };
 
     try {
-        const response = await fetch(`${window.ARIA_API_BASE_URL}/goals/${goalId}`, {
+        await fetchWithRetry(`${window.ARIA_API_BASE_URL}/goals/${goalId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(updates)
         });
-
-        if (response.ok) {
-            showToast('Goal updated successfully!', 'success');
-            closeEditGoalModal();
-            loadGoals();
-        } else {
-            throw new Error('Failed to update goal');
-        }
+        showToast('Goal updated successfully!', 'success');
+        closeEditGoalModal();
+        loadGoals();
     } catch (error) {
         showToast(`Error: ${error.message}`, 'error');
         console.error('Update goal error:', error);
@@ -1216,32 +1125,16 @@ async function updateGoal(event) {
 
 async function completeGoal(goalId) {
     try {
-        const response = await fetch(`${window.ARIA_API_BASE_URL}/goals/${goalId}`, {
+        await fetchWithRetry(`${window.ARIA_API_BASE_URL}/goals/${goalId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status: 'completed', progress: 100 })
         });
-
-        if (response.ok) {
-            showToast('🎉 Goal completed!', 'success');
-            loadGoals();
-        } else {
-            throw new Error('Failed to complete goal');
-        }
+        showToast('🎉 Goal completed!', 'success');
+        loadGoals();
     } catch (error) {
         showToast(`Error: ${error.message}`, 'error');
     }
-}
-
-// Toast Function
-function showToast(message, type = 'info') {
-    const toast = document.getElementById('toast');
-    toast.textContent = message;
-    toast.className = `toast ${type} show`;
-    
-    setTimeout(() => {
-        toast.classList.remove('show');
-    }, 3000);
 }
 
 // Search debounce
@@ -1282,7 +1175,7 @@ function switchGoalsTab(tab, btn) {
 async function loadHourlyGoals() {
     const container = document.getElementById('hourly-goals-list');
     try {
-        const response = await fetch(`${window.ARIA_API_BASE_URL}/hourly-goals`);
+        const response = await fetchWithRetry(`${window.ARIA_API_BASE_URL}/hourly-goals`);
         const data = await response.json();
         
         const goals = data.goals || [];
@@ -1350,19 +1243,14 @@ async function addHourlyGoal(event) {
     };
     
     try {
-        const response = await fetch(`${window.ARIA_API_BASE_URL}/hourly-goals`, {
+        await fetchWithRetry(`${window.ARIA_API_BASE_URL}/hourly-goals`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
-        
-        if (response.ok) {
-            showToast('✓ Hourly goal added!', 'success');
-            closeAddHourlyGoalModal();
-            loadHourlyGoals();
-        } else {
-            throw new Error('Failed to add hourly goal');
-        }
+        showToast('✓ Hourly goal added!', 'success');
+        closeAddHourlyGoalModal();
+        loadHourlyGoals();
     } catch (error) {
         showToast(`Error: ${error.message}`, 'error');
     }
@@ -1370,18 +1258,13 @@ async function addHourlyGoal(event) {
 
 async function completeHourlyGoal(goalId) {
     try {
-        const response = await fetch(`${window.ARIA_API_BASE_URL}/hourly-goals/${goalId}`, {
+        await fetchWithRetry(`${window.ARIA_API_BASE_URL}/hourly-goals/${goalId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status: 'completed' })
         });
-        
-        if (response.ok) {
-            showToast('✓ Hourly goal completed!', 'success');
-            loadHourlyGoals();
-        } else {
-            throw new Error('Failed to complete hourly goal');
-        }
+        showToast('✓ Hourly goal completed!', 'success');
+        loadHourlyGoals();
     } catch (error) {
         showToast(`Error: ${error.message}`, 'error');
     }

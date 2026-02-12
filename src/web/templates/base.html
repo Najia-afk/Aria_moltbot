@@ -411,7 +411,7 @@
             const container = document.getElementById('notification-container');
             const notification = document.createElement('div');
             notification.className = `notification ${type}`;
-            notification.innerHTML = `<span>${message}</span><button onclick="this.parentElement.remove()">&times;</button>`;
+            notification.innerHTML = `<span>${escapeHtml(message)}</span><button onclick="this.parentElement.remove()">&times;</button>`;
             container.appendChild(notification);
             setTimeout(() => notification.remove(), 5000);
         }
@@ -441,7 +441,8 @@
             .then(data => {
                 const el = document.getElementById('api-status');
                 const allUp = Object.values(data).every(s => s.status === 'up');
-                el.innerHTML = `<span class="status-dot ${allUp ? 'up' : 'partial'}"></span><span>${allUp ? 'All Systems Online' : 'Partial'}</span>`;
+                const statusClass = allUp ? 'up' : 'partial';
+                el.innerHTML = `<span class="status-dot ${statusClass}"></span><span>${escapeHtml(allUp ? 'All Systems Online' : 'Partial')}</span>`;
             })
             .catch(() => {
                 document.getElementById('api-status').innerHTML = '<span class="status-dot down"></span><span>Offline</span>';

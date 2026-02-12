@@ -82,12 +82,12 @@ async function loadThoughts(page = 1, limit = 25) {
     container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
     
     try {
-        const response = await fetch(`${window.ARIA_API_BASE_URL}/thoughts?limit=${limit}&page=${page}`);
+        const response = await fetchWithRetry(`${window.ARIA_API_BASE_URL}/thoughts?limit=${limit}&page=${page}`);
         const data = await response.json();
         renderThoughts(data.items || data.thoughts || []);
         if (thoughtsPager && data.pages) thoughtsPager.update(data);
     } catch (error) {
-        container.innerHTML = '<div class="empty-state"><p>Error loading thoughts</p></div>';
+        showErrorState('#thoughtsContainer', 'Error loading thoughts: ' + error.message, () => loadThoughts(page, limit));
     }
 }
 
@@ -126,10 +126,6 @@ function filterThoughts() {
         const matchSearch = !search || card.textContent.toLowerCase().includes(search);
         card.style.display = matchCategory && matchSearch ? 'block' : 'none';
     });
-}
-
-function formatTime(ts) {
-    return new Date(ts).toLocaleString();
 }
 
 document.getElementById('searchInput').addEventListener('input', filterThoughts);

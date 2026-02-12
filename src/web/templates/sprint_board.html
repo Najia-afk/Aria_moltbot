@@ -221,6 +221,7 @@
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4" async></script>
+<script src="/static/js/goals-common.js"></script>
 <script>
 const API_BASE = API_BASE_URL;
 let currentSprint = 'current';
@@ -244,9 +245,9 @@ async function loadBoard() {
             let html = '';
             for (const g of goals) {
                 try {
-                    html += renderGoalCard(g);
+                    html += renderGoalCard(g, { view: 'board' });
                 } catch (cardErr) {
-                    html += `<div class="goal-card" style="color:#ef5350;font-size:0.75rem;">Error: ${cardErr.message}<br>${g.title || g.goal_id || 'unknown'}</div>`;
+                    html += `<div class="goal-card" style="color:#ef5350;font-size:0.75rem;">Error: ${escapeHtml(cardErr.message)}<br>${escapeHtml(g.title || g.goal_id || 'unknown')}</div>`;
                 }
             }
             container.innerHTML = html;
@@ -256,50 +257,9 @@ async function loadBoard() {
     } catch (err) {
         // Show error visually on the board
         const el = document.getElementById('cards-backlog');
-        if (el) el.innerHTML = `<div style="color:#ef5350;padding:1rem;font-size:0.8rem;">Board load error: ${err.message}</div>`;
+        if (el) el.innerHTML = `<div style="color:#ef5350;padding:1rem;font-size:0.8rem;">Board load error: ${escapeHtml(err.message)}</div>`;
         console.error('loadBoard error:', err);
     }
-}
-
-function renderGoalCard(g) {
-    const priorityLabels = {1:'P1',2:'P2',3:'P3',4:'P4',5:'P5'};
-    const progress = Math.round(g.progress || 0);
-    const tags = (g.tags || []).map(t => `<span class="goal-tag">#${escapeHtml(t)}</span>`).join('');
-    const dueBadge = g.due_date ? formatDueBadge(g.due_date) : '';
-
-    return `<div class="goal-card" draggable="true" data-goal-id="${escapeHtml(g.goal_id)}"
-                ondragstart="onDragStart(event)" ondragend="onDragEnd(event)">
-        <div class="goal-card-header">
-            <span class="priority-badge priority-${g.priority}">${priorityLabels[g.priority] || 'P?'}</span>
-            ${dueBadge}
-        </div>
-        <div class="goal-card-title" title="${escapeHtml(g.title)}">${escapeHtml(g.title)}</div>
-        <div class="progress-bar-mini"><div class="fill" style="width:${progress}%"></div></div>
-        <div class="goal-card-meta">
-            <span style="font-size:0.65rem; color:var(--text-muted)">${progress}%</span>
-            ${g.assigned_to ? `<span style="font-size:0.65rem; color:var(--text-muted)">👤 ${escapeHtml(g.assigned_to)}</span>` : ''}
-        </div>
-        ${tags ? `<div class="goal-tags">${tags}</div>` : ''}
-    </div>`;
-}
-
-function formatDueBadge(dateStr) {
-    const due = new Date(dateStr);
-    const now = new Date();
-    const diff = (due - now) / (1000 * 60 * 60);
-    const cls = diff < 0 ? 'overdue' : '';
-    let label;
-    if (diff < 0) label = 'Overdue';
-    else if (diff < 24) label = `${Math.round(diff)}h`;
-    else label = `${Math.round(diff / 24)}d`;
-    return `<span class="due-badge ${cls}">⏰ ${label}</span>`;
-}
-
-function escapeHtml(str) {
-    if (!str) return '';
-    const d = document.createElement('div');
-    d.textContent = str;
-    return d.innerHTML;
 }
 
 // ── Drag & Drop ──────────────────────────────────────────────────────
@@ -475,18 +435,18 @@ try {
     if (modal) modal.addEventListener('click', function(e) {
         if (e.target === this) closeQuickAdd();
     });
-} catch(e) { console.warn('modal listener:', e); }
+} catch(e) { ariaWarn('modal listener:', e); }
 
 // ── Init ─────────────────────────────────────────────────────────────
 function boardInit() {
-    console.log('boardInit running, readyState:', document.readyState);
+    ariaLog('boardInit running, readyState:', document.readyState);
     loadBoard().catch(e => console.error('board:', e));
     loadGoalChart().catch(e => console.error('chart:', e));
     loadArchive().catch(e => console.error('archive:', e));
 }
 
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', boardInit);
+    document.addEventListener('DOMContentLoaded', () => boardInit());
 } else {
     boardInit();
 }

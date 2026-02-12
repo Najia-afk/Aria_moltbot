@@ -373,13 +373,13 @@ async function loadGraph() {
         catSelect.innerHTML = '<option value="">All Categories</option>' +
             cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
 
-        drawGraph(allEntities, allRelations);
+        drawSkillGraph(allEntities, allRelations);
     } catch (err) {
         console.error('Failed to load graph:', err);
     }
 }
 
-function drawGraph(entities, relations) {
+function drawSkillGraph(entities, relations) {
     const container = document.getElementById('skill-network');
 
     const nodes = entities.map(e => ({
@@ -466,7 +466,8 @@ function onNodeClick(params) {
     document.getElementById('no-selection').style.display = 'none';
     document.getElementById('node-detail').classList.add('active');
     document.getElementById('detail-name').textContent = entity.name;
-    document.getElementById('detail-type').innerHTML = `<span class="type-badge type-${entity.type}">${entity.type}</span>`;
+    const safeTypeClass = String(entity.type || '').replace(/[^a-zA-Z0-9_-]/g, '');
+    document.getElementById('detail-type').innerHTML = `<span class="type-badge type-${safeTypeClass}">${escapeHtml(entity.type || '')}</span>`;
     document.getElementById('detail-desc').textContent = entity.properties?.description || '—';
 
     // Count connections
@@ -508,7 +509,7 @@ function applyFilter() {
 
     const filteredIds = new Set(filtered.map(e => e.id));
     const filteredRelations = allRelations.filter(r => filteredIds.has(r.from_entity) && filteredIds.has(r.to_entity));
-    drawGraph(filtered, filteredRelations);
+    drawSkillGraph(filtered, filteredRelations);
 }
 
 let searchTimeout;
@@ -589,6 +590,6 @@ async function syncGraph() {
     }
 }
 
-document.addEventListener('DOMContentLoaded', loadGraph);
+document.addEventListener('DOMContentLoaded', () => loadGraph());
 </script>
 {% endblock %}

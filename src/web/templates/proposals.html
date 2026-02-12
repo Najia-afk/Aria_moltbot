@@ -108,7 +108,7 @@ function renderProposals(proposals) {
     `).join('');
 }
 
-function updateStats(proposals) {
+function updateProposalStats(proposals) {
     const counts = {proposed: 0, approved: 0, rejected: 0, implemented: 0};
     proposals.forEach(p => { counts[p.status] = (counts[p.status] || 0) + 1; });
     document.getElementById('stats-bar').innerHTML = Object.entries(counts).map(([k, v]) => `
@@ -133,20 +133,13 @@ async function reviewProposal(id, status) {
     const proposals = await loadProposals(currentFilter);
     allProposals = proposals;
     renderProposals(proposals);
-    updateStats(await loadProposals(null));
-}
-
-function escapeHtml(str) {
-    if (!str) return '';
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
+    updateProposalStats(await loadProposals(null));
 }
 
 (async () => {
     allProposals = await loadProposals(null);
     renderProposals(allProposals);
-    updateStats(allProposals);
+    updateProposalStats(allProposals);
 })();
 </script>
 {% endblock %}

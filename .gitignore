@@ -31,6 +31,16 @@ stacks/**/.env
 aria_memory/
 aria_memory/**
 
+# aria_memories (current) - Contains user data, NEVER COMMIT
+aria_memories/
+aria_memories/**
+
+# mirrored runtime memory snapshots
+aria_mind/aria_memories/
+aria_mind/aria_memories/**
+aria_mind/skills/aria_memories/
+aria_mind/skills/aria_memories/**
+
 # plans - Sensitive strategic documents (never commit)
 #plans/
 

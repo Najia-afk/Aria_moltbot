@@ -411,13 +411,13 @@ itemsPager = new AriaPagination('items-pagination', {
     limit: 25
 });
 
-async function init() {
+async function initWorkingMemoryPage() {
     loadItems();
     loadContext();
     loadCheckpoint();
 }
 
-init();
+initWorkingMemoryPage();
 setInterval(() => { loadItems(); loadContext(); }, 30000);
 </script>
 {% endblock %}

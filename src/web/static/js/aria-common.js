@@ -3,6 +3,21 @@
  * Depends on pricing.js (AriaModels, calculateLogCost, formatMoney).
  */
 
+window.ARIA_DEBUG = (new URLSearchParams(window.location.search).has('debug')) ||
+                    (localStorage.getItem('aria_debug') === '1');
+
+function ariaLog(...args) {
+    if (window.ARIA_DEBUG) {
+        console.log('[ARIA]', ...args);
+    }
+}
+
+function ariaWarn(...args) {
+    if (window.ARIA_DEBUG) {
+        console.warn('[ARIA]', ...args);
+    }
+}
+
 /**
  * Fetch with timeout and HTTP status check.
  * Returns response JSON or throws with useful error message.
@@ -25,6 +40,58 @@ async function fetchWithTimeout(url, options = {}, timeout = 15000) {
     }
 }
 
+async function fetchWithRetry(url, options = {}) {
+    const { retries = 2, timeout = 10000, onError = null, ...fetchOptions } = options;
+    let lastError;
+
+    for (let attempt = 0; attempt <= retries; attempt++) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeout);
+        try {
+            const response = await fetch(url, {
+                ...fetchOptions,
+                signal: controller.signal,
+            });
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                const text = await response.text().catch(() => '');
+                const error = new Error(`HTTP ${response.status}: ${text.slice(0, 120)}`);
+                error.status = response.status;
+                throw error;
+            }
+
+            return response;
+        } catch (error) {
+            clearTimeout(timeoutId);
+            lastError = error.name === 'AbortError' ? new Error('Request timed out') : error;
+
+            const canRetry = attempt < retries && (!lastError.status || lastError.status >= 500);
+            if (!canRetry) break;
+
+            await new Promise(resolve => setTimeout(resolve, 500 * (2 ** attempt)));
+        }
+    }
+
+    if (onError) onError(lastError);
+    throw lastError;
+}
+
+async function fetchAriaData(url, options = {}) {
+    const {
+        timeout = 10000,
+        retries = 1,
+        ...fetchOptions
+    } = options;
+
+    const response = await fetchWithRetry(url, {
+        retries,
+        timeout,
+        ...fetchOptions,
+    });
+    return await response.json();
+}
+
 /**
  * Show an error state with optional retry button in a container.
  * @param {string|Element} container - CSS selector or DOM element
@@ -34,12 +101,15 @@ async function fetchWithTimeout(url, options = {}, timeout = 15000) {
 function showErrorState(container, message, retryFn) {
     const el = typeof container === 'string' ? document.querySelector(container) : container;
     if (!el) return;
+    const esc = (window.escapeHtml && typeof window.escapeHtml === 'function')
+        ? window.escapeHtml
+        : (value) => String(value ?? '');
     const retryBtn = retryFn
         ? `<button onclick="(${retryFn.toString()})()" class="btn btn-sm btn-outline-primary mt-2">⟳ Retry</button>`
         : '';
     el.innerHTML = `
         <div class="text-center text-muted py-3">
-            <div class="mb-2">⚠️ ${message}</div>
+            <div class="mb-2">⚠️ ${esc(message)}</div>
             ${retryBtn}
         </div>
     `;

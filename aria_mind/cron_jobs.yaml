@@ -19,20 +19,21 @@ jobs:
 
   - name: work_cycle
     every: "15m"
-    text: "Read HEARTBEAT.md work_cycle section. Check goals, pick highest priority, make progress, log activity. Use api_client for all data ops."
+    text: "Read HEARTBEAT.md work_cycle section. Check goals, pick highest priority, make progress, log activity, then run memory sync to refresh aria_memories/memory/context.json. Use api_client for all data ops. After completion, log cron execution via api_client activity action='cron_execution' with details {'job':'work_cycle','estimated_tokens':150}."
     agent: main
     session: isolated
     delivery: none
 
-  - name: hourly_goal_check
-    cron: "0 0 * * * *"
-    text: "Read HEARTBEAT.md hourly_goal_check section. Check current hourly goal, attempt completion, create next goal. Use api_client for all data ops."
-    agent: main
-    session: isolated
-    delivery: none
+  # DISABLED: hourly_goal_check - was creating noise goals every hour
+  # - name: hourly_goal_check
+  #   cron: "0 0 * * * *"
+  #   text: "Read HEARTBEAT.md hourly_goal_check section. Check current hourly goal, attempt completion, create next goal. Use api_client for all data ops."
+  #   agent: main
+  #   session: isolated
+  #   delivery: none
 
-  - name: hourly_health_check
-    cron: "0 0 * * * *"
+  - name: health_check
+    cron: "0 0 0,6,12,18 * * *"
     text: "Run health check on all systems: exec python3 /root/.openclaw/workspace/skills/run_skill.py health health_check '{}', exec python3 /root/.openclaw/workspace/skills/run_skill.py api_client health_check '{}'. If any check fails, log an alert via api_client. If all pass, silently continue."
     agent: main
     session: isolated
@@ -45,14 +46,14 @@ jobs:
     text: "Delegate to aria-talk: Post a social update to available social platforms. Read HEARTBEAT.md social_post section. Use the social skill to route content to registered platforms. Quality over quantity. Only post if something genuinely valuable to share. Save drafts to aria_memories/moltbook/drafts/ instead of auto-posting."
     agent: main
     session: isolated
-    delivery: announce
+    delivery: none
     best_effort_deliver: true
 
   # ── Deep Analysis (delegated to analyst by main) ────────────────
 
   - name: six_hour_review
     cron: "0 0 0,6,12,18 * * *"
-    text: "COOLDOWN CHECK: First, call GET /api/activities?action=six_hour_review&limit=1. If the most recent result has a timestamp less than 5 hours ago, STOP and log 'Cooldown active — skipping duplicate six_hour_review' to activity_log via api_client, then end. Otherwise proceed: Delegate to analyst using trinity-free (tool-capable model, do NOT use chimera-free — it lacks tool calling): Run 6-hour review. Read HEARTBEAT.md six_hour_review section. Analyze last 6h via api_client, adjust priorities, generate insights. Use api_client not database."
+    text: "COOLDOWN CHECK: First, call GET /api/activities?action=six_hour_review&limit=1. If the most recent result has a timestamp less than 5 hours ago, STOP and log 'Cooldown active — skipping duplicate six_hour_review' to activity_log via api_client, then end. Otherwise proceed: Delegate to analyst using trinity-free (tool-capable model, do NOT use chimera-free — it lacks tool calling): Run 6-hour review. Read HEARTBEAT.md six_hour_review section. Analyze last 6h via api_client, adjust priorities, generate insights. Use api_client not database. After completion, log cron execution via api_client activity action='cron_execution' with details {'job':'six_hour_review','estimated_tokens':1000}."
     agent: main
     session: isolated
     delivery: announce
@@ -110,10 +111,10 @@ jobs:
 
   - name: nightly_tests
     cron: "0 0 3 * * *"
-    text: "Run pytest: exec python3 -m pytest tests/ -q --tb=short. Log results to activity_log via api_client."
+    text: "Run tests directly in isolated shell: exec /bin/sh -lc 'cd /app && python3 -m pytest tests/ -q --tb=short --maxfail=1 || true'. Log condensed summary to activity_log via api_client and add cron execution activity action='cron_execution' with details {'job':'nightly_tests','estimated_tokens':120}."
     agent: main
     session: isolated
-    delivery: announce
+    delivery: none
     best_effort_deliver: true
 
   # ── DB Maintenance (weekly, off-peak) ───────────────────────────
@@ -133,10 +134,4 @@ jobs:
     session: isolated
     delivery: silent
 
-  # ── Memory Sync (populates OpenClaw-readable files) ────────────
-  - name: memory_sync
-    every: "15m"
-    text: "Sync current state to aria_memories/memory/ files. Use working_memory.sync_to_files() to write context.json with active goals, recent activities, and system health. These files are read by OpenClaw at session start to reduce token usage."
-    agent: main
-    session: isolated
-    delivery: none
+  # memory_sync merged into work_cycle (S2-01)

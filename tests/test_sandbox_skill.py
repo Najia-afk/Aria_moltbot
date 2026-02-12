@@ -6,6 +6,7 @@ All httpx calls are mocked — no real sandbox container needed.
 """
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+from typing import Optional
 
 from aria_skills.base import SkillConfig, SkillResult, SkillStatus
 from aria_skills.sandbox import SandboxSkill
@@ -29,7 +30,7 @@ def sandbox_skill(sandbox_config) -> SandboxSkill:
     return SandboxSkill(sandbox_config)
 
 
-def _mock_response(status_code: int = 200, json_data: dict | None = None):
+def _mock_response(status_code: int = 200, json_data: Optional[dict] = None):
     """Build a mock httpx.Response."""
     resp = MagicMock()
     resp.status_code = status_code

@@ -50,7 +50,7 @@ restart: ## Restart API container
 # Development
 # ============================================================================
 
-.PHONY: lint format check
+.PHONY: lint format check verify-deploy watchdog hooks
 
 lint: ## Run linting
 	ruff check aria_skills/ aria_agents/ aria_models/ src/
@@ -59,6 +59,15 @@ format: ## Auto-format code
 	ruff format aria_skills/ aria_agents/ aria_models/ src/
 
 check: lint test-quick ## Lint + quick tests
+
+verify-deploy: ## Run deployment verification script
+	./scripts/verify_deployment.sh --quick
+
+watchdog: ## Run one health watchdog cycle for aria-api
+	./scripts/health_watchdog.sh aria-api
+
+hooks: ## Install git pre-commit hook
+	./scripts/install_hooks.sh
 
 # ============================================================================
 # Help

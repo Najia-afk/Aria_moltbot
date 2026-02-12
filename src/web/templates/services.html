@@ -606,7 +606,7 @@ async function runServiceAction(serviceId, action) {
 }
 
 // Initial load
-document.addEventListener('DOMContentLoaded', refreshAllStatus);
+document.addEventListener('DOMContentLoaded', () => refreshAllStatus());
 
 document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.control-btn').forEach(btn => {

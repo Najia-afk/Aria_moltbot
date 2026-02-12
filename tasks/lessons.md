@@ -64,3 +64,9 @@
 - **No `/api` prefix in runtime.** Despite `root_path="/api"`, internal container requests use bare paths (`/goals`, `/memories`). The `/api` prefix is only for reverse-proxy rewriting.
 - **Embedding-dependent endpoints should accept 502 in tests.** When the embedding model isn't configured in LiteLLM, semantic endpoints return 502. Tests should `assert status in (200, 502)` rather than hard-failing.
 - **DB user comes from `.env`, not convention.** Don't assume `postgres` or `admin` — always check `stacks/brain/.env` for actual credentials (`aria_admin`).
+
+## Sprint Final Review (2026-02-12)
+- **Host Python and container Python can diverge hard.** Validate in-container paths (`/app`) before treating host interpreter mismatches as code failures.
+- **`configure_python_environment` may return a stale venv path if the venv is missing.** Confirm executable exists before running test commands.
+- **Operational scripts need writable artifact targets.** Keep logs, state, backups, and alerts under `aria_memories/` to preserve write-boundary constraints.
+- **Deployment verification should include both API and web probes.** Checking container status alone misses route regressions.

@@ -85,12 +85,14 @@ services:
       PYTHONPATH: /root/.openclaw/workspace:/root/.openclaw/workspace/skills:/root/repo
     volumes:
       - openclaw_data:/root/.openclaw
-      # Mount FULL git repo for Aria to read/write (local commits)
-      - ../../:/root/repo
-      # Mount aria_mind as the OpenClaw workspace (read-write for memory)
+      # Mount FULL git repo (read-only — Aria reads, never writes directly)
+      - ../../:/root/repo:ro
+      # Mount aria_mind as the OpenClaw workspace (read-write — OpenClaw needs write access)
       - ../../aria_mind:/root/.openclaw/workspace
-      # Mount aria_memories for file-based artifacts (research, plans, drafts, exports)
+      # Mount aria_memories for file-based artifacts (read-write — Aria's writable space)
       - ../../aria_memories:/root/.openclaw/aria_memories
+      # Mount aria_souvenirs (read-only — creative artifacts)
+      - ../../aria_souvenirs:/root/.openclaw/aria_souvenirs:ro
       # Mount Python skill modules into workspace/skills/
       # NOTE: Each skill subdirectory now contains skill.json for OpenClaw
       - ../../aria_skills:/root/.openclaw/workspace/skills/aria_skills:ro

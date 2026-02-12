@@ -3,7 +3,7 @@ name = "aria-blue"
 version = "1.0.0"
 description = "Autonomous AI agent platform with local-first LLM inference, modular skills, and multi-agent orchestration"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 license = {file = "LICENSE"}
 authors = [
     {name = "Najia-afk"}
@@ -18,6 +18,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
@@ -116,7 +117,7 @@ show_missing = true
 
 [tool.black]
 line-length = 100
-target-version = ["py310", "py311", "py312"]
+target-version = ["py312", "py313"]
 include = '\.pyi?$'
 exclude = '''
 /(
@@ -139,7 +140,7 @@ exclude = '''
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = [
@@ -168,7 +169,7 @@ known-first-party = ["aria_mind", "aria_skills", "aria_agents"]
 # ============================================================================
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false

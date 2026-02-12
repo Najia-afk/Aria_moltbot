@@ -91,12 +91,11 @@ function setHours(h) {
     currentHours = h;
     document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
     event.target.classList.add('active');
-    loadStats();
+    loadSkillStats();
 }
 
-async function loadStats() {
-    const resp = await fetch(`/api/skills/stats?hours=${currentHours}`);
-    const body = await resp.json();
+async function loadSkillStats() {
+    const body = await fetchAriaData(`/api/skills/stats?hours=${currentHours}`);
     renderAll(body.stats || []);
 }
 
@@ -166,6 +165,6 @@ function renderDoughnut(id, labels, data, bg) {
     });
 }
 
-loadStats();
+loadSkillStats();
 </script>
 {% endblock %}

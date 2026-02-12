@@ -850,20 +850,10 @@ function formatDuration(ms) {
     return `${seconds}s`;
 }
 
-function showToast(message, type = 'info') {
-    const toast = document.getElementById('toast');
-    toast.textContent = message;
-    toast.className = `toast ${type} show`;
-    
-    setTimeout(() => {
-        toast.classList.remove('show');
-    }, 3000);
-}
-
 // Auto-refresh every 60 seconds
 setInterval(loadHeartbeatData, 60000);
 
 // Initialize
-document.addEventListener('DOMContentLoaded', loadHeartbeatData);
+document.addEventListener('DOMContentLoaded', () => loadHeartbeatData());
 </script>
 {% endblock %}

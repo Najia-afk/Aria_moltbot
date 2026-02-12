@@ -175,6 +175,7 @@
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="/static/js/chart-helpers.js"></script>
 <script data-page-script>
 // ── Globals ─────────────────────────────────────────────────────────────────
 let _reviews = [];
@@ -234,7 +235,7 @@ function renderCharts(pending, inProgress, completed) {
     });
     const periodLabels = Object.keys(periodCounts);
     if (periodLabels.length > 0) {
-        renderChart('chart-review-periods', 'bar', {
+        ARIAChartHelpers.renderChart(_charts, 'chart-review-periods', 'bar', {
             labels: periodLabels,
             datasets: [{
                 label: 'Reviews',
@@ -248,7 +249,7 @@ function renderCharts(pending, inProgress, completed) {
     // Task status doughnut
     const taskData = [pending, inProgress, completed].some(v => v > 0)
         ? [pending, inProgress, completed] : [0, 0, 0];
-    renderChart('chart-task-status', 'doughnut', {
+    ARIAChartHelpers.renderChart(_charts, 'chart-task-status', 'doughnut', {
         labels: ['Pending', 'In Progress', 'Completed'],
         datasets: [{
             data: taskData,
@@ -304,27 +305,8 @@ function renderTasks() {
     `).join('');
 }
 
-// ── Chart Helper ────────────────────────────────────────────────────────────
-function renderChart(canvasId, type, data, extra = {}) {
-    if (_charts[canvasId]) _charts[canvasId].destroy();
-    const ctx = document.getElementById(canvasId)?.getContext('2d');
-    if (!ctx) return;
-    const isDoughnut = type === 'doughnut';
-    const options = {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: isDoughnut, position: 'bottom', labels: { color: '#9ca3af', font: { size: 12 } } } },
-        scales: isDoughnut ? {} : {
-            x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af', font: { size: 11 } } },
-            y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af', font: { size: 11 } } },
-        },
-    };
-    if (extra.indexAxis) options.indexAxis = extra.indexAxis;
-    _charts[canvasId] = new Chart(ctx, { type, data, options });
-}
-
 // ── Modal ────────────────────────────────────────────────────────────────────
 function showAddReviewModal() { document.getElementById('add-review-modal').classList.add('active'); }
-function closeModal(id) { document.getElementById(id).classList.remove('active'); }
 
 async function addReview(event) {
     event.preventDefault();
@@ -349,10 +331,10 @@ async function addReview(event) {
 }
 
 // ── Init ────────────────────────────────────────────────────────────────────
-async function init() {
+async function initPerformancePage() {
     await AriaModels.init();
     loadPerformance();
 }
-init();
+initPerformancePage();
 </script>
 {% endblock %}

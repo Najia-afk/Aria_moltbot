@@ -186,7 +186,7 @@
         <option value="168">Last Week</option>
         <option value="720">Last Month</option>
     </select>
-    <button class="btn btn-primary" onclick="loadAll()">Refresh</button>
+    <button class="btn btn-primary" onclick="loadModelUsageDashboard()">Refresh</button>
 </div>
 
 <!-- Tabs -->
@@ -390,6 +390,7 @@
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="/static/js/chart-helpers.js"></script>
 <script data-page-script>
 // ── Globals ─────────────────────────────────────────────────────────────────
 let _statsData = null;     // /model-usage/stats response
@@ -408,25 +409,25 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 });
 
 // ── Load Stats ──────────────────────────────────────────────────────────────
-async function loadStats() {
+async function loadModelUsageStats() {
     const hours = document.getElementById('hours-filter').value;
     try {
-        _statsData = await fetchWithTimeout(`${API_BASE_URL}/model-usage/stats?hours=${hours}`);
-        renderOverview();
+        _statsData = await fetchAriaData(`${API_BASE_URL}/model-usage/stats?hours=${hours}`);
+        renderModelUsageOverview();
         renderLLMTab();
         renderSkillsTab();
     } catch (e) {
         console.error('Error loading stats:', e);
         document.querySelectorAll('.stat-card .value').forEach(el => { if (el.textContent === '-') el.textContent = '—'; });
         showErrorState('#overview-llm-body',
-            'Could not load model usage stats — ' + e.message, loadStats);
+            'Could not load model usage stats — ' + e.message, loadModelUsageStats);
     }
 }
 
 // ── Load Recent Usage ───────────────────────────────────────────────────────
 async function loadUsage(page = 1, limit = 50) {
     try {
-        _usageData = await fetchWithTimeout(`${API_BASE_URL}/model-usage?limit=${limit}&page=${page}`);
+        _usageData = await fetchAriaData(`${API_BASE_URL}/model-usage?limit=${limit}&page=${page}`);
         const items = _usageData.items || _usageData.usage || [];
         _usageData._allItems = items;
         renderRecentLLM();
@@ -442,7 +443,7 @@ async function loadUsage(page = 1, limit = 50) {
 // ════════════════════════════════════════════════════════════════════════════
 // OVERVIEW TAB
 // ════════════════════════════════════════════════════════════════════════════
-function renderOverview() {
+function renderModelUsageOverview() {
     if (!_statsData) return;
     const s = _statsData;
     const src = s.sources || {};
@@ -467,7 +468,7 @@ function renderOverview() {
     // ── Chart: Source Split (doughnut) ──
     const llmReq = src.litellm?.requests || 0;
     const skillReq = src.skills?.requests || 0;
-    renderChart('chart-source-split', 'doughnut', {
+    ARIAChartHelpers.renderChart(_charts, 'chart-source-split', 'doughnut', {
         labels: ['LLM Calls', 'Skill Executions'],
         datasets: [{
             data: [llmReq, skillReq],
@@ -485,7 +486,7 @@ function renderOverview() {
     });
     const provLabels = Object.keys(providerTokens);
     const provColors = provLabels.map(p => getProviderColor(p));
-    renderChart('chart-provider-tokens', 'bar', {
+    ARIAChartHelpers.renderChart(_charts, 'chart-provider-tokens', 'bar', {
         labels: provLabels,
         datasets: [{
             label: 'Total Tokens',
@@ -493,7 +494,7 @@ function renderOverview() {
             backgroundColor: provColors,
             borderRadius: 6,
         }]
-    }, { indexAxis: 'y' });
+    }, { indexAxis: 'y', maxTicksLimit: 10 });
 
     // ── Top LLM Models (overview) ──
     const topLLM = (s.by_model || []).filter(m => m.source !== 'skills').slice(0, 8);
@@ -552,7 +553,7 @@ function renderLLMTab() {
     const modelNames = llmModels.slice(0, 10).map(m => m.model);
     const modelReqs = llmModels.slice(0, 10).map(m => m.requests);
     const modelColors = modelNames.map(n => getProviderColor(getProvider(n)));
-    renderChart('chart-llm-models', 'bar', {
+    ARIAChartHelpers.renderChart(_charts, 'chart-llm-models', 'bar', {
         labels: modelNames,
         datasets: [{
             label: 'Requests',
@@ -560,11 +561,11 @@ function renderLLMTab() {
             backgroundColor: modelColors,
             borderRadius: 6,
         }]
-    }, { indexAxis: 'y' });
+    }, { indexAxis: 'y', maxTicksLimit: 10 });
 
     // ── Chart: Input vs Output tokens (bar) ──
     const topByTokens = llmModels.filter(m => (m.input_tokens||0)+(m.output_tokens||0) > 0).slice(0, 8);
-    renderChart('chart-llm-tokens', 'bar', {
+    ARIAChartHelpers.renderChart(_charts, 'chart-llm-tokens', 'bar', {
         labels: topByTokens.map(m => m.model),
         datasets: [
             {
@@ -580,7 +581,7 @@ function renderLLMTab() {
                 borderRadius: 4,
             }
         ]
-    }, { stacked: false });
+    }, { stacked: false, maxTicksLimit: 10 });
 
     // ── LLM Summary Table ──
     const llmBody = document.getElementById('llm-summary-body');
@@ -641,7 +642,7 @@ function renderSkillsTab() {
 
     // ── Chart: Calls per Skill (horizontal bar) ──
     const topSkills = skills.slice(0, 12);
-    renderChart('chart-skill-calls', 'bar', {
+    ARIAChartHelpers.renderChart(_charts, 'chart-skill-calls', 'bar', {
         labels: topSkills.map(m => m.model.replace('skill:', '')),
         datasets: [{
             label: 'Calls',
@@ -649,7 +650,7 @@ function renderSkillsTab() {
             backgroundColor: '#a855f7',
             borderRadius: 6,
         }]
-    }, { indexAxis: 'y' });
+    }, { indexAxis: 'y', maxTicksLimit: 10 });
 
     // ── Chart: Latency Distribution (bar) ──
     const latencyBuckets = { '<50ms': 0, '50-100ms': 0, '100-200ms': 0, '200-500ms': 0, '>500ms': 0 };
@@ -661,7 +662,7 @@ function renderSkillsTab() {
         else if (lat < 500) latencyBuckets['200-500ms'] += m.requests;
         else latencyBuckets['>500ms'] += m.requests;
     });
-    renderChart('chart-skill-latency', 'bar', {
+    ARIAChartHelpers.renderChart(_charts, 'chart-skill-latency', 'bar', {
         labels: Object.keys(latencyBuckets),
         datasets: [{
             label: 'Calls',
@@ -669,7 +670,7 @@ function renderSkillsTab() {
             backgroundColor: ['#22c55e', '#4ade80', '#f59e0b', '#f97316', '#ef4444'],
             borderRadius: 6,
         }]
-    });
+    }, { maxTicksLimit: 10 });
 
     // ── Skill Summary Table ──
     const body = document.getElementById('skill-summary-body');
@@ -716,59 +717,21 @@ function renderRecentSkills() {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// CHART HELPER
-// ════════════════════════════════════════════════════════════════════════════
-function renderChart(canvasId, type, data, extra = {}) {
-    if (_charts[canvasId]) _charts[canvasId].destroy();
-    const ctx = document.getElementById(canvasId)?.getContext('2d');
-    if (!ctx) return;
-
-    const isDoughnut = type === 'doughnut';
-    const options = {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                display: isDoughnut,
-                position: 'bottom',
-                labels: { color: '#9ca3af', font: { size: 12 } }
-            },
-        },
-        scales: isDoughnut ? {} : {
-            x: {
-                grid: { color: 'rgba(255,255,255,0.05)' },
-                ticks: { color: '#9ca3af', font: { size: 11 }, maxTicksLimit: 10 },
-                stacked: extra.stacked || false,
-            },
-            y: {
-                grid: { color: 'rgba(255,255,255,0.05)' },
-                ticks: { color: '#9ca3af', font: { size: 11 } },
-                stacked: extra.stacked || false,
-            }
-        },
-    };
-
-    if (extra.indexAxis) options.indexAxis = extra.indexAxis;
-
-    _charts[canvasId] = new Chart(ctx, { type, data, options });
-}
-
-// ════════════════════════════════════════════════════════════════════════════
 // INIT
 // ════════════════════════════════════════════════════════════════════════════
-async function loadAll() {
+async function loadModelUsageDashboard() {
     await AriaModels.init();
-    loadStats();
+    loadModelUsageStats();
     loadUsage();
 }
 
-document.getElementById('hours-filter').addEventListener('change', () => { loadStats(); });
+document.getElementById('hours-filter').addEventListener('change', () => { loadModelUsageStats(); });
 
 usagePager = new AriaPagination('usage-pagination', {
     onPageChange: (page, limit) => loadUsage(page, limit),
     limit: 50
 });
-loadAll();
-setInterval(loadAll, 30000);
+loadModelUsageDashboard();
+setInterval(loadModelUsageDashboard, 30000);
 </script>
 {% endblock %}

@@ -184,7 +184,62 @@ def build_agent_routing(catalog: Optional[Dict[str, Any]] = None) -> Dict[str, A
     return {
         "primary": routing.get("primary"),
         "fallbacks": routing.get("fallbacks", []),
+        "bypass": routing.get("bypass", False),
+        "tier_order": routing.get("tier_order", ["local", "free", "paid"]),
     }
+
+
+def get_routing_config(catalog: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Return normalized routing config from models.yaml."""
+    catalog = catalog or load_catalog()
+    routing = catalog.get("routing", {}) if catalog else {}
+    tier_order = routing.get("tier_order") or ["local", "free", "paid"]
+    if not isinstance(tier_order, list):
+        tier_order = ["local", "free", "paid"]
+    return {
+        "primary": routing.get("primary"),
+        "fallbacks": routing.get("fallbacks", []),
+        "timeout": routing.get("timeout", 600),
+        "retries": routing.get("retries", 2),
+        "bypass": bool(routing.get("bypass", False)),
+        "tier_order": tier_order,
+    }
+
+
+def get_model_for_task(
+    task: Optional[str] = None,
+    preferred_tier: Optional[str] = None,
+    catalog: Optional[Dict[str, Any]] = None,
+) -> Optional[str]:
+    """Resolve the best model ID for a task from YAML routing + criteria.
+
+    If `routing.bypass` is true, this returns `routing.primary` directly.
+    """
+    catalog = catalog or load_catalog()
+    if not catalog:
+        return None
+
+    routing = get_routing_config(catalog)
+    if routing.get("bypass"):
+        return routing.get("primary")
+
+    criteria = catalog.get("criteria", {})
+    use_cases = criteria.get("use_cases", {}) if isinstance(criteria, dict) else {}
+    tiers = criteria.get("tiers", {}) if isinstance(criteria, dict) else {}
+
+    if task and isinstance(use_cases.get(task), list) and use_cases.get(task):
+        return use_cases[task][0]
+
+    tier_order = routing.get("tier_order", ["local", "free", "paid"])
+    if preferred_tier and preferred_tier in tiers and tiers[preferred_tier]:
+        return tiers[preferred_tier][0]
+
+    for tier in tier_order:
+        tier_models = tiers.get(tier, []) if isinstance(tiers, dict) else []
+        if tier_models:
+            return tier_models[0]
+
+    return routing.get("primary")
 
 
 def list_all_model_ids(catalog: Optional[Dict[str, Any]] = None) -> list[str]:

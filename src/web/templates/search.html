@@ -144,7 +144,7 @@ async function performSearch(event) {
         const data = await response.json();
         renderResults(data, query);
     } catch (error) {
-        container.innerHTML = `<div class="empty-state"><p>Error: ${error.message}</p></div>`;
+        container.innerHTML = `<div class="empty-state"><p>Error: ${escapeHtml(error.message)}</p></div>`;
     }
 }
 
@@ -201,11 +201,6 @@ function renderSection(title, icon, items, highlight) {
             `).join('')}
         </div>
     `;
-}
-
-function formatTime(ts) {
-    if (!ts) return '';
-    return new Date(ts).toLocaleString();
 }
 
 function escapeRegex(str) {

@@ -388,7 +388,7 @@ async function loadKnowledgeGraph() {
         renderEntities();
         renderRelations();
         populateEntitySelects();
-        drawGraph();
+        drawKnowledgeGraph();
     } catch (error) {
         console.error('Failed to load knowledge graph:', error);
     }
@@ -455,10 +455,6 @@ function showAddRelationModal() {
     document.getElementById('add-relation-modal').classList.add('active');
 }
 
-function closeModal(id) {
-    document.getElementById(id).classList.remove('active');
-}
-
 async function addEntity(event) {
     event.preventDefault();
     
@@ -513,7 +509,7 @@ async function addRelation(event) {
     }
 }
 
-function drawGraph() {
+function drawKnowledgeGraph() {
     const container = document.getElementById('graph-network');
     const emptyMsg = document.getElementById('graph-empty');
     
@@ -593,7 +589,7 @@ function drawGraph() {
                 const nodeId = params.nodes[0];
                 const entity = entities.find(e => e.id === nodeId);
                 if (entity) {
-                    console.log('Selected entity:', entity);
+                    ariaLog('Selected entity:', entity);
                 }
             }
         });
@@ -615,7 +611,7 @@ function getTypeColor(type) {
 }
 
 // Initialize
-document.addEventListener('DOMContentLoaded', loadKnowledgeGraph);
-window.addEventListener('resize', drawGraph);
+document.addEventListener('DOMContentLoaded', () => loadKnowledgeGraph());
+window.addEventListener('resize', drawKnowledgeGraph);
 </script>
 {% endblock %}

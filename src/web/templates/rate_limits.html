@@ -196,7 +196,7 @@ function filterLimits() {
 
 document.getElementById('search-input').addEventListener('input', filterLimits);
 
-async function init() {
+async function initRateLimitsPage() {
     await AriaModels.init();
     loadRateLimits();
     loadModelConfig();
@@ -205,8 +205,7 @@ async function init() {
 async function loadModelConfig() {
     const tbody = document.getElementById('model-config-body');
     try {
-        const res = await fetch(`${API_BASE_URL}/models/config`);
-        const data = await res.json();
+        const data = await fetchAriaData(`${API_BASE_URL}/models/config`);
         const models = data.models || {};
         const entries = Object.values(models);
         if (entries.length === 0) {
@@ -227,11 +226,11 @@ async function loadModelConfig() {
             </tr>`;
         }).join('');
     } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="6" class="empty-state">Failed to load: ${e.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="empty-state">Failed to load: ${escapeHtml(e.message)}</td></tr>`;
     }
 }
 
-init();
+initRateLimitsPage();
 setInterval(loadRateLimits, 30000);
 </script>
 {% endblock %}

@@ -125,7 +125,7 @@
 
             renderSkills(allSkills);
         } catch (err) {
-            container.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><p>Failed to load skills: ${err.message}</p></div>`;
+            container.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><p>Failed to load skills: ${escapeHtml(err.message)}</p></div>`;
             console.error('loadSkills error:', err);
         }
     }
