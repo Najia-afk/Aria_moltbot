@@ -38,6 +38,7 @@ from aria_mind.skills._coherence import (
     write_skill_alignment_report as _coh_write_skill_alignment_report,
 )
 from aria_mind.skills._skill_introspection import collect_skill_info
+from aria_mind.skills._kernel_router import auto_route_task_to_skills
 
 
 _SUPPORT_SKILL_DIRS = {'_template', '__pycache__', 'pipelines'}
@@ -237,6 +238,9 @@ if __name__ == '__main__':
     parser.add_argument("--coherence-report", action="store_true")
     parser.add_argument("--include-support", action="store_true")
     parser.add_argument("--skill-info", type=str)
+    parser.add_argument("--auto-task", type=str)
+    parser.add_argument("--route-limit", type=int, default=5)
+    parser.add_argument("--route-no-info", action="store_true")
     cli_args, remaining = parser.parse_known_args()
 
     if cli_args.list_skills:
@@ -267,6 +271,20 @@ if __name__ == '__main__':
             workspace_root_fn=_workspace_root,
         )
         print(json.dumps(info, default=str))
+        sys.exit(0)
+
+    if cli_args.auto_task:
+        route = asyncio.run(
+            auto_route_task_to_skills(
+                task=cli_args.auto_task,
+                limit=max(1, cli_args.route_limit or 5),
+                registry=SKILL_REGISTRY,
+                validate_skill_coherence_fn=_validate_skill_coherence,
+                workspace_root_fn=_workspace_root,
+                include_info=not cli_args.route_no_info,
+            )
+        )
+        print(json.dumps(route, default=str))
         sys.exit(0)
 
     # Original positional argument interface
