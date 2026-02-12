@@ -1,6 +1,6 @@
 #!/bin/bash
-# Aria-Only Database Backup Script
-# Backs up ONLY Aria's tables from aria_warehouse, excluding LiteLLM's tables.
+# Aria Database Backup Script
+# Backs up full aria_warehouse + full litellm databases.
 # Stored securely in ~/aria_vault/backups/ (NOT accessible by Aria).
 #
 # Usage:  ./scripts/aria_backup.sh
@@ -30,57 +30,17 @@ DB_CONTAINER="aria-db"
 DB_NAME="aria_warehouse"
 DB_USER="${DB_USER:-admin}"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-BACKUP_FILE="${BACKUP_DIR}/aria_backup_${TIMESTAMP}.sql.gz"
+BACKUP_FILE="${BACKUP_DIR}/aria_warehouse_backup_${TIMESTAMP}.sql.gz"
+LITELLM_BACKUP_FILE="${BACKUP_DIR}/litellm_backup_${TIMESTAMP}.sql.gz"
 JSON_EXPORT="${BACKUP_DIR}/aria_export_${TIMESTAMP}.json"
 KEEP_DAYS=7
-
-# Aria's core tables (exclude litellm-owned tables)
-ARIA_TABLES=(
-    activity_log
-    thoughts
-    memories
-    goals
-    social_posts
-    heartbeat_log
-    schema_migrations
-    rate_limits
-    agent_sessions
-    model_usage
-    security_events
-    api_key_rotations
-    knowledge_entities
-    knowledge_relations
-    key_value_memory
-    performance_log
-    hourly_goals
-    model_cost_reference
-    bubble_balances
-    bubble_monetization
-    enrich_kg_runs
-    model_discovery_log
-    moltbook_users
-    opportunities
-    pending_complex_tasks
-    schedule_tick
-    scheduled_jobs
-    secops_work
-    spending_alerts
-    spending_log
-    yield_positions
-)
 
 # Ensure backup directory exists
 mkdir -p "${BACKUP_DIR}"
 
-echo "[$(date -Iseconds)] Starting Aria-only backup..."
+echo "[$(date -Iseconds)] Starting full DB backup..."
 
-# Build pg_dump table flags
-TABLE_FLAGS=""
-for table in "${ARIA_TABLES[@]}"; do
-    TABLE_FLAGS="${TABLE_FLAGS} -t ${table}"
-done
-
-# Run pg_dump inside Docker container, compress output
+# Full aria_warehouse backup (includes all current and future tables)
 docker exec "${DB_CONTAINER}" pg_dump \
     -U "${DB_USER}" \
     -d "${DB_NAME}" \
@@ -88,11 +48,23 @@ docker exec "${DB_CONTAINER}" pg_dump \
     --no-acl \
     --clean \
     --if-exists \
-    ${TABLE_FLAGS} \
     2>/dev/null | gzip > "${BACKUP_FILE}"
 
 BACKUP_SIZE=$(ls -lh "${BACKUP_FILE}" | awk '{print $5}')
-echo "[$(date -Iseconds)] SQL backup: ${BACKUP_FILE} (${BACKUP_SIZE})"
+echo "[$(date -Iseconds)] aria_warehouse backup: ${BACKUP_FILE} (${BACKUP_SIZE})"
+
+# Full LiteLLM database backup (all LiteLLM-owned data)
+docker exec "${DB_CONTAINER}" pg_dump \
+    -U "${DB_USER}" \
+    -d litellm \
+    --no-owner \
+    --no-acl \
+    --clean \
+    --if-exists \
+    2>/dev/null | gzip > "${LITELLM_BACKUP_FILE}"
+
+LITELLM_BACKUP_SIZE=$(ls -lh "${LITELLM_BACKUP_FILE}" | awk '{print $5}')
+echo "[$(date -Iseconds)] LiteLLM backup: ${LITELLM_BACKUP_FILE} (${LITELLM_BACKUP_SIZE})"
 
 # Also create a lightweight JSON export for quick inspection.
 # Keep this schema-safe across table/column changes to avoid backup failures.
@@ -115,9 +87,11 @@ fi
 echo "[$(date -Iseconds)] JSON export: ${JSON_EXPORT}"
 
 # Cleanup old backups (keep last N days)
-find "${BACKUP_DIR}" -name "aria_backup_*.sql.gz" -mtime +${KEEP_DAYS} -delete 2>/dev/null || true
+find "${BACKUP_DIR}" -name "aria_warehouse_backup_*.sql.gz" -mtime +${KEEP_DAYS} -delete 2>/dev/null || true
+find "${BACKUP_DIR}" -name "litellm_backup_*.sql.gz" -mtime +${KEEP_DAYS} -delete 2>/dev/null || true
 find "${BACKUP_DIR}" -name "aria_export_*.json" -mtime +${KEEP_DAYS} -delete 2>/dev/null || true
 
-REMAINING=$(ls -1 "${BACKUP_DIR}"/aria_backup_*.sql.gz 2>/dev/null | wc -l)
-echo "[$(date -Iseconds)] Backup complete. ${REMAINING} backups retained (${KEEP_DAYS}-day retention)."
+REMAINING=$(ls -1 "${BACKUP_DIR}"/aria_warehouse_backup_*.sql.gz 2>/dev/null | wc -l)
+REMAINING_LITELLM=$(ls -1 "${BACKUP_DIR}"/litellm_backup_*.sql.gz 2>/dev/null | wc -l)
+echo "[$(date -Iseconds)] Backup complete. aria_warehouse: ${REMAINING}, litellm: ${REMAINING_LITELLM} retained (${KEEP_DAYS}-day retention)."
 echo "---"
