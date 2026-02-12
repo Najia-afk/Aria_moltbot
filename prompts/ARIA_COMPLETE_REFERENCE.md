@@ -370,7 +370,7 @@ SKILL_REGISTRY = {
       }
     }
   ],
-  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py my_skill {{tool}} '{{args_json}}'"
+    "run": "python3 aria_mind/skills/run_skill.py my_skill {{tool}} '{{args_json}}'"
 }
 ```
 
@@ -390,7 +390,7 @@ metadata: {"openclaw": {"emoji": "🔧", "requires": {"env": ["MY_SKILL_API_KEY"
 ## Usage
 
 \`\`\`bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py my_skill my_action '{"input_data": "example"}'
+exec python3 aria_mind/skills/run_skill.py my_skill my_action '{"input_data": "example"}'
 \`\`\`
 
 ## Functions
@@ -604,10 +604,10 @@ volumes:
 
 ```bash
 # Via skill
-exec python3 /root/.openclaw/workspace/skills/run_skill.py model_switcher switch_model '{"model": "chimera-free"}'
+exec python3 aria_mind/skills/run_skill.py model_switcher switch_model '{"model": "chimera-free"}'
 
 # Check current model
-exec python3 /root/.openclaw/workspace/skills/run_skill.py model_switcher get_current_model '{}'
+exec python3 aria_mind/skills/run_skill.py model_switcher get_current_model '{}'
 ```
 
 ---
@@ -726,13 +726,13 @@ docker compose logs -f clawdbot
 
 ```bash
 # From inside clawdbot container or via exec
-python3 /root/.openclaw/workspace/skills/run_skill.py <skill> <function> '<args_json>'
+python3 aria_mind/skills/run_skill.py <skill> <function> '<args_json>'
 
 # Examples:
-python3 run_skill.py database query '{"sql": "SELECT * FROM goals LIMIT 5"}'
-python3 run_skill.py security_scan scan_code '{"code": "import os; os.system(cmd)"}'
-python3 run_skill.py market_data get_price '{"symbol": "BTC"}'
-python3 run_skill.py brainstorm ideate '{"topic": "AI agents", "technique": "scamper"}'
+python3 aria_mind/skills/run_skill.py api_client get_goals '{"status": "active", "limit": 5}'
+python3 aria_mind/skills/run_skill.py security_scan scan_directory '{"directory": "/workspace", "extensions": [".py"]}'
+python3 aria_mind/skills/run_skill.py market_data get_price '{"symbol": "BTC"}'
+python3 aria_mind/skills/run_skill.py --auto-task "summarize active goals and risks" --route-limit 2 --route-no-info
 ```
 
 ### Checklist for New Skills
@@ -757,16 +757,24 @@ python3 run_skill.py brainstorm ideate '{"topic": "AI agents", "technique": "sca
 ### Skill Invocation Pattern
 
 ```bash
-python3 /root/.openclaw/workspace/skills/run_skill.py <skill_name> <function> '<json_args>'
+python3 aria_mind/skills/run_skill.py <skill_name> <function> '<json_args>'
 ```
 
-### Available Skills (24)
+### Available Skills
+
+Use live catalog output as source of truth:
+
+```bash
+python -m aria_mind --list-skills
+```
+
+Legacy compatibility skills may still exist, but API-client-first flow is preferred.
 
 ```
-api_client, brainstorm, ci_cd, community, data_pipeline, database, experiment,
-fact_check, goals, health, hourly_goals, knowledge_graph, litellm,
-llm, market_data, model_switcher, moltbook, performance, portfolio,
-pytest, research, schedule, security_scan, social
+api_client, goals, health, hourly_goals, knowledge_graph, litellm,
+llm, market_data, moltbook, performance, portfolio,
+pytest_runner, research, schedule, security_scan, session_manager,
+social, sprint_manager, telegram, working_memory
 ```
 
 ### Focus Keywords
