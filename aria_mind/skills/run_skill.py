@@ -25,6 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from aria_mind.skills._skill_registry import SKILL_REGISTRY, _merge_registries
 from aria_mind.skills._tracking import _log_model_usage, _log_session
+from aria_mind.skills._tracking import _log_skill_invocation
 from aria_mind.skills._cli_tools import (
     handle_export_catalog,
     handle_health_check_all,
@@ -75,7 +76,10 @@ def _validate_skill_coherence(skill_name: str) -> dict:
 
 
 def _write_aria_mind_run_report(report: dict):
-    _coh_write_aria_mind_run_report(report, workspace_root_fn=_workspace_root)
+    try:
+        _coh_write_aria_mind_run_report(report, workspace_root_fn=_workspace_root)
+    except Exception:
+        pass
 
 
 def _collect_skill_alignment_report(include_support: bool = False) -> dict:
@@ -222,6 +226,7 @@ async def run_skill(skill_name: str, function_name: str, args: dict):
         try:
             await _log_session(skill_name, function_name, duration_ms, True)
             await _log_model_usage(skill_name, function_name, duration_ms)
+            await _log_skill_invocation(skill_name, function_name, duration_ms, True)
         except Exception:
             pass
 
@@ -254,6 +259,7 @@ async def run_skill(skill_name: str, function_name: str, args: dict):
         # P2.1 — log failed session
         try:
             await _log_session(skill_name, function_name, duration_ms, False, str(e))
+            await _log_skill_invocation(skill_name, function_name, duration_ms, False, str(e))
         except Exception:
             pass
 

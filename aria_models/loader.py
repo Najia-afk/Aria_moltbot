@@ -184,8 +184,6 @@ def build_agent_routing(catalog: Optional[Dict[str, Any]] = None) -> Dict[str, A
     return {
         "primary": routing.get("primary"),
         "fallbacks": routing.get("fallbacks", []),
-        "bypass": routing.get("bypass", False),
-        "tier_order": routing.get("tier_order", ["local", "free", "paid"]),
     }
 
 

@@ -78,3 +78,25 @@ async def _log_model_usage(skill_name: str, function_name: str, duration_ms: flo
     ok = await _api_post("/model-usage", payload)
     if not ok:
         _log_locally("model_usage", payload)
+
+
+async def _log_skill_invocation(
+    skill_name: str,
+    function_name: str,
+    duration_ms: float,
+    success: bool,
+    error_msg: str | None = None,
+) -> None:
+    """Log invocation to /skills/invocations for Skill Stats dashboard."""
+    payload = {
+        "skill_name": skill_name,
+        "tool_name": function_name,
+        "duration_ms": int(duration_ms),
+        "success": success,
+        "error_type": error_msg,
+        "tokens_used": 0,
+        "model_used": os.environ.get("OPENCLAW_MODEL", "litellm/kimi"),
+    }
+    ok = await _api_post("/skills/invocations", payload)
+    if not ok:
+        _log_locally("skill_invocation", payload)

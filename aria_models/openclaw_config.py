@@ -19,17 +19,40 @@ from aria_models.loader import (
 )
 
 
+def _non_tool_model_refs(catalog: Dict[str, Any]) -> set[str]:
+    models = catalog.get("models", {}) if isinstance(catalog, dict) else {}
+    refs: set[str] = set()
+    for model_id, cfg in models.items():
+        if cfg.get("tool_calling") is False:
+            refs.add(f"litellm/{model_id}")
+    return refs
+
+
+def _filter_fallbacks(model_cfg: Dict[str, Any], blocked_refs: set[str]) -> None:
+    if not isinstance(model_cfg, dict):
+        return
+    fallbacks = model_cfg.get("fallbacks")
+    if not isinstance(fallbacks, list):
+        return
+    model_cfg["fallbacks"] = [ref for ref in fallbacks if ref not in blocked_refs]
+
+
 def render_openclaw_config(template_path: Path, models_path: Path, output_path: Path) -> None:
     template = json.loads(template_path.read_text(encoding="utf-8"))
     catalog = load_catalog(models_path)
+    blocked_non_tool_refs = _non_tool_model_refs(catalog)
 
     # Agents routing + aliases
     agents_defaults = template.setdefault("agents", {}).setdefault("defaults", {})
     agents_defaults["model"] = build_agent_routing(catalog)
+    _filter_fallbacks(agents_defaults.get("model", {}), blocked_non_tool_refs)
     agents_defaults["models"] = build_agent_aliases(catalog)
     
     # Set timeoutSeconds at agents.defaults level (not in model object)
     agents_defaults["timeoutSeconds"] = get_timeout_seconds(catalog)
+
+    for agent in template.setdefault("agents", {}).get("list", []) or []:
+        _filter_fallbacks(agent.get("model", {}), blocked_non_tool_refs)
 
     # NOTE: Do NOT inject systemPrompt into agents.defaults — OpenClaw 2026.2.6+
     # rejects it as an unrecognized key and crashes. The system identity is
