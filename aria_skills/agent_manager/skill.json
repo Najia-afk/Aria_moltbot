@@ -1,5 +1,5 @@
 {
-  "name": "agent_manager",
+  "name": "aria-agent-manager",
   "version": "2.0.0",
   "description": "Runtime agent lifecycle management — spawn, monitor, terminate, prune sessions",
   "author": "Aria Blue",

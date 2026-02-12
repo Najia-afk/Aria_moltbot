@@ -1,6 +1,5 @@
 {
-  "name": "sprint_manager",
-  "canonical": "aria-sprint-manager",
+  "name": "aria-sprint-manager",
   "version": "1.0.0",
   "layer": 3,
   "category": "orchestrator",

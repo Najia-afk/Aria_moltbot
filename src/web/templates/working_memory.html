@@ -114,6 +114,8 @@
     </select>
     <button class="btn-sm btn-create" onclick="toggleCreateForm()">+ New Item</button>
     <button class="btn-sm btn-checkpoint" onclick="createCheckpoint()">📸 Checkpoint</button>
+    <button class="btn-sm" style="background:rgba(239,68,68,0.12);color:var(--danger);border:1px solid rgba(239,68,68,0.25);" onclick="cleanupTestData()">🧹 Cleanup Test Data</button>
+    <button class="btn-sm" style="background:rgba(245,158,11,0.12);color:#f59e0b;border:1px solid rgba(245,158,11,0.25);" onclick="cleanupExpired()">⌛ Cleanup Expired</button>
     <button class="btn-sm" style="background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border-color);" onclick="loadItems()">Refresh</button>
 </div>
 
@@ -199,6 +201,21 @@ let _items = [];
 let _categories = new Set();
 let itemsPager;
 
+function _toText(value) {
+    if (value === null || value === undefined) return '';
+    if (typeof value === 'string') return value;
+    try { return JSON.stringify(value); } catch { return String(value); }
+}
+
+function _esc(value) {
+    return _toText(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 // ── Toggle Create Form ──────────────────────────────────────────────────────
 function toggleCreateForm() {
     document.getElementById('create-form').classList.toggle('visible');
@@ -215,13 +232,7 @@ async function loadItems(page = 1, limit = 25) {
         _categories = new Set(_items.map(i => i.category).filter(Boolean));
         populateCategoryFilter();
 
-        // Stats
-        document.getElementById('stat-total').textContent = data.total || _items.length;
-        document.getElementById('stat-categories').textContent = _categories.size;
-        const avgImp = _items.length > 0
-            ? (_items.reduce((s, i) => s + (i.importance || 0), 0) / _items.length).toFixed(2)
-            : '-';
-        document.getElementById('stat-avg-importance').textContent = avgImp;
+        await loadStats();
 
         renderItems();
         if (itemsPager && data.pages) itemsPager.update(data);
@@ -229,6 +240,21 @@ async function loadItems(page = 1, limit = 25) {
         console.error('Load items error:', e);
         document.getElementById('items-body').innerHTML =
             '<tr><td colspan="7" class="empty-state">Failed to load working memory items</td></tr>';
+    }
+}
+
+async function loadStats() {
+    try {
+        const res = await fetch(`${API_BASE_URL}/working-memory/stats`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const s = await res.json();
+        document.getElementById('stat-total').textContent = s.total_items ?? '-';
+        document.getElementById('stat-categories').textContent = s.categories ?? '-';
+        document.getElementById('stat-avg-importance').textContent =
+            typeof s.avg_importance === 'number' ? s.avg_importance.toFixed(2) : '-';
+        document.getElementById('stat-checkpoints').textContent = s.checkpoint_count ?? '-';
+    } catch (e) {
+        console.error('Stats error:', e);
     }
 }
 
@@ -325,6 +351,59 @@ async function deleteItem(id) {
     }
 }
 
+async function cleanupTestData() {
+    if (!confirm('Delete ALL working-memory items in category "test"?')) return;
+    try {
+        const res = await fetch(`${API_BASE_URL}/working-memory/cleanup`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ category: 'test', delete_expired: false, dry_run: false })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+        alert(`Deleted ${data.deleted || 0} test item(s).`);
+        await loadItems();
+        await loadContext();
+        await loadCheckpoint();
+    } catch (e) {
+        console.error('Cleanup test error:', e);
+        alert('Failed to cleanup test data: ' + e.message);
+    }
+}
+
+async function cleanupExpired() {
+    try {
+        const dry = await fetch(`${API_BASE_URL}/working-memory/cleanup`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ delete_expired: true, dry_run: true })
+        });
+        const dryData = await dry.json();
+        if (!dry.ok) throw new Error(dryData.detail || `HTTP ${dry.status}`);
+        const count = dryData.matched || 0;
+        if (count === 0) {
+            alert('No expired items to clean.');
+            return;
+        }
+        if (!confirm(`Delete ${count} expired item(s)?`)) return;
+
+        const res = await fetch(`${API_BASE_URL}/working-memory/cleanup`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ delete_expired: true, dry_run: false })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+        alert(`Deleted ${data.deleted || 0} expired item(s).`);
+        await loadItems();
+        await loadContext();
+        await loadCheckpoint();
+    } catch (e) {
+        console.error('Cleanup expired error:', e);
+        alert('Failed to cleanup expired items: ' + e.message);
+    }
+}
+
 // ── Load Context ────────────────────────────────────────────────────────────
 async function loadContext() {
     try {
@@ -344,12 +423,14 @@ async function loadContext() {
             const score = item.relevance || item.importance || 0;
             const pct = (score / maxScore * 100).toFixed(0);
             const hue = Math.round(score / maxScore * 120); // 0=red, 120=green
+            const valueText = _toText(item.value);
+            const valueShort = valueText.length > 100 ? valueText.substring(0, 100) + '…' : valueText;
             return `<div class="context-item">
-                <span class="context-key">${item.key || '-'}</span>
+                <span class="context-key">${_esc(item.key || '-')}</span>
                 <div class="context-bar-wrapper">
                     <div class="context-bar" style="width:${pct}%;background:hsl(${hue},70%,50%)"></div>
                 </div>
-                <span class="context-value">${(item.value || '').substring(0, 100)}</span>
+                <span class="context-value">${_esc(valueShort)}</span>
                 <span class="context-score">${score.toFixed(2)}</span>
             </div>`;
         }).join('');
@@ -412,9 +493,9 @@ itemsPager = new AriaPagination('items-pagination', {
 });
 
 async function initWorkingMemoryPage() {
-    loadItems();
-    loadContext();
-    loadCheckpoint();
+    await loadItems();
+    await loadContext();
+    await loadCheckpoint();
 }
 
 initWorkingMemoryPage();

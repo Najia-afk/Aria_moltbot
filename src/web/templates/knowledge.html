@@ -3,7 +3,7 @@
 
 {% block extra_css %}
 <style>
-    .knowledge-header {
+    .knowledge-graph-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -11,151 +11,51 @@
         flex-wrap: wrap;
         gap: 1rem;
     }
-    .knowledge-header h1 {
+    .knowledge-graph-header h1 {
         display: flex;
         align-items: center;
         gap: 0.75rem;
     }
-    .knowledge-stats {
+    .graph-stats {
         display: flex;
-        gap: 1.5rem;
+        gap: 1rem;
     }
     .stat-box {
         background: var(--bg-secondary);
         border: 1px solid var(--border-color);
         border-radius: var(--radius-md);
-        padding: 0.75rem 1.25rem;
+        padding: 0.5rem 1rem;
         text-align: center;
     }
     .stat-box .value {
-        font-size: 1.5rem;
+        font-size: 1.3rem;
         font-weight: 600;
         color: var(--accent-primary);
     }
     .stat-box .label {
-        font-size: 0.8rem;
+        font-size: 0.75rem;
         color: var(--text-muted);
     }
-    .knowledge-tabs {
+    .graph-controls {
         display: flex;
-        gap: 0.5rem;
+        gap: 0.75rem;
         margin-bottom: 1rem;
-        border-bottom: 1px solid var(--border-color);
-        padding-bottom: 0.5rem;
-    }
-    .tab-btn {
-        padding: 0.5rem 1rem;
-        background: none;
-        border: none;
-        color: var(--text-secondary);
-        cursor: pointer;
-        border-radius: var(--radius-md);
-        transition: all 0.2s;
-    }
-    .tab-btn:hover {
-        background: var(--bg-tertiary);
-    }
-    .tab-btn.active {
-        background: var(--accent-primary);
-        color: white;
-    }
-    .knowledge-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1.5rem;
-    }
-    @media (max-width: 900px) {
-        .knowledge-grid {
-            grid-template-columns: 1fr;
-        }
-    }
-    .knowledge-section {
-        background: var(--bg-secondary);
-        border: 1px solid var(--border-color);
-        border-radius: var(--radius-lg);
-        overflow: hidden;
-    }
-    .section-header {
-        padding: 1rem 1.25rem;
-        background: var(--bg-tertiary);
-        border-bottom: 1px solid var(--border-color);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    .section-header h2 {
-        font-size: 1rem;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-    .section-content {
-        padding: 1rem;
-        max-height: 500px;
-        overflow-y: auto;
-    }
-    .entity-card, .relation-card {
-        background: var(--bg-primary);
-        border: 1px solid var(--border-color);
-        border-radius: var(--radius-md);
-        padding: 0.75rem 1rem;
-        margin-bottom: 0.75rem;
-    }
-    .entity-card:last-child, .relation-card:last-child {
-        margin-bottom: 0;
-    }
-    .entity-name {
-        font-weight: 600;
-        color: var(--text-primary);
-    }
-    .entity-type {
-        display: inline-block;
-        font-size: 0.7rem;
-        padding: 0.2rem 0.5rem;
-        border-radius: var(--radius-sm);
-        background: var(--accent-primary);
-        color: white;
-        margin-left: 0.5rem;
-    }
-    .entity-properties {
-        font-size: 0.85rem;
-        color: var(--text-secondary);
-        margin-top: 0.5rem;
-    }
-    .entity-date {
-        font-size: 0.75rem;
-        color: var(--text-muted);
-        margin-top: 0.5rem;
-    }
-    .relation-visual {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
         flex-wrap: wrap;
+        align-items: center;
     }
-    .relation-node {
-        padding: 0.3rem 0.6rem;
+    .graph-controls input,
+    .graph-controls select {
         background: var(--bg-secondary);
         border: 1px solid var(--border-color);
-        border-radius: var(--radius-sm);
+        color: var(--text-primary);
+        padding: 0.4rem 0.75rem;
+        border-radius: var(--radius-md);
         font-size: 0.85rem;
     }
-    .relation-type-badge {
-        background: var(--accent-secondary);
-        color: white;
-        padding: 0.2rem 0.5rem;
-        border-radius: var(--radius-sm);
-        font-size: 0.75rem;
+    .graph-controls input {
+        min-width: 200px;
     }
-    .relation-arrow {
-        color: var(--text-muted);
-    }
-    .empty-state {
-        text-align: center;
-        padding: 2rem;
-        color: var(--text-muted);
-    }
-    .btn-add {
+    .graph-controls button {
         padding: 0.4rem 0.75rem;
         background: var(--accent-primary);
         color: white;
@@ -164,204 +64,222 @@
         cursor: pointer;
         font-size: 0.85rem;
     }
-    .btn-add:hover {
-        opacity: 0.9;
+    .graph-controls button:hover {
+        opacity: 0.85;
     }
-    .modal {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0,0,0,0.6);
-        z-index: 1000;
-        align-items: center;
-        justify-content: center;
-    }
-    .modal.active {
-        display: flex;
-    }
-    .modal-content {
-        background: var(--bg-secondary);
+    .graph-controls button.secondary {
+        background: var(--bg-tertiary);
+        color: var(--text-secondary);
         border: 1px solid var(--border-color);
-        border-radius: var(--radius-lg);
-        padding: 1.5rem;
-        width: 100%;
-        max-width: 500px;
-        margin: 1rem;
     }
-    .modal-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 1rem;
+    .graph-layout {
+        display: grid;
+        grid-template-columns: 1fr 300px;
+        gap: 1rem;
+        height: calc(100vh - 280px);
+        min-height: 500px;
     }
-    .modal-close {
-        background: none;
-        border: none;
-        font-size: 1.5rem;
-        cursor: pointer;
-        color: var(--text-muted);
+    @media (max-width: 900px) {
+        .graph-layout {
+            grid-template-columns: 1fr;
+            height: auto;
+        }
     }
-    .form-group {
-        margin-bottom: 1rem;
-    }
-    .form-group label {
-        display: block;
-        margin-bottom: 0.25rem;
-        font-weight: 500;
-        font-size: 0.9rem;
-    }
-    .form-group input, .form-group select, .form-group textarea {
-        width: 100%;
-        padding: 0.5rem 0.75rem;
-        border: 1px solid var(--border-color);
-        border-radius: var(--radius-md);
-        background: var(--bg-primary);
-        color: var(--text-primary);
-    }
-    .btn-primary {
-        width: 100%;
-        padding: 0.75rem;
-        background: var(--accent-primary);
-        color: white;
-        border: none;
-        border-radius: var(--radius-md);
-        cursor: pointer;
-        font-weight: 500;
-    }
-    /* Graph Visualization */
     .graph-container {
         background: var(--bg-secondary);
         border: 1px solid var(--border-color);
         border-radius: var(--radius-lg);
-        padding: 1rem;
-        margin-bottom: 1.5rem;
-        min-height: 400px;
+        overflow: hidden;
         position: relative;
     }
-    #graph-network {
+    #knowledge-network {
         width: 100%;
-        height: 400px;
-        background: var(--bg-primary);
-        border-radius: var(--radius-md);
+        height: 100%;
+        min-height: 500px;
+    }
+    .sidebar {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+    .sidebar-panel {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+    }
+    .sidebar-panel .panel-header {
+        padding: 0.75rem 1rem;
+        background: var(--bg-tertiary);
+        border-bottom: 1px solid var(--border-color);
+        font-size: 0.85rem;
+        font-weight: 600;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .sidebar-panel .panel-content {
+        padding: 0.75rem;
+        max-height: 300px;
+        overflow-y: auto;
+        font-size: 0.85rem;
+    }
+    .node-detail {
+        display: none;
+    }
+    .node-detail.active {
+        display: block;
+    }
+    .detail-field {
+        margin-bottom: 0.5rem;
+    }
+    .detail-field .field-label {
+        color: var(--text-muted);
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        margin-bottom: 0.15rem;
+    }
+    .detail-field .field-value {
+        color: var(--text-primary);
+    }
+    .type-badge {
+        display: inline-block;
+        padding: 0.15rem 0.5rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+    .type-person { background: #ef444420; color: #f87171; border: 1px solid #ef444440; }
+    .type-concept { background: #3b82f620; color: #60a5fa; border: 1px solid #3b82f640; }
+    .type-technology { background: #10b98120; color: #34d399; border: 1px solid #10b98140; }
+    .type-project { background: #f59e0b20; color: #fbbf24; border: 1px solid #f59e0b40; }
+    .type-other { background: #6b728020; color: #d1d5db; border: 1px solid #6b728040; }
+    .legend {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        padding: 0.5rem;
+    }
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+    }
+    .legend-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+    }
+    .search-results {
+        max-height: 200px;
+        overflow-y: auto;
+    }
+    .search-result-item {
+        padding: 0.4rem 0.5rem;
+        border-bottom: 1px solid var(--border-color);
+        cursor: pointer;
+        font-size: 0.8rem;
+    }
+    .search-result-item:hover {
+        background: var(--bg-tertiary);
+    }
+    .sync-btn {
+        background: var(--bg-tertiary) !important;
+        color: var(--text-secondary) !important;
+        border: 1px solid var(--border-color) !important;
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="knowledge-header">
+<div class="knowledge-graph-header">
     <h1>🕸️ Knowledge Graph</h1>
-    <div class="knowledge-stats">
+    <div class="graph-stats">
         <div class="stat-box">
-            <div class="value" id="entity-count">-</div>
+            <div class="value" id="entity-count">0</div>
             <div class="label">Entities</div>
         </div>
         <div class="stat-box">
-            <div class="value" id="relation-count">-</div>
+            <div class="value" id="relation-count">0</div>
             <div class="label">Relations</div>
         </div>
     </div>
 </div>
 
-<!-- Graph Visualization -->
-<div class="graph-container">
-    <div id="graph-network"></div>
-    <div id="graph-empty" class="empty-state" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: none;">
-        No entities to visualize yet
-    </div>
+<div class="graph-controls">
+    <input type="text" id="search-input" placeholder="🔍 Search entities…" oninput="onSearchInput(this.value)">
+    <select id="filter-type" onchange="applyFilter()">
+        <option value="">All Types</option>
+        <option value="person">People</option>
+        <option value="concept">Concepts</option>
+        <option value="technology">Technologies</option>
+        <option value="project">Projects</option>
+        <option value="preference">Preferences</option>
+        <option value="location">Locations</option>
+        <option value="other">Other</option>
+    </select>
+    <button onclick="toggleLayout()" class="secondary">⚡ Toggle Layout</button>
+    <button onclick="syncGraph()" class="sync-btn">🔄 Refresh</button>
 </div>
 
-<div class="knowledge-grid">
-    <!-- Entities Section -->
-    <div class="knowledge-section">
-        <div class="section-header">
-            <h2>🔵 Entities</h2>
-            <button class="btn-add" onclick="showAddEntityModal()">+ Add Entity</button>
-        </div>
-        <div class="section-content" id="entities-list">
-            <div class="empty-state">Loading entities...</div>
-        </div>
-    </div>
-
-    <!-- Relations Section -->
-    <div class="knowledge-section">
-        <div class="section-header">
-            <h2>🔗 Relations</h2>
-            <button class="btn-add" onclick="showAddRelationModal()">+ Add Relation</button>
-        </div>
-        <div class="section-content" id="relations-list">
-            <div class="empty-state">Loading relations...</div>
-        </div>
-    </div>
+<div class="legend">
+    <div class="legend-item"><span class="legend-dot" style="background: #ef4444"></span> Person</div>
+    <div class="legend-item"><span class="legend-dot" style="background: #3b82f6"></span> Concept</div>
+    <div class="legend-item"><span class="legend-dot" style="background: #10b981"></span> Technology</div>
+    <div class="legend-item"><span class="legend-dot" style="background: #f59e0b"></span> Project</div>
+    <div class="legend-item"><span class="legend-dot" style="background: #6b7280"></span> Other</div>
 </div>
 
-<!-- Add Entity Modal -->
-<div class="modal" id="add-entity-modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3>Add Entity</h3>
-            <button class="modal-close" onclick="closeModal('add-entity-modal')">&times;</button>
-        </div>
-        <form onsubmit="addEntity(event)">
-            <div class="form-group">
-                <label>Name</label>
-                <input type="text" id="entity-name" required placeholder="e.g., Najia, Python, MLX">
-            </div>
-            <div class="form-group">
-                <label>Type</label>
-                <select id="entity-type">
-                    <option value="person">Person</option>
-                    <option value="concept">Concept</option>
-                    <option value="technology">Technology</option>
-                    <option value="project">Project</option>
-                    <option value="skill">Skill</option>
-                    <option value="preference">Preference</option>
-                    <option value="location">Location</option>
-                    <option value="other">Other</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Properties (JSON)</label>
-                <textarea id="entity-properties" rows="3" placeholder='{"description": "..."}'>{}</textarea>
-            </div>
-            <button type="submit" class="btn-primary">Add Entity</button>
-        </form>
+<div class="graph-layout">
+    <div class="graph-container">
+        <div id="knowledge-network"></div>
     </div>
-</div>
-
-<!-- Add Relation Modal -->
-<div class="modal" id="add-relation-modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3>Add Relation</h3>
-            <button class="modal-close" onclick="closeModal('add-relation-modal')">&times;</button>
+    <div class="sidebar">
+        <div class="sidebar-panel">
+            <div class="panel-header">📋 Node Inspector</div>
+            <div class="panel-content">
+                <div id="no-selection" class="empty-state" style="padding: 1rem; color: var(--text-muted); font-size: 0.8rem;">
+                    Click a node to inspect
+                </div>
+                <div id="node-detail" class="node-detail">
+                    <div class="detail-field">
+                        <div class="field-label">Name</div>
+                        <div class="field-value" id="detail-name"></div>
+                    </div>
+                    <div class="detail-field">
+                        <div class="field-label">Type</div>
+                        <div class="field-value" id="detail-type"></div>
+                    </div>
+                    <div class="detail-field">
+                        <div class="field-label">Description</div>
+                        <div class="field-value" id="detail-desc"></div>
+                    </div>
+                    <div class="detail-field">
+                        <div class="field-label">Connections</div>
+                        <div class="field-value" id="detail-connections"></div>
+                    </div>
+                    <div class="detail-field">
+                        <div class="field-label">Properties</div>
+                        <div class="field-value" id="detail-props" style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; white-space: pre-wrap;"></div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <form onsubmit="addRelation(event)">
-            <div class="form-group">
-                <label>From Entity</label>
-                <select id="relation-from" required></select>
+
+        <div class="sidebar-panel">
+            <div class="panel-header">
+                🔍 Search Results
+                <span id="search-count" style="font-weight: normal; color: var(--text-muted);">0</span>
             </div>
-            <div class="form-group">
-                <label>Relation Type</label>
-                <select id="relation-type">
-                    <option value="knows">knows</option>
-                    <option value="uses">uses</option>
-                    <option value="created_by">created_by</option>
-                    <option value="part_of">part_of</option>
-                    <option value="related_to">related_to</option>
-                    <option value="depends_on">depends_on</option>
-                    <option value="prefers">prefers</option>
-                    <option value="works_with">works_with</option>
-                </select>
+            <div class="panel-content search-results" id="search-results">
+                <div class="empty-state" style="padding: 0.5rem; color: var(--text-muted); font-size: 0.8rem;">
+                    Type to search…
+                </div>
             </div>
-            <div class="form-group">
-                <label>To Entity</label>
-                <select id="relation-to" required></select>
-            </div>
-            <button type="submit" class="btn-primary">Add Relation</button>
-        </form>
+        </div>
+
     </div>
 </div>
 {% endblock %}
@@ -370,248 +288,230 @@
 <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 <script>
 const API_BASE = '{{ api_base_url }}';
-let entities = [];
-let relations = [];
+let allEntities = [];
+let allRelations = [];
 let network = null;
+let currentLayout = 'physics';
+let nodesDataSet = null;
+let edgesDataSet = null;
 
-async function loadKnowledgeGraph() {
+function esc(str) {
+    if (!str) return '';
+    const d = document.createElement('div');
+    d.textContent = String(str);
+    return d.innerHTML;
+}
+
+const TYPE_COLORS = {
+    person: '#ef4444',
+    concept: '#3b82f6',
+    technology: '#10b981',
+    project: '#f59e0b',
+    preference: '#ec4899',
+    location: '#06b6d4',
+    other: '#6b7280',
+};
+const TYPE_SHAPES = {
+    person: 'dot',
+    concept: 'square',
+    technology: 'diamond',
+    project: 'triangle',
+    preference: 'star',
+    location: 'hexagon',
+    other: 'dot',
+};
+const TYPE_SIZES = {
+    person: 20,
+    concept: 22,
+    technology: 20,
+    project: 22,
+    preference: 18,
+    location: 20,
+    other: 18,
+};
+
+async function loadGraph() {
     try {
-        const response = await fetch(`${API_BASE}/knowledge-graph`);
-        const data = await response.json();
-        
-        entities = data.entities || [];
-        relations = data.relations || [];
-        
-        document.getElementById('entity-count').textContent = data.stats?.entity_count || 0;
-        document.getElementById('relation-count').textContent = data.stats?.relation_count || 0;
-        
-        renderEntities();
-        renderRelations();
-        populateEntitySelects();
-        drawKnowledgeGraph();
-    } catch (error) {
-        console.error('Failed to load knowledge graph:', error);
+        const resp = await fetch(`${API_BASE}/knowledge-graph?limit=2000`);
+        const data = await resp.json();
+        allEntities = data.entities || [];
+        allRelations = data.relations || [];
+
+        document.getElementById('entity-count').textContent = allEntities.length;
+        document.getElementById('relation-count').textContent = allRelations.length;
+
+        drawKnowledgeGraph(allEntities, allRelations);
+    } catch (err) {
+        console.error('Failed to load graph:', err);
     }
 }
 
-function renderEntities() {
-    const container = document.getElementById('entities-list');
-    if (entities.length === 0) {
-        container.innerHTML = '<div class="empty-state">No entities yet. Add one to start building your knowledge graph!</div>';
-        return;
-    }
-    
-    container.innerHTML = entities.map(e => `
-        <div class="entity-card">
-            <span class="entity-name">${e.name}</span>
-            <span class="entity-type">${e.type}</span>
-            ${e.properties && Object.keys(e.properties).length > 0 
-                ? `<div class="entity-properties">${JSON.stringify(e.properties)}</div>` 
-                : ''}
-            <div class="entity-date">Created: ${new Date(e.created_at).toLocaleString()}</div>
-        </div>
-    `).join('');
-}
+function drawKnowledgeGraph(entities, relations) {
+    const container = document.getElementById('knowledge-network');
 
-function renderRelations() {
-    const container = document.getElementById('relations-list');
-    if (relations.length === 0) {
-        container.innerHTML = '<div class="empty-state">No relations yet. Create connections between entities!</div>';
-        return;
-    }
-    
-    container.innerHTML = relations.map(r => `
-        <div class="relation-card">
-            <div class="relation-visual">
-                <span class="relation-node">${r.from_name} (${r.from_type})</span>
-                <span class="relation-arrow">→</span>
-                <span class="relation-type-badge">${r.relation_type}</span>
-                <span class="relation-arrow">→</span>
-                <span class="relation-node">${r.to_name} (${r.to_type})</span>
-            </div>
-            <div class="entity-date">Created: ${new Date(r.created_at).toLocaleString()}</div>
-        </div>
-    `).join('');
-}
-
-function populateEntitySelects() {
-    const fromSelect = document.getElementById('relation-from');
-    const toSelect = document.getElementById('relation-to');
-    
-    const options = entities.map(e => `<option value="${e.id}">${e.name} (${e.type})</option>`).join('');
-    fromSelect.innerHTML = options || '<option>No entities available</option>';
-    toSelect.innerHTML = options || '<option>No entities available</option>';
-}
-
-function showAddEntityModal() {
-    document.getElementById('add-entity-modal').classList.add('active');
-}
-
-function showAddRelationModal() {
-    if (entities.length < 2) {
-        alert('You need at least 2 entities to create a relation');
-        return;
-    }
-    document.getElementById('add-relation-modal').classList.add('active');
-}
-
-async function addEntity(event) {
-    event.preventDefault();
-    
-    const name = document.getElementById('entity-name').value;
-    const type = document.getElementById('entity-type').value;
-    let properties = {};
-    
-    try {
-        properties = JSON.parse(document.getElementById('entity-properties').value);
-    } catch (e) {
-        properties = {};
-    }
-    
-    try {
-        const response = await fetch(`${API_BASE}/knowledge-graph/entities`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ name, type, properties })
-        });
-        
-        if (response.ok) {
-            closeModal('add-entity-modal');
-            document.getElementById('entity-name').value = '';
-            document.getElementById('entity-properties').value = '{}';
-            loadKnowledgeGraph();
-        }
-    } catch (error) {
-        console.error('Failed to add entity:', error);
-    }
-}
-
-async function addRelation(event) {
-    event.preventDefault();
-    
-    const from_entity = document.getElementById('relation-from').value;
-    const to_entity = document.getElementById('relation-to').value;
-    const relation_type = document.getElementById('relation-type').value;
-    
-    try {
-        const response = await fetch(`${API_BASE}/knowledge-graph/relations`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ from_entity, to_entity, relation_type })
-        });
-        
-        if (response.ok) {
-            closeModal('add-relation-modal');
-            loadKnowledgeGraph();
-        }
-    } catch (error) {
-        console.error('Failed to add relation:', error);
-    }
-}
-
-function drawKnowledgeGraph() {
-    const container = document.getElementById('graph-network');
-    const emptyMsg = document.getElementById('graph-empty');
-    
-    if (entities.length === 0) {
-        emptyMsg.style.display = 'block';
-        container.style.display = 'none';
-        return;
-    }
-    emptyMsg.style.display = 'none';
-    container.style.display = 'block';
-    
-    // Prepare nodes
-    const nodes = new vis.DataSet(entities.map(e => ({
+    const nodes = entities.map(e => ({
         id: e.id,
         label: e.name,
-        title: `${e.name} (${e.type})\n${JSON.stringify(e.properties || {}, null, 2)}`,
+        title: `${e.name}\nType: ${e.type}\n${e.properties?.description || ''}`,
         color: {
-            background: getTypeColor(e.type),
-            border: '#ffffff',
-            highlight: { background: getTypeColor(e.type), border: '#7c3aed' }
+            background: TYPE_COLORS[e.type] || '#6b7280',
+            border: '#ffffff22',
+            highlight: { background: TYPE_COLORS[e.type] || '#6b7280', border: '#fff' },
         },
-        font: { color: '#ffffff', size: 14 },
-        shape: 'dot',
-        size: 25
-    })));
-    
-    // Prepare edges
-    const edges = new vis.DataSet(relations.map((r, i) => ({
-        id: i,
+        font: { color: '#e0e0e0', size: 12 },
+        shape: TYPE_SHAPES[e.type] || 'dot',
+        size: TYPE_SIZES[e.type] || 18,
+        _entity: e,
+    }));
+
+    const edges = relations.map((r, i) => ({
+        id: `e-${i}`,
         from: r.from_entity,
         to: r.to_entity,
         label: r.relation_type,
         arrows: 'to',
-        color: { color: '#7c3aed', highlight: '#a78bfa' },
-        font: { color: '#9ca3af', size: 11, strokeWidth: 0 },
-        smooth: { type: 'curvedCW', roundness: 0.2 }
-    })));
-    
-    // Network options
-    const options = {
-        nodes: {
-            borderWidth: 2,
-            shadow: true
-        },
-        edges: {
-            width: 2,
-            shadow: true
-        },
-        physics: {
-            enabled: true,
-            solver: 'forceAtlas2Based',
-            forceAtlas2Based: {
-                gravitationalConstant: -50,
-                centralGravity: 0.01,
-                springLength: 150,
-                springConstant: 0.08
-            },
-            stabilization: { iterations: 100 }
-        },
-        interaction: {
-            hover: true,
-            tooltipDelay: 200,
-            zoomView: true,
-            dragView: true
-        }
-    };
-    
-    // Create or update network
+        color: { color: '#555', highlight: '#a78bfa' },
+        font: { color: '#777', size: 9, strokeWidth: 0 },
+        smooth: { type: 'curvedCW', roundness: 0.15 },
+        width: 1.5,
+    }));
+
+    nodesDataSet = new vis.DataSet(nodes);
+    edgesDataSet = new vis.DataSet(edges);
+
+    const options = getLayoutOptions();
+
     if (network) {
-        network.setData({ nodes, edges });
+        network.setData({ nodes: nodesDataSet, edges: edgesDataSet });
+        network.setOptions(options);
     } else {
-        network = new vis.Network(container, { nodes, edges }, options);
-        
-        // Click event for node details
-        network.on('click', function(params) {
-            if (params.nodes.length > 0) {
-                const nodeId = params.nodes[0];
-                const entity = entities.find(e => e.id === nodeId);
-                if (entity) {
-                    ariaLog('Selected entity:', entity);
-                }
-            }
-        });
+        network = new vis.Network(container, { nodes: nodesDataSet, edges: edgesDataSet }, options);
+        network.on('click', onNodeClick);
     }
 }
 
-function getTypeColor(type) {
-    const colors = {
-        person: '#ef4444',
-        concept: '#3b82f6',
-        technology: '#10b981',
-        project: '#f59e0b',
-        skill: '#8b5cf6',
-        preference: '#ec4899',
-        location: '#06b6d4',
-        other: '#6b7280'
+function getLayoutOptions() {
+    const base = {
+        nodes: { borderWidth: 1.5, shadow: { enabled: true, size: 5 } },
+        edges: { width: 1.5, shadow: false },
+        interaction: { hover: true, tooltipDelay: 150, zoomView: true, dragView: true },
     };
-    return colors[type] || colors.other;
+    if (currentLayout === 'hierarchical') {
+        return {
+            ...base,
+            layout: { hierarchical: { direction: 'UD', sortMethod: 'hubsize', levelSeparation: 120, nodeSpacing: 80 } },
+            physics: false,
+        };
+    }
+    return {
+        ...base,
+        layout: { hierarchical: false },
+        physics: {
+            enabled: true,
+            solver: 'forceAtlas2Based',
+            forceAtlas2Based: { gravitationalConstant: -40, centralGravity: 0.005, springLength: 120, springConstant: 0.06 },
+            stabilization: { iterations: 150 },
+        },
+    };
 }
 
-// Initialize
-document.addEventListener('DOMContentLoaded', () => loadKnowledgeGraph());
-window.addEventListener('resize', drawKnowledgeGraph);
+function toggleLayout() {
+    currentLayout = currentLayout === 'physics' ? 'hierarchical' : 'physics';
+    if (network) network.setOptions(getLayoutOptions());
+}
+
+function onNodeClick(params) {
+    if (params.nodes.length === 0) {
+        document.getElementById('no-selection').style.display = 'block';
+        document.getElementById('node-detail').classList.remove('active');
+        return;
+    }
+    const nodeId = params.nodes[0];
+    const entity = allEntities.find(e => e.id === nodeId);
+    if (!entity) return;
+
+    document.getElementById('no-selection').style.display = 'none';
+    document.getElementById('node-detail').classList.add('active');
+    document.getElementById('detail-name').textContent = entity.name;
+    const safeTypeClass = String(entity.type || '').replace(/[^a-zA-Z0-9_-]/g, '');
+    document.getElementById('detail-type').innerHTML = `<span class="type-badge type-${safeTypeClass}">${escapeHtml(entity.type || '')}</span>`;
+    document.getElementById('detail-desc').textContent = entity.properties?.description || '—';
+
+    const outgoing = allRelations.filter(r => r.from_entity === nodeId);
+    const incoming = allRelations.filter(r => r.to_entity === nodeId);
+    document.getElementById('detail-connections').innerHTML =
+        `↗ ${outgoing.length} outgoing, ↙ ${incoming.length} incoming<br>` +
+        outgoing.map(r => `→ <em>${esc(r.relation_type)}</em> → ${esc(r.to_name || r.to_entity)}`).join('<br>') +
+        (outgoing.length && incoming.length ? '<br>' : '') +
+        incoming.map(r => `← ${esc(r.from_name || r.from_entity)} <em>${esc(r.relation_type)}</em> ←`).join('<br>');
+
+    document.getElementById('detail-props').textContent = JSON.stringify(entity.properties || {}, null, 2);
+}
+
+function applyFilter() {
+    const typeFilter = document.getElementById('filter-type').value;
+
+    let filtered = allEntities;
+    if (typeFilter) filtered = filtered.filter(e => e.type === typeFilter);
+
+    const filteredIds = new Set(filtered.map(e => e.id));
+    const filteredRelations = allRelations.filter(r => filteredIds.has(r.from_entity) && filteredIds.has(r.to_entity));
+    drawKnowledgeGraph(filtered, filteredRelations);
+}
+
+let searchTimeout;
+function onSearchInput(q) {
+    clearTimeout(searchTimeout);
+    if (!q || q.length < 2) {
+        document.getElementById('search-results').innerHTML = '<div class="empty-state" style="padding: 0.5rem; color: var(--text-muted); font-size: 0.8rem;">Type to search…</div>';
+        document.getElementById('search-count').textContent = '0';
+        return;
+    }
+    searchTimeout = setTimeout(() => doSearch(q), 300);
+}
+
+async function doSearch(q) {
+    try {
+        const query = String(q || '').toLowerCase();
+        const results = allEntities.filter((e) => {
+            const name = String(e.name || '').toLowerCase();
+            const desc = String(e.properties?.description || '').toLowerCase();
+            return name.includes(query) || desc.includes(query);
+        }).slice(0, 20);
+        document.getElementById('search-count').textContent = results.length;
+        if (results.length === 0) {
+            document.getElementById('search-results').innerHTML = '<div style="padding: 0.5rem; color: var(--text-muted);">No results</div>';
+            return;
+        }
+        document.getElementById('search-results').innerHTML = results.map(e => `
+            <div class="search-result-item" onclick="focusNode('${esc(e.id)}')">
+                <span class="type-badge type-${esc(e.type)}">${esc(e.type)}</span>
+                <strong>${esc(e.name)}</strong>
+                <div style="color: var(--text-muted); font-size: 0.7rem;">${esc(e.properties?.description?.substring(0, 60) || '')}</div>
+            </div>
+        `).join('');
+    } catch (err) {
+        console.error('Search failed:', err);
+    }
+}
+
+function focusNode(nodeId) {
+    if (network) {
+        network.focus(nodeId, { scale: 1.5, animation: { duration: 500, easingFunction: 'easeInOutQuad' } });
+        network.selectNodes([nodeId]);
+        onNodeClick({ nodes: [nodeId] });
+    }
+}
+
+async function syncGraph() {
+    try {
+        await loadGraph();
+        alert(`Graph refreshed: ${allEntities.length} entities, ${allRelations.length} relations`);
+    } catch (err) {
+        alert('Refresh failed: ' + err.message);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => loadGraph());
 </script>
 {% endblock %}

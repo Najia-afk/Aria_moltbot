@@ -1,6 +1,5 @@
 {
-  "name": "sandbox",
-  "canonical_name": "aria-sandbox",
+  "name": "aria-sandbox",
   "version": "2.0.0",
   "layer": 3,
   "description": "Sandboxed code execution environment — run code, read/write files, and run tests in an isolated Docker container.",

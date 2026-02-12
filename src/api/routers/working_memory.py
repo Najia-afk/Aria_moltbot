@@ -8,6 +8,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel
 from sqlalchemy import select, delete, update, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,6 +17,24 @@ from deps import get_db
 from pagination import paginate_query, build_paginated_response
 
 router = APIRouter(tags=["Working Memory"])
+
+
+def _not_expired_clause():
+    return (
+        (WorkingMemory.ttl_hours.is_(None))
+        | (
+            WorkingMemory.created_at
+            + func.make_interval(0, 0, 0, 0, WorkingMemory.ttl_hours)
+            > func.now()
+        )
+    )
+
+
+class CleanupRequest(BaseModel):
+    category: str | None = None
+    source: str | None = None
+    delete_expired: bool = True
+    dry_run: bool = False
 
 
 # ── List / Filter ────────────────────────────────────────────────────────────
@@ -70,14 +89,7 @@ async def get_working_memory_context(
     if category:
         stmt = stmt.where(WorkingMemory.category == category)
     # Exclude expired TTL items
-    stmt = stmt.where(
-        (WorkingMemory.ttl_hours.is_(None))
-        | (
-            WorkingMemory.created_at
-            + func.make_interval(0, 0, 0, 0, WorkingMemory.ttl_hours)
-            > func.now()
-        )
-    )
+    stmt = stmt.where(_not_expired_clause())
     # Cap SQL results to avoid loading entire table into memory
     stmt = stmt.order_by(WorkingMemory.importance.desc()).limit(200)
     result = await db.execute(stmt)
@@ -296,4 +308,89 @@ async def get_latest_checkpoint(
         "checkpoint_id": latest_id,
         "items": [r.to_dict() for r in rows],
         "count": len(rows),
+    }
+
+
+@router.get("/working-memory/stats")
+async def get_working_memory_stats(db: AsyncSession = Depends(get_db)):
+    """Reliable aggregate stats across all working memory rows."""
+    total = (await db.execute(select(func.count()).select_from(WorkingMemory))).scalar() or 0
+
+    category_rows = (
+        await db.execute(
+            select(WorkingMemory.category, func.count().label("count"))
+            .group_by(WorkingMemory.category)
+            .order_by(func.count().desc())
+        )
+    ).all()
+
+    avg_importance = (
+        await db.execute(select(func.avg(WorkingMemory.importance)))
+    ).scalar()
+    avg_importance = float(avg_importance) if avg_importance is not None else 0.0
+
+    checkpoint_count = (
+        await db.execute(
+            select(func.count(func.distinct(WorkingMemory.checkpoint_id)))
+            .where(WorkingMemory.checkpoint_id.isnot(None))
+        )
+    ).scalar() or 0
+
+    expired_count = (
+        await db.execute(
+            select(func.count())
+            .select_from(WorkingMemory)
+            .where(~_not_expired_clause())
+        )
+    ).scalar() or 0
+
+    return {
+        "total_items": total,
+        "categories": len(category_rows),
+        "avg_importance": round(avg_importance, 2),
+        "checkpoint_count": checkpoint_count,
+        "expired_count": expired_count,
+        "by_category": [
+            {"category": row[0], "count": row[1]}
+            for row in category_rows
+        ],
+    }
+
+
+@router.post("/working-memory/cleanup")
+async def cleanup_working_memory(
+    payload: CleanupRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Smart cleanup for noisy data (e.g. test rows, expired rows)."""
+    filters = []
+    if payload.category:
+        filters.append(WorkingMemory.category == payload.category)
+    if payload.source:
+        filters.append(WorkingMemory.source == payload.source)
+
+    if payload.delete_expired:
+        filters.append(~_not_expired_clause())
+
+    if not filters:
+        raise HTTPException(status_code=400, detail="Provide category/source or enable delete_expired")
+
+    count_stmt = select(func.count()).select_from(WorkingMemory)
+    for cond in filters:
+        count_stmt = count_stmt.where(cond)
+    matched = (await db.execute(count_stmt)).scalar() or 0
+
+    if payload.dry_run:
+        return {"matched": matched, "deleted": 0, "dry_run": True}
+
+    del_stmt = delete(WorkingMemory)
+    for cond in filters:
+        del_stmt = del_stmt.where(cond)
+    result = await db.execute(del_stmt)
+    await db.commit()
+
+    return {
+        "matched": matched,
+        "deleted": result.rowcount or 0,
+        "dry_run": False,
     }

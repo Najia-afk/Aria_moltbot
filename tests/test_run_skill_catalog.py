@@ -179,3 +179,55 @@ class TestPositionalArgsStillWork:
         output = json.loads(result.stdout)
         assert "error" in output
         assert "Usage" in output["error"]
+
+
+class TestMandatorySkillCoherence:
+    """Mandatory coherence policy for changed skills in run_skill."""
+
+    def test_validate_skill_coherence_detects_missing_files(self, tmp_path, monkeypatch):
+        from aria_mind.skills import run_skill as rs
+
+        skill_dir = tmp_path / "aria_skills" / "demo_skill"
+        skill_dir.mkdir(parents=True, exist_ok=True)
+        (skill_dir / "__init__.py").write_text("class DemoSkill: pass\n", encoding="utf-8")
+        (skill_dir / "skill.json").write_text(
+            json.dumps({"name": "aria-wrong-name"}),
+            encoding="utf-8",
+        )
+
+        monkeypatch.setattr(rs, "_workspace_root", lambda: tmp_path)
+        monkeypatch.setattr(rs, "_has_skill_changes", lambda _name: True)
+
+        report = rs._validate_skill_coherence("demo_skill")
+        assert report["has_changes"] is True
+        assert report["coherent"] is False
+        assert any("Missing SKILL.md" in err for err in report["errors"])
+        assert any("skill.json name mismatch" in err for err in report["errors"])
+
+    @pytest.mark.asyncio
+    async def test_run_skill_blocks_changed_incoherent_skill(self, monkeypatch):
+        from aria_mind.skills import run_skill as rs
+
+        monkeypatch.setattr(
+            rs,
+            "_validate_skill_coherence",
+            lambda _name: {
+                "has_changes": True,
+                "coherent": False,
+                "errors": ["Missing SKILL.md"],
+            },
+        )
+
+        captured = {}
+        monkeypatch.setattr(rs, "_write_aria_mind_run_report", lambda payload: captured.update(payload))
+
+        monkeypatch.setitem(rs.SKILL_REGISTRY, "tmp_skill", ("json", "JSONDecoder", lambda: {}))
+
+        result = await rs.run_skill("tmp_skill", "any_method", {})
+        assert "error" in result
+        assert "Skill coherence check failed" in result["error"]
+        assert result.get("coherence", {}).get("coherent") is False
+        assert captured.get("status") == "blocked_coherence"
+        assert captured.get("mandatory_enforced") is True
+
+        rs.SKILL_REGISTRY.pop("tmp_skill", None)

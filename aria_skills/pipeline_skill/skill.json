@@ -1,5 +1,5 @@
 {
-  "name": "aria-pipeline",
+  "name": "aria-pipeline-skill",
   "version": "1.0.0",
   "description": "Cognitive Pipeline Engine — compose and run multi-step skill workflows with dependency tracking, failure handling, and shared context.",
   "author": "Aria Team",
