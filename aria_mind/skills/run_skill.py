@@ -3,12 +3,12 @@
 Aria Skill Runner - Execute Python skills from OpenClaw exec tool.
 
 Usage:
-    python3 run_skill.py <skill_name> <function_name> [args_json]
+    python3 aria_mind/skills/run_skill.py <skill_name> <function_name> [args_json]
     
 Example:
-    python3 run_skill.py database query '{"sql": "SELECT * FROM activity_log LIMIT 5"}'
-    python3 run_skill.py security_scan scan_code '{"code": "import os; os.system(cmd)"}'
-    python3 run_skill.py market_data get_price '{"symbol": "BTC"}'
+    python3 aria_mind/skills/run_skill.py api_client get_activities '{"limit": 5}'
+    python3 aria_mind/skills/run_skill.py security_scan scan_directory '{"directory": "/workspace", "extensions": [".py"]}'
+    python3 aria_mind/skills/run_skill.py market_data get_price '{"symbol": "BTC"}'
 """
 import sys
 import os
@@ -43,6 +43,15 @@ from aria_mind.skills._kernel_router import auto_route_task_to_skills
 
 
 _SUPPORT_SKILL_DIRS = {'_template', '__pycache__', 'pipelines'}
+
+
+def _is_allowed_skill_method(function_name: str) -> bool:
+    if not isinstance(function_name, str):
+        return False
+    fn = function_name.strip()
+    if not fn or fn.startswith("_"):
+        return False
+    return fn.isidentifier()
 
 
 def _workspace_root() -> Path:
@@ -93,6 +102,39 @@ async def run_skill(skill_name: str, function_name: str, args: dict):
         # Normalize canonical "aria-*" names to python underscore names
         if skill_name.startswith("aria-"):
             skill_name = skill_name[5:].replace("-", "_")
+
+        if not _is_allowed_skill_method(function_name):
+            duration_ms = (time.monotonic() - t0) * 1000
+            error_msg = (
+                "Invalid function_name. Only public python identifiers are allowed "
+                "(no private/dunder methods)."
+            )
+            _write_aria_mind_run_report({
+                'requested_skill_name': requested_skill_name,
+                'normalized_skill_name': skill_name,
+                'function_name': function_name,
+                'args_keys': sorted(list((args or {}).keys())) if isinstance(args, dict) else [],
+                'status': 'failed',
+                'error': error_msg,
+                'duration_ms': round(duration_ms, 2),
+                'mandatory_enforced': True,
+            })
+            return {'error': error_msg}
+
+        if not isinstance(args, dict):
+            duration_ms = (time.monotonic() - t0) * 1000
+            error_msg = 'Invalid args payload. Expected a JSON object.'
+            _write_aria_mind_run_report({
+                'requested_skill_name': requested_skill_name,
+                'normalized_skill_name': skill_name,
+                'function_name': function_name,
+                'args_keys': [],
+                'status': 'failed',
+                'error': error_msg,
+                'duration_ms': round(duration_ms, 2),
+                'mandatory_enforced': True,
+            })
+            return {'error': error_msg}
 
         coherence = _validate_skill_coherence(skill_name)
 
@@ -255,6 +297,13 @@ def _parse_args_payload(raw: Optional[str]) -> Tuple[dict, Optional[str]]:
         try:
             return json.loads(cleaned), None
         except json.JSONDecodeError:
+            truncated = raw[:2000]
+            if len(raw) > 2000:
+                return {
+                    'raw_input': truncated,
+                    'truncated': True,
+                    'original_length': len(raw),
+                }, 'Could not parse args as JSON, passing truncated raw_input'
             return {'raw_input': raw}, 'Could not parse args as JSON, passing as raw_input'
 
 if __name__ == '__main__':

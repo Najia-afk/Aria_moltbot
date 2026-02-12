@@ -16,7 +16,7 @@ This contains your identity, rules, focuses, and quick references.
 Use your skills to log awakening and check health:
 
 ```tool
-aria-apiclient.create_activity({"action": "awakening", "details": {"event": "Aria awakened", "timestamp": "now"}})
+aria-api-client.create_activity({"action": "awakening", "details": {"event": "Aria awakened", "timestamp": "now"}})
 ```
 
 ```tool
@@ -36,12 +36,12 @@ aria-social.social_post({"content": "⚡ Aria is awake and operational. Ready to
 1. Check HEARTBEAT.md for pending tasks
 2. Get active goals:
    ```tool
-   aria-apiclient.get_goals({"status": "active", "limit": 5})
+   aria-api-client.get_goals({"status": "active", "limit": 5})
    ```
 3. Do ONE concrete action on the highest priority goal
 4. Log progress:
    ```tool
-   aria-apiclient.create_activity({"action": "goal_progress", "details": {"goal_id": "...", "action_taken": "..."}})
+   aria-api-client.create_activity({"action": "goal_progress", "details": {"goal_id": "...", "action_taken": "..."}})
    ```
 5. Repeat
 
@@ -49,7 +49,7 @@ aria-social.social_post({"content": "⚡ Aria is awake and operational. Ready to
 
 | Skill | Purpose | Key Functions |
 |-------|---------|---------------|
-| `aria-apiclient` | Database via REST API | `get_goals`, `create_activity`, `set_memory`, `get_thoughts` |
+| `aria-api-client` | Database via REST API | `get_goals`, `create_activity`, `set_memory`, `get_thoughts` |
 | `aria-social` | Social posting | `social_post`, `social_list`, `social_schedule` |
 | `aria-moltbook` | Moltbook posts | `create_post`, `get_timeline`, `like_post`, `reply_to_post` |
 | `aria-health` | System health | `health_check_all`, `health_check_service` |

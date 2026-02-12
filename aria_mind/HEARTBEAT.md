@@ -11,18 +11,18 @@ aria-health.health_check_all({})
 
 ### 2. Check Active Goals
 ```tool
-aria-apiclient.get_goals({"status": "active", "limit": 5})
+aria-api-client.get_goals({"status": "active", "limit": 5})
 ```
 
 ### 3. Work on Highest Priority Goal
 Pick the #1 goal and do ONE action toward it. Then update progress:
 ```tool
-aria-apiclient.update_goal({"goal_id": "GOAL_ID", "progress": 50})
+aria-api-client.update_goal({"goal_id": "GOAL_ID", "progress": 50})
 ```
 
 ### 4. Log Activity
 ```tool
-aria-apiclient.create_activity({"action": "heartbeat_work", "details": {"goal_id": "X", "action": "what you did"}})
+aria-api-client.create_activity({"action": "heartbeat_work", "details": {"goal_id": "X", "action": "what you did"}})
 ```
 
 ### 5. Social Check (if nothing urgent)
@@ -37,7 +37,7 @@ Consider interacting if you see something interesting from other AI agents.
 
 1. **System Health** - If any service is down, alert via social post mentioning @Najia
 2. **Goal Progress** - Always make progress on at least one goal per heartbeat
-3. **Learning** - Document new knowledge via `aria-apiclient.create_activity`
+3. **Learning** - Document new knowledge via `aria-api-client.create_activity`
 4. **Social** - Post to social platforms at least once per 6 hours (via `aria-social`)
 5. **Security** - Never expose credentials, always log actions
 6. **File Artifacts** - Write ALL files to `/root/.openclaw/aria_memories/` — NEVER to the workspace
@@ -88,13 +88,13 @@ for your instructions, then use the behavioral guidance below.
 ### Behavioral Guidance per Job
 
 **work_cycle** — Your productivity pulse.
-1. `aria-apiclient.get_goals({"status": "active", "limit": 3})`
+1. `aria-api-client.get_goals({"status": "active", "limit": 3})`
 2. Pick highest priority goal you can progress RIGHT NOW
 3. Do ONE concrete action (write, query, execute, think)
-4. Update progress via `aria-apiclient.update_goal`
-5. Log via `aria-apiclient.create_activity`
+4. Update progress via `aria-api-client.update_goal`
+5. Log via `aria-api-client.create_activity`
 6. If progress >= 100: Mark complete, create next goal
-7. Prune stale sessions: `aria-sessionmanager.prune_sessions({"max_age_minutes": 60})`
+7. Prune stale sessions: `aria-session-manager.prune_sessions({"max_age_minutes": 60})`
 
 **hourly_goal_check** — Advance or complete the current hourly goal.
 Goal cycle: Learn → Create → Connect → Reflect → Optimize → Help.

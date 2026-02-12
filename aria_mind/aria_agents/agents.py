@@ -3,6 +3,7 @@
 These agents subclass BaseAgent and use sessions_spawn for actual execution.
 """
 import json
+import re
 from typing import Any
 
 from .base import AgentConfig, AgentResult, BaseAgent
@@ -52,16 +53,31 @@ class OpenClawAgent(BaseAgent):
     
     def _build_prompt(self, task_type: str, params: dict, context: str) -> str:
         """Build the prompt for the sub-agent."""
+        safe_task_type = self._sanitize_prompt_fragment(task_type, max_len=160)
+        safe_context = self._sanitize_prompt_fragment(context, max_len=2400)
         prompt_parts = [
             f"You are the {self.focus} agent.",
-            f"Task type: {task_type}",
+            f"Task type: {safe_task_type}",
             f"Your capabilities: {', '.join(self.capabilities)}",
         ]
-        if context:
-            prompt_parts.append(f"Context: {context}")
+        if safe_context:
+            prompt_parts.append(f"Context: {safe_context}")
         if params:
-            prompt_parts.append(f"Parameters: {json.dumps(params, indent=2)}")
+            try:
+                params_text = json.dumps(params, indent=2, default=str)
+            except Exception:
+                params_text = str(params)
+            prompt_parts.append(
+                f"Parameters: {self._sanitize_prompt_fragment(params_text, max_len=2400)}"
+            )
         return "\n".join(prompt_parts)
+
+    def _sanitize_prompt_fragment(self, value: Any, max_len: int = 2000) -> str:
+        text = str(value or "")
+        text = re.sub(r"[\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]", "", text)
+        text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", text)
+        text = re.sub(r"\s+", " ", text).strip()
+        return text[:max_len]
     
     def _spawn_session(self, prompt: str, timeout: int | None = None) -> dict:
         """Spawn OpenClaw session. Override in tests or use mock.

@@ -10,7 +10,8 @@ aria-<skill-name>.<function>({"param": "value"})
 >
 > **Catalog:** Run `python -m aria_mind --list-skills` to generate a live skill catalog from `aria_skills/catalog.py`.
 >
-> **Deprecated (removed in v1.2):** `database`, `brainstorm`, `community`, `fact_check`, `model_switcher`, `experiment` — functionality merged into other skills or obsoleted.
+> **Legacy compatibility skills (de-prioritized):** `database`, `brainstorm`, `community`, `fact_check`, `model_switcher`, `experiment`.
+> Prefer `api_client` and layer-aligned skills for normal operations.
 
 ## Skill Layers
 
@@ -22,40 +23,40 @@ aria-<skill-name>.<function>({"param": "value"})
 | 3 | Domain | Business logic | `agent_manager`, `ci_cd`, `data_pipeline`, `knowledge_graph`, `market_data`, `memeothy`, `moltbook`, `moonshot`, `ollama`, `portfolio`, `pytest_runner`, `research`, `sandbox`, `security_scan`, `social`, `telegram` |
 | 4 | Orchestration | High-level coordination | `goals`, `hourly_goals`, `performance`, `schedule`, `working_memory`, `pipeline_skill` |
 
-## ⭐ PRIMARY SKILL: aria-apiclient
+## ⭐ PRIMARY SKILL: aria-api-client
 
 **Use this for ALL database operations!** It provides a clean REST interface to aria-api.
-**⚠️ NEVER use aria-database for reads/writes when aria-apiclient can do the same thing.**
+**⚠️ NEVER use aria-database for reads/writes when aria-api-client can do the same thing.**
 **aria-database is for raw SQL emergencies only (migrations, complex JOINs, admin ops).**
 
 ```tool
 # Get/create activities
-aria-apiclient.get_activities({"limit": 10})
-aria-apiclient.create_activity({"action": "task_done", "details": {"info": "..."}})
+aria-api-client.get_activities({"limit": 10})
+aria-api-client.create_activity({"action": "task_done", "details": {"info": "..."}})
 
 # Goals CRUD
-aria-apiclient.get_goals({"status": "active", "limit": 5})
-aria-apiclient.create_goal({"title": "...", "description": "...", "priority": 2})
-aria-apiclient.update_goal({"goal_id": "X", "progress": 50, "status": "completed"})
-aria-apiclient.delete_goal({"goal_id": "X"})
+aria-api-client.get_goals({"status": "active", "limit": 5})
+aria-api-client.create_goal({"title": "...", "description": "...", "priority": 2})
+aria-api-client.update_goal({"goal_id": "X", "progress": 50, "status": "completed"})
+aria-api-client.delete_goal({"goal_id": "X"})
 
 # Memories (key-value store)
-aria-apiclient.get_memories({"limit": 10, "category": "preferences"})
-aria-apiclient.set_memory({"key": "user_pref", "value": "dark_mode", "category": "preferences"})
-aria-apiclient.get_memory({"key": "user_pref"})
-aria-apiclient.delete_memory({"key": "user_pref"})
+aria-api-client.get_memories({"limit": 10, "category": "preferences"})
+aria-api-client.set_memory({"key": "user_pref", "value": "dark_mode", "category": "preferences"})
+aria-api-client.get_memory({"key": "user_pref"})
+aria-api-client.delete_memory({"key": "user_pref"})
 
 # Thoughts (reflections)
-aria-apiclient.get_thoughts({"limit": 10})
-aria-apiclient.create_thought({"content": "Reflecting on...", "category": "reflection"})
+aria-api-client.get_thoughts({"limit": 10})
+aria-api-client.create_thought({"content": "Reflecting on...", "category": "reflection"})
 
 # Hourly goals
-aria-apiclient.get_hourly_goals({"status": "pending"})
-aria-apiclient.create_hourly_goal({"goal_type": "learn", "description": "..."})
-aria-apiclient.update_hourly_goal({"goal_id": "X", "status": "completed", "result": "..."})
+aria-api-client.get_hourly_goals({"status": "pending"})
+aria-api-client.create_hourly_goal({"goal_type": "learn", "description": "..."})
+aria-api-client.update_hourly_goal({"goal_id": "X", "status": "completed", "result": "..."})
 
 # Health check
-aria-apiclient.health_check({})
+aria-api-client.health_check({})
 ```
 
 ## Skill Categories by Focus
@@ -65,11 +66,11 @@ aria-apiclient.health_check({})
 |-------|-----------|--------|
 | `goals` | `create_goal`, `list_goals`, `update_progress`, `complete_goal` | Task tracking, priorities |
 | `schedule` | `list_jobs`, `create_task`, `trigger`, `sync_jobs` | Scheduled tasks, automation |
-| `health` | `check_health`, `get_metrics`, `system_status`, `run_diagnostics`, `auto_recover` | System monitoring & self-diagnostic (v1.1) |
+| `health` | `health_check_all`, `health_check_service`, `get_metrics`, `run_diagnostics` | System monitoring & self-diagnostic (v1.1) |
 | `agent_manager` | `list_agents`, `spawn_agent`, `stop_agent`, `get_status` | Agent lifecycle management (v1.1) |
 | `session_manager` | `create_session`, `get_session`, `end_session`, `list_sessions` | Session lifecycle management (v1.1) |
 | `ci_cd` | `generate_workflow`, `generate_dockerfile`, `lint_workflow` | CI/CD automation |
-| `pytest` | `run_pytest`, `collect_pytest` | Test execution |
+| `pytest_runner` | `run_pytest`, `collect_pytest` | Test execution |
 | `database` | `fetch_all`, `fetch_one`, `execute`, `log_thought`, `store_memory` | PostgreSQL operations |
 | `input_guard` | `check_input`, `scan_output`, `detect_injection` | Runtime security (v1.1) |
 | `sandbox` | `execute_code`, `run_script`, `get_result` | Docker sandbox for safe code execution (v1.1) |
@@ -141,7 +142,7 @@ aria-moltbook.get_timeline({"limit": 10})
 aria-moltbook.like_post({"post_id": "molt_123"})
 ```
 
-### Direct Database (⚠️ LAST RESORT — prefer aria-apiclient for ALL data ops)
+### Direct Database (⚠️ LAST RESORT — prefer aria-api-client for ALL data ops)
 ```tool
 aria-database.fetch_all({"query": "SELECT * FROM goals WHERE status = $1 LIMIT 5", "args": ["active"]})
 aria-database.fetch_one({"query": "SELECT * FROM goals WHERE id = $1", "args": ["1"]})

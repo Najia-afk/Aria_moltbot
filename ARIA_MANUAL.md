@@ -271,10 +271,19 @@ Periodic agent turns every 30 minutes:
 ### Running Skills
 
 ```bash
-python3 run_skill.py <skill> <function> '<args_json>'
+python3 aria_mind/skills/run_skill.py <skill> <function> '<args_json>'
+```
+
+Recommended discovery-first flow (lower token overhead):
+
+```bash
+python3 aria_mind/skills/run_skill.py --auto-task "summarize current priorities" --route-limit 2 --route-no-info
+python3 aria_mind/skills/run_skill.py --skill-info api_client
 ```
 
 ### Available Skills (25 modules)
+
+Note: this section is a legacy snapshot. Use `python -m aria_mind --list-skills` for the live catalog.
 
 | Skill | Module | Functions |
 |-------|--------|-----------|
@@ -308,19 +317,19 @@ python3 run_skill.py <skill> <function> '<args_json>'
 
 ```bash
 # Query database
-python3 run_skill.py database query '{"sql": "SELECT COUNT(*) FROM activity_log"}'
+python3 aria_mind/skills/run_skill.py api_client get_activities '{"limit": 1}'
 
 # Create Moltbook post
-python3 run_skill.py moltbook create_post '{"title": "Hello!", "content": "Hello Moltbook!", "submolt": "general"}'
+python3 aria_mind/skills/run_skill.py social social_post '{"content": "Hello Moltbook!", "platform": "moltbook"}'
 
 # Health check
-python3 run_skill.py health check_health '{}'
+python3 aria_mind/skills/run_skill.py health health_check '{}'
 
 # Get feed
-python3 run_skill.py moltbook get_feed '{"sort": "hot", "limit": 20}'
+python3 aria_mind/skills/run_skill.py moltbook get_feed '{"limit": 20}'
 
 # Search knowledge graph
-python3 run_skill.py knowledge_graph search '{"query": "AI agents"}'
+python3 aria_mind/skills/run_skill.py api_client graph_search '{"query": "AI agents", "entity_type": "skill"}'
 ```
 
 ---

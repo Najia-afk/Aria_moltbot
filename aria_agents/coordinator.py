@@ -112,7 +112,7 @@ class LLMAgent(BaseAgent):
         
         # Build messages for LLM
         import os
-        context_limit = int(os.getenv("AGENT_CONTEXT_LIMIT", "10"))
+        context_limit = int(os.getenv("AGENT_CONTEXT_LIMIT", "8"))
         messages = [{"role": "system", "content": self.get_system_prompt()}]
         skill_routing = kwargs.get("skill_routing")
         if isinstance(skill_routing, dict):
@@ -120,18 +120,15 @@ class LLMAgent(BaseAgent):
             route_source = skill_routing.get("route_source", "unknown")
             if candidates:
                 top = []
-                for row in candidates[:3]:
-                    top_name = row.get("canonical_name") or row.get("skill_name")
+                for row in candidates[:2]:
+                    top_name = row.get("skill_name") or row.get("canonical_name")
                     if top_name:
                         top.append(str(top_name))
                 if top:
                     messages.append(
                         {
                             "role": "system",
-                            "content": (
-                                "Runtime skill routing hint "
-                                f"(source: {route_source}): {', '.join(top)}"
-                            ),
+                            "content": f"Skill hints ({route_source}): {', '.join(top)}",
                         }
                     )
 
@@ -191,7 +188,7 @@ class AgentCoordinator:
     async def suggest_skills_for_task(
         self,
         task: str,
-        limit: int = 3,
+        limit: int = 2,
         include_info: bool = False,
     ) -> Dict[str, Any]:
         """Best-effort skill routing for a free-form task."""
@@ -325,7 +322,7 @@ class AgentCoordinator:
             try:
                 kwargs["skill_routing"] = await self.suggest_skills_for_task(
                     task=message,
-                    limit=3,
+                    limit=2,
                     include_info=False,
                 )
             except Exception as exc:

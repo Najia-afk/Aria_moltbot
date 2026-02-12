@@ -357,10 +357,13 @@ aria_skills/<skill>/
 
 ```
 /root/.openclaw/workspace/skills/
-├── run_skill.py                # Skill runner (generated at startup)
+├── run_skill.py                # Legacy compatibility runner
 ├── aria_skills/                # ← mounted from ../../aria_skills
 ├── aria_agents/                # ← mounted from ../../aria_agents
 └── legacy/                     # ← mounted from ../../skills (deprecated)
+
+/root/.openclaw/workspace/aria_mind/skills/
+└── run_skill.py                # Primary skill runner (current)
 
 /root/.openclaw/skills/         # OpenClaw manifest symlinks
 ├── aria-database/skill.json    # → .../aria_skills/database/skill.json
@@ -374,7 +377,7 @@ aria_skills/<skill>/
 OpenClaw Agent (exec tool)
        │
        ▼
-python3 run_skill.py <skill> <function> '<args_json>'
+python3 aria_mind/skills/run_skill.py <skill> <function> '<args_json>'
        │
        ▼
 SkillRegistry → imports aria_skills.<skill>

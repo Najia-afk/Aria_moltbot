@@ -70,7 +70,7 @@ skills = SkillRegistry()
 await skills.load_from_config("aria_mind/TOOLS.md")
 
 # Verify critical skills
-assert skills.get("database").is_available
+assert skills.get("api_client").is_available
 assert skills.get("moltbook").is_available
 ```
 

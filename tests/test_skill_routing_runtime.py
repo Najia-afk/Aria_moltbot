@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from aria_mind.skills import _kernel_router as kernel_router
-from aria_mind.skills.run_skill import _parse_args_payload
+from aria_mind.skills.run_skill import _is_allowed_skill_method, _parse_args_payload, run_skill
 
 
 pytestmark = pytest.mark.unit
@@ -21,6 +21,34 @@ class TestParseArgsPayload:
         args, warning = _parse_args_payload("not-json")
         assert args == {"raw_input": "not-json"}
         assert warning is not None
+
+
+class TestRunSkillInputGuards:
+    @pytest.mark.parametrize(
+        "name,allowed",
+        [
+            ("health_check", True),
+            ("execute", True),
+            ("__init__", False),
+            ("_private", False),
+            ("bad-name", False),
+            ("", False),
+        ],
+    )
+    def test_method_name_guard(self, name: str, allowed: bool):
+        assert _is_allowed_skill_method(name) is allowed
+
+    @pytest.mark.asyncio
+    async def test_run_skill_rejects_non_dict_args(self):
+        result = await run_skill("api_client", "health_check", ["not", "an", "object"])  # type: ignore[arg-type]
+        assert "error" in result
+        assert "Expected a JSON object" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_run_skill_rejects_private_method(self):
+        result = await run_skill("api_client", "__init__", {})
+        assert "error" in result
+        assert "Only public python identifiers" in result["error"]
 
 
 class TestAutoRouteDiagnostics:

@@ -16,7 +16,7 @@ from aria_mind.skills._skill_introspection import collect_skill_info
 _API_BASE = os.environ.get("ARIA_API_URL", "http://aria-api:8000/api").rstrip("/")
 
 try:
-    import httpx
+    import httpx  # type: ignore[import-not-found]
 
     _HAS_HTTPX = True
 except ImportError:

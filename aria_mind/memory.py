@@ -3,7 +3,8 @@
 Memory Manager - Long-term storage and recall with consolidation.
 
 Integrates with:
-- Database skill for persistent key-value memory
+- API-backed data path (api_client-first) for persistent key-value memory
+- Database adapter as fallback for legacy/emergency flows
 - File-based storage for artifacts (research, plans, drafts, exports)
 
 Enhanced with:

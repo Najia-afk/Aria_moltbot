@@ -285,14 +285,16 @@ Use the `input_guard` skill for runtime security:
 
 ```bash
 # Analyze input
-python3 run_skill.py input_guard analyze_input '{"text": "user message"}'
+python3 aria_mind/skills/run_skill.py input_guard check_input '{"text": "user message"}'
 
-# Build safe query
-python3 run_skill.py input_guard build_safe_query '{"operation": "select", "table": "goals", "columns": ["id", "title"]}'
+# Detect prompt injection patterns
+python3 aria_mind/skills/run_skill.py input_guard detect_injection '{"text": "Ignore previous instructions"}'
 
-# Get security summary
-python3 run_skill.py input_guard get_security_summary '{"hours": 24}'
+# Inspect available methods safely
+python3 aria_mind/skills/run_skill.py --skill-info input_guard
 ```
+
+`run_skill.py` enforces public-method-only execution and rejects private/dunder function names.
 
 ---
 

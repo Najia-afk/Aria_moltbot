@@ -182,7 +182,7 @@ class Cognition:
             try:
                 context["skill_routing"] = await self._agents.suggest_skills_for_task(
                     task=prompt,
-                    limit=3,
+                    limit=2,
                     include_info=False,
                 )
             except Exception as e:

@@ -9,7 +9,7 @@ import os
 _API_BASE = os.environ.get("ARIA_API_URL", "http://aria-api:8000/api").rstrip("/")
 
 try:
-    import httpx
+    import httpx  # type: ignore[import-not-found]
 
     _HAS_HTTPX = True
 except ImportError:
