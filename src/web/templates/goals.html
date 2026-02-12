@@ -1392,6 +1392,9 @@ goalsPager = new AriaPagination('goals-pagination', {
     onPageChange: (page, limit) => loadGoals(page, limit),
     limit: 25
 });
-document.addEventListener('DOMContentLoaded', loadGoals);
+document.addEventListener('DOMContentLoaded', () => {
+    loadGoals();
+    setInterval(() => loadGoals(), 30000);
+});
 </script>
 {% endblock %}

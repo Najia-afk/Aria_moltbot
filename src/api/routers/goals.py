@@ -127,9 +127,14 @@ async def goal_board(
         )
         sprint = latest.scalar() or "sprint-1"
 
-    # Fetch all goals for this sprint + backlog
+    from sqlalchemy import or_
+
+    # Fetch all goals for this sprint + backlog + NULL sprint
     stmt = select(Goal).where(
-        Goal.sprint.in_([sprint, "backlog"])
+        or_(
+            Goal.sprint.in_([sprint, "backlog"]),
+            Goal.sprint.is_(None),
+        )
     ).order_by(Goal.position.asc(), Goal.priority.asc())
     result = await db.execute(stmt)
     goals = result.scalars().all()

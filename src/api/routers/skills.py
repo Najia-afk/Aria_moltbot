@@ -39,12 +39,29 @@ async def list_skills(
     status: str = None,
     db: AsyncSession = Depends(get_db),
 ):
-    """List all registered skills with optional status filter."""
+    """List all registered skills with optional status filter. Auto-seeds if empty."""
     stmt = select(SkillStatusRecord).order_by(SkillStatusRecord.skill_name)
     if status:
         stmt = stmt.where(SkillStatusRecord.status == status)
     result = await db.execute(stmt)
     rows = result.scalars().all()
+
+    # Auto-seed if table is empty (first access)
+    if not rows and not status:
+        for name, layer in _KNOWN_SKILLS:
+            seed_stmt = pg_insert(SkillStatusRecord).values(
+                skill_name=name,
+                canonical_name=name.replace("_", "-"),
+                status="healthy",
+                layer=layer,
+            ).on_conflict_do_nothing(index_elements=["skill_name"])
+            await db.execute(seed_stmt)
+        await db.commit()
+        result = await db.execute(
+            select(SkillStatusRecord).order_by(SkillStatusRecord.skill_name)
+        )
+        rows = result.scalars().all()
+
     return {
         "skills": [r.to_dict() for r in rows],
         "count": len(rows),

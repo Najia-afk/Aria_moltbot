@@ -448,6 +448,6 @@ postsPager = new AriaPagination('posts-pagination', {
     onPageChange: (page, limit) => loadPosts(page, limit),
     limit: 25
 });
-document.addEventListener('DOMContentLoaded', loadPosts);
+document.addEventListener('DOMContentLoaded', () => loadPosts());
 </script>
 {% endblock %}

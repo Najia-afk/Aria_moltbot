@@ -331,55 +331,36 @@
         })
         .catch(() => {});
 
-    // Load recent activities + activity timeline chart (single fetch)
+    // Load recent activities + activity timeline chart
     let _activitiesCache = [];
 
     function loadActivityChart() {
         const periodDays = parseInt(document.getElementById('activity-period-filter').value || '7', 10);
-        const now = new Date();
-        const dayBuckets = {};
 
-        if (periodDays === 1) {
-            // Hourly buckets for 24h
-            for (let i = 23; i >= 0; i--) {
-                const d = new Date(now);
-                d.setHours(d.getHours() - i, 0, 0, 0);
-                const key = d.toISOString().slice(0, 13);
-                dayBuckets[key] = 0;
-            }
-            _activitiesCache.forEach(a => {
-                if (!a.created_at) return;
-                const key = new Date(a.created_at).toISOString().slice(0, 13);
-                if (dayBuckets[key] !== undefined) dayBuckets[key] += 1;
+        fetch(`${API_BASE}/activities/timeline?days=${periodDays}`)
+            .then(r => r.json())
+            .then(timeline => {
+                if (!Array.isArray(timeline) || timeline.length === 0) {
+                    document.getElementById('activity-chart').innerHTML = '<p>No activity data</p>';
+                    return;
+                }
+                const labels = timeline.map(d => {
+                    if (periodDays === 1) return d.day;
+                    return new Date(d.day + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                });
+                const values = timeline.map(d => d.count);
+
+                const ctx = document.getElementById('activity-timeline-canvas').getContext('2d');
+                if (activityChart) activityChart.destroy();
+                activityChart = new Chart(ctx, {
+                    type: 'line',
+                    data: { labels, datasets: [{ label: 'Activities', data: values, borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,0.1)', fill: true, tension: 0.4 }] },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } }, y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } } } }
+                });
+            })
+            .catch(() => {
+                document.getElementById('activity-chart').innerHTML = '<p>Could not load activity timeline</p>';
             });
-        } else {
-            // Daily buckets for 7d / 30d
-            for (let i = periodDays - 1; i >= 0; i--) {
-                const d = new Date(now);
-                d.setDate(d.getDate() - i);
-                const key = d.toISOString().split('T')[0];
-                dayBuckets[key] = 0;
-            }
-            _activitiesCache.forEach(a => {
-                if (!a.created_at) return;
-                const key = new Date(a.created_at).toISOString().split('T')[0];
-                if (dayBuckets[key] !== undefined) dayBuckets[key] += 1;
-            });
-        }
-
-        const labels = Object.keys(dayBuckets).map(d => {
-            if (periodDays === 1) return new Date(d).toLocaleTimeString('en-US', { hour: 'numeric' });
-            return new Date(d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-        });
-        const values = Object.values(dayBuckets);
-
-        const ctx = document.getElementById('activity-timeline-canvas').getContext('2d');
-        if (activityChart) activityChart.destroy();
-        activityChart = new Chart(ctx, {
-            type: 'line',
-            data: { labels, datasets: [{ label: 'Activities', data: values, borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,0.1)', fill: true, tension: 0.4 }] },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } }, y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } } } }
-        });
     }
 
     fetch(`${API_BASE}/activities?limit=500`)
@@ -404,7 +385,7 @@
                 document.getElementById('recent-activity').innerHTML = html;
             }
 
-            // ── Activity Timeline Chart ──
+            // ── Activity Timeline Chart (server-side aggregation) ──
             loadActivityChart();
         })
         .catch(e => {
@@ -417,14 +398,28 @@
         .then(r => r.json())
         .then(data => {
             const thoughts = data?.items || data?.thoughts || [];
-            const counts = {};
+            const rawCounts = {};
             thoughts.forEach(t => {
                 const key = t.category || 'uncategorized';
-                counts[key] = (counts[key] || 0) + 1;
+                rawCounts[key] = (rawCounts[key] || 0) + 1;
             });
 
-            const labels = Object.keys(counts);
-            const values = Object.values(counts);
+            // Group into high-level categories (max 6 slices)
+            const categoryMap = {
+                'reflection': 'Reflection', 'self-reflection': 'Reflection', 'introspection': 'Reflection',
+                'analysis': 'Analysis', 'observation': 'Analysis', 'evaluation': 'Analysis', 'assessment': 'Analysis',
+                'planning': 'Planning', 'strategy': 'Planning', 'goal': 'Planning', 'decision': 'Planning',
+                'creative': 'Creative', 'idea': 'Creative', 'brainstorm': 'Creative', 'imagination': 'Creative',
+                'learning': 'Learning', 'insight': 'Learning', 'discovery': 'Learning', 'research': 'Learning',
+            };
+            const grouped = {};
+            for (const [cat, count] of Object.entries(rawCounts)) {
+                const group = categoryMap[cat.toLowerCase()] || 'Other';
+                grouped[group] = (grouped[group] || 0) + count;
+            }
+
+            const labels = Object.keys(grouped);
+            const values = Object.values(grouped);
 
             if (labels.length === 0) {
                 document.getElementById('thoughts-chart').innerHTML = '<p>No thoughts data</p>';

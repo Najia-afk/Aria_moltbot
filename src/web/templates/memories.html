@@ -280,6 +280,6 @@ memoriesPager = new AriaPagination('memories-pagination', {
     onPageChange: (page, limit) => loadMemories(page, limit),
     limit: 25
 });
-document.addEventListener('DOMContentLoaded', loadMemories);
+document.addEventListener('DOMContentLoaded', () => loadMemories());
 </script>
 {% endblock %}

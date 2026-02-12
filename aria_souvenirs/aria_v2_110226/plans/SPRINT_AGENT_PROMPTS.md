@@ -429,6 +429,96 @@ After completion, update tasks/lessons.md with any new patterns discovered.
 
 ---
 
+## Sprint 7 Prompt
+
+```
+You are an expert AI coding agent. Execute Sprint 7 for the Aria project.
+
+## CONTEXT
+- Workspace: /Users/najia/aria
+- Stack: FastAPI (API), Flask (Web), PostgreSQL 16, SQLAlchemy 2.0 async, Docker Compose
+- 5-Layer: DB → SQLAlchemy ORM → FastAPI API → api_client (httpx) → Skills → ARIA
+- Sprint tickets: aria_souvenirs/aria_v2_110226/plans/sprint7/S7-01 through S7-10
+- Sprint 6 complete (18 broken endpoints fixed, pgvector installed, error handling added)
+- S7-03 ALREADY DONE — LiteLLM direct DB queries implemented and deployed
+
+## YOUR TASK
+1. Read ALL ticket files in aria_souvenirs/aria_v2_110226/plans/sprint7/ (S7-01 through S7-10)
+2. Read tasks/lessons.md for project rules and patterns
+3. SKIP S7-03 — already completed (litellm direct DB queries)
+4. Execute tickets in this order:
+
+   PHASE A — P0 Critical Empty Pages (parallel):
+   - S7-01: Fix DOMContentLoaded in 4 templates (thoughts, memories, social, goals)
+     → Change `addEventListener('DOMContentLoaded', loadFn)` to `addEventListener('DOMContentLoaded', () => loadFn())`
+   - S7-02: Fix working_memory.html JSONB display
+     → Add `typeof item.value === 'string' ? item.value : JSON.stringify(item.value, null, 2)` before .substring()/.replace()
+
+   PHASE B — Dashboard Improvements (parallel):
+   - S7-04: Add /activities/timeline endpoint + update dashboard chart
+   - S7-05: Fix sprint board NULL sprint query + add goals setInterval(30s)
+   - S7-06: Auto-seed skills from registry if skill_status is empty
+   - S7-07: Group dashboard thoughts chart categories
+
+   PHASE C — Agent Improvements (parallel):
+   - S7-08: Pass agent_id in swarm session creation
+   - S7-09: Add heartbeat data to performance page
+
+   LAST: S7-10 (full dashboard verification — every page must show data)
+
+5. Docker compose build && up -d after all changes
+6. Git commit: "Sprint 7: Fix empty dashboard pages + LiteLLM direct DB (S7-01→S7-10)"
+
+## HARD CONSTRAINTS
+1. 5-layer architecture — skills use api_client, never SQLAlchemy
+2. ZERO secrets in code — .env only
+3. models.yaml is SSOT for model names
+4. Test in Docker before marking done
+5. aria_memories/ is Aria's only writable path
+6. NEVER modify aria_mind/soul/
+
+## TWO DATABASES (IMPORTANT)
+- Main: postgresql://aria_admin:…@aria-db:5432/aria_warehouse (Aria tables)
+- LiteLLM: postgresql://aria_admin:…@aria-db:5432/litellm (LiteLLM_SpendLogs)
+- Both use same PG instance, same credentials, different DB name
+- litellm_engine + LiteLLMSessionLocal already created in db/session.py
+- get_litellm_db() dependency already in deps.py
+
+## KEY FILES
+- src/web/templates/thoughts.html (S7-01 — line ~140, DOMContentLoaded fix)
+- src/web/templates/memories.html (S7-01 — line ~283, DOMContentLoaded fix)
+- src/web/templates/social.html (S7-01 — line ~451, DOMContentLoaded fix)
+- src/web/templates/goals.html (S7-01 — line ~1395, DOMContentLoaded fix + S7-05 setInterval)
+- src/web/templates/working_memory.html (S7-02 — lines ~264-273, JSONB type fix)
+- src/web/templates/dashboard.html (S7-04 — line ~385 activity chart, S7-07 — line ~416 thoughts chart)
+- src/api/routers/activities.py (S7-04 — new /activities/timeline endpoint)
+- src/api/routers/goals.py (S7-05 — line ~130, add or_(Goal.sprint.is_(None)))
+- src/api/routers/skills.py (S7-06 — fallback to registry if empty)
+- src/api/routers/performance.py (S7-09 — add heartbeat health data)
+- aria_agents/coordinator.py (S7-08 — pass agent_id to sessions)
+- aria_agents/base.py (S7-08 — pass self.name as agent_id)
+
+## PAGE VERIFICATION CHECKLIST
+After sprint, ALL of these pages must show real data (not empty / not "Failed to load"):
+- [ ] Dashboard: activity chart shows 7 days, thoughts chart ≤6 categories
+- [ ] Thoughts: shows 67+ thought records
+- [ ] Memories: shows 31+ memory records
+- [ ] Social: shows 19+ social posts
+- [ ] Goals: shows 53+ goals, auto-refreshes
+- [ ] Sprint Board: shows goals in columns
+- [ ] Working Memory: shows 5 items (no TypeError)
+- [ ] Skills: shows available skills (not empty)
+- [ ] Models: shows spend data (15K+ logs — S7-03 already done)
+- [ ] Model Usage: shows usage logs with litellm source
+- [ ] Operations: shows global spend stats
+- [ ] Sessions: shows 3,500+ sessions
+- [ ] Performance: shows health data
+
+After completion, update tasks/lessons.md with any new patterns discovered.
+```
+
+---
+
 ## Quick Reference — Running a Sprint
 
 ```bash

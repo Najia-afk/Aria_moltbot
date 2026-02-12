@@ -34,6 +34,17 @@ def _as_psycopg_url(url: str) -> str:
     return url
 
 
+def _litellm_url_from(url: str) -> str:
+    """Derive LiteLLM database URL from the main DATABASE_URL.
+
+    Same host/credentials, different database name (litellm).
+    postgresql://user:pass@host:5432/aria_warehouse → …/litellm
+    """
+    # Replace the last path segment (database name) with 'litellm'
+    base = url.rsplit("/", 1)[0]
+    return f"{base}/litellm"
+
+
 # ── Engine + session factory ─────────────────────────────────────────────────
 
 async_engine = create_async_engine(
@@ -48,6 +59,25 @@ async_engine = create_async_engine(
 
 AsyncSessionLocal = async_sessionmaker(
     async_engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+)
+
+
+# ── LiteLLM database (separate DB, same PG instance) ────────────────────────
+
+litellm_engine = create_async_engine(
+    _as_psycopg_url(_litellm_url_from(DATABASE_URL)),
+    pool_size=3,
+    max_overflow=5,
+    pool_timeout=15,
+    pool_recycle=3600,
+    pool_pre_ping=True,
+    echo=False,
+)
+
+LiteLLMSessionLocal = async_sessionmaker(
+    litellm_engine,
     class_=AsyncSession,
     expire_on_commit=False,
 )

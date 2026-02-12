@@ -4,6 +4,7 @@ Activity log endpoints — CRUD + activity feed + interactions.
 
 import json as json_lib
 import uuid
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy import func, select, text as sa_text
@@ -61,6 +62,22 @@ async def create_activity(request: Request, db: AsyncSession = Depends(get_db)):
     db.add(activity)
     await db.commit()
     return {"id": str(activity.id), "created": True}
+
+
+@router.get("/activities/timeline")
+async def activity_timeline(days: int = 7, db: AsyncSession = Depends(get_db)):
+    """Daily activity counts for the last N days (server-side aggregation)."""
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    result = await db.execute(
+        select(
+            func.date(ActivityLog.created_at).label("day"),
+            func.count(ActivityLog.id).label("count"),
+        )
+        .where(ActivityLog.created_at >= cutoff)
+        .group_by(func.date(ActivityLog.created_at))
+        .order_by(func.date(ActivityLog.created_at))
+    )
+    return [{"day": str(r.day), "count": r.count} for r in result.all()]
 
 
 

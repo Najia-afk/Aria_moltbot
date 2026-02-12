@@ -261,16 +261,15 @@ function renderItems() {
     body.innerHTML = filtered.map(item => {
         const imp = item.importance || 0;
         const impClass = imp >= 0.7 ? 'high' : imp >= 0.4 ? 'medium' : 'low';
-        const truncVal = (item.value || '').length > 80
-            ? (item.value || '').substring(0, 80) + '…'
-            : (item.value || '');
+        const valStr = typeof item.value === 'string' ? item.value : JSON.stringify(item.value, null, 2);
+        const truncVal = valStr.length > 80 ? valStr.substring(0, 80) + '…' : valStr;
         const ttlDisplay = item.ttl_hours ? `${item.ttl_hours}h` : '∞';
         const accessed = item.accessed_at ? formatDate(item.accessed_at) : '-';
 
         return `<tr>
             <td><span class="category-badge">${item.category || '-'}</span></td>
             <td><strong>${item.key || '-'}</strong></td>
-            <td title="${(item.value || '').replace(/"/g, '&quot;')}">${truncVal}</td>
+            <td title="${valStr.replace(/"/g, '&quot;')}">${truncVal}</td>
             <td><span class="importance-badge ${impClass}">${imp.toFixed(1)}</span></td>
             <td>${ttlDisplay}</td>
             <td>${accessed}</td>

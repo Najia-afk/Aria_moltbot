@@ -1,66 +1,158 @@
 """
 Model usage endpoints — merged skill tracking (DB) + LiteLLM spend logs.
+
+LiteLLM spend is queried directly from its PostgreSQL database (same PG
+instance, separate 'litellm' database) instead of the HTTP proxy which
+OOMs/times out with 15K+ rows.
 """
 
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-import httpx
 from fastapi import APIRouter, Depends, Request
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import LITELLM_MASTER_KEY, SERVICE_URLS
 from db.models import ModelUsage
-from deps import get_db
+from deps import get_db, get_litellm_db
 from pagination import build_paginated_response
 
 router = APIRouter(tags=["Model Usage"])
 
 
-# ── LiteLLM helper ──────────────────────────────────────────────────────────
+# ── LiteLLM helper (direct DB) ──────────────────────────────────────────────
 
-async def _fetch_litellm_spend_logs(limit: int = 200) -> list[dict]:
-    """Fetch spend logs from LiteLLM proxy. Returns normalized records."""
-    litellm_base = SERVICE_URLS.get("litellm", ("http://litellm:4000",))[0]
+async def _fetch_litellm_spend_logs(
+    db: AsyncSession,
+    limit: int = 200,
+    since: Optional[datetime] = None,
+) -> list[dict]:
+    """Fetch spend logs directly from the LiteLLM PostgreSQL database."""
     try:
-        headers = {"Authorization": f"Bearer {LITELLM_MASTER_KEY}"} if LITELLM_MASTER_KEY else {}
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            resp = await client.get(f"{litellm_base}/spend/logs", headers=headers)
-            if resp.status_code != 200:
-                return []
-            logs = resp.json()
-            if not isinstance(logs, list):
-                return []
-            results = []
-            for log in logs[:limit]:
-                meta = log.get("metadata", {}) or {}
-                model_raw = log.get("model", "") or ""
-                model_group = log.get("model_group", "") or ""
-                display_model = model_group or (model_raw.split("/")[-1] if "/" in model_raw else model_raw)
-                provider = log.get("custom_llm_provider", "") or (
-                    model_raw.split("/")[0] if "/" in model_raw else "litellm"
-                )
-                status = meta.get("status", "success")
-                results.append({
-                    "id": log.get("request_id", ""),
-                    "model": display_model,
-                    "provider": provider,
-                    "input_tokens": log.get("prompt_tokens", 0) or 0,
-                    "output_tokens": log.get("completion_tokens", 0) or 0,
-                    "total_tokens": log.get("total_tokens", 0) or 0,
-                    "cost_usd": float(log.get("spend", 0) or 0),
-                    "latency_ms": None,
-                    "success": status == "success",
-                    "error_message": None if status == "success" else status,
-                    "session_id": log.get("session_id"),
-                    "created_at": log.get("startTime"),
-                    "source": "litellm",
-                })
-            return results
+        params: dict = {"limit": limit}
+        where_clause = ""
+        if since:
+            where_clause = 'WHERE "startTime" >= :since'
+            params["since"] = since
+
+        result = await db.execute(
+            text(f"""
+                SELECT request_id, model, model_group, custom_llm_provider,
+                       prompt_tokens, completion_tokens, total_tokens,
+                       spend, "startTime", status, session_id, metadata
+                FROM "LiteLLM_SpendLogs"
+                {where_clause}
+                ORDER BY "startTime" DESC
+                LIMIT :limit
+            """),
+            params,
+        )
+        rows = result.mappings().all()
+
+        results = []
+        for log in rows:
+            model_raw = log.get("model") or ""
+            model_group = log.get("model_group") or ""
+            display_model = model_group or (model_raw.split("/")[-1] if "/" in model_raw else model_raw)
+            provider = log.get("custom_llm_provider") or (
+                model_raw.split("/")[0] if "/" in model_raw else "litellm"
+            )
+            meta = log.get("metadata") or {}
+            status = meta.get("status", "success") if isinstance(meta, dict) else "success"
+            start_time = log.get("startTime")
+
+            results.append({
+                "id": log.get("request_id") or "",
+                "model": display_model,
+                "provider": provider,
+                "input_tokens": log.get("prompt_tokens") or 0,
+                "output_tokens": log.get("completion_tokens") or 0,
+                "total_tokens": log.get("total_tokens") or 0,
+                "cost_usd": float(log.get("spend") or 0),
+                "latency_ms": None,
+                "success": status == "success",
+                "error_message": None if status == "success" else status,
+                "session_id": log.get("session_id"),
+                "created_at": start_time.isoformat() if start_time else None,
+                "source": "litellm",
+            })
+        return results
     except Exception as e:
-        print(f"⚠️ Failed to fetch LiteLLM spend: {e}")
+        print(f"⚠️ Failed to fetch LiteLLM spend from DB: {e}")
+        return []
+
+
+async def _litellm_aggregate_stats(
+    db: AsyncSession,
+    since: Optional[datetime] = None,
+) -> dict:
+    """Aggregate LiteLLM stats directly from the DB."""
+    try:
+        params: dict = {}
+        where_clause = ""
+        if since:
+            where_clause = 'WHERE "startTime" >= :since'
+            params["since"] = since
+
+        result = await db.execute(
+            text(f"""
+                SELECT
+                    COUNT(*)                            AS total_requests,
+                    COALESCE(SUM(total_tokens), 0)      AS total_tokens,
+                    COALESCE(SUM(prompt_tokens), 0)     AS input_tokens,
+                    COALESCE(SUM(completion_tokens), 0) AS output_tokens,
+                    COALESCE(SUM(spend), 0)             AS total_cost
+                FROM "LiteLLM_SpendLogs"
+                {where_clause}
+            """),
+            params,
+        )
+        row = result.mappings().one()
+        return {
+            "requests": int(row["total_requests"]),
+            "tokens": int(row["total_tokens"]),
+            "input_tokens": int(row["input_tokens"]),
+            "output_tokens": int(row["output_tokens"]),
+            "cost": float(row["total_cost"]),
+        }
+    except Exception as e:
+        print(f"⚠️ Failed to aggregate LiteLLM stats: {e}")
+        return {"requests": 0, "tokens": 0, "input_tokens": 0, "output_tokens": 0, "cost": 0}
+
+
+async def _litellm_by_model_stats(
+    db: AsyncSession,
+    since: Optional[datetime] = None,
+) -> list[dict]:
+    """Per-model aggregation from LiteLLM DB."""
+    try:
+        params: dict = {}
+        where_clause = ""
+        if since:
+            where_clause = 'WHERE "startTime" >= :since'
+            params["since"] = since
+
+        result = await db.execute(
+            text(f"""
+                SELECT
+                    COALESCE(NULLIF(model_group, ''), model) AS display_model,
+                    COALESCE(NULLIF(custom_llm_provider, ''), 'litellm') AS provider,
+                    COUNT(*)                                AS requests,
+                    COALESCE(SUM(prompt_tokens), 0)         AS input_tokens,
+                    COALESCE(SUM(completion_tokens), 0)     AS output_tokens,
+                    COALESCE(SUM(spend), 0)                 AS cost
+                FROM "LiteLLM_SpendLogs"
+                {where_clause}
+                GROUP BY display_model, provider
+                ORDER BY requests DESC
+            """),
+            params,
+        )
+        return [dict(r) for r in result.mappings().all()]
+    except Exception as e:
+        print(f"⚠️ Failed to get LiteLLM by-model stats: {e}")
         return []
 
 
@@ -74,6 +166,7 @@ async def get_model_usage(
     provider: Optional[str] = None,
     source: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
+    litellm_db: AsyncSession = Depends(get_litellm_db),
 ):
     """Merged model usage from skill executions (DB) + LLM calls (LiteLLM)."""
     results: list[dict] = []
@@ -103,9 +196,9 @@ async def get_model_usage(
                 "source": "skills",
             })
 
-    # 2. LiteLLM logs
+    # 2. LiteLLM logs (direct DB query)
     if source in (None, "", "litellm", "all"):
-        litellm_logs = await _fetch_litellm_spend_logs(limit=limit)
+        litellm_logs = await _fetch_litellm_spend_logs(litellm_db, limit=limit)
         if model:
             litellm_logs = [l for l in litellm_logs if model.lower() in (l.get("model") or "").lower()]
         if provider:
@@ -144,11 +237,12 @@ async def log_model_usage(request: Request, db: AsyncSession = Depends(get_db)):
 
 @router.get("/model-usage/stats")
 async def get_model_usage_stats(
-    hours: int = 24, db: AsyncSession = Depends(get_db)
+    hours: int = 24,
+    db: AsyncSession = Depends(get_db),
+    litellm_db: AsyncSession = Depends(get_litellm_db),
 ):
     """Stats merging skill executions (DB) + LLM calls (LiteLLM)."""
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
-    cutoff_iso = cutoff.isoformat()
 
     # 1. DB stats
     window_filter = ModelUsage.created_at > cutoff
@@ -196,42 +290,40 @@ async def get_model_usage_stats(
             "cost": float(r[5]), "avg_latency": int(r[6]), "source": "skills",
         }
 
-    # 2. LiteLLM stats
-    litellm_logs = await _fetch_litellm_spend_logs(limit=5000)
-    llm_in_window = [l for l in litellm_logs if (l.get("created_at") or "") >= cutoff_iso]
-    llm_total = len(llm_in_window)
-    llm_tokens = sum(l.get("total_tokens", 0) for l in llm_in_window)
-    llm_cost = sum(l.get("cost_usd", 0) for l in llm_in_window)
+    # 2. LiteLLM stats (direct DB aggregation — no more HTTP proxy)
+    llm_agg = await _litellm_aggregate_stats(litellm_db, since=cutoff)
+    llm_by_model = await _litellm_by_model_stats(litellm_db, since=cutoff)
 
-    for l in llm_in_window:
-        model_name = l.get("model") or "unknown"
+    for entry in llm_by_model:
+        model_name = entry.get("display_model") or "unknown"
         if model_name in by_model_map:
-            entry = by_model_map[model_name]
-            entry["requests"] += 1
-            entry["input_tokens"] += l.get("input_tokens", 0)
-            entry["output_tokens"] += l.get("output_tokens", 0)
-            entry["cost"] += l.get("cost_usd", 0)
-            entry["source"] = "merged"
+            existing = by_model_map[model_name]
+            existing["requests"] += entry.get("requests", 0)
+            existing["input_tokens"] += entry.get("input_tokens", 0)
+            existing["output_tokens"] += entry.get("output_tokens", 0)
+            existing["cost"] += float(entry.get("cost", 0))
+            existing["source"] = "merged"
         else:
             by_model_map[model_name] = {
-                "model": model_name, "provider": l.get("provider", "litellm"),
-                "requests": 1, "input_tokens": l.get("input_tokens", 0),
-                "output_tokens": l.get("output_tokens", 0),
-                "cost": l.get("cost_usd", 0), "avg_latency": 0, "source": "litellm",
+                "model": model_name, "provider": entry.get("provider", "litellm"),
+                "requests": entry.get("requests", 0),
+                "input_tokens": entry.get("input_tokens", 0),
+                "output_tokens": entry.get("output_tokens", 0),
+                "cost": float(entry.get("cost", 0)), "avg_latency": 0, "source": "litellm",
             }
 
     by_model_list = sorted(by_model_map.values(), key=lambda x: x["requests"], reverse=True)
 
     return {
         "period_hours": hours,
-        "total_requests": db_total + llm_total,
-        "total_tokens": db_tokens + llm_tokens,
-        "total_cost": float(db_cost) + llm_cost,
+        "total_requests": db_total + llm_agg["requests"],
+        "total_tokens": db_tokens + llm_agg["tokens"],
+        "total_cost": float(db_cost) + llm_agg["cost"],
         "avg_latency_ms": int(db_latency),
         "success_rate": 100,
         "by_model": by_model_list,
         "sources": {
             "skills": {"requests": db_total, "tokens": db_tokens, "cost": float(db_cost)},
-            "litellm": {"requests": llm_total, "tokens": llm_tokens, "cost": llm_cost},
+            "litellm": {"requests": llm_agg["requests"], "tokens": llm_agg["tokens"], "cost": llm_agg["cost"]},
         },
     }

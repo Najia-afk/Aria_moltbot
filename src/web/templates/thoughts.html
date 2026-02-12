@@ -137,6 +137,6 @@ thoughtsPager = new AriaPagination('thoughts-pagination', {
     onPageChange: (page, limit) => loadThoughts(page, limit),
     limit: 25
 });
-document.addEventListener('DOMContentLoaded', loadThoughts);
+document.addEventListener('DOMContentLoaded', () => loadThoughts());
 </script>
 {% endblock %}

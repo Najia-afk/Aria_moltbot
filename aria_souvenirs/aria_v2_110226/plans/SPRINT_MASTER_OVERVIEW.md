@@ -1,4 +1,4 @@
-# Aria v2 Sprint Master Overview — 2026-02-11 (Revised v3)
+# Aria v2 Sprint Master Overview — 2026-02-11 (Revised v4)
 
 > **Product Owner:** Najia (Shiva) | **Sprint Agent:** Claude Opus 4.6
 > **Created:** 2026-02-11 | **Revised:** 2026-02-11 | **Environment:** Mac Mini M4 (Production)
@@ -7,12 +7,13 @@
 
 ## Executive Summary
 
-**6 sprints, 64 tickets, ~227 story points** across five phases:
+**7 sprints, 74 tickets, ~257 story points** across six phases:
 1. **Phase 1** — Stabilize: Fix frontend bugs, critical backend bugs, add global pagination (Sprints 1 + 2)
 2. **Phase 2** — Enhance: Goals sprint board with Kanban, PO skill, stacked chart (Sprint 3)
 3. **Phase 3** — Scale: Knowledge graph auto-generation, skill pathfinding RAG, vis.js visualization (Sprint 4)
 4. **Phase 4** — Evolve: Semantic memory (pgvector), error recovery, composable pipelines, self-improvement loop (Sprint 5)
 5. **Phase 5** — Harden: Production stabilization — fix 18 broken endpoints, frontend error handling, DB resilience (Sprint 6)
+6. **Phase 6** — Data: Fix empty dashboard pages, direct LiteLLM DB queries, server-side aggregation (Sprint 7)
 
 ---
 
@@ -176,6 +177,42 @@
 
 ---
 
+## Sprint 7 — Dashboard Data Fixes & Direct LiteLLM DB
+
+**Phase:** 6 | **Tickets:** 10 | **Points:** ~30 | **Risk:** Low-Medium
+**Focus:** Fix all empty/broken dashboard pages. Root causes: DOMContentLoaded Event bug (4 pages), JSONB type mismatch (working memory), LiteLLM HTTP proxy OOM/timeout (models/usage), client-side data capping (activity timeline), missing seed data (skills).
+**Origin:** Post-Sprint-6 dashboard audit — all pages checked for data display issues.
+
+| # | Ticket | Priority | Pts | Description |
+|---|--------|----------|-----|-------------|
+| S7-01 | Fix DOMContentLoaded Event bug | P0 | 2 | Thoughts/Memories/Social/Goals pass Event object as page param → 422 |
+| S7-02 | Fix Working Memory JSONB display | P0 | 2 | `.substring()` on JSONB objects → TypeError → "Failed to load" |
+| S7-03 | LiteLLM direct DB queries | P0 | 5 | ✅ DONE — Replace HTTP proxy (OOM/timeout) with direct PG queries |
+| S7-04 | Dashboard activity timeline | P1 | 5 | Server-side daily aggregation instead of client-side 500-row cap |
+| S7-05 | Sprint board NULL fix + auto-refresh | P1 | 3 | SQL IN misses NULL sprints + add setInterval(30s) |
+| S7-06 | Auto-seed skills on first access | P2 | 2 | skill_status has 0 rows — fallback to skill registry |
+| S7-07 | Dashboard thoughts chart grouping | P2 | 2 | Too many subcategories in doughnut chart — group into ≤6 |
+| S7-08 | Sessions agent_id tracking | P2 | 3 | Swarm agents default to "main" — pass actual agent name |
+| S7-09 | Performance health check integration | P2 | 3 | Show heartbeat_log data on performance page |
+| S7-10 | Full dashboard verification | P0 | 3 | Every page loads data — acceptance gate |
+
+**Dependency:** S7-01/S7-02/S7-03 parallel (P0 critical). S7-04→S7-09 parallel (independent). S7-10 last.
+
+**Root Cause Analysis:**
+| Root Cause | Pages Affected | Fix Ticket |
+|---|---|---|
+| DOMContentLoaded passes Event as page param → 422 | Thoughts, Memories, Social, Goals (4 pages) | S7-01 |
+| JSONB value treated as string → TypeError | Working Memory | S7-02 |
+| LiteLLM HTTP proxy OOM (15K+ rows) + 5s timeout | Models, Model Usage, Operations (3 pages) | S7-03 ✅ |
+| Client-side 500-row cap on 2,500+ activities | Dashboard activity chart | S7-04 |
+| SQL IN doesn't match NULL sprint values | Sprint Board | S7-05 |
+| skill_status table never seeded (0 rows) | Skills page | S7-06 |
+| Raw category field has 15+ subcategories | Dashboard thoughts chart | S7-07 |
+| Swarm agents don't pass agent_id to sessions | Sessions page | S7-08 |
+| Performance page only shows manual reviews | Performance page | S7-09 |
+
+---
+
 ## Global Dependency Map
 
 ```
@@ -225,6 +262,15 @@ Sprint 6 (Phase 5 — Production Stabilization)
   ├── S6-04 (frontend resilience — after backend fixes)
   ├── S6-06 (health check — after S6-01)
   └── S6-10 (full verification) last
+
+    ↓ Complete S6 before S7
+
+Sprint 7 (Phase 6 — Dashboard Data Fixes)
+  ├── S7-01, S7-02, S7-03✅ (P0 critical — parallel, fix empty pages)
+  ├── S7-04 (activity timeline — independent)
+  ├── S7-05 (after S7-01 — goals page must work first)
+  ├── S7-06, S7-07, S7-08, S7-09 (parallel — independent improvements)
+  └── S7-10 (full verification) last
 ```
 
 ---
@@ -239,7 +285,8 @@ Sprint 6 (Phase 5 — Production Stabilization)
 | Sprint 4 | 10 | ~42 | 14-20h | Medium-High — new subsystem + audit |
 | Sprint 5 | 8 | ~42 | 16-24h | High — new memory layer + pgvector |
 | Sprint 6 | 10 | ~36 | 10-14h | Medium — fixes known issues, mostly backend |
-| **Total** | **64** | **~227** | **70-100h** | |
+| Sprint 7 | 10 | ~30 | 6-10h | Low — known root causes, surgical fixes |
+| **Total** | **74** | **~257** | **76-110h** | |
 
 ---
 
