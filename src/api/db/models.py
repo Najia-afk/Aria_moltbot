@@ -456,6 +456,8 @@ Index("idx_agent_sessions_started", AgentSession.started_at.desc())
 Index("idx_agent_sessions_status", AgentSession.status)
 Index("idx_agent_sessions_type", AgentSession.session_type)
 Index("idx_agent_sessions_agent_started", AgentSession.agent_id, AgentSession.started_at.desc())
+Index("idx_agent_sessions_metadata_gin", AgentSession.metadata_json, postgresql_using="gin")
+Index("idx_agent_sessions_openclaw_sid", text("(metadata ->> 'openclaw_session_id')"))
 
 
 class ModelUsage(Base):

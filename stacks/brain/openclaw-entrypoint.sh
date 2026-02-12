@@ -166,6 +166,8 @@ fi
 OPENCLAW_CONFIG="/root/.openclaw/openclaw.json"
 MODELS_CATALOG="/root/.openclaw/workspace/aria_models/models.yaml"
 OPENCLAW_TEMPLATE="/root/.openclaw/openclaw-config-template.json"
+AUTH_TEMPLATE="/root/.openclaw/auth-profiles-template.json"
+AUTH_PROFILES="/root/.openclaw/auth-profiles.json"
 OPENCLAW_RENDERER="/root/.openclaw/workspace/aria_models/openclaw_config.py"
 
 echo "=== Generating openclaw.json from models.yaml ==="
@@ -212,13 +214,35 @@ if [ -n "$LITELLM_MASTER_KEY" ]; then
   jq --arg key "$LITELLM_MASTER_KEY" '.models.providers.litellm.apiKey = $key' "$OPENCLAW_CONFIG" > "${OPENCLAW_CONFIG}.tmp" && mv "${OPENCLAW_CONFIG}.tmp" "$OPENCLAW_CONFIG"
 fi
 
+# Generate auth profiles from template and inject LiteLLM API key
+if [ -f "$AUTH_TEMPLATE" ]; then
+    echo "=== Rendering auth-profiles.json from template ==="
+    cp "$AUTH_TEMPLATE" "$AUTH_PROFILES"
+    if [ -n "$LITELLM_MASTER_KEY" ]; then
+        jq --arg key "$LITELLM_MASTER_KEY" '
+            if .profiles then
+                .profiles = (
+                    .profiles
+                    | with_entries(
+                            .value.apiKey = (
+                                if (.value.apiKey | type) == "string" and (.value.apiKey | startswith("${"))
+                                then $key
+                                else .value.apiKey
+                                end
+                            )
+                        )
+                )
+            else . end
+        ' "$AUTH_PROFILES" > "${AUTH_PROFILES}.tmp" && mv "${AUTH_PROFILES}.tmp" "$AUTH_PROFILES"
+    fi
+fi
+
 # SECURITY: Remove any direct OpenRouter/cloud provider access from OpenClaw config.
 # All model routing MUST go through LiteLLM — OpenClaw should never talk to OpenRouter directly.
 echo "=== Stripping non-litellm providers from openclaw.json ==="
 jq 'if .models.providers then .models.providers = {litellm: .models.providers.litellm} else . end' "$OPENCLAW_CONFIG" > "${OPENCLAW_CONFIG}.tmp" && mv "${OPENCLAW_CONFIG}.tmp" "$OPENCLAW_CONFIG"
 
 # Also remove any stale auth profiles that reference direct cloud providers
-AUTH_PROFILES="/root/.openclaw/auth-profiles.json"
 if [ -f "$AUTH_PROFILES" ]; then
   echo "=== Cleaning auth-profiles: keeping only litellm profiles ==="
   jq '{profiles: (.profiles // {} | with_entries(select(.key | test("litellm"))))}' "$AUTH_PROFILES" > "${AUTH_PROFILES}.tmp" && mv "${AUTH_PROFILES}.tmp" "$AUTH_PROFILES"
@@ -231,7 +255,28 @@ if [ -n "$BROWSER_CDP_URL" ]; then
 fi
 
 echo "=== Generated openclaw.json ==="
-cat "$OPENCLAW_CONFIG"
+jq '
+    if .models and .models.providers and .models.providers.litellm then
+        .models.providers.litellm.apiKey = "***REDACTED***"
+    else . end
+    | if .gateway and .gateway.auth then
+            .gateway.auth.token = "***REDACTED***"
+        else . end
+' "$OPENCLAW_CONFIG"
+
+if [ -f "$AUTH_PROFILES" ]; then
+    echo "=== Generated auth-profiles.json ==="
+    jq '
+        if .profiles then
+            .profiles = (
+                .profiles
+                | with_entries(
+                        .value.apiKey = "***REDACTED***"
+                    )
+            )
+        else . end
+    ' "$AUTH_PROFILES"
+fi
 
 # Check if this is first boot (awakening)
 FIRST_BOOT_MARKER="/root/.openclaw/.awakened"

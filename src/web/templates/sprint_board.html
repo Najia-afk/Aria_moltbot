@@ -8,14 +8,14 @@
 <style>
     /* Board layout (no tabs) */
 
-    /* Kanban Board */
-    .kanban-board { display:grid; grid-template-columns:repeat(5,1fr); gap:0.75rem; min-height:500px; margin-bottom:1.5rem; }
-    .kanban-column { background:var(--bg-secondary); border-radius:12px; padding:0.75rem; min-height:400px; display:flex; flex-direction:column; }
+    /* Kanban Board (horizontal swimlanes) */
+    .kanban-board { display:flex; flex-direction:column; gap:0.75rem; min-height:500px; margin-bottom:1.5rem; }
+    .kanban-column { background:var(--bg-secondary); border-radius:12px; padding:0.75rem; display:flex; flex-direction:column; }
     .kanban-column.drag-over { outline:2px dashed var(--accent-primary); outline-offset:-2px; }
     .column-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem; padding-bottom:0.5rem; border-bottom:2px solid var(--border-color); }
     .column-title { font-weight:600; font-size:0.85rem; color:var(--text-primary); display:flex; align-items:center; gap:0.4rem; }
     .column-count { background:var(--bg-tertiary); color:var(--text-secondary); padding:0.15rem 0.5rem; border-radius:10px; font-size:0.75rem; font-weight:600; }
-    .column-cards { flex:1; display:flex; flex-direction:column; gap:0.5rem; min-height:50px; }
+    .column-cards { display:flex; flex-direction:row; gap:0.5rem; min-height:110px; overflow-x:auto; overflow-y:hidden; padding-bottom:0.35rem; }
 
     /* Column accent colors */
     .kanban-column[data-column="backlog"] .column-header { border-color:#78909c; }
@@ -25,7 +25,7 @@
     .kanban-column[data-column="done"] .column-header { border-color:#66bb6a; }
 
     /* Goal Cards */
-    .goal-card { background:var(--bg-primary); border:1px solid var(--border-color); border-radius:8px; padding:0.65rem; cursor:grab; transition:all 0.2s; }
+    .goal-card { background:var(--bg-primary); border:1px solid var(--border-color); border-radius:8px; padding:0.65rem; cursor:grab; transition:all 0.2s; width:250px; min-width:250px; max-width:250px; }
     .goal-card:hover { border-color:var(--accent-primary); transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,0.3); }
     .goal-card.dragging { opacity:0.5; transform:rotate(2deg); }
     .goal-card-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.35rem; }
@@ -73,11 +73,8 @@
     .board-stat .stat-num { font-size:1.3rem; font-weight:700; color:var(--text-primary); }
     .board-stat .stat-lbl { font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; }
 
-    @media (max-width:1024px) {
-        .kanban-board { grid-template-columns:repeat(3,1fr); }
-    }
     @media (max-width:768px) {
-        .kanban-board { grid-template-columns:1fr; }
+        .goal-card { width:220px; min-width:220px; max-width:220px; }
         .board-stats { grid-template-columns:repeat(3,1fr); }
     }
 </style>
@@ -88,8 +85,8 @@
 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
     <div style="display:flex; gap:0.5rem; align-items:center;">
         <select id="sprintSelector" class="input" style="width:180px; padding:0.4rem 0.6rem;" onchange="loadBoard()">
+            <option value="backlog" selected>Backlog Only</option>
             <option value="current">Current Sprint</option>
-            <option value="backlog">Backlog Only</option>
         </select>
     </div>
     <button class="btn btn-primary" onclick="openQuickAdd()">

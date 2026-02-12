@@ -124,14 +124,32 @@ async def run_startup():
     print("🤖 Phase 3: Initializing Agents...")
     
     coordinator = AgentCoordinator(registry)
+    strict_agent_boot = os.getenv("ARIA_STRICT_AGENT_BOOT", "true").lower() == "true"
+    expected_agents = [
+        part.strip()
+        for part in os.getenv(
+            "ARIA_EXPECTED_AGENTS",
+            "aria,devops,analyst,creator,memory,aria_talk",
+        ).split(",")
+        if part.strip()
+    ]
     
     try:
         await coordinator.load_from_file("aria_mind/AGENTS.md")
+        from aria_agents.loader import AgentLoader
+        missing = AgentLoader.missing_expected_agents(coordinator._configs, expected_agents)
+        if missing:
+            raise RuntimeError(
+                "Agent config sanity check failed; missing expected agents: "
+                + ", ".join(missing)
+            )
         await coordinator.initialize_agents()
         agents = coordinator.list_agents()
         print(f"   ✓ Agents loaded: {agents}")
         mind.cognition.set_agent_coordinator(coordinator)
     except Exception as e:
+        if strict_agent_boot:
+            raise
         logger.warning(f"Agents init: {e}")
         print(f"   ⚠ Agents: {e}")
     

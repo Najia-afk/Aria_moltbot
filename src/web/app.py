@@ -96,7 +96,8 @@ def create_app():
     
     @app.route('/dashboard')
     def dashboard():
-        return render_template('dashboard.html')
+        from flask import redirect
+        return redirect('/', code=301)
     
     @app.route('/activities')
     def activities():
@@ -134,11 +135,8 @@ def create_app():
 
     @app.route('/wallets')
     def wallets():
-        return render_template('wallets.html')
-
-    @app.route('/goals')
-    def goals():
-        return render_template('goals.html')
+        from flask import redirect
+        return redirect('/models', code=301)
 
     @app.route('/sprint-board')
     def sprint_board():
@@ -171,10 +169,6 @@ def create_app():
     # ============================================
     # Aria Operations Routes
     # ============================================
-    @app.route('/operations')
-    def operations():
-        return render_template('operations.html')
-
     @app.route('/sessions')
     def sessions():
         return render_template('sessions.html')

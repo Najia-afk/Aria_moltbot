@@ -145,55 +145,85 @@ _SAFE_EXTENSIONS = {
     ".cfg", ".ini", ".log", ".csv", ".html", ".css", ".js",
 }
 
+_FILE_ROOTS = {
+    "mind": "/aria_mind",
+    "memories": "/aria_memories",
+    "agents": "/aria_agents",
+    "souvenirs": "/aria_souvenirs",
+}
+
+
+def _get_root_path(kind: str) -> str:
+    root = _FILE_ROOTS.get(kind)
+    if not root:
+        raise HTTPException(status_code=404, detail="Unknown file root")
+    return root
+
+
+def _read_root_file(kind: str, path: str) -> dict:
+    root = _get_root_path(kind)
+    safe = os.path.normpath(path)
+    if ".." in safe:
+        raise HTTPException(status_code=400, detail="Invalid path")
+    full = f"{root}/{safe}"
+    if not os.path.isfile(full):
+        raise HTTPException(status_code=404, detail="File not found")
+    ext = os.path.splitext(full)[1].lower()
+    if ext not in _SAFE_EXTENSIONS:
+        raise HTTPException(status_code=415, detail=f"Cannot render {ext} files")
+    try:
+        with open(full, "r", encoding="utf-8", errors="replace") as f:
+            return {"path": safe, "content": f.read()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get("/admin/files/mind")
 async def list_mind_files():
     """List all files under /aria_mind (read-only)."""
-    return _list_tree("/aria_mind")
+    return _list_tree(_get_root_path("mind"))
 
 
 @router.get("/admin/files/memories")
 async def list_memories_files():
     """List all files under /aria_memories (read-only)."""
-    return _list_tree("/aria_memories")
+    return _list_tree(_get_root_path("memories"))
+
+
+@router.get("/admin/files/agents")
+async def list_agents_files():
+    """List all files under /aria_agents (read-only)."""
+    return _list_tree(_get_root_path("agents"))
+
+
+@router.get("/admin/files/souvenirs")
+async def list_souvenirs_files():
+    """List all files under /aria_souvenirs (read-only)."""
+    return _list_tree(_get_root_path("souvenirs"))
 
 
 @router.get("/admin/files/mind/{path:path}")
 async def read_mind_file(path: str):
     """Read a text file from /aria_mind."""
-    safe = os.path.normpath(path)
-    if ".." in safe:
-        raise HTTPException(status_code=400, detail="Invalid path")
-    full = f"/aria_mind/{safe}"
-    if not os.path.isfile(full):
-        raise HTTPException(status_code=404, detail="File not found")
-    ext = os.path.splitext(full)[1].lower()
-    if ext not in _SAFE_EXTENSIONS:
-        raise HTTPException(status_code=415, detail=f"Cannot render {ext} files")
-    try:
-        with open(full, "r", encoding="utf-8", errors="replace") as f:
-            return {"path": safe, "content": f.read()}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return _read_root_file("mind", path)
 
 
 @router.get("/admin/files/memories/{path:path}")
 async def read_memories_file(path: str):
     """Read a text file from /aria_memories."""
-    safe = os.path.normpath(path)
-    if ".." in safe:
-        raise HTTPException(status_code=400, detail="Invalid path")
-    full = f"/aria_memories/{safe}"
-    if not os.path.isfile(full):
-        raise HTTPException(status_code=404, detail="File not found")
-    ext = os.path.splitext(full)[1].lower()
-    if ext not in _SAFE_EXTENSIONS:
-        raise HTTPException(status_code=415, detail=f"Cannot render {ext} files")
-    try:
-        with open(full, "r", encoding="utf-8", errors="replace") as f:
-            return {"path": safe, "content": f.read()}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return _read_root_file("memories", path)
+
+
+@router.get("/admin/files/agents/{path:path}")
+async def read_agents_file(path: str):
+    """Read a text file from /aria_agents."""
+    return _read_root_file("agents", path)
+
+
+@router.get("/admin/files/souvenirs/{path:path}")
+async def read_souvenirs_file(path: str):
+    """Read a text file from /aria_souvenirs."""
+    return _read_root_file("souvenirs", path)
 
 
 # ── DB Maintenance ───────────────────────────────────────────────────────────

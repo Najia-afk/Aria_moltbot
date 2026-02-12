@@ -70,6 +70,9 @@
         <option value="completed">Completed</option>
         <option value="error">Error</option>
     </select>
+    <select class="filter-select" id="agent-filter">
+        <option value="">All Agents</option>
+    </select>
     <input type="text" class="search-box" id="search-input" placeholder="Search by session or agent...">
     <button class="btn btn-primary" onclick="loadSessionDashboard()">Refresh</button>
 </div>
@@ -229,6 +232,7 @@ async function loadSessionStats() {
         _stats = await fetchAriaData(`${API_BASE_URL}/sessions/stats`);
         renderSessionOverview();
         renderAgentTab();
+            populateAgentFilter();
     } catch (e) {
         console.error('Stats error:', e);
         showErrorState('#overview-agents-body',
@@ -240,8 +244,10 @@ async function loadSessionStats() {
 // ── Load Sessions ───────────────────────────────────────────────────────────
 async function loadSessions(page = 1, limit = 50) {
     const status = document.getElementById('status-filter').value;
+        const agent = document.getElementById('agent-filter').value;
     let url = `${API_BASE_URL}/sessions?limit=${limit}&page=${page}`;
     if (status) url += `&status=${status}`;
+        if (agent) url += `&agent_id=${encodeURIComponent(agent)}`;
     try {
         const data = await fetchAriaData(url);
         _sessions = data.items || data.sessions || [];
@@ -255,6 +261,20 @@ async function loadSessions(page = 1, limit = 50) {
     }
 }
 
+function populateAgentFilter() {
+    if (!_stats) return;
+    const select = document.getElementById('agent-filter');
+    const current = select.value;
+    const agents = (_stats.by_agent || []).map(a => a.agent_id).filter(Boolean);
+
+    select.innerHTML = '<option value="">All Agents</option>' +
+        agents.map(agent => `<option value="${agent}">${agent}</option>`).join('');
+
+    if (current && agents.includes(current)) {
+        select.value = current;
+    }
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // OVERVIEW
 // ════════════════════════════════════════════════════════════════════════════
@@ -262,6 +282,9 @@ function renderSessionOverview() {
     if (!_stats) return;
     const s = _stats;
     const lit = s.litellm || {};
+    const sources = s.sources || {};
+    const skillSrc = sources.skills || {};
+    const litSrc = sources.litellm || {};
 
     // Tab badges
     document.getElementById('tab-badge-total').textContent = formatNumber(s.total_sessions);
@@ -271,10 +294,10 @@ function renderSessionOverview() {
     document.getElementById('stat-active').textContent = s.active_sessions || 0;
     document.getElementById('stat-total').textContent = formatNumber(s.total_sessions);
     document.getElementById('stat-total-sub').textContent =
-        `DB: ${formatNumber(s.total_sessions - (lit.sessions||0))} | LiteLLM: ${formatNumber(lit.sessions||0)}`;
+        'DB sessions (auto-synced from OpenClaw + runtime events)';
     document.getElementById('stat-tokens').textContent = formatNumber(s.total_tokens);
     document.getElementById('stat-tokens-sub').textContent =
-        `DB: ${formatNumber(s.total_tokens - (lit.tokens||0))} | LiteLLM: ${formatNumber(lit.tokens||0)}`;
+        `Skills DB: ${formatNumber(skillSrc.tokens || 0)} | LiteLLM DB: ${formatNumber(litSrc.tokens || lit.tokens || 0)}`;
     document.getElementById('stat-cost').textContent = formatCost(s.total_cost);
 
     // Error count from by_status
@@ -450,6 +473,7 @@ async function loadSessionDashboard() {
 }
 
 document.getElementById('status-filter').addEventListener('change', () => loadSessions());
+document.getElementById('agent-filter').addEventListener('change', () => loadSessions());
 document.getElementById('search-input').addEventListener('input', renderRecent);
 
 sessionsPager = new AriaPagination('sessions-pagination', {

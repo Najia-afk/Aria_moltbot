@@ -82,7 +82,8 @@ services:
       # Local aria-api for backup persistence
       ARIA_API_URL: http://aria-api:8000
       # Python path for Aria modules
-      PYTHONPATH: /root/.openclaw/workspace:/root/.openclaw/workspace/skills:/root/repo
+      # Priority order matters: use canonical repo packages before workspace mirrors
+      PYTHONPATH: /root/repo:/root/.openclaw/workspace/skills:/root/.openclaw/workspace
     volumes:
       - openclaw_data:/root/.openclaw
       # Mount FULL git repo (read-only — Aria reads, never writes directly)
@@ -107,6 +108,8 @@ services:
       - ./openclaw-entrypoint.sh:/openclaw-entrypoint.sh:ro
       # Mount OpenClaw config template
       - ./openclaw-config.json:/root/.openclaw/openclaw-config-template.json:ro
+      # Mount OpenClaw auth profiles template
+      - ./openclaw-auth-profiles.json:/root/.openclaw/auth-profiles-template.json:ro
       # Custom system prompt for Aria (S-27)
       - ../../prompts/system_prompt.txt:/root/.openclaw/system_prompt.txt:ro
     ports:
@@ -411,6 +414,9 @@ services:
       ARIA_SERVICE_CMD_PROMETHEUS_STOP: ${ARIA_SERVICE_CMD_PROMETHEUS_STOP:-docker stop prometheus}
       # Path to OpenClaw cron jobs file (mounted volume)
       OPENCLAW_JOBS_PATH: /openclaw/cron/jobs.json
+      OPENCLAW_SESSIONS_INDEX_PATH: /openclaw/agents/main/sessions/sessions.json
+      OPENCLAW_AGENTS_ROOT: /openclaw/agents
+      OPENCLAW_SESSIONS_SYNC_INTERVAL_SECONDS: "30"
     volumes:
       # Mount API source for live reload during development
       - ../../src/api:/app:ro
@@ -424,6 +430,10 @@ services:
       - ../../aria_skills:/aria_skills:ro
       # Mount aria_memories for live memory view (read-only)
       - ../../aria_memories:/aria_memories:ro
+      # Mount aria_agents for soul file browser (read-only)
+      - ../../aria_agents:/aria_agents:ro
+      # Mount aria_souvenirs for soul file browser (read-only)
+      - ../../aria_souvenirs:/aria_souvenirs:ro
       # Docker socket for service control (admin actions)
       - /var/run/docker.sock:/var/run/docker.sock
     ports:

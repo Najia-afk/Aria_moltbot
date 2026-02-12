@@ -3,9 +3,9 @@
 
 {% block extra_css %}
 <style>
-    .soul-layout { display: grid; grid-template-columns: 240px 1fr; gap: 25px; min-height: 70vh; }
-    .soul-sidebar { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px; height: fit-content; position: sticky; top: 100px; }
-    .soul-sidebar h3 { font-size: 13px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 12px; }
+    .soul-layout { display: grid; grid-template-columns: 280px 1fr; gap: 25px; min-height: 70vh; }
+    .soul-sidebar { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px; height: fit-content; max-height: calc(100vh - 130px); overflow-y: auto; position: sticky; top: 100px; }
+    .soul-sidebar h3 { font-size: 13px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.02em; }
     .soul-nav-item { display: block; padding: 10px 14px; border-radius: 8px; color: var(--text-secondary); text-decoration: none; font-size: 13px; cursor: pointer; transition: all 0.15s; border: none; background: none; width: 100%; text-align: left; }
     .soul-nav-item:hover { background: var(--bg-tertiary); color: var(--text-primary); }
     .soul-nav-item.active { background: rgba(99,102,241,0.15); color: var(--accent-primary); font-weight: 600; }
@@ -25,13 +25,13 @@
     .read-only-badge { display: inline-block; padding: 4px 12px; background: rgba(245,158,11,0.15); color: #f59e0b; border-radius: 8px; font-size: 11px; font-weight: 600; margin-bottom: 20px; }
     /* File browser */
     .file-section { margin-top: 16px; }
-    .file-section-header { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-secondary); background: none; border: none; width: 100%; text-align: left; transition: all 0.15s; }
+    .file-section-header { display: flex; align-items: center; gap: 8px; padding: 11px 12px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-secondary); background: none; border: none; width: 100%; text-align: left; transition: all 0.15s; }
     .file-section-header:hover { background: var(--bg-tertiary); color: var(--text-primary); }
     .file-section-header .chevron { transition: transform 0.2s; font-size: 10px; }
     .file-section-header.open .chevron { transform: rotate(90deg); }
-    .file-tree { display: none; padding-left: 8px; max-height: 300px; overflow-y: auto; }
+    .file-tree { display: none; padding-left: 8px; max-height: 320px; overflow-y: auto; }
     .file-tree.open { display: block; }
-    .file-tree-item { display: flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; color: var(--text-muted); border: none; background: none; width: 100%; text-align: left; transition: all 0.15s; }
+    .file-tree-item { display: flex; align-items: center; gap: 6px; padding: 7px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; color: var(--text-muted); border: none; background: none; width: 100%; text-align: left; transition: all 0.15s; }
     .file-tree-item:hover { background: var(--bg-tertiary); color: var(--text-primary); }
     .file-tree-item.active { background: rgba(99,102,241,0.15); color: var(--accent-primary); }
     .file-tree-item .icon { font-size: 11px; width: 16px; text-align: center; }
@@ -40,9 +40,16 @@
     .file-tree-dir .dir-chevron { font-size: 8px; transition: transform 0.15s; width: 10px; }
     .file-tree-dir.collapsed .dir-chevron { transform: rotate(0deg); }
     .file-tree-dir.expanded .dir-chevron { transform: rotate(90deg); }
+    .dir-children { display: none; }
     .file-meta { font-size: 10px; color: var(--text-muted); margin-left: auto; }
     .sidebar-divider { border-top: 1px solid var(--border-color); margin: 12px 0; }
-    @media (max-width: 768px) { .soul-layout { grid-template-columns: 1fr; } .soul-sidebar { position: static; } }
+    @media (max-width: 768px) {
+        .soul-layout { grid-template-columns: 1fr; gap: 14px; }
+        .soul-sidebar { position: static; max-height: none; }
+        .file-section-header { font-size: 14px; padding: 12px; }
+        .file-tree { max-height: 220px; }
+        .soul-content { padding: 18px; }
+    }
 </style>
 {% endblock %}
 
@@ -51,37 +58,34 @@
 <span class="read-only-badge">🔒 Read-Only — Identity files cannot be modified</span>
 <div class="soul-layout">
     <div class="soul-sidebar">
-        <h3>Soul Documents</h3>
-        <button class="soul-nav-item active" onclick="loadDoc('SOUL.md', this)">✨ Soul</button>
-        <button class="soul-nav-item" onclick="loadDoc('IDENTITY.md', this)">🪪 Identity</button>
-        <button class="soul-nav-item" onclick="loadDoc('GOALS.md', this)">🎯 Goals</button>
-        <button class="soul-nav-item" onclick="loadDoc('SECURITY.md', this)">🛡️ Security</button>
-        <button class="soul-nav-item" onclick="loadDoc('HEARTBEAT.md', this)">💓 Heartbeat</button>
-        <button class="soul-nav-item" onclick="loadDoc('MEMORY.md', this)">💾 Memory</button>
-        <button class="soul-nav-item" onclick="loadDoc('SKILLS.md', this)">🔧 Skills</button>
-        <button class="soul-nav-item" onclick="loadDoc('TOOLS.md', this)">🛠️ Tools</button>
-        <button class="soul-nav-item" onclick="loadDoc('USER.md', this)">👤 User</button>
-        <button class="soul-nav-item" onclick="loadDoc('AWAKENING.md', this)">🌅 Awakening</button>
-        <button class="soul-nav-item" onclick="loadDoc('ORCHESTRATION.md', this)">🎼 Orchestration</button>
-        <button class="soul-nav-item" onclick="loadDoc('AGENTS.md', this)">🤖 Agents</button>
-        <button class="soul-nav-item" onclick="loadDoc('BOOTSTRAP.md', this)">🚀 Bootstrap</button>
+        <h3>Workspace Roots</h3>
 
-        <div class="sidebar-divider"></div>
-
-        <!-- aria_mind file browser -->
         <div class="file-section">
-            <button class="file-section-header" onclick="toggleSection('mind', this)">
+            <button id="section-memories" class="file-section-header" onclick="toggleSection('memories', this)">
+                <span class="chevron">▶</span> 💾 aria_memories
+            </button>
+            <div class="file-tree" id="tree-memories"></div>
+        </div>
+
+        <div class="file-section">
+            <button id="section-souvenirs" class="file-section-header" onclick="toggleSection('souvenirs', this)">
+                <span class="chevron">▶</span> 🎁 aria_souvenirs
+            </button>
+            <div class="file-tree" id="tree-souvenirs"></div>
+        </div>
+
+        <div class="file-section">
+            <button id="section-mind" class="file-section-header" onclick="toggleSection('mind', this)">
                 <span class="chevron">▶</span> 🧠 aria_mind
             </button>
             <div class="file-tree" id="tree-mind"></div>
         </div>
 
-        <!-- aria_memories file browser -->
         <div class="file-section">
-            <button class="file-section-header" onclick="toggleSection('memories', this)">
-                <span class="chevron">▶</span> 💾 aria_memories
+            <button id="section-agents" class="file-section-header" onclick="toggleSection('agents', this)">
+                <span class="chevron">▶</span> 🤖 aria_agents
             </button>
-            <div class="file-tree" id="tree-memories"></div>
+            <div class="file-tree" id="tree-agents"></div>
         </div>
     </div>
     <div class="soul-content" id="soul-content">
@@ -93,32 +97,26 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script>
-// ── Soul document loader ──────────────────────────────────────────────
-async function loadDoc(filename, btn) {
-    document.querySelectorAll('.soul-nav-item').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.file-tree-item').forEach(b => b.classList.remove('active'));
-    if (btn) btn.classList.add('active');
-    const content = document.getElementById('soul-content');
-    content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);">Loading...</div>';
-    try {
-        const res = await fetch(`${API_BASE_URL}/soul/${encodeURIComponent(filename)}`);
-        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-        const data = await res.json();
-        content.innerHTML = marked.parse(data.content);
-    } catch (err) {
-        content.innerHTML = `<p style="color:var(--danger);">Failed to load ${escapeHtml(filename)}: ${escapeHtml(err.message)}</p>`;
-    }
-}
-
 // ── File browser ──────────────────────────────────────────────────────
 const _treeCache = {};
+const RENDERABLE_EXTS = ['.md','.txt','.yaml','.yml','.json','.py','.sh','.toml','.cfg','.ini','.log','.csv','.html','.css','.js'];
+
+function jsStringEscape(value) {
+    return String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+function clearActiveFile() {
+    document.querySelectorAll('.file-tree-item').forEach(b => b.classList.remove('active'));
+}
 
 function toggleSection(kind, headerBtn) {
     const tree = document.getElementById(`tree-${kind}`);
     const isOpen = tree.classList.contains('open');
     tree.classList.toggle('open');
     headerBtn.classList.toggle('open');
-    if (!isOpen && !_treeCache[kind]) loadTree(kind);
+    if (!isOpen && !_treeCache[kind]) {
+        loadTree(kind);
+    }
 }
 
 async function loadTree(kind) {
@@ -137,40 +135,66 @@ async function loadTree(kind) {
 
 function renderTree(kind, items) {
     const tree = document.getElementById(`tree-${kind}`);
-    const renderableExts = ['.md','.txt','.yaml','.yml','.json','.py','.sh','.toml','.cfg','.ini','.log','.csv','.html','.css','.js'];
-    let html = '';
+    const rootNode = { dirs: new Map(), files: [] };
+
     for (const item of items) {
-        const depth = item.path.split('/').length - 1;
-        const indent = depth * 12;
-        if (item.type === 'dir') {
-            const dirName = item.path.split('/').pop();
-            const dirId = `dir-${kind}-${item.path.replace(/[\/\s]/g, '-')}`;
-            html += `<button class="file-tree-dir expanded" style="padding-left:${10 + indent}px" onclick="toggleDir('${dirId}')">
-                <span class="dir-chevron">▶</span> 📁 ${dirName}
-            </button>`;
-            html += `<div id="${dirId}" class="dir-children">`;
-        } else {
-            const name = item.path.split('/').pop();
-            const ext = '.' + name.split('.').pop().toLowerCase();
-            const canOpen = renderableExts.includes(ext);
-            const sizeStr = item.size > 1024 ? `${(item.size/1024).toFixed(1)}k` : `${item.size}b`;
-            const icon = ext === '.md' ? '📄' : ext === '.py' ? '🐍' : ext === '.yaml' || ext === '.yml' ? '⚙️' : ext === '.json' ? '📋' : '📎';
-            if (canOpen) {
-                html += `<button class="file-tree-item" style="padding-left:${10 + indent}px" onclick="loadFile('${kind}','${item.path}',this)">
-                    <span class="icon">${icon}</span>${name}<span class="file-meta">${sizeStr}</span>
-                </button>`;
-            } else {
-                html += `<div class="file-tree-item" style="padding-left:${10 + indent}px;opacity:0.5;cursor:default;">
-                    <span class="icon">${icon}</span>${name}<span class="file-meta">${sizeStr}</span>
-                </div>`;
+        const parts = item.path.split('/').filter(Boolean);
+        let node = rootNode;
+
+        for (let index = 0; index < parts.length - 1; index++) {
+            const part = parts[index];
+            if (!node.dirs.has(part)) {
+                node.dirs.set(part, { dirs: new Map(), files: [] });
             }
+            node = node.dirs.get(part);
+        }
+
+        const leafName = parts[parts.length - 1];
+        if (item.type === 'dir') {
+            if (!node.dirs.has(leafName)) {
+                node.dirs.set(leafName, { dirs: new Map(), files: [] });
+            }
+        } else {
+            node.files.push(item);
         }
     }
-    // Close any open dir-children divs
-    const openDirs = (html.match(/<div id="dir-/g) || []).length;
-    const closedDirs = (html.match(/<\/div>/g) || []).length;
-    for (let i = 0; i < openDirs - closedDirs; i++) html += '</div>';
+
+    const html = renderTreeNode(kind, rootNode, 0, 'root');
     tree.innerHTML = html || '<div style="padding:8px 10px;color:var(--text-muted);font-size:12px;">No files</div>';
+}
+
+function renderTreeNode(kind, node, depth, pathKey) {
+    let html = '';
+    const indent = depth * 12;
+
+    const sortedDirs = Array.from(node.dirs.keys()).sort((a, b) => a.localeCompare(b));
+    for (const dirName of sortedDirs) {
+        const child = node.dirs.get(dirName);
+        const dirId = `dir-${kind}-${pathKey}-${dirName}`.replace(/[^a-zA-Z0-9_-]/g, '-');
+        html += `<button class="file-tree-dir collapsed" style="padding-left:${10 + indent}px" onclick="toggleDir('${jsStringEscape(dirId)}')">`
+            + `<span class="dir-chevron">▶</span> 📁 ${escapeHtml(dirName)}</button>`;
+        html += `<div id="${dirId}" class="dir-children">`;
+        html += renderTreeNode(kind, child, depth + 1, `${pathKey}/${dirName}`);
+        html += '</div>';
+    }
+
+    const sortedFiles = [...node.files].sort((a, b) => a.path.localeCompare(b.path));
+    for (const item of sortedFiles) {
+        const name = item.path.split('/').pop();
+        const ext = '.' + name.split('.').pop().toLowerCase();
+        const canOpen = RENDERABLE_EXTS.includes(ext);
+        const sizeStr = item.size > 1024 ? `${(item.size / 1024).toFixed(1)}k` : `${item.size}b`;
+        const icon = ext === '.md' ? '📄' : ext === '.py' ? '🐍' : ext === '.yaml' || ext === '.yml' ? '⚙️' : ext === '.json' ? '📋' : '📎';
+        if (canOpen) {
+            html += `<button class="file-tree-item" style="padding-left:${10 + indent}px" onclick="loadFile('${jsStringEscape(kind)}','${jsStringEscape(item.path)}',this)">`
+                + `<span class="icon">${icon}</span>${escapeHtml(name)}<span class="file-meta">${sizeStr}</span></button>`;
+        } else {
+            html += `<div class="file-tree-item" style="padding-left:${10 + indent}px;opacity:0.5;cursor:default;">`
+                + `<span class="icon">${icon}</span>${escapeHtml(name)}<span class="file-meta">${sizeStr}</span></div>`;
+        }
+    }
+
+    return html;
 }
 
 function toggleDir(dirId) {
@@ -184,8 +208,7 @@ function toggleDir(dirId) {
 }
 
 async function loadFile(kind, path, btn) {
-    document.querySelectorAll('.soul-nav-item').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.file-tree-item').forEach(b => b.classList.remove('active'));
+    clearActiveFile();
     if (btn) btn.classList.add('active');
     const content = document.getElementById('soul-content');
     content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);">Loading...</div>';
@@ -207,6 +230,12 @@ async function loadFile(kind, path, btn) {
 }
 
 // ── Init ──────────────────────────────────────────────────────────────
-loadDoc('SOUL.md', document.querySelector('.soul-nav-item'));
+(async function initSoulView() {
+    const mindHeader = document.getElementById('section-mind');
+    if (mindHeader) {
+        toggleSection('mind', mindHeader);
+    }
+    await loadFile('mind', 'SOUL.md');
+})();
 </script>
 {% endblock %}

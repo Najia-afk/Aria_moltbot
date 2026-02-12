@@ -150,17 +150,38 @@ class ConversationSummarySkill(BaseSkill):
 
             litellm_url = os.getenv("LITELLM_API_BASE", "http://aria-litellm:18793")
             litellm_key = os.getenv("LITELLM_API_KEY", "sk-aria-internal")
+            agent_id = (
+                os.getenv("OPENCLAW_AGENT_ID")
+                or os.getenv("ARIA_AGENT_ID")
+                or os.getenv("AGENT_ID")
+                or "main"
+            )
+            openclaw_session_id = (
+                os.getenv("OPENCLAW_SESSION_ID")
+                or os.getenv("SESSION_ID")
+                or os.getenv("ARIA_SESSION_ID")
+                or ""
+            )
+
+            payload = {
+                "model": "qwen3-mlx",
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.3,
+                "max_tokens": 800,
+                "metadata": {
+                    "source": "aria_skills.conversation_summary",
+                    "agent_id": agent_id,
+                    "openclaw_session_id": openclaw_session_id,
+                },
+            }
+            if openclaw_session_id:
+                payload["session_id"] = openclaw_session_id
 
             async with httpx.AsyncClient(timeout=60) as client:
                 resp = await client.post(
                     f"{litellm_url}/v1/chat/completions",
                     headers={"Authorization": f"Bearer {litellm_key}"},
-                    json={
-                        "model": "qwen3-mlx",
-                        "messages": [{"role": "user", "content": prompt}],
-                        "temperature": 0.3,
-                        "max_tokens": 800,
-                    },
+                    json=payload,
                 )
                 resp.raise_for_status()
                 llm_data = resp.json()

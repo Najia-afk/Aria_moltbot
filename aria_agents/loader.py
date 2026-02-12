@@ -9,6 +9,11 @@ import re
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 
+try:
+    import yaml  # type: ignore
+except Exception:  # pragma: no cover - optional dependency in some runtimes
+    yaml = None
+
 from aria_agents.base import AgentConfig, AgentRole
 from aria_models.loader import load_catalog
 
@@ -93,9 +98,32 @@ class AgentLoader:
                             value = [v.strip() for v in value[1:-1].split(',')]
                         
                         props[key] = value
+
+            # Prefer fenced YAML blocks when present (the current AGENTS.md format)
+            yaml_match = re.search(r"```yaml\s*(.*?)\s*```", section, flags=re.DOTALL | re.IGNORECASE)
+            if yaml_match:
+                yaml_data = AgentLoader._safe_yaml_dict(yaml_match.group(1))
+                for key, value in yaml_data.items():
+                    props[str(key).lower()] = value
+
+            # Ignore documentation-only sections that don't define an actual agent config
+            config_keys = {
+                "model", "skills", "capabilities", "role", "focus",
+                "parent", "temperature", "max_tokens",
+            }
+            if not any(k in props for k in config_keys):
+                continue
             
+            # Canonical agent id: prefer explicit YAML id when provided
+            explicit_id = str(props.get("id", "")).strip().lower().replace(" ", "_")
+            if explicit_id:
+                agent_id = explicit_id
+
             # Map role string to enum
-            role_str = props.get("role", "coordinator")
+            role_str = props.get("role")
+            if not role_str:
+                role_str = AgentLoader._role_from_focus(props.get("focus"))
+            role_str = str(role_str or "coordinator").strip().lower()
             try:
                 role = AgentRole(role_str)
             except ValueError:
@@ -107,14 +135,21 @@ class AgentLoader:
                 role = AgentRole.COORDINATOR
             
             # Create config
+            skills = props.get("skills", [])
+            capabilities = props.get("capabilities", [])
+            if not isinstance(skills, list):
+                skills = [str(skills)] if skills else []
+            if not isinstance(capabilities, list):
+                capabilities = [str(capabilities)] if capabilities else []
+
             config = AgentConfig(
                 id=agent_id,
                 name=props.get("name", agent_id),
                 role=role,
                 model=props.get("model", _default_model),
                 parent=props.get("parent"),
-                capabilities=props.get("capabilities", []),
-                skills=props.get("skills", []),
+                capabilities=capabilities,
+                skills=skills,
                 temperature=float(props.get("temperature", 0.7)),
                 max_tokens=int(props.get("max_tokens", 2048)),
             )
@@ -122,6 +157,76 @@ class AgentLoader:
             agents[agent_id] = config
         
         return agents
+
+    @staticmethod
+    def _safe_yaml_dict(raw: str) -> Dict[str, Any]:
+        """Parse a YAML block to a dictionary with safe fallbacks."""
+        if yaml is not None:
+            try:
+                parsed = yaml.safe_load(raw) or {}
+                if isinstance(parsed, dict):
+                    return parsed
+                return {}
+            except Exception as exc:
+                logger.warning(f"Failed to parse agent YAML block with PyYAML: {exc}")
+
+        # Fallback parser for simple key/value and [list, values] forms used in AGENTS.md
+        data: Dict[str, Any] = {}
+        for line in raw.splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#") or ":" not in stripped:
+                continue
+            key, value = stripped.split(":", 1)
+            key = key.strip()
+            value = value.strip()
+            if not key:
+                continue
+
+            if value.startswith("[") and value.endswith("]"):
+                items = [v.strip() for v in value[1:-1].split(",") if v.strip()]
+                data[key] = items
+                continue
+
+            lowered = value.lower()
+            if lowered in {"true", "false"}:
+                data[key] = lowered == "true"
+                continue
+            if re.fullmatch(r"-?\d+", value):
+                data[key] = int(value)
+                continue
+            if re.fullmatch(r"-?\d+\.\d+", value):
+                data[key] = float(value)
+                continue
+
+            data[key] = value.strip("\"'")
+        return data
+
+    @staticmethod
+    def _role_from_focus(focus: Any) -> str:
+        """Map AGENTS.md focus values to AgentRole enum values."""
+        focus_value = str(focus or "").strip().lower()
+        focus_to_role = {
+            "orchestrator": "coordinator",
+            "coordinator": "coordinator",
+            "devsecops": "devsecops",
+            "data": "data",
+            "trader": "trader",
+            "creative": "creative",
+            "social": "social",
+            "journalist": "journalist",
+            "memory": "memory",
+            "conversational": "coordinator",
+        }
+        return focus_to_role.get(focus_value, "coordinator")
+
+    @staticmethod
+    def missing_expected_agents(
+        agents: Dict[str, AgentConfig],
+        expected: List[str],
+    ) -> List[str]:
+        """Return expected agent IDs that are missing from loaded configs."""
+        loaded = set(agents.keys())
+        return [agent_id for agent_id in expected if agent_id not in loaded]
     
     @staticmethod
     def get_agent_hierarchy(agents: Dict[str, AgentConfig]) -> Dict[str, List[str]]:

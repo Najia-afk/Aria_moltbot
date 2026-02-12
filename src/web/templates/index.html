@@ -1,12 +1,149 @@
 {% extends "base.html" %}
 {% block title %}Home{% endblock %}
 
+{% block extra_css %}
+<style>
+    .host-stats-widget {
+        background: var(--bg-secondary);
+        border-radius: 12px;
+        padding: 20px;
+        border: 1px solid var(--border-color);
+        margin-bottom: 20px;
+    }
+    .host-stats-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+    }
+    .host-stats-title {
+        font-size: 16px;
+        font-weight: 600;
+    }
+    .host-stats-hostname {
+        font-size: 12px;
+        color: var(--text-muted);
+    }
+    .host-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 15px;
+    }
+    .host-stat-item {
+        text-align: center;
+        padding: 15px;
+        background: var(--bg-tertiary);
+        border-radius: 10px;
+    }
+    .host-stat-icon {
+        font-size: 20px;
+        margin-bottom: 8px;
+    }
+    .host-stat-value {
+        font-size: 20px;
+        font-weight: 700;
+        margin-bottom: 4px;
+    }
+    .host-stat-label {
+        font-size: 11px;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .host-stat-bar {
+        width: 100%;
+        height: 4px;
+        background: rgba(255,255,255,0.1);
+        border-radius: 2px;
+        margin-top: 8px;
+        overflow: hidden;
+    }
+    .host-stat-bar-fill {
+        height: 100%;
+        border-radius: 2px;
+        transition: width 0.3s ease;
+    }
+    .host-stat-bar-fill.good { background: var(--success); }
+    .host-stat-bar-fill.warn { background: var(--warning); }
+    .host-stat-bar-fill.bad { background: var(--danger); }
+    .home-dashboard-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+        gap: 16px;
+        margin: 1rem 0 2rem;
+    }
+    .home-analytics-grid,
+    .home-recent-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(260px, 1fr));
+        gap: 16px;
+        margin: 0 0 16px;
+    }
+    .home-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 16px;
+    }
+    .home-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+    .home-card-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+    .home-list {
+        max-height: 280px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .home-list-item {
+        border: 1px solid var(--border-color);
+        background: var(--bg-primary);
+        border-radius: 8px;
+        padding: 10px;
+    }
+    .home-list-item .title {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 4px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .home-list-item .meta {
+        font-size: 11px;
+        color: var(--text-muted);
+    }
+    #home-activity-timeline {
+        height: 260px;
+    }
+    .home-chart-holder {
+        height: 260px;
+    }
+    @media (max-width: 768px) {
+        .host-stats-grid { grid-template-columns: repeat(2, 1fr); }
+        .home-analytics-grid,
+        .home-recent-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="hero">
     <div class="hero-content">
         <div class="hero-icon">🌟</div>
         <h1>Aria Blue</h1>
-        <p class="hero-subtitle">Autonomous AI Agent - Dashboard & Control Center</p>
+        <p class="hero-subtitle">Autonomous AI Agent - Overview & Control Center</p>
     </div>
 </div>
 
@@ -41,16 +178,41 @@
     </div>
 </section>
 
+<div class="host-stats-widget" id="host-stats-widget">
+    <div class="host-stats-header">
+        <span class="host-stats-title">🖥️ Host System</span>
+        <span class="host-stats-hostname" id="host-hostname">Loading...</span>
+    </div>
+    <div class="host-stats-grid">
+        <div class="host-stat-item">
+            <div class="host-stat-icon">🧠</div>
+            <div class="host-stat-value" id="host-ram">-</div>
+            <div class="host-stat-label">RAM</div>
+            <div class="host-stat-bar"><div class="host-stat-bar-fill" id="host-ram-bar"></div></div>
+        </div>
+        <div class="host-stat-item">
+            <div class="host-stat-icon">💾</div>
+            <div class="host-stat-value" id="host-swap">-</div>
+            <div class="host-stat-label">Swap</div>
+            <div class="host-stat-bar"><div class="host-stat-bar-fill" id="host-swap-bar"></div></div>
+        </div>
+        <div class="host-stat-item">
+            <div class="host-stat-icon">💿</div>
+            <div class="host-stat-value" id="host-disk">-</div>
+            <div class="host-stat-label">SSD</div>
+            <div class="host-stat-bar"><div class="host-stat-bar-fill" id="host-disk-bar"></div></div>
+        </div>
+        <div class="host-stat-item">
+            <div class="host-stat-icon" id="host-smart-icon">❤️</div>
+            <div class="host-stat-value" id="host-smart">-</div>
+            <div class="host-stat-label">SMART</div>
+        </div>
+    </div>
+</div>
+
 <section class="quick-links">
     <h2 class="section-title">Quick Access</h2>
     <div class="links-grid">
-        <a href="/dashboard" class="link-card">
-            <div class="link-icon dashboard">📊</div>
-            <div class="link-info">
-                <h3>Dashboard</h3>
-                <p>Stats, graphs, and real-time monitoring</p>
-            </div>
-        </a>
         <a href="/activities" class="link-card">
             <div class="link-icon activities">⚡</div>
             <div class="link-info">
@@ -75,6 +237,70 @@
     </div>
 </section>
 
+<section>
+    <div class="home-card-header" style="margin-top:8px;">
+        <h2 class="section-title" style="margin:0;">Overview</h2>
+        <button class="btn btn-secondary" onclick="loadHomeOverview()">Refresh</button>
+    </div>
+    <div class="home-analytics-grid">
+        <div class="home-card">
+            <div class="home-card-header">
+                <span class="home-card-title">⚡ Activity Timeline (7d)</span>
+                <a href="/activities" class="btn-link">View All →</a>
+            </div>
+            <div id="home-activity-timeline">
+                <canvas id="home-activity-timeline-canvas"></canvas>
+            </div>
+        </div>
+
+        <div class="home-card">
+            <div class="home-card-header">
+                <span class="home-card-title">💭 Thoughts by Type</span>
+                <a href="/thoughts" class="btn-link">View All →</a>
+            </div>
+            <div class="home-chart-holder">
+                <canvas id="home-thoughts-chart-canvas"></canvas>
+            </div>
+        </div>
+
+        <div class="home-card">
+            <div class="home-card-header">
+                <span class="home-card-title">💾 Memories by Category</span>
+                <a href="/memories" class="btn-link">View All →</a>
+            </div>
+            <div class="home-chart-holder">
+                <canvas id="home-memories-chart-canvas"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="home-recent-grid">
+        <div class="home-card">
+            <div class="home-card-header">
+                <span class="home-card-title">📄 Recent Activity</span>
+                <a href="/activities" class="btn-link">Open →</a>
+            </div>
+            <div class="home-list" id="home-recent-activities"><p>Loading...</p></div>
+        </div>
+
+        <div class="home-card">
+            <div class="home-card-header">
+                <span class="home-card-title">💭 Recent Thoughts</span>
+                <a href="/thoughts" class="btn-link">Open →</a>
+            </div>
+            <div class="home-list" id="home-recent-thoughts"><p>Loading...</p></div>
+        </div>
+
+        <div class="home-card">
+            <div class="home-card-header">
+                <span class="home-card-title">💾 Recent Memories</span>
+                <a href="/memories" class="btn-link">Open →</a>
+            </div>
+            <div class="home-list" id="home-recent-memories"><p>Loading...</p></div>
+        </div>
+    </div>
+</section>
+
 <section class="services-section">
     <h2 class="section-title">External Services</h2>
     <div class="services-grid">
@@ -90,7 +316,7 @@
             <div class="service-icon grafana">📈</div>
             <div class="service-info">
                 <h3>Grafana</h3>
-                <p>Monitoring Dashboard</p>
+                <p>Monitoring</p>
             </div>
             <span class="service-status loading" id="status-grafana">...</span>
         </a>
@@ -155,7 +381,182 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script data-page-script>
+    let homeActivityChart = null;
+    let homeThoughtsChart = null;
+    let homeMemoriesChart = null;
+
+    function renderActivityTimeline(items) {
+        const holder = document.getElementById('home-activity-timeline');
+        if (!Array.isArray(items) || items.length === 0) {
+            holder.innerHTML = '<p style="color:var(--text-muted)">No activity data</p>';
+            return;
+        }
+        const labels = items.map(d => new Date(d.day + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+        const values = items.map(d => d.count || 0);
+        const ctx = document.getElementById('home-activity-timeline-canvas').getContext('2d');
+        if (homeActivityChart) homeActivityChart.destroy();
+        homeActivityChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Activities',
+                    data: values,
+                    borderColor: '#8b5cf6',
+                    backgroundColor: 'rgba(139,92,246,0.12)',
+                    fill: true,
+                    tension: 0.35,
+                }],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+            },
+        });
+    }
+
+    function renderMiniList(containerId, items, titleKey, metaBuilder) {
+        const container = document.getElementById(containerId);
+        if (!Array.isArray(items) || items.length === 0) {
+            container.innerHTML = '<p style="color:var(--text-muted)">No items</p>';
+            return;
+        }
+        container.innerHTML = items.slice(0, 12).map((item) => `
+            <div class="home-list-item">
+                <div class="title">${escapeHtml(String(item[titleKey] || item.content || item.action || item.key || 'Untitled'))}</div>
+                <div class="meta">${escapeHtml(metaBuilder(item))}</div>
+            </div>
+        `).join('');
+    }
+
+    function renderDoughnutChart(canvasId, chartInstance, labels, values, palette) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return chartInstance;
+        if (!labels.length) {
+            const parent = canvas.parentElement;
+            if (parent) parent.innerHTML = '<p style="color:var(--text-muted)">No data</p>';
+            return chartInstance;
+        }
+        const ctx = canvas.getContext('2d');
+        if (chartInstance) chartInstance.destroy();
+        return new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels,
+                datasets: [{
+                    data: values,
+                    backgroundColor: palette,
+                    borderWidth: 0,
+                }],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { color: '#9ca3af', font: { size: 11 } },
+                    },
+                },
+            },
+        });
+    }
+
+    async function loadHomeOverview() {
+        const base = window.ARIA_API_BASE_URL;
+        const [timelineRes, activitiesRes, thoughtsRes, memoriesRes] = await Promise.allSettled([
+            fetch(`${base}/activities/timeline?days=7`).then(r => r.json()),
+            fetch(`${base}/activities?limit=30&page=1`).then(r => r.json()),
+            fetch(`${base}/thoughts?limit=30&page=1`).then(r => r.json()),
+            fetch(`${base}/memories?limit=30&page=1`).then(r => r.json()),
+        ]);
+
+        if (timelineRes.status === 'fulfilled') {
+            renderActivityTimeline(timelineRes.value);
+        }
+        if (activitiesRes.status === 'fulfilled') {
+            const items = activitiesRes.value.items || activitiesRes.value.activities || activitiesRes.value || [];
+            renderMiniList('home-recent-activities', items, 'action', (i) => {
+                const subtitle = i.description || i.type || i.skill || i.action || 'activity';
+                return `${subtitle} • ${new Date(i.created_at || Date.now()).toLocaleString()}`;
+            });
+        }
+        if (thoughtsRes.status === 'fulfilled') {
+            const items = thoughtsRes.value.items || thoughtsRes.value.thoughts || thoughtsRes.value || [];
+            renderMiniList('home-recent-thoughts', items, 'content', (i) => `${i.category || 'general'} • ${new Date(i.created_at || Date.now()).toLocaleString()}`);
+
+            const byCategory = {};
+            items.forEach(item => {
+                const key = item.category || 'general';
+                byCategory[key] = (byCategory[key] || 0) + 1;
+            });
+            const labels = Object.keys(byCategory);
+            const values = labels.map(label => byCategory[label]);
+            homeThoughtsChart = renderDoughnutChart(
+                'home-thoughts-chart-canvas',
+                homeThoughtsChart,
+                labels,
+                values,
+                ['#8b5cf6', '#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#14b8a6']
+            );
+        }
+        if (memoriesRes.status === 'fulfilled') {
+            const items = memoriesRes.value.items || memoriesRes.value.memories || memoriesRes.value || [];
+            renderMiniList('home-recent-memories', items, 'key', (i) => `${i.category || 'general'} • ${new Date(i.updated_at || i.created_at || Date.now()).toLocaleString()}`);
+
+            const byCategory = {};
+            items.forEach(item => {
+                const key = item.category || 'general';
+                byCategory[key] = (byCategory[key] || 0) + 1;
+            });
+            const labels = Object.keys(byCategory);
+            const values = labels.map(label => byCategory[label]);
+            homeMemoriesChart = renderDoughnutChart(
+                'home-memories-chart-canvas',
+                homeMemoriesChart,
+                labels,
+                values,
+                ['#22c55e', '#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#f97316']
+            );
+        }
+    }
+
+    async function updateHostStats() {
+        return fetch(`${window.ARIA_API_BASE_URL}/host-stats`)
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('host-hostname').textContent = data.hostname || 'Unknown';
+
+                const ramPct = data.ram?.percent || 0;
+                document.getElementById('host-ram').textContent = `${data.ram?.used_gb?.toFixed(1) || 0}/${data.ram?.total_gb || 0}GB`;
+                const ramBar = document.getElementById('host-ram-bar');
+                ramBar.style.width = `${ramPct}%`;
+                ramBar.className = 'host-stat-bar-fill ' + (ramPct > 90 ? 'bad' : ramPct > 70 ? 'warn' : 'good');
+
+                const swapPct = data.swap?.percent || 0;
+                document.getElementById('host-swap').textContent = `${data.swap?.used_gb?.toFixed(1) || 0}/${data.swap?.total_gb || 0}GB`;
+                const swapBar = document.getElementById('host-swap-bar');
+                swapBar.style.width = `${swapPct}%`;
+                swapBar.className = 'host-stat-bar-fill ' + (swapPct > 80 ? 'bad' : swapPct > 50 ? 'warn' : 'good');
+
+                const diskPct = data.disk?.percent || 0;
+                document.getElementById('host-disk').textContent = `${data.disk?.used_gb || 0}/${data.disk?.total_gb || 0}GB`;
+                const diskBar = document.getElementById('host-disk-bar');
+                diskBar.style.width = `${diskPct}%`;
+                diskBar.className = 'host-stat-bar-fill ' + (diskPct > 90 ? 'bad' : diskPct > 75 ? 'warn' : 'good');
+
+                const smartHealthy = data.smart?.healthy !== false;
+                document.getElementById('host-smart').textContent = smartHealthy ? 'Healthy' : 'Warning';
+                document.getElementById('host-smart-icon').textContent = smartHealthy ? '❤️' : '⚠️';
+            })
+            .catch(() => {
+                document.getElementById('host-hostname').textContent = 'Offline';
+            });
+    }
+
     // Load stats
     fetch(`${window.ARIA_API_BASE_URL}/stats`)
         .then(r => r.json())
@@ -188,5 +589,9 @@
                 el.className = 'service-status loading';
             });
         });
+
+    loadHomeOverview();
+    updateHostStats();
+    setInterval(updateHostStats, 30000);
 </script>
 {% endblock %}

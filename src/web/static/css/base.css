@@ -290,6 +290,9 @@ footer p {
     .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
     main { padding: var(--space-md); }
     header .container { padding: 0 var(--space-md); }
+    nav { gap: var(--space-sm); }
+    .logo { font-size: 1rem; }
+    .logo-text span { font-size: 1.05rem; }
     
     /* Mobile: hide nav by default, show hamburger */
     .nav-links {
@@ -310,6 +313,12 @@ footer p {
     
     .nav-links.active {
         display: flex;
+    }
+
+    .nav-links > a,
+    .nav-links .nav-dropdown-toggle {
+        width: 100%;
+        justify-content: space-between;
     }
     
     /* Stack dropdowns vertically on mobile */

@@ -8,6 +8,7 @@ import argparse
 import asyncio
 import sys
 import logging
+import os
 from typing import Optional
 
 from aria_mind import AriaMind
@@ -20,6 +21,17 @@ from aria_mind.logging_config import configure_logging, correlation_id_var, new_
 configure_logging()
 correlation_id_var.set(new_correlation_id())
 logger = logging.getLogger("aria.cli")
+
+
+def _expected_agent_ids() -> list[str]:
+    return [
+        part.strip()
+        for part in os.getenv(
+            "ARIA_EXPECTED_AGENTS",
+            "aria,devops,analyst,creator,memory,aria_talk",
+        ).split(",")
+        if part.strip()
+    ]
 
 
 async def run_interactive():
@@ -40,6 +52,13 @@ async def run_interactive():
     coordinator = AgentCoordinator(registry)
     try:
         await coordinator.load_from_file("aria_mind/AGENTS.md")
+        from aria_agents.loader import AgentLoader
+        missing = AgentLoader.missing_expected_agents(coordinator._configs, _expected_agent_ids())
+        if missing:
+            raise RuntimeError(
+                "Agent config sanity check failed; missing expected agents: "
+                + ", ".join(missing)
+            )
         await coordinator.initialize_agents()
         print(f"✓ Loaded {len(coordinator.list_agents())} agents")
     except Exception as e:
@@ -125,6 +144,13 @@ async def run_health_check():
     coordinator = AgentCoordinator()
     try:
         await coordinator.load_from_file("aria_mind/AGENTS.md")
+        from aria_agents.loader import AgentLoader
+        missing = AgentLoader.missing_expected_agents(coordinator._configs, _expected_agent_ids())
+        if missing:
+            raise RuntimeError(
+                "Agent config sanity check failed; missing expected agents: "
+                + ", ".join(missing)
+            )
         agents = coordinator.list_agents()
         print(f"✓ Agents configured: {len(agents) if agents else 0}")
     except Exception as e:

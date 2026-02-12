@@ -51,6 +51,13 @@ OPEN_ROUTER_KEY    = os.getenv("OPEN_ROUTER_KEY", "")
 
 # ── OpenClaw ─────────────────────────────────────────────────────────────────
 OPENCLAW_JOBS_PATH = os.getenv("OPENCLAW_JOBS_PATH", "/openclaw/cron/jobs.json")
+OPENCLAW_SESSIONS_INDEX_PATH = os.getenv(
+    "OPENCLAW_SESSIONS_INDEX_PATH", "/openclaw/agents/main/sessions/sessions.json"
+)
+OPENCLAW_AGENTS_ROOT = os.getenv("OPENCLAW_AGENTS_ROOT", "/openclaw/agents")
+OPENCLAW_SESSIONS_SYNC_INTERVAL_SECONDS = int(
+    os.getenv("OPENCLAW_SESSIONS_SYNC_INTERVAL_SECONDS", "30")
+)
 
 # ── Runtime ──────────────────────────────────────────────────────────────────
 STARTUP_TIME = datetime.now(timezone.utc)
