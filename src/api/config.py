@@ -59,6 +59,11 @@ OPENCLAW_SESSIONS_SYNC_INTERVAL_SECONDS = int(
     os.getenv("OPENCLAW_SESSIONS_SYNC_INTERVAL_SECONDS", "30")
 )
 
+# ── Startup jobs ─────────────────────────────────────────────────────────────
+SKILL_BACKFILL_ON_STARTUP = os.getenv(
+    "SKILL_BACKFILL_ON_STARTUP", "true"
+).lower() in {"1", "true", "yes"}
+
 # ── Runtime ──────────────────────────────────────────────────────────────────
 STARTUP_TIME = datetime.now(timezone.utc)
 API_VERSION  = "3.0.0"

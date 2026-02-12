@@ -417,6 +417,7 @@ services:
       OPENCLAW_SESSIONS_INDEX_PATH: /openclaw/agents/main/sessions/sessions.json
       OPENCLAW_AGENTS_ROOT: /openclaw/agents
       OPENCLAW_SESSIONS_SYNC_INTERVAL_SECONDS: "30"
+      SKILL_BACKFILL_ON_STARTUP: ${SKILL_BACKFILL_ON_STARTUP:-true}
     volumes:
       # Mount API source for live reload during development
       - ../../src/api:/app:ro
