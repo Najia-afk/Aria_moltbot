@@ -197,7 +197,7 @@ function renderCharts(data) {
 
 async function loadCreativePulse() {
     const hours = document.getElementById('hours-filter').value;
-    const url = `${API_BASE_URL}/activities/visualization?hours=${encodeURIComponent(hours)}&limit=30`;
+    const url = `${API_BASE_URL}/activities/visualization?hours=${encodeURIComponent(hours)}&limit=30&include_creative=true`;
     const data = await fetchAriaData(url);
 
     const total = data.summary?.total || 0;

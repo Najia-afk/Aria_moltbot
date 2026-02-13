@@ -185,7 +185,12 @@ async def activity_timeline(days: int = 7, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/activities/visualization")
-async def activity_visualization(hours: int = 24, limit: int = 25, db: AsyncSession = Depends(get_db)):
+async def activity_visualization(
+    hours: int = 24,
+    limit: int = 25,
+    include_creative: bool = False,
+    db: AsyncSession = Depends(get_db),
+):
     """Aggregated activity data for UI visualizations."""
     now_utc = datetime.now(timezone.utc)
     cutoff = now_utc - timedelta(hours=max(1, min(hours, 24 * 30)))
@@ -230,17 +235,19 @@ async def activity_visualization(hours: int = 24, limit: int = 25, db: AsyncSess
         )
     ).all()
 
-    all_skills_rows = (
-        await db.execute(
-            select(
-                skill_bucket,
-                func.count(ActivityLog.id).label("count"),
+    all_skills_rows = []
+    if include_creative:
+        all_skills_rows = (
+            await db.execute(
+                select(
+                    skill_bucket,
+                    func.count(ActivityLog.id).label("count"),
+                )
+                .where(ActivityLog.created_at >= cutoff)
+                .group_by(skill_bucket)
+                .order_by(desc(func.count(ActivityLog.id)))
             )
-            .where(ActivityLog.created_at >= cutoff)
-            .group_by(skill_bucket)
-            .order_by(desc(func.count(ActivityLog.id)))
-        )
-    ).all()
+        ).all()
 
     total_rows = (
         await db.execute(
@@ -272,7 +279,18 @@ async def activity_visualization(hours: int = 24, limit: int = 25, db: AsyncSess
     ]
 
     def _normalize_skill_name(name: str | None) -> str:
-        return (name or "unknown").strip().lower().replace("-", "_")
+        skill = (name or "unknown").strip().lower().replace("-", "_")
+        if skill.startswith("aria_"):
+            skill = skill[5:]
+        alias_map = {
+            "apiclient": "api_client",
+            "factcheck": "fact_check",
+            "modelswitcher": "model_switcher",
+            "hourlygoals": "hourly_goals",
+            "securityscan": "security_scan",
+            "sessionmanager": "session_manager",
+        }
+        return alias_map.get(skill, skill)
 
     all_skill_counts = {
         _normalize_skill_name(row.skill): int(row.count or 0)
@@ -308,10 +326,11 @@ async def activity_visualization(hours: int = 24, limit: int = 25, db: AsyncSess
             for row in skills_rows
         ],
         "creative": {
+            "enabled": include_creative,
             "targets": creative_skill_targets,
             "total": creative_total,
             "skills": creative_skills,
-        },
+        } if include_creative else None,
         "recent": [
             {
                 "id": str(item.id),
