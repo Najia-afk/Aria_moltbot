@@ -102,6 +102,10 @@ def create_app():
     @app.route('/activities')
     def activities():
         return render_template('activities.html')
+
+    @app.route('/activity-visualization')
+    def activity_visualization():
+        return render_template('activity_visualization.html')
     
     @app.route('/thoughts')
     def thoughts():

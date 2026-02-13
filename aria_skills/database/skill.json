@@ -1,10 +1,13 @@
 {
   "name": "aria-database",
   "version": "1.0.0",
-  "description": "Query Aria's PostgreSQL database. Execute SQL queries on activity logs, memories, thoughts, and goals.",
+  "description": "Self-healing and recovery database skill. Use for diagnostics/migrations/admin SQL when api_client is insufficient.",
   "author": "Aria Team",
   "layer": 3,
   "dependencies": ["api_client"],
+  "support_level": "advanced_compatibility",
+  "default_routing": false,
+  "recommended_usage": "self_healing_recovery",
   "focus_affinity": ["data"],
   "tools": [
     {

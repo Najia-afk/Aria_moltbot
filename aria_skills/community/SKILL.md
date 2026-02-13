@@ -1,5 +1,7 @@
 # aria-community
 
+Support level: advanced compatibility (specialist use)
+
 Community growth and engagement orchestration.
 
 ## Purpose

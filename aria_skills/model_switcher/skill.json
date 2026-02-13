@@ -5,6 +5,9 @@
   "author": "Aria Team",
   "layer": 2,
   "dependencies": ["litellm"],
+  "support_level": "advanced_compatibility",
+  "default_routing": false,
+  "recommended_usage": "operator_override_only",
   "focus_affinity": ["orchestrator"],
   "tools": [
     {

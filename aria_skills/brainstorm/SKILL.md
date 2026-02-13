@@ -1,5 +1,7 @@
 # aria-brainstorm
 
+Support level: advanced compatibility (specialist use)
+
 Creative ideation and brainstorming session management.
 
 ## Purpose

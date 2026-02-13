@@ -131,7 +131,9 @@ aria-api-client.mark_proposal_implemented({"proposal_id": "UUID", "reviewed_by":
 | 🧠 Cognitive | `aria-working-memory`, `aria-pipeline-skill`, `aria-conversation-summary` |
 | ⚡ Utility | `aria-api-client`, `aria-litellm` |
 
-> **Legacy compatibility skills (de-prioritized):** `aria-database`, `aria-brainstorm`, `aria-community`, `aria-fact-check`, `aria-model-switcher`, `aria-experiment`
+> **Advanced compatibility skills (targeted use, not default routing):** `aria-database`, `aria-brainstorm`, `aria-community`, `aria-fact-check`, `aria-model-switcher`, `aria-experiment`
+>
+> Use these intentionally for specialized workflows. In normal operations, prefer layer-aligned defaults (`aria-api-client`, `aria-working-memory`, `aria-social`, etc.).
 
 ## Composable Pipelines
 
@@ -169,7 +171,7 @@ aria-health.health_check_all({})
 # Add knowledge
 aria-knowledge-graph.kg_add_entity({"name": "Python", "type": "language"})
 
-# Direct SQL (use sparingly - prefer aria-api-client)
+# Direct SQL (self-healing / recovery path — prefer aria-api-client first)
 aria-database.fetch_all({"query": "SELECT * FROM goals LIMIT 5"})
 ```
 

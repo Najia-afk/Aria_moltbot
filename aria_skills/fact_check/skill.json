@@ -5,6 +5,9 @@
   "author": "Aria Blue",
   "layer": 3,
   "dependencies": ["api_client", "research"],
+  "support_level": "advanced_compatibility",
+  "default_routing": false,
+  "recommended_usage": "specialist_verification_workflows",
   "focus_affinity": ["journalist"],
   "tools": [
     {

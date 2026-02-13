@@ -1,5 +1,7 @@
 # aria-experiment
 
+Support level: advanced compatibility (specialist use)
+
 Experiment tracking and lightweight model registry support.
 
 ## Purpose

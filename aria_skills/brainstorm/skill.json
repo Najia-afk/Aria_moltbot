@@ -5,6 +5,9 @@
   "author": "Aria Blue",
   "layer": 3,
   "dependencies": ["api_client"],
+  "support_level": "advanced_compatibility",
+  "default_routing": false,
+  "recommended_usage": "specialist_creative_sessions",
   "focus_affinity": ["creative"],
   "tools": [
     {

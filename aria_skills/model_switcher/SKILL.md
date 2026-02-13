@@ -1,5 +1,7 @@
 # aria-model-switcher
 
+Support level: advanced compatibility (operator override)
+
 Catalog-backed model selection and thinking-mode control.
 
 ## Purpose

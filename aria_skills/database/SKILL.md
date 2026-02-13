@@ -1,11 +1,13 @@
 # aria-database
 
-Compatibility database skill for memory/thought data operations via API.
+Support level: advanced compatibility (self-healing/recovery path)
+
+Compatibility database skill for recovery-grade operations.
 
 ## Purpose
 - Provide database-oriented methods in skill form.
 - Route supported operations through `api_client` safely.
-- Avoid unsafe raw SQL in runtime environments.
+- Use direct SQL only for diagnostics, migrations, and repair workflows.
 
 ## Main Tools
 - `log_thought`

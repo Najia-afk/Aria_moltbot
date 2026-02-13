@@ -10,8 +10,15 @@ aria-<skill-name>.<function>({"param": "value"})
 >
 > **Catalog:** Run `python -m aria_mind --list-skills` to generate a live skill catalog from `aria_skills/catalog.py`.
 >
-> **Legacy compatibility skills (de-prioritized):** `database`, `brainstorm`, `community`, `fact_check`, `model_switcher`, `experiment`.
+> **Advanced compatibility skills (targeted, non-default):** `database`, `brainstorm`, `community`, `fact_check`, `model_switcher`, `experiment`.
 > Prefer `api_client` and layer-aligned skills for normal operations.
+
+### Advanced Compatibility Escalation Policy
+
+- Use `api_client` first for CRUD/workflow operations.
+- Escalate to `database` for self-healing, diagnostics, migrations, and recovery when `api_client` cannot complete the task.
+- Use `brainstorm`, `community`, `fact_check`, `model_switcher`, and `experiment` only for explicit specialist tasks.
+- Do not route to advanced compatibility skills by default in routine cron paths.
 
 ## Skill Layers
 

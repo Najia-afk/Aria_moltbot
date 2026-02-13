@@ -1,5 +1,7 @@
 # aria-fact-check
 
+Support level: advanced compatibility (specialist use)
+
 Claim extraction and structured verification workflow helpers.
 
 ## Purpose

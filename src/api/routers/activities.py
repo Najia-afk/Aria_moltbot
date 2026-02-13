@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Request
-from sqlalchemy import Float, cast, func, select
+from sqlalchemy import Float, cast, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import ActivityLog, SocialPost
@@ -182,6 +182,101 @@ async def activity_timeline(days: int = 7, db: AsyncSession = Depends(get_db)):
         .order_by(func.date(ActivityLog.created_at))
     )
     return [{"day": str(r.day), "count": r.count} for r in result.all()]
+
+
+@router.get("/activities/visualization")
+async def activity_visualization(hours: int = 24, limit: int = 25, db: AsyncSession = Depends(get_db)):
+    """Aggregated activity data for UI visualizations."""
+    now_utc = datetime.now(timezone.utc)
+    cutoff = now_utc - timedelta(hours=max(1, min(hours, 24 * 30)))
+    limit = max(1, min(limit, 200))
+
+    hourly_rows = (
+        await db.execute(
+            select(
+                func.date_trunc("hour", ActivityLog.created_at).label("hour"),
+                func.count(ActivityLog.id).label("count"),
+            )
+            .where(ActivityLog.created_at >= cutoff)
+            .group_by(func.date_trunc("hour", ActivityLog.created_at))
+            .order_by(func.date_trunc("hour", ActivityLog.created_at))
+        )
+    ).all()
+
+    actions_rows = (
+        await db.execute(
+            select(ActivityLog.action, func.count(ActivityLog.id).label("count"))
+            .where(ActivityLog.created_at >= cutoff)
+            .group_by(ActivityLog.action)
+            .order_by(desc(func.count(ActivityLog.id)))
+            .limit(12)
+        )
+    ).all()
+
+    skills_rows = (
+        await db.execute(
+            select(
+                func.coalesce(ActivityLog.skill, "unknown").label("skill"),
+                func.count(ActivityLog.id).label("count"),
+            )
+            .where(ActivityLog.created_at >= cutoff)
+            .group_by(func.coalesce(ActivityLog.skill, "unknown"))
+            .order_by(desc(func.count(ActivityLog.id)))
+            .limit(12)
+        )
+    ).all()
+
+    total_rows = (
+        await db.execute(
+            select(
+                func.count(ActivityLog.id).label("total"),
+                func.sum(case((ActivityLog.success == True, 1), else_=0)).label("success"),
+                func.sum(case((ActivityLog.success == False, 1), else_=0)).label("fail"),
+            ).where(ActivityLog.created_at >= cutoff)
+        )
+    ).one()
+
+    recent_items = (
+        await db.execute(
+            select(ActivityLog)
+            .where(ActivityLog.created_at >= cutoff)
+            .order_by(ActivityLog.created_at.desc())
+            .limit(limit)
+        )
+    ).scalars().all()
+
+    return {
+        "window_hours": hours,
+        "generated_at": now_utc.isoformat(),
+        "summary": {
+            "total": int(total_rows.total or 0),
+            "success": int(total_rows.success or 0),
+            "fail": int(total_rows.fail or 0),
+        },
+        "hourly": [
+            {"hour": row.hour.isoformat() if row.hour else None, "count": int(row.count or 0)}
+            for row in hourly_rows
+        ],
+        "actions": [
+            {"action": row.action or "unknown", "count": int(row.count or 0)}
+            for row in actions_rows
+        ],
+        "skills": [
+            {"skill": row.skill or "unknown", "count": int(row.count or 0)}
+            for row in skills_rows
+        ],
+        "recent": [
+            {
+                "id": str(item.id),
+                "action": item.action,
+                "skill": item.skill,
+                "success": bool(item.success),
+                "created_at": item.created_at.isoformat() if item.created_at else None,
+                "description": _extract_description(item.details),
+            }
+            for item in recent_items
+        ],
+    }
 
 
 
