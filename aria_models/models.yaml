@@ -14,7 +14,7 @@
     }
   },
   "routing": {
-    "primary": "litellm/kimi",
+    "primary": "litellm/step-35-flash-free",
     "bypass": false,
     "tier_order": ["local", "free", "paid"],
     "timeout": 300,
@@ -482,10 +482,10 @@
       "creative_writing": ["trinity-free"],
       "long_context": ["qwen3-next-free", "nemotron-free", "kimi"],
       "fast_simple": ["gpt-oss-small-free", "kimi"],
-      "default": ["kimi"]
+      "default": ["step-35-flash-free"]
     },
     "focus_defaults": {
-      "orchestrator": "kimi",
+      "orchestrator": "step-35-flash-free",
       "devsecops": "qwen3-coder-free",
       "data": "chimera-free",
       "trader": "deepseek-free",
@@ -495,8 +495,8 @@
     }
   },
   "profiles": {
-    "routing":  { "model": "kimi",             "temperature": 0.3, "max_tokens": 512 },
-    "analysis": { "model": "kimi",             "temperature": 0.7, "max_tokens": 4096 },
+    "routing":  { "model": "step-35-flash-free", "temperature": 0.3, "max_tokens": 512 },
+    "analysis": { "model": "step-35-flash-free", "temperature": 0.7, "max_tokens": 4096 },
     "creative": { "model": "trinity-free",     "temperature": 0.9, "max_tokens": 2048 },
     "code":     { "model": "qwen3-coder-free", "temperature": 0.2, "max_tokens": 8192 },
     "social":   { "model": "trinity-free",     "temperature": 0.8, "max_tokens": 1024 }

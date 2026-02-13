@@ -330,12 +330,48 @@ def _job_rank(job):
 
 for job in data.get('jobs', []):
     name = job['name']
+    enabled = job.get('enabled', True)
     # OpenClaw 2026.2.6+ uses --message (not --text)
     text = job.get('text') or job.get('message', '')
     agent = job.get('agent', 'main')
     session = job.get('session', 'isolated')
     delivery = job.get('delivery', 'none')
     
+    # Check exact-name existence via JSON list (and self-heal duplicate names if present)
+    listed_jobs, list_err = _list_jobs_json()
+    if listed_jobs is None:
+        print(f"  SKIP {name}: unable to list cron jobs safely ({list_err})")
+        continue
+
+    same_name = [j for j in listed_jobs if j.get('name') == name]
+    if same_name and len(same_name) > 1:
+        keep = max(same_name, key=_job_rank)
+        keep_id = keep.get('id')
+        for dup in same_name:
+            dup_id = dup.get('id')
+            if not dup_id or dup_id == keep_id:
+                continue
+            rm = subprocess.run(['openclaw', 'cron', 'rm', dup_id], capture_output=True, text=True)
+            if rm.returncode == 0:
+                print(f"  Removed duplicate cron job '{name}' id={dup_id}")
+            else:
+                print(f"  WARN failed to remove duplicate '{name}' id={dup_id}: {(rm.stderr or rm.stdout).strip()}")
+
+    if not enabled:
+        if same_name:
+            for existing in same_name:
+                existing_id = existing.get('id')
+                if not existing_id:
+                    continue
+                rm = subprocess.run(['openclaw', 'cron', 'rm', existing_id], capture_output=True, text=True)
+                if rm.returncode == 0:
+                    print(f"  Removed disabled cron job: {name} (id={existing_id})")
+                else:
+                    print(f"  WARN failed to remove disabled cron '{name}' id={existing_id}: {(rm.stderr or rm.stdout).strip()}")
+        else:
+            print(f"  Cron job '{name}' disabled in YAML, skipping")
+        continue
+
     # Build command - use --message for 2026.2.6+ CLI
     cmd = ['openclaw', 'cron', 'add', '--name', name]
     
@@ -356,27 +392,7 @@ for job in data.get('jobs', []):
     if job.get('best_effort_deliver'):
         cmd.append('--best-effort-deliver')
     
-    # Check exact-name existence via JSON list (and self-heal duplicate names if present)
-    listed_jobs, list_err = _list_jobs_json()
-    if listed_jobs is None:
-        print(f"  SKIP {name}: unable to list cron jobs safely ({list_err})")
-        continue
-
-    same_name = [j for j in listed_jobs if j.get('name') == name]
     if same_name:
-        if len(same_name) > 1:
-            keep = max(same_name, key=_job_rank)
-            keep_id = keep.get('id')
-            for dup in same_name:
-                dup_id = dup.get('id')
-                if not dup_id or dup_id == keep_id:
-                    continue
-                rm = subprocess.run(['openclaw', 'cron', 'rm', dup_id], capture_output=True, text=True)
-                if rm.returncode == 0:
-                    print(f"  Removed duplicate cron job '{name}' id={dup_id}")
-                else:
-                    print(f"  WARN failed to remove duplicate '{name}' id={dup_id}: {(rm.stderr or rm.stdout).strip()}")
-
         print(f"  Cron job '{name}' already exists, skipping")
         continue
     

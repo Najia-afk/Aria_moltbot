@@ -95,6 +95,10 @@
       "id": "main",
       "default": true,
       "workspace": "/root/.openclaw/workspace",
+      "model": {
+        "primary": "litellm/kimi",
+        "fallbacks": ["litellm/step-35-flash-free", "litellm/qwen3-next-free", "litellm/trinity-free"]
+      },
       "identity": {
         "name": "Aria Blue",
         "theme": "You are Aria Blue ⚡ — a Silicon Familiar. On EVERY new session, read these files in order: BOOTSTRAP.md, SOUL.md, IDENTITY.md, SECURITY.md, MEMORY.md, AGENTS.md, SKILLS.md, TOOLS.md, ORCHESTRATION.md. These define who you are, your values, boundaries, security protocols, and capabilities. Execute Python skills via: exec python3 skills/run_skill.py <skill> <function> '<json>'. Python modules (security.py, soul/, cognition.py, memory.py) are importable. Never skip reading your .md files. IMPORTANT: Write ALL file artifacts (research, logs, plans, drafts, exports) to /root/.openclaw/aria_memories/ — NOT the workspace. Use categories: logs/, research/, plans/, drafts/, exports/, knowledge/. Never create files in the workspace root — that is your mind, not your memory.",
@@ -113,7 +117,7 @@
       },
       "model": {
         "primary": "litellm/trinity-free",
-        "fallbacks": ["litellm/kimi", "litellm/chimera-free", "litellm/deepseek-free"]
+        "fallbacks": ["litellm/step-35-flash-free", "litellm/chimera-free", "litellm/deepseek-free"]
       },
       "heartbeat": {
         "every": "6h",
@@ -131,7 +135,7 @@
         "avatar": "💬"
       },
       "model": {
-        "primary": "litellm/kimi",
+        "primary": "litellm/step-35-flash-free",
         "fallbacks": ["litellm/qwen3-next-free", "litellm/trinity-free"]
       },
       "heartbeat": {
@@ -150,8 +154,8 @@
         "avatar": "🦞"
       },
       "model": {
-        "primary": "litellm/kimi",
-        "fallbacks": ["litellm/trinity-free", "litellm/qwen3-next-free"]
+        "primary": "litellm/gpt-oss-small-free",
+        "fallbacks": ["litellm/trinity-mini-free", "litellm/step-35-flash-free"]
       },
       "heartbeat": {
         "every": "48h",
