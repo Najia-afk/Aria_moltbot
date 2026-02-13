@@ -38,7 +38,7 @@
 {% block content %}
 <div class="page-header">
     <h1>✨ Creative Pulse</h1>
-    <p>Live view of what Aria is doing: activity flow, top actions, top skills, and recent execution feed.</p>
+    <p>Creativity-focused activity view for brainstorm, experiment, community, fact-check, model-switcher, memeothy, and llm.</p>
 </div>
 
 <div class="page-controls">
@@ -53,39 +53,32 @@
 </div>
 
 <div class="stats-grid">
-    <div class="stat-card"><h4>Total Events</h4><div id="stat-total" class="value">-</div></div>
-    <div class="stat-card"><h4>Successful</h4><div id="stat-success" class="value">-</div></div>
-    <div class="stat-card"><h4>Failed</h4><div id="stat-fail" class="value">-</div></div>
-    <div class="stat-card"><h4>Success Rate</h4><div id="stat-rate" class="value">-</div></div>
     <div class="stat-card"><h4>Creative Skill Events</h4><div id="stat-creative" class="value">-</div></div>
+    <div class="stat-card"><h4>Creative Success</h4><div id="stat-creative-success" class="value">-</div></div>
+    <div class="stat-card"><h4>Creative Fail</h4><div id="stat-creative-fail" class="value">-</div></div>
+    <div class="stat-card"><h4>Creative Success Rate</h4><div id="stat-creative-rate" class="value">-</div></div>
 </div>
 
 <div class="chart-grid">
     <div class="chart-card" id="hourly-card">
-        <h4>⏱️ Activity by Hour</h4>
+        <h4>⏱️ Creative Activity by Hour</h4>
         <canvas id="hourly-chart"></canvas>
-        <div id="hourly-empty" class="chart-empty">No hourly activity data in selected window.</div>
+        <div id="hourly-empty" class="chart-empty">No creative hourly activity in selected window.</div>
     </div>
     <div class="chart-card" id="actions-card">
-        <h4>🎯 Top Actions</h4>
+        <h4>🎯 Creative Top Actions</h4>
         <canvas id="actions-chart"></canvas>
-        <div id="actions-empty" class="chart-empty">No action data in selected window.</div>
+        <div id="actions-empty" class="chart-empty">No creative action data in selected window.</div>
     </div>
 </div>
 
 <div class="chart-card" style="margin-bottom:20px;" id="skills-card">
-    <h4>🔧 Top Skills</h4>
+    <h4>🔧 Creative Skill Breakdown</h4>
     <canvas id="skills-chart"></canvas>
-    <div id="skills-empty" class="chart-empty">No skill data in selected window.</div>
-</div>
-
-<div class="chart-card" style="margin-bottom:20px;" id="creative-card">
-    <h4>✨ Creative / Advanced Skills Pulse</h4>
-    <canvas id="creative-chart"></canvas>
     <div id="creative-empty" class="chart-empty">No creative-skill activity in selected window.</div>
 </div>
 
-<h3 style="margin:0 0 10px;">Recent Activity Feed</h3>
+<h3 style="margin:0 0 10px;">Recent Creative Activity Feed</h3>
 <table class="data-table">
     <thead>
         <tr><th>Time</th><th>Action</th><th>Skill</th><th>Status</th><th>Description</th></tr>
@@ -142,17 +135,15 @@ function renderCharts(data) {
     destroyChart('hourly');
     destroyChart('actions');
     destroyChart('skills');
-    destroyChart('creative');
 
-    const hourlyData = data.hourly || [];
-    const actionData = data.actions || [];
-    const skillData = data.skills || [];
-    const creativeData = data.creative?.skills || [];
+    const creative = data.creative || {};
+    const hourlyData = creative.hourly || [];
+    const actionData = creative.actions || [];
+    const skillData = creative.skills || [];
 
     setChartVisibility('hourly-chart', 'hourly-empty', hourlyData.length > 0);
     setChartVisibility('actions-chart', 'actions-empty', actionData.length > 0);
-    setChartVisibility('skills-chart', 'skills-empty', skillData.length > 0);
-    setChartVisibility('creative-chart', 'creative-empty', creativeData.some(x => (x.count || 0) > 0));
+    setChartVisibility('skills-chart', 'creative-empty', skillData.some(x => (x.count || 0) > 0));
 
     if (hourlyData.length > 0) {
         const hourlyLabels = hourlyData.map(x => new Date(x.hour).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}));
@@ -174,22 +165,12 @@ function renderCharts(data) {
         });
     }
 
-    if (skillData.length > 0) {
+    if (skillData.some(x => (x.count || 0) > 0)) {
         const skillLabels = skillData.map(x => x.skill);
         const skillValues = skillData.map(x => x.count);
         _charts.skills = new Chart(document.getElementById('skills-chart'), {
             type: 'bar',
             data: { labels: skillLabels, datasets: [{ label: 'Count', data: skillValues, backgroundColor: 'rgba(16,185,129,0.7)' }] },
-            options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: false } } }
-        });
-    }
-
-    if (creativeData.some(x => (x.count || 0) > 0)) {
-        const creativeLabels = creativeData.map(x => x.skill);
-        const creativeValues = creativeData.map(x => x.count || 0);
-        _charts.creative = new Chart(document.getElementById('creative-chart'), {
-            type: 'bar',
-            data: { labels: creativeLabels, datasets: [{ label: 'Events', data: creativeValues, backgroundColor: 'rgba(236,72,153,0.7)' }] },
             options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: false } } }
         });
     }
@@ -200,20 +181,21 @@ async function loadCreativePulse() {
     const url = `${API_BASE_URL}/activities/visualization?hours=${encodeURIComponent(hours)}&limit=30&include_creative=true`;
     const data = await fetchAriaData(url);
 
-    const total = data.summary?.total || 0;
-    const success = data.summary?.success || 0;
-    const fail = data.summary?.fail || 0;
-    const rate = total ? (success * 100 / total) : 0;
+    const creative = data.creative || {};
+    const creativeRecent = creative.recent || [];
+    const creativeTotal = creative.total || 0;
+    const creativeSuccess = creativeRecent.filter(x => x && x.success).length;
+    const creativeFail = Math.max(0, creativeTotal - creativeSuccess);
+    const creativeRate = creativeTotal ? (creativeSuccess * 100 / creativeTotal) : 0;
 
-    document.getElementById('stat-total').textContent = formatNumber(total);
-    document.getElementById('stat-success').textContent = formatNumber(success);
-    document.getElementById('stat-fail').textContent = formatNumber(fail);
-    document.getElementById('stat-rate').textContent = fmtPct(rate);
-    document.getElementById('stat-creative').textContent = formatNumber(data.creative?.total || 0);
+    document.getElementById('stat-creative').textContent = formatNumber(creativeTotal);
+    document.getElementById('stat-creative-success').textContent = formatNumber(creativeSuccess);
+    document.getElementById('stat-creative-fail').textContent = formatNumber(creativeFail);
+    document.getElementById('stat-creative-rate').textContent = fmtPct(creativeRate);
     document.getElementById('sync-meta').textContent = `Data sync: ${new Date().toLocaleTimeString()}`;
 
     renderCharts(data);
-    renderRecent(data.recent || []);
+    renderRecent(creativeRecent);
 }
 
 document.getElementById('hours-filter').addEventListener('change', loadCreativePulse);
@@ -222,8 +204,7 @@ loadCreativePulse().catch(err => {
     document.getElementById('recent-body').innerHTML = `<tr><td colspan="5">Error loading Creative Pulse: ${err.message}</td></tr>`;
     setChartVisibility('hourly-chart', 'hourly-empty', false);
     setChartVisibility('actions-chart', 'actions-empty', false);
-    setChartVisibility('skills-chart', 'skills-empty', false);
-    setChartVisibility('creative-chart', 'creative-empty', false);
+    setChartVisibility('skills-chart', 'creative-empty', false);
 });
 </script>
 {% endblock %}

@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Request
-from sqlalchemy import Float, case, cast, desc, func, select
+from sqlalchemy import Float, case, cast, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import ActivityLog, SocialPost
@@ -236,7 +236,30 @@ async def activity_visualization(
     ).all()
 
     all_skills_rows = []
+    creative_hourly_rows = []
+    creative_recent_items = []
+    creative_actions_rows = []
     if include_creative:
+        creative_skill_targets = [
+            "brainstorm",
+            "experiment",
+            "community",
+            "fact_check",
+            "model_switcher",
+            "memeothy",
+            "llm",
+        ]
+
+        skill_expr = func.lower(func.replace(func.coalesce(ActivityLog.skill, ""), "-", "_"))
+        creative_candidates = set(creative_skill_targets)
+        creative_candidates.update({f"aria_{name}" for name in creative_skill_targets})
+        creative_candidates.update({
+            "factcheck",
+            "modelswitcher",
+        })
+
+        creative_filter = or_(*[skill_expr == value for value in sorted(creative_candidates)])
+
         all_skills_rows = (
             await db.execute(
                 select(
@@ -244,8 +267,43 @@ async def activity_visualization(
                     func.count(ActivityLog.id).label("count"),
                 )
                 .where(ActivityLog.created_at >= cutoff)
+                .where(creative_filter)
                 .group_by(skill_bucket)
                 .order_by(desc(func.count(ActivityLog.id)))
+            )
+        ).all()
+
+        creative_hourly_rows = (
+            await db.execute(
+                select(
+                    hour_bucket,
+                    func.count(ActivityLog.id).label("count"),
+                )
+                .where(ActivityLog.created_at >= cutoff)
+                .where(creative_filter)
+                .group_by(hour_bucket)
+                .order_by(hour_bucket)
+            )
+        ).all()
+
+        creative_recent_items = (
+            await db.execute(
+                select(ActivityLog)
+                .where(ActivityLog.created_at >= cutoff)
+                .where(creative_filter)
+                .order_by(ActivityLog.created_at.desc())
+                .limit(limit)
+            )
+        ).scalars().all()
+
+        creative_actions_rows = (
+            await db.execute(
+                select(ActivityLog.action, func.count(ActivityLog.id).label("count"))
+                .where(ActivityLog.created_at >= cutoff)
+                .where(creative_filter)
+                .group_by(ActivityLog.action)
+                .order_by(desc(func.count(ActivityLog.id)))
+                .limit(8)
             )
         ).all()
 
@@ -330,6 +388,25 @@ async def activity_visualization(
             "targets": creative_skill_targets,
             "total": creative_total,
             "skills": creative_skills,
+            "hourly": [
+                {"hour": row.hour.isoformat() if row.hour else None, "count": int(row.count or 0)}
+                for row in creative_hourly_rows
+            ],
+            "actions": [
+                {"action": row.action or "unknown", "count": int(row.count or 0)}
+                for row in creative_actions_rows
+            ],
+            "recent": [
+                {
+                    "id": str(item.id),
+                    "action": item.action,
+                    "skill": item.skill,
+                    "success": bool(item.success),
+                    "created_at": item.created_at.isoformat() if item.created_at else None,
+                    "description": _extract_description(item.details),
+                }
+                for item in creative_recent_items
+            ],
         } if include_creative else None,
         "recent": [
             {
