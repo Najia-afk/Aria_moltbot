@@ -86,4 +86,10 @@ Attempts to save artifacts to unlisted categories raise a `ValueError`.
 
 ### sync_to_files()
 
-The `WorkingMemory` skill (`aria_skills/working_memory/`) provides `sync_to_files()` which writes current session state (active goals, recent activities, system health) to `aria_memories/memory/context.json`. This runs on a cron schedule so that OpenClaw sessions start with warm context, reducing token usage.
+The `WorkingMemory` skill (`aria_skills/working_memory/`) provides `sync_to_files()` which writes current session state (active goals, recent activities, system health) to a canonical snapshot file:
+
+- `aria_memories/memory/context.json`
+
+For runtime compatibility, it also mirrors the same payload to legacy compatibility paths if they exist (for example nested runtime paths under `aria_mind/skills/aria_memories/memory/context.json`).
+
+The API endpoint `GET /working-memory/file-snapshot` reads available snapshot candidates and selects the freshest `last_updated` payload so dashboard visibility remains stable across local/container execution layouts.

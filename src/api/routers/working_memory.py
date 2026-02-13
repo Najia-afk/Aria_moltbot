@@ -4,8 +4,10 @@ Working Memory endpoints — persistent short-term memory that survives restarts
 Provides CRUD plus weighted-context retrieval and checkpoint/restore.
 """
 
+import json
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
@@ -355,6 +357,90 @@ async def get_working_memory_stats(db: AsyncSession = Depends(get_db)):
             for row in category_rows
         ],
     }
+
+
+@router.get("/working-memory/file-snapshot")
+async def get_working_memory_file_snapshot():
+    """Read file-based working memory snapshot from aria_memories/memory/context.json."""
+    here = Path(__file__).resolve()
+    candidates: list[Path] = []
+
+    for parent in [here.parent, *here.parents, Path.cwd()]:
+        candidates.append(parent / "aria_memories" / "memory" / "context.json")
+        candidates.append(parent / "aria_mind" / "skills" / "aria_memories" / "memory" / "context.json")
+
+    unique_candidates: list[Path] = []
+    seen: set[str] = set()
+    for cand in candidates:
+        key = str(cand.resolve()) if cand.exists() else str(cand)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique_candidates.append(cand)
+
+    existing = [cand for cand in unique_candidates if cand.exists()]
+    if not existing:
+        return {
+            "exists": False,
+            "path": str(unique_candidates[0]) if unique_candidates else "aria_memories/memory/context.json",
+            "sources": [],
+            "snapshot": None,
+        }
+
+    picked_path = None
+    picked_payload = None
+    picked_last_updated = None
+    source_meta = []
+    canonical_candidate = None
+    canonical_payload = None
+
+    try:
+        for cand in existing:
+            raw = cand.read_text(encoding="utf-8")
+            payload = json.loads(raw) if raw.strip() else {}
+            last_updated = payload.get("last_updated") if isinstance(payload, dict) else None
+
+            source_meta.append(
+                {
+                    "path": str(cand),
+                    "last_updated": last_updated,
+                    "size_bytes": cand.stat().st_size,
+                }
+            )
+
+            is_legacy_nested = "aria_mind/skills/aria_memories/memory/context.json" in str(cand)
+            if not is_legacy_nested and canonical_candidate is None:
+                canonical_candidate = cand
+                canonical_payload = payload
+
+            if picked_path is None:
+                picked_path = cand
+                picked_payload = payload
+                picked_last_updated = last_updated
+                continue
+
+            if isinstance(last_updated, str) and isinstance(picked_last_updated, str):
+                if last_updated > picked_last_updated:
+                    picked_path = cand
+                    picked_payload = payload
+                    picked_last_updated = last_updated
+            elif isinstance(last_updated, str) and not isinstance(picked_last_updated, str):
+                picked_path = cand
+                picked_payload = payload
+                picked_last_updated = last_updated
+
+        if canonical_candidate is not None:
+            picked_path = canonical_candidate
+            picked_payload = canonical_payload
+
+        return {
+            "exists": True,
+            "path": str(picked_path),
+            "sources": source_meta,
+            "snapshot": picked_payload,
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to read file snapshot: {exc}")
 
 
 @router.post("/working-memory/cleanup")

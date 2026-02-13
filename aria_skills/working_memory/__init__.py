@@ -6,6 +6,7 @@ Wraps the /working-memory REST endpoints via httpx (api_client pattern).
 """
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+from pathlib import Path
 
 from aria_skills.api_client import get_api_client
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
@@ -244,10 +245,8 @@ class WorkingMemorySkill(BaseSkill):
     async def sync_to_files(self) -> SkillResult:
         """Cron-callable: sync DB state to aria_memories/memory/ JSON files."""
         import json as _json
-        from pathlib import Path
-        from datetime import timezone
-
-        memories_path = Path(__file__).parent.parent.parent / "aria_memories" / "memory"
+        workspace_root = self._resolve_workspace_root()
+        memories_path = workspace_root / "aria_memories" / "memory"
         memories_path.mkdir(parents=True, exist_ok=True)
 
         context_data = {
@@ -274,11 +273,89 @@ class WorkingMemorySkill(BaseSkill):
         except Exception as e:
             self.logger.warning(f"sync_to_files: API fetch failed: {e}")
 
-        # Write context.json
+        # Write canonical context.json
         context_path = memories_path / "context.json"
+        payload = _json.dumps(context_data, indent=2, default=str)
         context_path.write_text(
-            _json.dumps(context_data, indent=2, default=str), encoding="utf-8"
+            payload, encoding="utf-8"
         )
 
+        mirror_paths = self._legacy_snapshot_paths(workspace_root)
+        mirrored = []
+        for mirror in mirror_paths:
+            try:
+                mirror.parent.mkdir(parents=True, exist_ok=True)
+                mirror.write_text(payload, encoding="utf-8")
+                mirrored.append(str(mirror))
+            except Exception as e:
+                self.logger.debug(f"sync_to_files: mirror write skipped for {mirror}: {e}")
+
         files_written = ["context.json"]
-        return SkillResult.ok({"files_updated": files_written, "path": str(memories_path)})
+        return SkillResult.ok({
+            "files_updated": files_written,
+            "path": str(memories_path),
+            "workspace_root": str(workspace_root),
+            "mirrored_paths": mirrored,
+        })
+
+    def _resolve_workspace_root(self) -> Path:
+        """Find the best workspace root across local and container execution layouts."""
+        candidates: list[Path] = []
+
+        env_root = self.config.config.get("workspace_root") if self.config and self.config.config else None
+        if env_root:
+            candidates.append(Path(str(env_root)).expanduser())
+
+        env_root = None
+        try:
+            import os
+            env_root = os.environ.get("ARIA_WORKSPACE_ROOT")
+        except Exception:
+            env_root = None
+        if env_root:
+            candidates.append(Path(env_root).expanduser())
+
+        here = Path(__file__).resolve()
+        candidates.extend([here.parent, *here.parents])
+        candidates.append(Path.cwd())
+
+        best: Path | None = None
+        best_score = -1
+
+        for cand in candidates:
+            score = 0
+            if (cand / "pyproject.toml").exists():
+                score += 3
+            if (cand / "README.md").exists():
+                score += 2
+            if (cand / "aria_memories").is_dir():
+                score += 2
+            if (cand / "aria_skills").is_dir():
+                score += 2
+            if (cand / "src").is_dir():
+                score += 1
+
+            if score > best_score:
+                best = cand
+                best_score = score
+
+        return (best or Path.cwd()).resolve()
+
+    def _legacy_snapshot_paths(self, workspace_root: Path) -> list[Path]:
+        """Known compatibility locations that may still be read by older runtime paths."""
+        paths = [
+            workspace_root / "aria_mind" / "skills" / "aria_memories" / "memory" / "context.json",
+        ]
+        canonical = (workspace_root / "aria_memories" / "memory" / "context.json").resolve()
+        unique: list[Path] = []
+        seen: set[str] = set()
+        for path in paths:
+            resolved = path.resolve()
+            if resolved == canonical:
+                continue
+            key = str(resolved)
+            if key in seen:
+                continue
+            seen.add(key)
+            unique.append(path)
+        return unique

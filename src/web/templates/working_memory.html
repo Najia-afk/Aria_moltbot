@@ -70,6 +70,15 @@
     .context-value { flex: 1; font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .context-score { font-size: 12px; font-weight: 600; color: var(--accent-primary); min-width: 50px; text-align: right; }
 
+    .snapshot-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; }
+    .snapshot-card { background: var(--bg-primary, #0d1117); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; }
+    .snapshot-card h4 { font-size: 11px; color: var(--text-muted); margin: 0 0 8px; text-transform: uppercase; letter-spacing: 0.03em; }
+    .snapshot-card .value { font-size: 13px; color: var(--text-primary); }
+    .snapshot-list { margin: 0; padding-left: 16px; color: var(--text-secondary); font-size: 12px; }
+    .snapshot-list li { margin-bottom: 4px; }
+    .snapshot-meta { margin-top: 10px; font-size: 12px; color: var(--text-muted); display: flex; gap: 12px; flex-wrap: wrap; }
+    .snapshot-path { font-family: var(--font-mono, monospace); word-break: break-all; }
+
     /* Checkpoint Section */
     .checkpoint-section { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; margin-top: 25px; }
     .checkpoint-section h3 { font-size: 15px; font-weight: 600; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
@@ -182,6 +191,13 @@
     <h3>🎯 Top Context (by relevance)</h3>
     <div id="context-list">
         <div class="empty-state">Loading context...</div>
+    </div>
+</div>
+
+<div class="context-panel">
+    <h3>🗂️ File Snapshot Context</h3>
+    <div id="file-snapshot">
+        <div class="empty-state">Loading file snapshot...</div>
     </div>
 </div>
 
@@ -441,6 +457,66 @@ async function loadContext() {
     }
 }
 
+async function loadFileSnapshot() {
+    try {
+        const res = await fetch(`${API_BASE_URL}/working-memory/file-snapshot`);
+        const data = await res.json();
+        const container = document.getElementById('file-snapshot');
+
+        if (!data.exists || !data.snapshot) {
+            container.innerHTML = '<div class="empty-state">No file snapshot found</div>';
+            return;
+        }
+
+        const snap = data.snapshot || {};
+        const goals = Array.isArray(snap.active_goals) ? snap.active_goals : [];
+        const activities = Array.isArray(snap.recent_activities) ? snap.recent_activities : [];
+        const health = snap.system_health || {};
+        const updated = snap.last_updated ? formatDate(snap.last_updated) : '-';
+        const sourcePath = data.path || '-';
+        const sourceCount = Array.isArray(data.sources) ? data.sources.length : 0;
+        let freshness = 'unknown';
+        if (snap.last_updated) {
+            const dt = new Date(snap.last_updated);
+            if (!Number.isNaN(dt.getTime())) {
+                const ageMinutes = (Date.now() - dt.getTime()) / 60000;
+                if (ageMinutes <= 10) freshness = 'fresh';
+                else if (ageMinutes <= 120) freshness = 'warm';
+                else freshness = 'stale';
+            }
+        }
+
+        container.innerHTML = `
+            <div class="snapshot-grid">
+                <div class="snapshot-card">
+                    <h4>Last Updated</h4>
+                    <div class="value">${_esc(updated)}</div>
+                </div>
+                <div class="snapshot-card">
+                    <h4>System Health</h4>
+                    <div class="value">${_esc(health.status || 'unknown')} (${_esc(freshness)})</div>
+                </div>
+                <div class="snapshot-card">
+                    <h4>Active Goals (${goals.length})</h4>
+                    ${goals.length ? `<ul class="snapshot-list">${goals.slice(0, 4).map(g => `<li>${_esc(g.title || g.goal_id || '-')}</li>`).join('')}</ul>` : '<div class="value">None</div>'}
+                </div>
+                <div class="snapshot-card">
+                    <h4>Recent Activities (${activities.length})</h4>
+                    ${activities.length ? `<ul class="snapshot-list">${activities.slice(0, 4).map(a => `<li>${_esc(a.action || a.description || '-')}</li>`).join('')}</ul>` : '<div class="value">None</div>'}
+                </div>
+            </div>
+            <div class="snapshot-meta">
+                <span>Source files checked: ${sourceCount}</span>
+                <span class="snapshot-path">Selected path: ${_esc(sourcePath)}</span>
+            </div>
+        `;
+    } catch (e) {
+        console.error('File snapshot error:', e);
+        document.getElementById('file-snapshot').innerHTML =
+            '<div class="empty-state">Failed to load file snapshot</div>';
+    }
+}
+
 // ── Checkpoints ─────────────────────────────────────────────────────────────
 async function createCheckpoint() {
     try {
@@ -495,10 +571,11 @@ itemsPager = new AriaPagination('items-pagination', {
 async function initWorkingMemoryPage() {
     await loadItems();
     await loadContext();
+    await loadFileSnapshot();
     await loadCheckpoint();
 }
 
 initWorkingMemoryPage();
-setInterval(() => { loadItems(); loadContext(); }, 30000);
+setInterval(() => { loadItems(); loadContext(); loadFileSnapshot(); }, 30000);
 </script>
 {% endblock %}
