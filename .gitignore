@@ -58,6 +58,9 @@ logs/
 *.backup
 *.bak
 
+# Souvenirs payload artifacts (may contain verification/session-sensitive data)
+aria_souvenirs/**/moltbook/*payload.json
+
 # IDE
 .vscode/
 .idea/
