@@ -146,6 +146,9 @@ pip3 install --break-system-packages --quiet \
 if [ -f /root/.openclaw/workspace/skills/run_skill.py ]; then
     chmod +x /root/.openclaw/workspace/skills/run_skill.py
     echo "Skill runner found at /root/.openclaw/workspace/skills/run_skill.py"
+    mkdir -p /root/.openclaw/workspace/aria_mind/skills
+    ln -sf /root/.openclaw/workspace/skills/run_skill.py /root/.openclaw/workspace/aria_mind/skills/run_skill.py
+    echo "Compatibility symlink: /root/.openclaw/workspace/aria_mind/skills/run_skill.py"
 else
     echo "WARNING: run_skill.py not found — check aria_mind volume mount"
 fi
@@ -312,7 +315,7 @@ for job in data.get('jobs', []):
     text = job.get('text') or job.get('message', '')
     agent = job.get('agent', 'main')
     session = job.get('session', 'isolated')
-    delivery = job.get('delivery', 'announce')
+    delivery = job.get('delivery', 'none')
     
     # Build command - use --message for 2026.2.6+ CLI
     cmd = ['openclaw', 'cron', 'add', '--name', name]
@@ -327,7 +330,7 @@ for job in data.get('jobs', []):
     # Add delivery mode: --announce flag (2026.2.6+ replaces --delivery)
     if delivery == 'announce':
         cmd.append('--announce')
-    elif delivery == 'none':
+    elif delivery in ('none', 'silent', 'chat'):
         cmd.append('--no-deliver')
     
     # Best-effort: don't fail job if delivery target is missing (isolated sessions)

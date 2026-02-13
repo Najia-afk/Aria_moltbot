@@ -23,24 +23,44 @@ sys.path.insert(0, '/root/.openclaw/workspace/skills')
 sys.path.insert(0, '/root/.openclaw/workspace')
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from aria_mind.skills._skill_registry import SKILL_REGISTRY, _merge_registries
-from aria_mind.skills._tracking import _log_model_usage, _log_session
-from aria_mind.skills._tracking import _log_skill_invocation
-from aria_mind.skills._cli_tools import (
-    handle_export_catalog,
-    handle_health_check_all,
-    handle_list_skills,
-)
-from aria_mind.skills._coherence import (
-    workspace_root as _coh_workspace_root,
-    has_skill_changes as _coh_has_skill_changes,
-    validate_skill_coherence as _coh_validate_skill_coherence,
-    write_aria_mind_run_report as _coh_write_aria_mind_run_report,
-    collect_skill_alignment_report as _coh_collect_skill_alignment_report,
-    write_skill_alignment_report as _coh_write_skill_alignment_report,
-)
-from aria_mind.skills._skill_introspection import collect_skill_info
-from aria_mind.skills._kernel_router import auto_route_task_to_skills
+try:
+    from aria_mind.skills._skill_registry import SKILL_REGISTRY, _merge_registries
+    from aria_mind.skills._tracking import _log_model_usage, _log_session
+    from aria_mind.skills._tracking import _log_skill_invocation
+    from aria_mind.skills._cli_tools import (
+        handle_export_catalog,
+        handle_health_check_all,
+        handle_list_skills,
+    )
+    from aria_mind.skills._coherence import (
+        workspace_root as _coh_workspace_root,
+        has_skill_changes as _coh_has_skill_changes,
+        validate_skill_coherence as _coh_validate_skill_coherence,
+        write_aria_mind_run_report as _coh_write_aria_mind_run_report,
+        collect_skill_alignment_report as _coh_collect_skill_alignment_report,
+        write_skill_alignment_report as _coh_write_skill_alignment_report,
+    )
+    from aria_mind.skills._skill_introspection import collect_skill_info
+    from aria_mind.skills._kernel_router import auto_route_task_to_skills
+except ModuleNotFoundError:
+    from _skill_registry import SKILL_REGISTRY, _merge_registries
+    from _tracking import _log_model_usage, _log_session
+    from _tracking import _log_skill_invocation
+    from _cli_tools import (
+        handle_export_catalog,
+        handle_health_check_all,
+        handle_list_skills,
+    )
+    from _coherence import (
+        workspace_root as _coh_workspace_root,
+        has_skill_changes as _coh_has_skill_changes,
+        validate_skill_coherence as _coh_validate_skill_coherence,
+        write_aria_mind_run_report as _coh_write_aria_mind_run_report,
+        collect_skill_alignment_report as _coh_collect_skill_alignment_report,
+        write_skill_alignment_report as _coh_write_skill_alignment_report,
+    )
+    from _skill_introspection import collect_skill_info
+    from _kernel_router import auto_route_task_to_skills
 
 
 _SUPPORT_SKILL_DIRS = {'_template', '__pycache__', 'pipelines'}

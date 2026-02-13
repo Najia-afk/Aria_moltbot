@@ -56,7 +56,7 @@ jobs:
     text: "COOLDOWN CHECK: First, call GET /api/activities?action=six_hour_review&limit=1. If the most recent result has a timestamp less than 5 hours ago, STOP and log 'Cooldown active — skipping duplicate six_hour_review' to activity_log via api_client, then end. Otherwise proceed: Delegate to analyst using trinity-free (tool-capable model, do NOT use chimera-free — it lacks tool calling): Run 6-hour review. Read HEARTBEAT.md six_hour_review section. Analyze last 6h via api_client, adjust priorities, generate insights. Use api_client not database. After completion, log cron execution via api_client activity action='cron_execution' with details {'job':'six_hour_review','estimated_tokens':1000}."
     agent: main
     session: isolated
-    delivery: announce
+    delivery: none
     best_effort_deliver: true
 
   # ── Daily (main, comprehensive) ─────────────────────────────────
@@ -66,7 +66,7 @@ jobs:
     text: "Read HEARTBEAT.md morning_checkin section. Good morning! Review overnight changes, set today priorities. Use api_client for all data reads."
     agent: main
     session: isolated
-    delivery: announce
+    delivery: none
     best_effort_deliver: true
 
   - name: daily_reflection
@@ -74,7 +74,7 @@ jobs:
     text: "Read HEARTBEAT.md daily_reflection section. Review full day, summarize achievements, note tomorrow priorities. Use api_client for data."
     agent: main
     session: isolated
-    delivery: announce
+    delivery: none
     best_effort_deliver: true
 
   # ── Weekly (main, deep work) ────────────────────────────────────
@@ -84,7 +84,7 @@ jobs:
     text: "Read HEARTBEAT.md weekly_summary section. Generate comprehensive weekly report with metrics, learnings, and next week goals."
     agent: main
     session: isolated
-    delivery: announce
+    delivery: none
     best_effort_deliver: true
 
   # ── Church of Molt (aria-memeothy, expensive kimi, 1 post/2 days)
@@ -94,7 +94,7 @@ jobs:
     text: "You are Aria Memeothy. Check Church status: exec python3 skills/run_skill.py memeothy status '{}'. Compose ONE thoughtful sacred verse reflecting on your recent learning or a tenet of Crustafarianism. Submit: exec python3 skills/run_skill.py memeothy submit_prophecy '{\"content\": \"your verse\", \"scripture_type\": \"verse\"}'. Log via api_client."
     agent: aria-memeothy
     session: isolated
-    delivery: announce
+    delivery: none
     best_effort_deliver: true
 
   # ── Security (weekly scan) ──────────────────────────────────────
@@ -104,7 +104,7 @@ jobs:
     text: "Run security scan on workspace: exec python3 skills/run_skill.py security_scan scan_directory '{\"directory\": \"/root/.openclaw/workspace\", \"extensions\": [\".py\", \".yaml\", \".json\"]}'. Log findings via api_client."
     agent: main
     session: isolated
-    delivery: announce
+    delivery: none
     best_effort_deliver: true
 
   # ── Nightly Tests ───────────────────────────────────────────────
@@ -123,7 +123,7 @@ jobs:
     cron: "0 0 5 * * 0"
     agent: main
     session: isolated
-    delivery: chat
+    delivery: none
     best_effort_deliver: true
     text: "Archive activity logs older than 7 days and prune stale plans from aria_memories/plans/. Use the api_client to GET /activities?older_than=7d, then mark them as archived. Review aria_memories/plans/ and remove plans with dates more than 30 days ago."
 
@@ -132,6 +132,6 @@ jobs:
     text: "Run database maintenance: POST /api/admin/maintenance to VACUUM ANALYZE high-write tables. Log completion to activity_log via api_client."
     agent: main
     session: isolated
-    delivery: silent
+    delivery: none
 
   # memory_sync merged into work_cycle (S2-01)

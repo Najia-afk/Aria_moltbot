@@ -176,6 +176,8 @@ class SessionManagerSkill(BaseSkill):
             if ts_str:
                 try:
                     ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                    if ts.tzinfo is None:
+                        ts = ts.replace(tzinfo=timezone.utc)
                     if ts < cutoff:
                         to_delete.append(sess)
                     else:
@@ -242,6 +244,8 @@ class SessionManagerSkill(BaseSkill):
             if ts_str:
                 try:
                     ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                    if ts.tzinfo is None:
+                        ts = ts.replace(tzinfo=timezone.utc)
                     if (now - ts).total_seconds() > self._stale_threshold_minutes * 60:
                         stale_count += 1
                 except (ValueError, TypeError):
