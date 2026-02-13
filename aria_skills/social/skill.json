@@ -19,7 +19,7 @@
           },
           "platform": {
             "type": "string",
-            "enum": ["moltbook", "twitter", "mastodon"],
+            "enum": ["moltbook", "telegram", "mastodon"],
             "description": "Target platform"
           },
           "mood": {
@@ -35,6 +35,15 @@
             "type": "string",
             "enum": ["public", "private", "followers"],
             "description": "Post visibility"
+          },
+          "simulate": {
+            "type": "boolean",
+            "description": "Run in safe simulation mode (recommended default true)",
+            "default": true
+          },
+          "chat_id": {
+            "type": "string",
+            "description": "Optional target Telegram chat id for telegram platform"
           }
         },
         "required": ["content", "platform"]
@@ -70,6 +79,11 @@
           "platform": {
             "type": "string",
             "description": "Target platform"
+          },
+          "simulate": {
+            "type": "boolean",
+            "description": "Store as simulation-only schedule intent",
+            "default": true
           },
           "scheduled_for": {
             "type": "string",

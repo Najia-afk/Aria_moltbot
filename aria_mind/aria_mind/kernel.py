@@ -116,3 +116,7 @@ class KernelLoader:
         _loaded = False
         _kernel = None
         _checksums = {}
+
+
+# Backward compatibility alias — AGENTS.md references Kernel
+Kernel = KernelLoader

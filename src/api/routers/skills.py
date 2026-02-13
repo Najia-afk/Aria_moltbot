@@ -148,8 +148,44 @@ async def list_skills(
         )
         rows = result.scalars().all()
 
+    invocation_rows = (
+        await db.execute(
+            select(
+                SkillInvocation.skill_name,
+                func.count().label("total"),
+                func.sum(case((SkillInvocation.success == False, 1), else_=0)).label("failures"),
+                func.max(SkillInvocation.created_at).label("last_execution"),
+            )
+            .group_by(SkillInvocation.skill_name)
+        )
+    ).all()
+
+    usage_by_skill = {
+        row.skill_name: {
+            "total": int(row.total or 0),
+            "failures": int(row.failures or 0),
+            "last_execution": row.last_execution,
+        }
+        for row in invocation_rows
+    }
+
+    items = []
+    for row in rows:
+        item = row.to_dict()
+        agg = usage_by_skill.get(row.skill_name)
+        if agg:
+            item["use_count"] = max(int(item.get("use_count") or 0), agg["total"])
+            item["error_count"] = max(int(item.get("error_count") or 0), agg["failures"])
+            if agg["last_execution"]:
+                item["last_execution"] = agg["last_execution"].isoformat()
+
+        if not item.get("last_health_check"):
+            item["last_health_check"] = item.get("updated_at")
+
+        items.append(item)
+
     return {
-        "skills": [r.to_dict() for r in rows],
+        "skills": items,
         "count": len(rows),
         "healthy": sum(1 for r in rows if r.status == "healthy"),
         "degraded": sum(1 for r in rows if r.status == "degraded"),
@@ -250,6 +286,46 @@ async def skill_stats(hours: int = 24, db: AsyncSession = Depends(get_db)):
             "total_tokens": row.total_tokens or 0,
         })
     return {"stats": stats, "hours": hours}
+
+
+@router.get("/skills/stats/summary")
+async def skill_stats_summary(hours: int = 24, db: AsyncSession = Depends(get_db)):
+    """Compact aggregate summary for skills telemetry widgets."""
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+
+    summary_row = (
+        await db.execute(
+            select(
+                func.count().label("total"),
+                func.sum(case((SkillInvocation.success == False, 1), else_=0)).label("failures"),
+                func.avg(SkillInvocation.duration_ms).label("avg_duration_ms"),
+            ).where(SkillInvocation.created_at >= cutoff)
+        )
+    ).one()
+
+    recent = (
+        await db.execute(
+            select(SkillInvocation.skill_name, func.count().label("count"))
+            .where(SkillInvocation.created_at >= cutoff)
+            .group_by(SkillInvocation.skill_name)
+            .order_by(func.count().desc())
+            .limit(10)
+        )
+    ).all()
+
+    total = int(summary_row.total or 0)
+    failures = int(summary_row.failures or 0)
+    return {
+        "hours": hours,
+        "total": total,
+        "failures": failures,
+        "error_rate": round((failures / max(total, 1)), 3),
+        "avg_duration_ms": round(float(summary_row.avg_duration_ms or 0), 1),
+        "invocations": [
+            {"skill_name": row.skill_name, "count": int(row.count or 0)}
+            for row in recent
+        ],
+    }
 
 
 @router.get("/skills/stats/{skill_name}")

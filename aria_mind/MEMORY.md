@@ -90,6 +90,14 @@ The `WorkingMemory` skill (`aria_skills/working_memory/`) provides `sync_to_file
 
 - `aria_memories/memory/context.json`
 
-For runtime compatibility, it also mirrors the same payload to legacy compatibility paths if they exist (for example nested runtime paths under `aria_mind/skills/aria_memories/memory/context.json`).
+Legacy mirror behavior is now **disabled by default**. During transition periods you can temporarily enable legacy mirror writes with:
 
-The API endpoint `GET /working-memory/file-snapshot` reads available snapshot candidates and selects the freshest `last_updated` payload so dashboard visibility remains stable across local/container execution layouts.
+- `ARIA_WM_WRITE_LEGACY_MIRROR=true`
+
+Stale legacy snapshots are pruned automatically by default (`ARIA_WM_PRUNE_LEGACY_SNAPSHOTS=true`) to phase out old path usage over time.
+
+The API endpoint `GET /working-memory/file-snapshot` is canonical-first:
+
+- reads canonical snapshot paths first
+- falls back to legacy snapshot paths only when canonical is missing
+- returns `path_mode` and source metadata for dashboard observability

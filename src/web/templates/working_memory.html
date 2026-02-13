@@ -79,6 +79,17 @@
     .snapshot-meta { margin-top: 10px; font-size: 12px; color: var(--text-muted); display: flex; gap: 12px; flex-wrap: wrap; }
     .snapshot-path { font-family: var(--font-mono, monospace); word-break: break-all; }
 
+    .memory-notice {
+        margin-bottom: 1rem;
+        padding: 0.9rem 1rem;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        color: var(--text-secondary);
+        font-size: 13px;
+    }
+    .memory-notice strong { color: var(--text-primary); }
+
     /* Checkpoint Section */
     .checkpoint-section { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; margin-top: 25px; }
     .checkpoint-section h3 { font-size: 15px; font-weight: 600; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
@@ -94,6 +105,11 @@
 <div class="page-header">
     <h1>🧠 Working Memory</h1>
     <p>Aria's short-term working memory — active context, items, and checkpoints</p>
+</div>
+
+<div class="memory-notice">
+    <strong>Short-term context scope:</strong> this page is for active session context (`/working-memory`) used for ranking, access, and checkpointing.
+    For durable long-term key-value memory, use <a href="/memories">Memories</a>.
 </div>
 
 <!-- Stats Grid -->
@@ -475,6 +491,8 @@ async function loadFileSnapshot() {
         const updated = snap.last_updated ? formatDate(snap.last_updated) : '-';
         const sourcePath = data.path || '-';
         const sourceCount = Array.isArray(data.sources) ? data.sources.length : 0;
+        const pathMode = data.path_mode || 'unknown';
+        const legacyDetected = Number(data.legacy_sources_detected || 0);
         let freshness = 'unknown';
         if (snap.last_updated) {
             const dt = new Date(snap.last_updated);
@@ -507,6 +525,8 @@ async function loadFileSnapshot() {
             </div>
             <div class="snapshot-meta">
                 <span>Source files checked: ${sourceCount}</span>
+                <span>Mode: ${_esc(pathMode)}</span>
+                ${legacyDetected > 0 ? `<span>Legacy files detected: ${legacyDetected}</span>` : ''}
                 <span class="snapshot-path">Selected path: ${_esc(sourcePath)}</span>
             </div>
         `;

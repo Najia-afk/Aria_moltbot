@@ -50,7 +50,7 @@ restart: ## Restart API container
 # Development
 # ============================================================================
 
-.PHONY: lint format check verify-deploy watchdog hooks
+.PHONY: lint format check verify-deploy verify-pairing watchdog hooks
 
 lint: ## Run linting
 	ruff check aria_skills/ aria_agents/ aria_models/ src/
@@ -62,6 +62,9 @@ check: lint test-quick ## Lint + quick tests
 
 verify-deploy: ## Run deployment verification script
 	./scripts/verify_deployment.sh --quick
+
+verify-pairing: ## Verify clawdbot telegram pairing persistence (usage: make verify-pairing USER_ID=1643801012)
+	./scripts/verify_clawdbot_pairing.sh --user-id $(USER_ID)
 
 watchdog: ## Run one health watchdog cycle for aria-api
 	./scripts/health_watchdog.sh aria-api

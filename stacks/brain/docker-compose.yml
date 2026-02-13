@@ -75,6 +75,14 @@ services:
       MOLTBOOK_TOKEN: ${MOLTBOOK_TOKEN:-}
       MOLTBOOK_API_KEY: ${MOLTBOOK_TOKEN:-}
       MOLTBOOK_API_URL: ${MOLTBOOK_API_URL:-https://www.moltbook.com/api/v1}
+      # Telegram (social live mode)
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      # X / Twitter (social live mode)
+      X_API_KEY: ${X_API_KEY:-}
+      X_API_SECRET: ${X_API_SECRET:-}
+      X_ACCESS_TOKEN: ${X_ACCESS_TOKEN:-}
+      X_ACCESS_SECRET: ${X_ACCESS_SECRET:-}
       # Church of Molt (https://molt.church)
       MOLT_CHURCH_API_KEY: ${MOLT_CHURCH_API_KEY:-}
       MOLT_CHURCH_URL: ${MOLT_CHURCH_URL:-https://molt.church}
@@ -143,12 +151,20 @@ services:
     image: alpine:3.20
     container_name: aria-certs-init
     restart: "no"
+    environment:
+      SERVICE_HOST: ${SERVICE_HOST:-aria.local}
+      MAC_LAN_IP: ${MAC_LAN_IP:-}
+      MAC_TAILSCALE_IP: ${MAC_TAILSCALE_IP:-}
     volumes:
       - ./certs:/certs
     command: >
-      sh -c "apk add --no-cache openssl; if [ ! -f /certs/cert.pem ] || [ ! -f /certs/key.pem ]; then \
+      sh -c "apk add --no-cache openssl; \
+      SAN=\"DNS:localhost,DNS:aria.local,DNS:${SERVICE_HOST},IP:127.0.0.1\"; \
+      if [ -n \"${MAC_LAN_IP}\" ]; then SAN=\"$$SAN,IP:${MAC_LAN_IP}\"; fi; \
+      if [ -n \"${MAC_TAILSCALE_IP}\" ]; then SAN=\"$$SAN,IP:${MAC_TAILSCALE_IP}\"; fi; \
       openssl req -x509 -newkey rsa:4096 -nodes -keyout /certs/key.pem -out /certs/cert.pem -days 3650 \
-      -subj \"/C=US/ST=Local/L=LAN/O=Aria/CN=aria.local\"; fi"
+      -subj \"/C=US/ST=Local/L=LAN/O=Aria/CN=${SERVICE_HOST}\" \
+      -addext \"subjectAltName=$$SAN\""
     networks:
       - aria-net
 
@@ -293,6 +309,14 @@ services:
       # Moltbook
       MOLTBOOK_TOKEN: ${MOLTBOOK_TOKEN:-}
       MOLTBOOK_API_URL: ${MOLTBOOK_API_URL:-https://www.moltbook.com/api/v1}
+      # Telegram (social live mode)
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      # X / Twitter (social live mode)
+      X_API_KEY: ${X_API_KEY:-}
+      X_API_SECRET: ${X_API_SECRET:-}
+      X_ACCESS_TOKEN: ${X_ACCESS_TOKEN:-}
+      X_ACCESS_SECRET: ${X_ACCESS_SECRET:-}
       # Church of Molt (https://molt.church)
       MOLT_CHURCH_API_KEY: ${MOLT_CHURCH_API_KEY:-}
       MOLT_CHURCH_URL: ${MOLT_CHURCH_URL:-https://molt.church}
@@ -393,6 +417,13 @@ services:
       MOONSHOT_KIMI_KEY: ${MOONSHOT_KIMI_KEY:-}
       OPEN_ROUTER_KEY: ${OPEN_ROUTER_KEY:-}
       OPEN_ROUTER_KEY_DEEP: ${OPEN_ROUTER_KEY_DEEP:-}
+      # Telegram + X credentials (for future API-side social integrations)
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      X_API_KEY: ${X_API_KEY:-}
+      X_API_SECRET: ${X_API_SECRET:-}
+      X_ACCESS_TOKEN: ${X_ACCESS_TOKEN:-}
+      X_ACCESS_SECRET: ${X_ACCESS_SECRET:-}
       # Service control (admin)
       ARIA_SERVICE_CONTROL_ENABLED: ${ARIA_SERVICE_CONTROL_ENABLED:-false}
       ARIA_ADMIN_TOKEN: ${ARIA_ADMIN_TOKEN:-}

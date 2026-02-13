@@ -6,11 +6,15 @@ Manages social media content creation and posting.
 Persists via REST API (TICKET-12: eliminate in-memory stubs).
 """
 from datetime import datetime, timezone
+import os
 from typing import Any, Dict, List, Optional
+
+import httpx
 
 from aria_skills.api_client import get_api_client
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
 from aria_skills.registry import SkillRegistry
+from aria_skills.social.future_platforms import TelegramSimulationPlatform
 from aria_skills.social.platform import SocialPlatform
 
 
@@ -40,6 +44,7 @@ class SocialSkill(BaseSkill):
     async def initialize(self) -> bool:
         """Initialize social skill."""
         self._api = await get_api_client()
+        self.register_platform("telegram", TelegramSimulationPlatform())
         self._status = SkillStatus.AVAILABLE
         self.logger.info("Social skill initialized (API-backed)")
         return True
@@ -51,6 +56,62 @@ class SocialSkill(BaseSkill):
     async def health_check(self) -> SkillStatus:
         """Check availability."""
         return self._status
+
+    async def _persist_social_row(
+        self,
+        *,
+        platform: str,
+        content: str,
+        visibility: str,
+        metadata: Optional[Dict[str, Any]] = None,
+        reply_to: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        payload = {
+            "platform": platform,
+            "content": content,
+            "visibility": visibility,
+            "reply_to": reply_to,
+            "metadata": metadata or {},
+        }
+
+        # Primary path: shared api_client session
+        if self._api and getattr(self._api, "_client", None):
+            try:
+                resp = await self._api._client.post("/social", json=payload)
+                resp.raise_for_status()
+                return resp.json()
+            except Exception as e:
+                self.logger.debug(f"_persist_social_row primary client failed: {e}")
+
+        # Fallback path: explicit URLs for local-vs-container execution compatibility
+        api_candidates: list[str] = []
+        env_url = os.environ.get("ARIA_API_URL")
+        if env_url:
+            api_candidates.append(env_url.rstrip("/"))
+        api_candidates.extend([
+            "http://localhost:8000/api",
+            "http://127.0.0.1:8000/api",
+            "http://aria-api:8000/api",
+        ])
+
+        deduped: list[str] = []
+        seen: set[str] = set()
+        for base in api_candidates:
+            if base in seen:
+                continue
+            seen.add(base)
+            deduped.append(base)
+
+        for base in deduped:
+            try:
+                async with httpx.AsyncClient(timeout=8.0) as client:
+                    resp = await client.post(f"{base}/social", json=payload)
+                    if resp.status_code < 300:
+                        return resp.json()
+            except Exception as e:
+                self.logger.debug(f"_persist_social_row fallback failed for {base}: {e}")
+
+        return None
     
     @logged_method()
     async def create_post(
@@ -59,6 +120,10 @@ class SocialSkill(BaseSkill):
         platform: str = "moltbook",
         tags: Optional[List[str]] = None,
         media_urls: Optional[List[str]] = None,
+        mood: Optional[str] = None,
+        visibility: str = "public",
+        simulate: bool = True,
+        chat_id: Optional[str] = None,
     ) -> SkillResult:
         """
         Create a social media post, routed to the specified platform.
@@ -73,8 +138,66 @@ class SocialSkill(BaseSkill):
             SkillResult with post data
         """
         # Route to registered platform if available
-        if platform and platform in self._platforms:
-            return await self._platforms[platform].post(content, tags)
+        normalized_platform = (platform or "moltbook").strip().lower()
+        if normalized_platform in {"x", "x.com", "twitter", "email", "proton"}:
+            return SkillResult.fail(f"platform '{normalized_platform}' is disabled")
+
+        if normalized_platform in self._platforms:
+            target = self._platforms[normalized_platform]
+            try:
+                routed = await target.post(
+                    content,
+                    tags,
+                    simulate=simulate,
+                    visibility=visibility,
+                    chat_id=chat_id,
+                    mood=mood,
+                    media_urls=media_urls,
+                )
+                if routed.success and normalized_platform in {"telegram"}:
+                    simulated_state = simulate
+                    if isinstance(routed.data, dict) and "simulated" in routed.data:
+                        simulated_state = bool(routed.data.get("simulated"))
+                    persisted = await self._persist_social_row(
+                        platform=normalized_platform,
+                        content=content,
+                        visibility=visibility,
+                        metadata={
+                            "simulated": simulated_state,
+                            "source": "aria-social",
+                            "platform_result": routed.data,
+                            "tags": tags or [],
+                            "mood": mood,
+                            "chat_id": chat_id,
+                        },
+                    )
+                    if isinstance(routed.data, dict):
+                        routed.data["persisted"] = bool(persisted)
+                        routed.data["persisted_record"] = persisted
+                return routed
+            except TypeError:
+                routed = await target.post(content, tags)
+                if routed.success and normalized_platform in {"telegram"}:
+                    simulated_state = simulate
+                    if isinstance(routed.data, dict) and "simulated" in routed.data:
+                        simulated_state = bool(routed.data.get("simulated"))
+                    persisted = await self._persist_social_row(
+                        platform=normalized_platform,
+                        content=content,
+                        visibility=visibility,
+                        metadata={
+                            "simulated": simulated_state,
+                            "source": "aria-social",
+                            "platform_result": routed.data,
+                            "tags": tags or [],
+                            "mood": mood,
+                            "chat_id": chat_id,
+                        },
+                    )
+                    if isinstance(routed.data, dict):
+                        routed.data["persisted"] = bool(persisted)
+                        routed.data["persisted_record"] = persisted
+                return routed
         
         # Fallback: store via API if no platform registered
         self._post_counter += 1
@@ -83,9 +206,13 @@ class SocialSkill(BaseSkill):
         post = {
             "id": post_id,
             "content": content,
-            "platform": platform,
+            "platform": normalized_platform,
             "tags": tags or [],
             "media_urls": media_urls or [],
+            "mood": mood,
+            "visibility": visibility,
+            "simulated": simulate,
+            "chat_id": chat_id,
             "status": "draft",
             "created_at": datetime.now(timezone.utc).isoformat(),
             "published_at": None,
@@ -100,6 +227,104 @@ class SocialSkill(BaseSkill):
             self.logger.warning(f"API create_post failed, using fallback: {e}")
             self._posts.append(post)
             return SkillResult.ok(post)
+
+    @logged_method()
+    async def social_post(
+        self,
+        content: str,
+        platform: str = "moltbook",
+        tags: Optional[List[str]] = None,
+        mood: Optional[str] = None,
+        visibility: str = "public",
+        simulate: bool = True,
+        chat_id: Optional[str] = None,
+    ) -> SkillResult:
+        """Tool-compatible wrapper for creating posts across platforms."""
+        return await self.create_post(
+            content=content,
+            platform=platform,
+            tags=tags,
+            mood=mood,
+            visibility=visibility,
+            simulate=simulate,
+            chat_id=chat_id,
+        )
+
+    @logged_method()
+    async def social_list(self, platform: Optional[str] = None, limit: int = 20) -> SkillResult:
+        """Tool-compatible wrapper for listing social posts."""
+        return await self.get_posts(platform=platform, limit=limit)
+
+    @logged_method()
+    async def social_schedule(
+        self,
+        content: str,
+        platform: str,
+        scheduled_for: str,
+        tags: Optional[List[str]] = None,
+        mood: Optional[str] = None,
+        visibility: str = "public",
+        simulate: bool = True,
+    ) -> SkillResult:
+        """Schedule intent record (simulation-first) for future publisher automation."""
+        try:
+            _ = datetime.fromisoformat(scheduled_for.replace("Z", "+00:00"))
+        except Exception:
+            return SkillResult.fail("scheduled_for must be an ISO timestamp")
+
+        payload = {
+            "platform": (platform or "").lower(),
+            "content": content,
+            "visibility": visibility,
+            "metadata": {
+                "scheduled_for": scheduled_for,
+                "tags": tags or [],
+                "mood": mood,
+                "simulated": simulate,
+                "status": "scheduled",
+            },
+        }
+
+        if simulate:
+            persisted = await self._persist_social_row(
+                platform=payload["platform"],
+                content=content,
+                visibility=visibility,
+                metadata={
+                    "scheduled_for": scheduled_for,
+                    "tags": tags or [],
+                    "mood": mood,
+                    "simulated": True,
+                    "status": "scheduled",
+                    "source": "aria-social",
+                },
+            )
+            return SkillResult.ok(
+                {
+                    "scheduled": True,
+                    "simulated": True,
+                    "platform": payload["platform"],
+                    "scheduled_for": scheduled_for,
+                    "preview": content,
+                    "persisted": bool(persisted),
+                    "persisted_record": persisted,
+                }
+            )
+
+        try:
+            resp = await self._api._client.post("/social", json=payload)
+            resp.raise_for_status()
+            return SkillResult.ok(
+                {
+                    "scheduled": True,
+                    "simulated": False,
+                    "platform": payload["platform"],
+                    "scheduled_for": scheduled_for,
+                    "record": resp.json(),
+                }
+            )
+        except Exception as e:
+            return SkillResult.fail(f"schedule persist failed: {e}")
     
     @logged_method()
     async def publish_post(self, post_id: str) -> SkillResult:

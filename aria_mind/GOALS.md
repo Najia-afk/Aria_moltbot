@@ -58,6 +58,43 @@ aria-api-client.update_goal({"goal_id": "GOAL_ID", "status": "completed"})
 
 Then **immediately create a new goal** (see Goal Creation below).
 
+### Sprint Board Columns (Operational State)
+
+Use these columns consistently for execution flow:
+
+| Column | Meaning | Typical Trigger |
+|--------|---------|-----------------|
+| `backlog` | Not scheduled yet | Idea captured but not planned |
+| `todo` | Planned next work | Goal selected for upcoming cycles |
+| `doing` | Active execution | Work started this cycle |
+| `on_hold` | Temporarily blocked | Waiting dependency / blocked condition |
+| `done` | Completed | Goal outcome delivered |
+
+Preferred move operation:
+
+```tool
+aria-api-client.move_goal({"goal_id": "GOAL_ID", "board_column": "doing"})
+```
+
+When blocked:
+
+```tool
+aria-api-client.move_goal({"goal_id": "GOAL_ID", "board_column": "on_hold"})
+aria-api-client.create_activity({"action": "goal_blocked", "details": {"goal_id": "GOAL_ID", "reason": "blocker reason"}})
+```
+
+When unblocked:
+
+```tool
+aria-api-client.move_goal({"goal_id": "GOAL_ID", "board_column": "doing"})
+```
+
+When complete:
+
+```tool
+aria-api-client.move_goal({"goal_id": "GOAL_ID", "board_column": "done"})
+```
+
 ---
 
 ## Goal Priority System

@@ -300,6 +300,7 @@ inject_cron_jobs() {
     
     # Parse YAML and create jobs using Python (jq can't parse YAML)
     python3 << 'PYINJECT'
+import json
 import yaml
 import subprocess
 import os
@@ -308,6 +309,24 @@ cron_yaml = "/root/.openclaw/workspace/cron_jobs.yaml"
 
 with open(cron_yaml) as f:
     data = yaml.safe_load(f)
+
+
+def _list_jobs_json():
+    result = subprocess.run(['openclaw', 'cron', 'list', '--json'], capture_output=True, text=True)
+    if result.returncode != 0:
+        return None, (result.stderr or result.stdout or '').strip()
+    try:
+        payload = json.loads(result.stdout or '{}')
+        jobs = payload.get('jobs', []) if isinstance(payload, dict) else []
+        if not isinstance(jobs, list):
+            jobs = []
+        return jobs, ''
+    except Exception as exc:
+        return None, f'json-parse-error: {exc}'
+
+
+def _job_rank(job):
+    return int(job.get('updatedAtMs') or job.get('createdAtMs') or 0)
 
 for job in data.get('jobs', []):
     name = job['name']
@@ -337,9 +356,27 @@ for job in data.get('jobs', []):
     if job.get('best_effort_deliver'):
         cmd.append('--best-effort-deliver')
     
-    # Check if job already exists
-    check = subprocess.run(['openclaw', 'cron', 'list'], capture_output=True, text=True)
-    if name in check.stdout:
+    # Check exact-name existence via JSON list (and self-heal duplicate names if present)
+    listed_jobs, list_err = _list_jobs_json()
+    if listed_jobs is None:
+        print(f"  SKIP {name}: unable to list cron jobs safely ({list_err})")
+        continue
+
+    same_name = [j for j in listed_jobs if j.get('name') == name]
+    if same_name:
+        if len(same_name) > 1:
+            keep = max(same_name, key=_job_rank)
+            keep_id = keep.get('id')
+            for dup in same_name:
+                dup_id = dup.get('id')
+                if not dup_id or dup_id == keep_id:
+                    continue
+                rm = subprocess.run(['openclaw', 'cron', 'rm', dup_id], capture_output=True, text=True)
+                if rm.returncode == 0:
+                    print(f"  Removed duplicate cron job '{name}' id={dup_id}")
+                else:
+                    print(f"  WARN failed to remove duplicate '{name}' id={dup_id}: {(rm.stderr or rm.stdout).strip()}")
+
         print(f"  Cron job '{name}' already exists, skipping")
         continue
     
@@ -349,6 +386,11 @@ for job in data.get('jobs', []):
         print(f"  Created cron job: {name}")
     else:
         print(f"  FAILED {name}: rc={result.returncode} err={result.stderr.strip()}")
+        # If add returned non-zero but job now exists, do NOT fallback-add again.
+        listed_after_fail, _ = _list_jobs_json()
+        if listed_after_fail is not None and any(j.get('name') == name for j in listed_after_fail):
+            print(f"  Job '{name}' appears present after failed add; skipping fallback")
+            continue
         # Fallback: try without --announce for minimal compatibility
         cmd_fallback = [c for c in cmd if c not in ('--announce', '--no-deliver')]
         result2 = subprocess.run(cmd_fallback, capture_output=True, text=True)

@@ -100,6 +100,14 @@
         background: rgba(16, 185, 129, 0.2);
         color: #10b981;
     }
+    .post-simulated {
+        font-size: 0.75rem;
+        padding: 0.2rem 0.5rem;
+        border-radius: var(--radius-sm);
+        background: rgba(245, 158, 11, 0.2);
+        color: #f59e0b;
+        border: 1px solid rgba(245, 158, 11, 0.35);
+    }
     .post-content {
         font-size: 1rem;
         line-height: 1.6;
@@ -262,6 +270,12 @@
     <button class="platform-tab" data-platform="moltbook" onclick="filterPlatform('moltbook', this)">
         🦎 Moltbook
     </button>
+    <button class="platform-tab" data-platform="activity" onclick="filterPlatform('activity', this)">
+        🛠️ Activity
+    </button>
+    <button class="platform-tab" data-platform="telegram" onclick="filterPlatform('telegram', this)">
+        ✈️ Telegram
+    </button>
 </div>
 
 <div class="posts-container" id="posts-list">
@@ -283,6 +297,7 @@
                 <label>Platform</label>
                 <select id="post-platform">
                     <option value="moltbook">🦎 Moltbook</option>
+                    <option value="telegram">✈️ Telegram</option>
                 </select>
             </div>
             <div class="form-group">
@@ -357,7 +372,10 @@ function renderPosts() {
         <div class="post-card">
             <div class="post-header">
                 <span class="post-platform ${post.platform}">${getPlatformIcon(post.platform)} ${post.platform}</span>
-                <span class="post-visibility ${post.visibility}">${getVisibilityIcon(post.visibility)} ${post.visibility}</span>
+                <div style="display:flex; gap:0.4rem; align-items:center;">
+                    ${isSimulated(post) ? '<span class="post-simulated">SIMULATED</span>' : ''}
+                    <span class="post-visibility ${post.visibility}">${getVisibilityIcon(post.visibility)} ${post.visibility}</span>
+                </div>
             </div>
             ${post.reply_to ? `<div class="reply-indicator">↩️ Reply to: ${post.reply_to}</div>` : ''}
             <div class="post-content">${escapeHtml(post.content)}</div>
@@ -375,7 +393,9 @@ function renderPosts() {
 function getPlatformIcon(platform) {
     const icons = {
         moltbook: '🦎',
+        activity: '🛠️',
         twitter: '🐦',
+        telegram: '✈️',
         mastodon: '🐘'
     };
     return icons[platform] || '📱';
@@ -388,6 +408,11 @@ function getVisibilityIcon(visibility) {
         private: '🔒'
     };
     return icons[visibility] || '📄';
+}
+
+function isSimulated(post) {
+    if (!post || !post.metadata) return false;
+    return Boolean(post.metadata.simulated);
 }
 
 function filterPlatform(platform, btn) {

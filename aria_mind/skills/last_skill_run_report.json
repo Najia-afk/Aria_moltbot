@@ -1,0 +1,35 @@
+{
+  "requested_skill_name": "social",
+  "normalized_skill_name": "social",
+  "function_name": "social_post",
+  "args_keys": [
+    "content",
+    "email_subject",
+    "email_to",
+    "platform",
+    "simulate"
+  ],
+  "status": "success",
+  "duration_ms": 30.24,
+  "coherence": {
+    "skill_name": "social",
+    "canonical_name": "aria-social",
+    "skill_path": "/Users/najia/aria/aria_skills/social",
+    "has_changes": true,
+    "checks": {
+      "init_exists": true,
+      "json_exists": true,
+      "md_exists": true,
+      "json_name_matches": true,
+      "manifest_name": "aria-social",
+      "init_registry_decorator": true,
+      "init_has_skill_class": true,
+      "md_mentions_skill": true
+    },
+    "errors": [],
+    "warnings": [],
+    "coherent": true
+  },
+  "mandatory_enforced": true,
+  "reported_at": "2026-02-13T20:54:14.806931+00:00"
+}

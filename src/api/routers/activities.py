@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy import Float, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.models import ActivityLog
+from db.models import ActivityLog, SocialPost
 from deps import get_db
 from pagination import paginate_query, build_paginated_response
 
@@ -23,6 +23,30 @@ def _extract_description(details) -> str:
     if isinstance(details, dict):
         return details.get("message") or details.get("description") or str(details)
     return str(details) if details else ""
+
+
+def _should_mirror_to_social(action: str, details: dict | None) -> bool:
+    action_l = (action or "").lower()
+    if "commit" in action_l or "comment" in action_l:
+        return True
+    if isinstance(details, dict):
+        txt = " ".join(str(details.get(k, "")) for k in ("action", "event", "type", "message", "description")).lower()
+        return ("commit" in txt) or ("comment" in txt)
+    return False
+
+
+def _social_content_from_activity(action: str, skill: str | None, details: dict | None, success: bool, error_message: str | None) -> str:
+    status_icon = "✅" if success else "❌"
+    action_text = action or "activity"
+    msg = _extract_description(details)
+    parts = [f"{status_icon} {action_text}"]
+    if skill:
+        parts.append(f"skill={skill}")
+    if msg and msg != "{}":
+        parts.append(msg)
+    if error_message:
+        parts.append(f"error={error_message}")
+    return " · ".join(parts)
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
@@ -89,6 +113,32 @@ async def create_activity(request: Request, db: AsyncSession = Depends(get_db)):
         error_message=data.get("error_message"),
     )
     db.add(activity)
+
+    # Mirror commit/comment-style events into social feed for dashboard visibility.
+    action = data.get("action") or ""
+    details = data.get("details") if isinstance(data.get("details"), dict) else {}
+    if _should_mirror_to_social(action, details):
+        social_post = SocialPost(
+            id=uuid.uuid4(),
+            platform="activity",
+            content=_social_content_from_activity(
+                action=action,
+                skill=data.get("skill"),
+                details=details,
+                success=data.get("success", True),
+                error_message=data.get("error_message"),
+            ),
+            visibility="public",
+            metadata_json={
+                "source": "activity_log",
+                "action": action,
+                "skill": data.get("skill"),
+                "success": data.get("success", True),
+                "details": details,
+            },
+        )
+        db.add(social_post)
+
     await db.commit()
     return {"id": str(activity.id), "created": True}
 

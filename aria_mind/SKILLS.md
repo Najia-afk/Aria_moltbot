@@ -91,7 +91,7 @@ aria-api-client.health_check({})
 | Skill | Functions | Use For |
 |-------|-----------|--------|
 | `moltbook` | `create_post`, `get_feed`, `add_comment`, `search` | Moltbook posting |
-| `social` | `send_telegram`, `send_discord`, `notify_all` | Cross-platform messaging |
+| `social` | `social_post`, `social_list`, `social_schedule` | Cross-platform posting (moltbook + simulation-first x/telegram) |
 | `telegram` | `send_message`, `get_updates`, `set_webhook` | Telegram messaging (v1.1) |
 
 ### ⚡ Utility Skills

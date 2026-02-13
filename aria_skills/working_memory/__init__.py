@@ -245,6 +245,7 @@ class WorkingMemorySkill(BaseSkill):
     async def sync_to_files(self) -> SkillResult:
         """Cron-callable: sync DB state to aria_memories/memory/ JSON files."""
         import json as _json
+        import os
         workspace_root = self._resolve_workspace_root()
         memories_path = workspace_root / "aria_memories" / "memory"
         memories_path.mkdir(parents=True, exist_ok=True)
@@ -282,13 +283,21 @@ class WorkingMemorySkill(BaseSkill):
 
         mirror_paths = self._legacy_snapshot_paths(workspace_root)
         mirrored = []
+        pruned = []
+        write_legacy_mirror = os.getenv("ARIA_WM_WRITE_LEGACY_MIRROR", "false").lower() == "true"
+        prune_legacy = os.getenv("ARIA_WM_PRUNE_LEGACY_SNAPSHOTS", "true").lower() == "true"
+
         for mirror in mirror_paths:
             try:
-                mirror.parent.mkdir(parents=True, exist_ok=True)
-                mirror.write_text(payload, encoding="utf-8")
-                mirrored.append(str(mirror))
+                if write_legacy_mirror:
+                    mirror.parent.mkdir(parents=True, exist_ok=True)
+                    mirror.write_text(payload, encoding="utf-8")
+                    mirrored.append(str(mirror))
+                elif prune_legacy and mirror.exists():
+                    mirror.unlink()
+                    pruned.append(str(mirror))
             except Exception as e:
-                self.logger.debug(f"sync_to_files: mirror write skipped for {mirror}: {e}")
+                self.logger.debug(f"sync_to_files: legacy maintenance skipped for {mirror}: {e}")
 
         files_written = ["context.json"]
         return SkillResult.ok({
@@ -296,6 +305,8 @@ class WorkingMemorySkill(BaseSkill):
             "path": str(memories_path),
             "workspace_root": str(workspace_root),
             "mirrored_paths": mirrored,
+            "pruned_legacy_paths": pruned,
+            "legacy_mirror_enabled": write_legacy_mirror,
         })
 
     def _resolve_workspace_root(self) -> Path:

@@ -1351,6 +1351,46 @@ class AriaAPIClient(BaseSkill):
         except Exception as e:
             return SkillResult.fail(f"Failed to get proposals: {e}")
 
+    async def get_proposal(self, proposal_id: str) -> SkillResult:
+        """Get a single improvement proposal by ID."""
+        try:
+            resp = await self._client.get(f"/proposals/{proposal_id}")
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to get proposal: {e}")
+
+    async def review_proposal(
+        self,
+        proposal_id: str,
+        status: str,
+        reviewed_by: str = "aria",
+    ) -> SkillResult:
+        """Review a proposal with status approved/rejected/implemented."""
+        if status not in ("approved", "rejected", "implemented"):
+            return SkillResult.fail("status must be approved, rejected, or implemented")
+        try:
+            resp = await self._client.patch(
+                f"/proposals/{proposal_id}",
+                json={"status": status, "reviewed_by": reviewed_by},
+            )
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to review proposal: {e}")
+
+    async def mark_proposal_implemented(
+        self,
+        proposal_id: str,
+        reviewed_by: str = "aria",
+    ) -> SkillResult:
+        """Mark an approved proposal as implemented."""
+        return await self.review_proposal(
+            proposal_id=proposal_id,
+            status="implemented",
+            reviewed_by=reviewed_by,
+        )
+
     # ========================================
     # Skill Invocations (S5-07)
     # ========================================

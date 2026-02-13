@@ -20,6 +20,21 @@ class AgentRole(Enum):
     MEMORY = "memory"
 
 
+class FocusType(Enum):
+    """Focus type personas - aliases for AgentRole.
+    
+    These map 1:1 with AgentRole for semantic clarity in different contexts.
+    """
+    ORCHESTRATOR = "coordinator"
+    DEVSECOPS = "devsecops"
+    DATA = "data"
+    TRADER = "trader"
+    CREATIVE = "creative"
+    SOCIAL = "social"
+    JOURNALIST = "journalist"
+    MEMORY = "memory"
+
+
 @dataclass
 class AgentConfig:
     """Configuration for an agent."""

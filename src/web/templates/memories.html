@@ -98,6 +98,18 @@
     font-size: 0.85rem;
     color: var(--text-muted);
 }
+.memory-notice {
+    margin-bottom: 1rem;
+    padding: 0.9rem 1rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+.memory-notice strong {
+    color: var(--text-primary);
+}
 </style>
 {% endblock %}
 
@@ -105,6 +117,11 @@
 <div class="page-header">
     <h1>💾 Aria's Memories</h1>
     <p>Persistent key-value store for long-term memory</p>
+</div>
+
+<div class="memory-notice">
+    <strong>Long-term memory scope:</strong> this page is for durable memories (`/memories`) that should persist over time.
+    For live session context and checkpointed short-term state, use <a href="/working-memory">Working Memory</a>.
 </div>
 
 <div class="stats-bar" id="statsBar">

@@ -39,6 +39,24 @@
     .skill-card-stats { display: flex; gap: 16px; font-size: 12px; color: var(--text-secondary); margin-bottom: 8px; }
     .skill-card-stats span { display: flex; align-items: center; gap: 4px; }
     .skill-card-meta { font-size: 11px; color: var(--text-muted); }
+    .usage-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        margin-top: 6px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+    }
+    .usage-badge.never-used {
+        background: rgba(245, 158, 11, 0.15);
+        color: #f59e0b;
+        border: 1px solid rgba(245, 158, 11, 0.28);
+        cursor: help;
+    }
     .skill-card-detail { display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-color); font-size: 12px; color: var(--text-secondary); }
     .skill-card.expanded .skill-card-detail { display: block; }
     .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; }
@@ -102,6 +120,23 @@
 {% block extra_js %}
 <script>
     let allSkills = [];
+    const zeroUseReasons = {
+        agent_manager: 'Orchestration helper; only used when multi-agent lifecycle ops are explicitly invoked.',
+        ci_cd: 'Specialized DevOps skill; only runs when CI/CD tasks are requested.',
+        community: 'Optional social/community workflow; not in current cron path.',
+        data_pipeline: 'ETL-focused skill; used only for data pipeline tasks.',
+        experiment: 'Experiment/ML workflow skill; dormant unless explicitly called.',
+        fact_check: 'Targeted verification skill; used only for fact-check workflows.',
+        model_switcher: 'Used when explicit model switch operations are requested.',
+        moonshot: 'Paid-provider skill; typically avoided unless fallback routing selects it.',
+        ollama: 'Local fallback skill; only used when routing selects Ollama path.',
+        performance: 'Review/assessment skill; runs only in performance workflows.',
+        pipelines: 'Pipeline registry helper; no direct invocations expected in normal flow.',
+        pipeline_skill: 'Runs only when a pipeline is explicitly executed.',
+        sandbox: 'Security sandbox; used only for isolated execution tasks.',
+        schedule: 'Scheduler helper; not directly invoked in current runtime flow.',
+        telegram: 'Social channel skill; unused unless Telegram integration is active.',
+    };
 
     async function loadSkills() {
         const container = document.getElementById('skills-container');
@@ -150,6 +185,12 @@
             const lastExec = s.last_execution ? new Date(s.last_execution).toLocaleString() : '—';
             const updatedAt = s.updated_at ? new Date(s.updated_at).toLocaleString() : '—';
             const metaHtml = s.metadata ? `<pre style="margin:8px 0 0;white-space:pre-wrap;font-size:11px;color:var(--text-muted)">${escHtml(JSON.stringify(s.metadata, null, 2))}</pre>` : '';
+            const uses = Number(s.use_count || 0);
+            const isNeverUsed = uses === 0 && !s.last_execution;
+            const zeroReason = zeroUseReasons[s.skill_name] || 'Registered and healthy, but not selected by current routing/cron workloads yet.';
+            const usageBadge = isNeverUsed
+                ? `<div class="usage-badge never-used" title="${escHtml(zeroReason)}">Never used (30d)</div>`
+                : '';
 
             return `
                 <div class="skill-card" onclick="this.classList.toggle('expanded')">
@@ -165,6 +206,7 @@
                         <span>✖ ${s.error_count ?? 0} errors</span>
                         <span>Status: <strong>${escHtml(s.status)}</strong></span>
                     </div>
+                    ${usageBadge}
                     <div class="skill-card-meta">Last health check: ${lastCheck}</div>
                     <div class="skill-card-detail">
                         <dl class="meta-grid">

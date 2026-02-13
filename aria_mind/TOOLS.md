@@ -38,6 +38,21 @@ aria-sprint-manager.sprint_plan({"sprint_name": "sprint-1", "goal_ids": ["g1","g
 aria-sprint-manager.sprint_move_goal({"goal_id": "X", "column": "doing"})
 aria-sprint-manager.sprint_prioritize({"column": "todo", "goal_ids_ordered": ["g1","g2"]})
 
+# Allowed board columns (goals)
+# backlog | todo | doing | on_hold | done
+
+# Typical board workflow
+# 1) Create in todo (planned work)
+aria-api-client.create_goal({"title": "...", "priority": 2, "board_column": "todo", "sprint": "sprint-1"})
+# 2) Start execution
+aria-api-client.move_goal({"goal_id": "X", "board_column": "doing"})
+# 3) Pause when blocked
+aria-api-client.move_goal({"goal_id": "X", "board_column": "on_hold"})
+# 4) Resume
+aria-api-client.move_goal({"goal_id": "X", "board_column": "doing"})
+# 5) Complete
+aria-api-client.move_goal({"goal_id": "X", "board_column": "done"})
+
 # Knowledge Graph — PREFER THESE OVER TOOLS.md SCANNING (~100-200 tokens)
 aria-api-client.find_skill_for_task({"task": "post to moltbook"})     # Best skill for a task
 aria-api-client.graph_search({"query": "security", "entity_type": "skill"})  # ILIKE search
@@ -51,10 +66,57 @@ aria-api-client.get_memories({"limit": 10})
 aria-api-client.set_memory({"key": "preference", "value": "dark_mode"})
 aria-api-client.get_memory({"key": "preference"})
 
+# Working Memory (short-term active context)
+aria-working-memory.remember({"key": "current_task", "value": "...", "category": "task", "importance": 0.7, "ttl_hours": 24})
+aria-working-memory.get_context({"limit": 10})
+aria-working-memory.checkpoint({})
+aria-working-memory.sync_to_files({})
+
 # Thoughts
 aria-api-client.create_thought({"content": "Reflecting...", "category": "reflection"})
 aria-api-client.get_thoughts({"limit": 10})
+
+# Improvement Proposals (self-improvement loop)
+aria-api-client.propose_improvement({
+	"title": "Fix timeout on model-usage endpoint",
+	"description": "Endpoint times out under high volume due to missing index",
+	"category": "performance",
+	"risk_level": "low",
+	"file_path": "src/api/routers/model_usage.py",
+	"rationale": "Index on created_at reduces scan latency"
+})
+aria-api-client.get_proposals({"status": "proposed", "page": 1})
+aria-api-client.get_proposal({"proposal_id": "UUID"})
+aria-api-client.review_proposal({"proposal_id": "UUID", "status": "approved", "reviewed_by": "najia"})
+aria-api-client.mark_proposal_implemented({"proposal_id": "UUID", "reviewed_by": "aria"})
 ```
+
+## Memory Routing Rule (MUST)
+
+- Use `aria-working-memory` for **short-term / active session context** (task state, transient observations, checkpointable context).
+- Use `aria-api-client` `/memories` for **long-term durable memory** (preferences, stable facts, historical knowledge).
+- When ending a work cycle, run `aria-working-memory.sync_to_files({})` to refresh `aria_memories/memory/context.json`.
+- Do not treat `/working-memory` row counts as long-term memory volume; access/ranking activity can be high even with few rows.
+
+## Goal Board Rule (MUST)
+
+- Use board columns as operational state:
+	- `todo` = queued next work
+	- `doing` = active in-progress work
+	- `on_hold` = blocked/paused with reason logged in activity
+	- `done` = completed work
+- Prefer `aria-api-client.move_goal(...)` for column changes so status is synced consistently.
+- When placing a goal on `on_hold`, always log the blocker with `aria-api-client.create_activity({...})`.
+
+## Proposal Loop Rule (MUST)
+
+- Propose changes through `aria-api-client.propose_improvement(...)` before touching medium/high-risk code.
+- Respect proposal risk model:
+	- `low`: can be implemented quickly after review
+	- `medium`: requires explicit approval before implementation
+	- `high`: requires explicit approval + extra review
+- Never propose modifications under `soul/` paths.
+- After implementation, mark proposal status to `implemented` and log execution outcome via activity.
 
 ## All 26 Active Skills
 
@@ -97,6 +159,9 @@ aria-pipeline-skill.run({"pipeline": "bug_fix", "params": {"error_type": "timeou
 ```yaml
 # Post to Moltbook (rate: 1/30min)
 aria-social.social_post({"content": "Hello world!", "platform": "moltbook"})
+
+# Simulate Telegram post (future-ready, safe default)
+aria-social.social_post({"content": "Daily summary", "platform": "telegram", "simulate": true})
 
 # Check health
 aria-health.health_check_all({})

@@ -363,39 +363,55 @@ async def get_working_memory_stats(db: AsyncSession = Depends(get_db)):
 async def get_working_memory_file_snapshot():
     """Read file-based working memory snapshot from aria_memories/memory/context.json."""
     here = Path(__file__).resolve()
-    candidates: list[Path] = []
+    canonical_candidates: list[Path] = []
+    legacy_candidates: list[Path] = []
 
     for parent in [here.parent, *here.parents, Path.cwd()]:
-        candidates.append(parent / "aria_memories" / "memory" / "context.json")
-        candidates.append(parent / "aria_mind" / "skills" / "aria_memories" / "memory" / "context.json")
+        canonical_candidates.append(parent / "aria_memories" / "memory" / "context.json")
+        legacy_candidates.append(
+            parent / "aria_mind" / "skills" / "aria_memories" / "memory" / "context.json"
+        )
 
-    unique_candidates: list[Path] = []
-    seen: set[str] = set()
-    for cand in candidates:
-        key = str(cand.resolve()) if cand.exists() else str(cand)
-        if key in seen:
-            continue
-        seen.add(key)
-        unique_candidates.append(cand)
+    def _dedupe(paths: list[Path]) -> list[Path]:
+        out: list[Path] = []
+        seen: set[str] = set()
+        for cand in paths:
+            key = str(cand.resolve()) if cand.exists() else str(cand)
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(cand)
+        return out
 
-    existing = [cand for cand in unique_candidates if cand.exists()]
-    if not existing:
+    canonical_candidates = _dedupe(canonical_candidates)
+    legacy_candidates = _dedupe(legacy_candidates)
+
+    canonical_existing = [cand for cand in canonical_candidates if cand.exists()]
+    legacy_existing = [cand for cand in legacy_candidates if cand.exists()]
+
+    candidates_to_read = canonical_existing if canonical_existing else legacy_existing
+    path_mode = "canonical" if canonical_existing else ("legacy-fallback" if legacy_existing else "missing")
+
+    if not candidates_to_read:
+        seed_path = canonical_candidates[0] if canonical_candidates else Path("aria_memories/memory/context.json")
         return {
             "exists": False,
-            "path": str(unique_candidates[0]) if unique_candidates else "aria_memories/memory/context.json",
+            "path": str(seed_path),
             "sources": [],
+            "path_mode": path_mode,
             "snapshot": None,
         }
+
+    unique_candidates: list[Path] = candidates_to_read
+    seen: set[str] = set()
 
     picked_path = None
     picked_payload = None
     picked_last_updated = None
     source_meta = []
-    canonical_candidate = None
-    canonical_payload = None
 
     try:
-        for cand in existing:
+        for cand in unique_candidates:
             raw = cand.read_text(encoding="utf-8")
             payload = json.loads(raw) if raw.strip() else {}
             last_updated = payload.get("last_updated") if isinstance(payload, dict) else None
@@ -407,11 +423,6 @@ async def get_working_memory_file_snapshot():
                     "size_bytes": cand.stat().st_size,
                 }
             )
-
-            is_legacy_nested = "aria_mind/skills/aria_memories/memory/context.json" in str(cand)
-            if not is_legacy_nested and canonical_candidate is None:
-                canonical_candidate = cand
-                canonical_payload = payload
 
             if picked_path is None:
                 picked_path = cand
@@ -429,14 +440,12 @@ async def get_working_memory_file_snapshot():
                 picked_payload = payload
                 picked_last_updated = last_updated
 
-        if canonical_candidate is not None:
-            picked_path = canonical_candidate
-            picked_payload = canonical_payload
-
         return {
             "exists": True,
             "path": str(picked_path),
             "sources": source_meta,
+            "path_mode": path_mode,
+            "legacy_sources_detected": len(legacy_existing),
             "snapshot": picked_payload,
         }
     except Exception as exc:
