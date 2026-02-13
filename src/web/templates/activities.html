@@ -43,6 +43,9 @@
         text-transform: uppercase;
         letter-spacing: 0.03em;
     }
+    .sortable-head { cursor: pointer; user-select: none; }
+    .sortable-head .sort-indicator { margin-left: 6px; color: var(--text-muted); }
+    .sort-note { font-size: 11px; color: var(--text-muted); margin-top: 8px; }
     .data-table tr:hover { background: rgba(0,212,255,0.04); }
     .data-table tr:last-child td { border-bottom: none; }
 
@@ -78,10 +81,10 @@
     <table class="data-table" id="activities-table">
         <thead>
             <tr>
-                <th>Time</th>
-                <th>Action</th>
-                <th>Skill</th>
-                <th>Status</th>
+                <th class="sortable-head" data-sort-key="created_at">Time<span class="sort-indicator">↕</span></th>
+                <th class="sortable-head" data-sort-key="action">Action<span class="sort-indicator">↕</span></th>
+                <th class="sortable-head" data-sort-key="skill">Skill<span class="sort-indicator">↕</span></th>
+                <th class="sortable-head" data-sort-key="status">Status<span class="sort-indicator">↕</span></th>
                 <th>Description</th>
             </tr>
         </thead>
@@ -89,6 +92,7 @@
             <tr><td colspan="5" class="empty-state">Loading...</td></tr>
         </tbody>
     </table>
+    <div class="sort-note">Sorting applies to current page only (pagination/limit still controls DB reads).</div>
     <div id="activities-pagination"></div>
 </div>
 {% endblock %}
@@ -97,6 +101,8 @@
 <script data-page-script>
     let allActivities = [];
     let activitiesPager;
+    let activeSortKey = 'created_at';
+    let activeSortDir = 'desc';
 
     function esc(v) {
         return String(v ?? '')
@@ -114,7 +120,7 @@
             .then(r => r.json())
             .then(data => {
                 allActivities = data.items || data;
-                renderActivities(allActivities);
+                applyFiltersAndSort();
                 if (activitiesPager && data.pages) activitiesPager.update(data);
                 document.getElementById('sync-meta').textContent = `Data sync: ${new Date().toLocaleTimeString()}`;
             })
@@ -125,6 +131,44 @@
                         <div style="font-size:12px;margin-top:10px">${esc(e.message)}</div>
                     </td></tr>`;
             });
+    }
+
+    function compareValues(a, b, key) {
+        if (key === 'created_at') {
+            const av = a.created_at ? new Date(a.created_at).getTime() : 0;
+            const bv = b.created_at ? new Date(b.created_at).getTime() : 0;
+            return av - bv;
+        }
+        if (key === 'status') {
+            const aStatus = (a.status || (a.success ? 'ok' : 'error') || 'unknown').toLowerCase();
+            const bStatus = (b.status || (b.success ? 'ok' : 'error') || 'unknown').toLowerCase();
+            return aStatus.localeCompare(bStatus);
+        }
+        const av = String(a[key] || a.type || '').toLowerCase();
+        const bv = String(b[key] || b.type || '').toLowerCase();
+        return av.localeCompare(bv);
+    }
+
+    function sortActivities(data) {
+        const cloned = [...data];
+        cloned.sort((a, b) => {
+            const cmp = compareValues(a, b, activeSortKey);
+            return activeSortDir === 'asc' ? cmp : -cmp;
+        });
+        return cloned;
+    }
+
+    function updateSortIndicators() {
+        document.querySelectorAll('.sortable-head').forEach(head => {
+            const key = head.dataset.sortKey;
+            const indicator = head.querySelector('.sort-indicator');
+            if (!indicator) return;
+            if (key !== activeSortKey) {
+                indicator.textContent = '↕';
+            } else {
+                indicator.textContent = activeSortDir === 'asc' ? '↑' : '↓';
+            }
+        });
     }
 
     function renderActivities(data) {
@@ -161,7 +205,7 @@
         document.getElementById('activities-body').innerHTML = html;
     }
 
-    function filterActivities() {
+    function applyFiltersAndSort() {
         const search = document.getElementById('search-input').value.toLowerCase();
         const statusFilter = document.getElementById('status-filter').value;
 
@@ -179,16 +223,31 @@
             filtered = filtered.filter(a => (a.status || (a.success ? 'ok' : 'error')) === statusFilter);
         }
 
-        renderActivities(filtered);
+        const sorted = sortActivities(filtered);
+        updateSortIndicators();
+        renderActivities(sorted);
     }
 
-    document.getElementById('search-input').addEventListener('input', filterActivities);
-    document.getElementById('status-filter').addEventListener('change', filterActivities);
+    document.getElementById('search-input').addEventListener('input', applyFiltersAndSort);
+    document.getElementById('status-filter').addEventListener('change', applyFiltersAndSort);
+    document.querySelectorAll('.sortable-head').forEach(head => {
+        head.addEventListener('click', () => {
+            const key = head.dataset.sortKey;
+            if (activeSortKey === key) {
+                activeSortDir = activeSortDir === 'asc' ? 'desc' : 'asc';
+            } else {
+                activeSortKey = key;
+                activeSortDir = key === 'created_at' ? 'desc' : 'asc';
+            }
+            applyFiltersAndSort();
+        });
+    });
 
     activitiesPager = new AriaPagination('activities-pagination', {
         onPageChange: (page, limit) => loadActivities(page, limit),
         limit: 25
     });
+    updateSortIndicators();
     loadActivities();
 </script>
 {% endblock %}
