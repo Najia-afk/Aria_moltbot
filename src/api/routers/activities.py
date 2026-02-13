@@ -230,6 +230,18 @@ async def activity_visualization(hours: int = 24, limit: int = 25, db: AsyncSess
         )
     ).all()
 
+    all_skills_rows = (
+        await db.execute(
+            select(
+                skill_bucket,
+                func.count(ActivityLog.id).label("count"),
+            )
+            .where(ActivityLog.created_at >= cutoff)
+            .group_by(skill_bucket)
+            .order_by(desc(func.count(ActivityLog.id)))
+        )
+    ).all()
+
     total_rows = (
         await db.execute(
             select(
@@ -248,6 +260,32 @@ async def activity_visualization(hours: int = 24, limit: int = 25, db: AsyncSess
             .limit(limit)
         )
     ).scalars().all()
+
+    creative_skill_targets = [
+        "brainstorm",
+        "experiment",
+        "community",
+        "fact_check",
+        "model_switcher",
+        "memeothy",
+        "llm",
+    ]
+
+    def _normalize_skill_name(name: str | None) -> str:
+        return (name or "unknown").strip().lower().replace("-", "_")
+
+    all_skill_counts = {
+        _normalize_skill_name(row.skill): int(row.count or 0)
+        for row in all_skills_rows
+    }
+    creative_skills = [
+        {
+            "skill": skill_name,
+            "count": int(all_skill_counts.get(skill_name, 0)),
+        }
+        for skill_name in creative_skill_targets
+    ]
+    creative_total = sum(item["count"] for item in creative_skills)
 
     return {
         "window_hours": hours,
@@ -269,6 +307,11 @@ async def activity_visualization(hours: int = 24, limit: int = 25, db: AsyncSess
             {"skill": row.skill or "unknown", "count": int(row.count or 0)}
             for row in skills_rows
         ],
+        "creative": {
+            "targets": creative_skill_targets,
+            "total": creative_total,
+            "skills": creative_skills,
+        },
         "recent": [
             {
                 "id": str(item.id),

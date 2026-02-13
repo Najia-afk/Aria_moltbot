@@ -57,6 +57,7 @@
     <div class="stat-card"><h4>Successful</h4><div id="stat-success" class="value">-</div></div>
     <div class="stat-card"><h4>Failed</h4><div id="stat-fail" class="value">-</div></div>
     <div class="stat-card"><h4>Success Rate</h4><div id="stat-rate" class="value">-</div></div>
+    <div class="stat-card"><h4>Creative Skill Events</h4><div id="stat-creative" class="value">-</div></div>
 </div>
 
 <div class="chart-grid">
@@ -76,6 +77,12 @@
     <h4>🔧 Top Skills</h4>
     <canvas id="skills-chart"></canvas>
     <div id="skills-empty" class="chart-empty">No skill data in selected window.</div>
+</div>
+
+<div class="chart-card" style="margin-bottom:20px;" id="creative-card">
+    <h4>✨ Creative / Advanced Skills Pulse</h4>
+    <canvas id="creative-chart"></canvas>
+    <div id="creative-empty" class="chart-empty">No creative-skill activity in selected window.</div>
 </div>
 
 <h3 style="margin:0 0 10px;">Recent Activity Feed</h3>
@@ -135,14 +142,17 @@ function renderCharts(data) {
     destroyChart('hourly');
     destroyChart('actions');
     destroyChart('skills');
+    destroyChart('creative');
 
     const hourlyData = data.hourly || [];
     const actionData = data.actions || [];
     const skillData = data.skills || [];
+    const creativeData = data.creative?.skills || [];
 
     setChartVisibility('hourly-chart', 'hourly-empty', hourlyData.length > 0);
     setChartVisibility('actions-chart', 'actions-empty', actionData.length > 0);
     setChartVisibility('skills-chart', 'skills-empty', skillData.length > 0);
+    setChartVisibility('creative-chart', 'creative-empty', creativeData.some(x => (x.count || 0) > 0));
 
     if (hourlyData.length > 0) {
         const hourlyLabels = hourlyData.map(x => new Date(x.hour).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}));
@@ -173,6 +183,16 @@ function renderCharts(data) {
             options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: false } } }
         });
     }
+
+    if (creativeData.some(x => (x.count || 0) > 0)) {
+        const creativeLabels = creativeData.map(x => x.skill);
+        const creativeValues = creativeData.map(x => x.count || 0);
+        _charts.creative = new Chart(document.getElementById('creative-chart'), {
+            type: 'bar',
+            data: { labels: creativeLabels, datasets: [{ label: 'Events', data: creativeValues, backgroundColor: 'rgba(236,72,153,0.7)' }] },
+            options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: false } } }
+        });
+    }
 }
 
 async function loadCreativePulse() {
@@ -189,6 +209,7 @@ async function loadCreativePulse() {
     document.getElementById('stat-success').textContent = formatNumber(success);
     document.getElementById('stat-fail').textContent = formatNumber(fail);
     document.getElementById('stat-rate').textContent = fmtPct(rate);
+    document.getElementById('stat-creative').textContent = formatNumber(data.creative?.total || 0);
     document.getElementById('sync-meta').textContent = `Data sync: ${new Date().toLocaleTimeString()}`;
 
     renderCharts(data);
@@ -202,6 +223,7 @@ loadCreativePulse().catch(err => {
     setChartVisibility('hourly-chart', 'hourly-empty', false);
     setChartVisibility('actions-chart', 'actions-empty', false);
     setChartVisibility('skills-chart', 'skills-empty', false);
+    setChartVisibility('creative-chart', 'creative-empty', false);
 });
 </script>
 {% endblock %}
