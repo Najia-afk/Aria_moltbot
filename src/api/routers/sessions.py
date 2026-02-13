@@ -12,7 +12,7 @@ from typing import Any, Optional
 
 import httpx
 from fastapi import APIRouter, Depends, Request
-from sqlalchemy import func, select, text, update
+from sqlalchemy import delete, func, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -85,6 +85,57 @@ def _extract_live_status(session: dict[str, Any]) -> str:
     return "active"
 
 
+def _extract_live_label(session: dict[str, Any]) -> str | None:
+    direct_label = session.get("label")
+    if isinstance(direct_label, str) and direct_label.strip():
+        return direct_label.strip()
+
+    origin = session.get("origin")
+    if isinstance(origin, dict):
+        origin_label = origin.get("label")
+        if isinstance(origin_label, str) and origin_label.strip():
+            return origin_label.strip()
+
+    delivery = session.get("deliveryContext")
+    if isinstance(delivery, dict):
+        to_value = delivery.get("to")
+        if isinstance(to_value, str) and to_value.strip():
+            return to_value.strip()
+
+    last_to = session.get("lastTo")
+    if isinstance(last_to, str) and last_to.strip():
+        return last_to.strip()
+
+    return None
+
+
+def _extract_live_channel(session: dict[str, Any]) -> str | None:
+    delivery = session.get("deliveryContext")
+    if isinstance(delivery, dict):
+        channel = delivery.get("channel")
+        if isinstance(channel, str) and channel.strip():
+            return channel.strip().lower()
+
+    for key in ("lastChannel", "channel"):
+        raw = session.get(key)
+        if isinstance(raw, str) and raw.strip():
+            return raw.strip().lower()
+
+    origin = session.get("origin")
+    if isinstance(origin, dict):
+        provider = origin.get("provider")
+        if isinstance(provider, str) and provider.strip():
+            return provider.strip().lower()
+
+    source_key = str(session.get("source_key") or "")
+    if source_key and ":" in source_key and not source_key.startswith("agent:"):
+        prefix = source_key.split(":", 1)[0].strip().lower()
+        if prefix and prefix != "agent":
+            return prefix
+
+    return None
+
+
 def _normalize_live_session(
     session: dict[str, Any],
     source: str = "openclaw_live",
@@ -98,7 +149,11 @@ def _normalize_live_session(
     )
     ended_at = _parse_iso_dt(session.get("endedAt") or session.get("ended_at"))
 
-    stable_id = uuid.uuid5(_OPENCLAW_UUID_NAMESPACE, f"openclaw:{openclaw_sid}")
+    source_key = str(session.get("source_key") or "").strip()
+    identity_seed = f"openclaw:{openclaw_sid}"
+    if source_key:
+        identity_seed = f"openclaw_key:{source_key}"
+    stable_id = uuid.uuid5(_OPENCLAW_UUID_NAMESPACE, identity_seed)
     compact_session = {
         "id": openclaw_sid,
         "agentId": session.get("agentId") or session.get("agent_id") or session.get("agent"),
@@ -107,7 +162,8 @@ def _normalize_live_session(
         "createdAt": session.get("createdAt") or session.get("created_at") or session.get("startedAt") or session.get("started_at"),
         "updatedAt": session.get("updatedAt") or session.get("updated_at"),
         "endedAt": session.get("endedAt") or session.get("ended_at"),
-        "label": session.get("label"),
+        "label": _extract_live_label(session),
+        "channel": _extract_live_channel(session),
         "model": session.get("model"),
         "contextTokens": session.get("contextTokens"),
     }
@@ -122,6 +178,8 @@ def _normalize_live_session(
         "metadata_json": {
             "source": source,
             "openclaw_session_id": openclaw_sid,
+            "openclaw_source_key": source_key or None,
+            "openclaw_source_channel": _extract_live_channel(session),
             "openclaw_session": compact_session,
             "synced_at": datetime.now(timezone.utc).isoformat(),
         },
@@ -159,13 +217,35 @@ def _parse_sessions_index_payload(payload: Any, agent_hint: str = "main") -> lis
         if len(parts) >= 2 and parts[0] == "agent":
             agent_id = parts[1]
 
+        label_raw = _extract_live_label(value)
+        source_channel = _extract_live_channel(value)
+        label = str(label_raw or "").strip().lower()
+
+        origin_provider = ""
+        origin = value.get("origin")
+        if isinstance(origin, dict):
+            provider = origin.get("provider")
+            if isinstance(provider, str):
+                origin_provider = provider.strip().lower()
+
+        delivery_to = ""
+        delivery = value.get("deliveryContext")
+        if isinstance(delivery, dict):
+            to_value = delivery.get("to")
+            if isinstance(to_value, str):
+                delivery_to = to_value.strip().lower()
+
         session_type = "openclaw"
         if ":cron:" in key_str:
             session_type = "openclaw_cron"
+        elif ":subagent:" in key_str:
+            session_type = "openclaw_subagent"
         elif ":run:" in key_str:
             session_type = "openclaw_run"
         elif key_str.endswith(":main"):
             session_type = "openclaw_main"
+        if label == "heartbeat" or origin_provider == "heartbeat" or delivery_to == "heartbeat":
+            session_type = "openclaw_heartbeat"
 
         updated_at_dt = _parse_epoch_ms_dt(value.get("updatedAt"))
         updated_iso = updated_at_dt.isoformat() if updated_at_dt else None
@@ -179,14 +259,41 @@ def _parse_sessions_index_payload(payload: Any, agent_hint: str = "main") -> lis
                 "status": "active",
                 "updatedAt": updated_iso,
                 "createdAt": updated_iso,
-                "label": value.get("label"),
+                "label": label_raw,
+                "channel": source_channel,
                 "model": value.get("model"),
                 "contextTokens": value.get("contextTokens"),
                 "source_key": key_str,
             }
         )
 
-    return sessions
+    # Deduplicate by sessionId: same OpenClaw session can appear under multiple keys
+    # (e.g. agent:* and channel-prefixed keys). Keep the richest row.
+    def _row_score(row: dict[str, Any]) -> tuple[int, int, int, int]:
+        session_type = str(row.get("session_type") or "")
+        type_score = {
+            "openclaw_subagent": 40,
+            "openclaw_heartbeat": 35,
+            "openclaw_cron": 30,
+            "openclaw_main": 20,
+            "openclaw": 10,
+            "openclaw_run": 5,
+        }.get(session_type, 0)
+        channel_score = 10 if str(row.get("channel") or "").strip() else 0
+        label_score = 5 if str(row.get("label") or "").strip() else 0
+        updated_score = 1 if str(row.get("updatedAt") or "").strip() else 0
+        return (type_score, channel_score, label_score, updated_score)
+
+    best_by_sid: dict[str, dict[str, Any]] = {}
+    for row in sessions:
+        sid = str(row.get("sessionId") or row.get("id") or "").strip()
+        if not sid:
+            continue
+        current = best_by_sid.get(sid)
+        if current is None or _row_score(row) > _row_score(current):
+            best_by_sid[sid] = row
+
+    return list(best_by_sid.values())
 
 
 def _fetch_volume_openclaw_sessions() -> list[dict[str, Any]]:
@@ -360,6 +467,21 @@ async def _sync_payload_sessions_to_db(
         if not normalized:
             continue
 
+        metadata = normalized.get("metadata_json") or {}
+        openclaw_sid = str(metadata.get("openclaw_session_id") or "").strip()
+        source_key = str(metadata.get("openclaw_source_key") or "").strip()
+
+        # Legacy compatibility cleanup:
+        # older sync used id = uuid5("openclaw:<session_id>") which can collide across keys
+        # (e.g., agent:*:main, heartbeat/main variants). If we now have source_key-based id,
+        # remove the old legacy row for the same OpenClaw session id.
+        if openclaw_sid and source_key:
+            legacy_id = uuid.uuid5(_OPENCLAW_UUID_NAMESPACE, f"openclaw:{openclaw_sid}")
+            if legacy_id != normalized["id"]:
+                await db.execute(
+                    delete(AgentSession).where(AgentSession.id == legacy_id)
+                )
+
         stmt = pg_insert(AgentSession).values(**normalized).on_conflict_do_update(
             index_elements=["id"],
             set_={
@@ -420,16 +542,27 @@ async def get_agent_sessions(
     limit: int = 25,
     status: Optional[str] = None,
     agent_id: Optional[str] = None,
+    source_channel: Optional[str] = None,
     sync_live: bool = False,
+    include_runtime_events: bool = False,
+    include_cron_events: bool = False,
     db: AsyncSession = Depends(get_db),
 ):
     await _maybe_autosync_sessions(db, force=sync_live)
 
     base = select(AgentSession).order_by(AgentSession.started_at.desc())
+    if not include_runtime_events:
+        base = base.where(AgentSession.session_type != "skill_exec")
+    if not include_cron_events:
+        base = base.where(AgentSession.session_type != "openclaw_cron")
     if status:
         base = base.where(AgentSession.status == status)
     if agent_id:
         base = base.where(AgentSession.agent_id == agent_id)
+    if source_channel:
+        base = base.where(
+            AgentSession.metadata_json["openclaw_source_channel"].astext == source_channel
+        )
 
     count_stmt = select(func.count()).select_from(base.subquery())
     total = (await db.execute(count_stmt)).scalar() or 0
@@ -447,6 +580,8 @@ async def get_agent_sessions(
             "tokens_used": s.tokens_used,
             "cost_usd": float(s.cost_usd) if s.cost_usd else 0,
             "status": s.status,
+            "source_channel": (s.metadata_json or {}).get("openclaw_source_channel")
+            or ((s.metadata_json or {}).get("openclaw_session") or {}).get("channel"),
             "metadata": s.metadata_json or {},
         }
         for s in rows
@@ -454,16 +589,98 @@ async def get_agent_sessions(
     return build_paginated_response(items, total, page, limit)
 
 
+@router.get("/sessions/hourly")
+async def get_sessions_hourly(
+    hours: int = 24,
+    sync_live: bool = False,
+    include_runtime_events: bool = False,
+    include_cron_events: bool = False,
+    source_channel: Optional[str] = None,
+    status: Optional[str] = None,
+    agent_id: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """Hourly session counts grouped by agent for time-series charts."""
+    await _maybe_autosync_sessions(db, force=sync_live)
+
+    bounded_hours = max(1, min(int(hours), 168))
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=bounded_hours)
+    hour_bucket = func.date_trunc("hour", AgentSession.started_at).label("hour")
+
+    hourly_stmt = (
+        select(
+            hour_bucket,
+            AgentSession.agent_id,
+            func.count(AgentSession.id).label("count"),
+        )
+        .where(AgentSession.started_at.is_not(None))
+        .where(AgentSession.started_at >= cutoff)
+    )
+    if not include_runtime_events:
+        hourly_stmt = hourly_stmt.where(AgentSession.session_type != "skill_exec")
+    if not include_cron_events:
+        hourly_stmt = hourly_stmt.where(AgentSession.session_type != "openclaw_cron")
+    if source_channel:
+        hourly_stmt = hourly_stmt.where(
+            AgentSession.metadata_json["openclaw_source_channel"].astext == source_channel
+        )
+    if status:
+        hourly_stmt = hourly_stmt.where(AgentSession.status == status)
+    if agent_id:
+        hourly_stmt = hourly_stmt.where(AgentSession.agent_id == agent_id)
+
+    result = await db.execute(
+        hourly_stmt
+        .group_by(hour_bucket, AgentSession.agent_id)
+        .order_by(hour_bucket.asc(), AgentSession.agent_id.asc())
+    )
+
+    items = [
+        {
+            "hour": row.hour.isoformat() if row.hour else None,
+            "agent_id": row.agent_id,
+            "count": int(row.count or 0),
+        }
+        for row in result.all()
+        if row.hour is not None
+    ]
+
+    return {
+        "hours": bounded_hours,
+        "timezone": "UTC",
+        "items": items,
+    }
+
+
 @router.post("/sessions")
 async def create_agent_session(request: Request, db: AsyncSession = Depends(get_db)):
     data = await request.json()
-    session = AgentSession(
-        id=uuid.uuid4(),
-        agent_id=data.get("agent_id", "main"),
-        session_type=data.get("session_type", "interactive"),
-        status="active",
-        metadata_json=data.get("metadata", {}),
-    )
+    status = str(data.get("status") or "active").strip().lower()
+    allowed_status = {"active", "completed", "ended", "error"}
+    if status not in allowed_status:
+        status = "active"
+
+    started_at = _parse_iso_dt(data.get("started_at"))
+    ended_at = _parse_iso_dt(data.get("ended_at"))
+    if status in {"completed", "ended", "error"} and ended_at is None:
+        ended_at = datetime.now(timezone.utc)
+
+    payload = {
+        "id": uuid.uuid4(),
+        "agent_id": data.get("agent_id", "main"),
+        "session_type": data.get("session_type", "interactive"),
+        "messages_count": int(data.get("messages_count") or 0),
+        "tokens_used": int(data.get("tokens_used") or 0),
+        "cost_usd": float(data.get("cost_usd") or 0),
+        "status": status,
+        "metadata_json": data.get("metadata", {}),
+    }
+    if started_at is not None:
+        payload["started_at"] = started_at
+    if ended_at is not None:
+        payload["ended_at"] = ended_at
+
+    session = AgentSession(**payload)
     db.add(session)
     await db.commit()
     return {"id": str(session.id), "created": True}
@@ -497,17 +714,41 @@ async def update_agent_session(
 @router.get("/sessions/stats")
 async def get_session_stats(
     sync_live: bool = False,
+    include_runtime_events: bool = False,
+    include_cron_events: bool = False,
+    source_channel: Optional[str] = None,
+    status: Optional[str] = None,
+    agent_id: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     litellm_db: AsyncSession = Depends(get_litellm_db),
 ):
     """Session statistics aligned with model-usage DB sources."""
     await _maybe_autosync_sessions(db, force=sync_live)
 
-    total = (await db.execute(select(func.count(AgentSession.id)))).scalar() or 0
-    active = (
-        await db.execute(
-            select(func.count(AgentSession.id)).where(AgentSession.status == "active")
+    session_filters = []
+    if not include_runtime_events:
+        session_filters.append(AgentSession.session_type != "skill_exec")
+    if not include_cron_events:
+        session_filters.append(AgentSession.session_type != "openclaw_cron")
+    if source_channel:
+        session_filters.append(
+            AgentSession.metadata_json["openclaw_source_channel"].astext == source_channel
         )
+    if status:
+        session_filters.append(AgentSession.status == status)
+    if agent_id:
+        session_filters.append(AgentSession.agent_id == agent_id)
+
+    total_stmt = select(func.count(AgentSession.id))
+    if session_filters:
+        total_stmt = total_stmt.where(*session_filters)
+    total = (await db.execute(total_stmt)).scalar() or 0
+
+    active_stmt = select(func.count(AgentSession.id)).where(AgentSession.status == "active")
+    if session_filters:
+        active_stmt = active_stmt.where(*session_filters)
+    active = (
+        await db.execute(active_stmt)
     ).scalar() or 0
     skill_tokens = (
         await db.execute(
@@ -540,21 +781,21 @@ async def get_session_stats(
     total_tokens = int(skill_tokens) + int(llm_totals["tokens"])
     total_cost = float(skill_cost) + float(llm_totals["cost"])
 
-    by_agent_sessions_result = await db.execute(
-        select(
-            AgentSession.agent_id,
-            func.count(AgentSession.id).label("sessions"),
-        )
-        .group_by(AgentSession.agent_id)
-        .order_by(func.count(AgentSession.id).desc())
+    by_agent_stmt = select(
+        AgentSession.agent_id,
+        func.count(AgentSession.id).label("sessions"),
     )
+    if session_filters:
+        by_agent_stmt = by_agent_stmt.where(*session_filters)
+    by_agent_stmt = by_agent_stmt.group_by(AgentSession.agent_id).order_by(func.count(AgentSession.id).desc())
+    by_agent_sessions_result = await db.execute(by_agent_stmt)
     by_agent_map: dict[str, dict[str, Any]] = {
         str(r[0]): {"agent_id": str(r[0]), "sessions": int(r[1] or 0), "tokens": 0, "cost": 0.0}
         for r in by_agent_sessions_result.all()
     }
 
     # Skill-side usage by linked session_id
-    by_agent_skill_usage = await db.execute(
+    usage_stmt = (
         select(
             AgentSession.agent_id,
             func.coalesce(func.sum(ModelUsage.input_tokens + ModelUsage.output_tokens), 0).label("tokens"),
@@ -562,8 +803,11 @@ async def get_session_stats(
         )
         .select_from(ModelUsage)
         .join(AgentSession, AgentSession.id == ModelUsage.session_id)
-        .group_by(AgentSession.agent_id)
     )
+    if session_filters:
+        usage_stmt = usage_stmt.where(*session_filters)
+    usage_stmt = usage_stmt.group_by(AgentSession.agent_id)
+    by_agent_skill_usage = await db.execute(usage_stmt)
     for r in by_agent_skill_usage.all():
         agent = str(r[0] or "unknown")
         if agent == "unknown":
@@ -645,20 +889,22 @@ async def get_session_stats(
         reverse=True,
     )
 
-    by_status_result = await db.execute(
-        select(
-            AgentSession.status,
-            func.count(AgentSession.id).label("count"),
-        ).group_by(AgentSession.status)
+    by_status_stmt = select(
+        AgentSession.status,
+        func.count(AgentSession.id).label("count"),
     )
+    if session_filters:
+        by_status_stmt = by_status_stmt.where(*session_filters)
+    by_status_result = await db.execute(by_status_stmt.group_by(AgentSession.status))
     by_status = [{"status": r[0], "count": r[1]} for r in by_status_result.all()]
 
-    by_type_result = await db.execute(
-        select(
-            AgentSession.session_type,
-            func.count(AgentSession.id).label("count"),
-        ).group_by(AgentSession.session_type)
+    by_type_stmt = select(
+        AgentSession.session_type,
+        func.count(AgentSession.id).label("count"),
     )
+    if session_filters:
+        by_type_stmt = by_type_stmt.where(*session_filters)
+    by_type_result = await db.execute(by_type_stmt.group_by(AgentSession.session_type))
     by_type = [{"type": r[0], "count": r[1]} for r in by_type_result.all()]
 
     return {

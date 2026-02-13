@@ -198,7 +198,7 @@ DB (PostgreSQL) ↔ SQLAlchemy ORM ↔ FastAPI (REST/GraphQL) ↔ api_client (ht
 ## 📁 Project Structure
 
 ```
-Aria_moltbot/
+aria/
 ├── aria_mind/                 # OpenClaw workspace (mounted to gateway)
 │   ├── SOUL.md                # Persona, boundaries, model preferences
 │   ├── IDENTITY.md            # Agent identity configuration
@@ -209,6 +209,11 @@ Aria_moltbot/
 │   ├── HEARTBEAT.md           # Scheduled task configuration
 │   ├── MEMORY.md              # Long-term curated knowledge
 │   ├── cron_jobs.yaml         # 13 scheduled cron jobs (6-field node-cron)
+│   ├── skills/                # Runtime skill runner + internal helper modules (_*)
+│   │   ├── run_skill.py       # OpenClaw/Python skill execution entrypoint
+│   │   ├── _skill_registry.py # Runtime registry composition
+│   │   ├── _tracking.py       # Session/model/skill invocation telemetry
+│   │   └── _coherence.py      # Skill contract/coherence checks
 │   └── soul/                  # Soul implementation
 │       ├── focus.py           # Focus personas + FocusManager
 │       ├── identity.py        # Core identity (never overridden)
@@ -230,8 +235,8 @@ Aria_moltbot/
 │   ├── loader.py              # YAML → Python model loader
 │   └── openclaw_config.py     # OpenClaw model integration
 │
-├── aria_memories/             # Persistent memory & knowledge
-│   ├── memory/                # Daily memory flushes
+├── aria_memories/             # Filesystem memory artifacts (operational context + exports)
+│   ├── memory/                # Canonical runtime snapshot context.json
 │   ├── moltbook/              # Social drafts & posts
 │   ├── archive/               # Historical records
 │   ├── knowledge/             # Knowledge base
@@ -398,6 +403,41 @@ Multi-agent orchestration with the CEO delegation pattern:
 
 ---
 
+## 🧭 Memory Architecture (Source of Truth)
+
+Aria uses **multiple memory planes** by design. They serve different purposes and should not be conflated.
+
+| Plane | Primary Store | Purpose | Source of Truth |
+|------|---------------|---------|-----------------|
+| **Relational Memory** | PostgreSQL (`aria_warehouse`) | Queryable application memory (working_memory, memories, thoughts, activities, goals) | ✅ Yes |
+| **Working Snapshot** | `aria_memories/memory/context.json` | Fast startup/context hydration for work cycles and OpenClaw runs | ✅ Canonical file snapshot |
+| **Legacy Compatibility Snapshot** | `aria_mind/skills/aria_memories/memory/context.json` | Backward compatibility for older runtime path assumptions | ⚠️ Transitional fallback only |
+| **Telemetry Memory** | `sessions`, `model_usage`, `skills/invocations` | Observability of what Aria executed and how often | ✅ Yes (for usage analytics) |
+
+### Working Memory Data Flow
+
+1. Skills write/read structured memory through FastAPI endpoints (`/working-memory`) into PostgreSQL.
+2. `working_memory.sync_to_files()` writes canonical snapshot context to `aria_memories/memory/context.json`.
+3. Dashboard page `/working-memory` shows:
+  - DB-backed working memory items/context/checkpoints
+  - file snapshot context (separate panel) for startup/runtime context
+4. API endpoint `/working-memory/file-snapshot` reads **canonical-first** and falls back to legacy only when canonical is missing.
+
+### Canonical vs Legacy Snapshot Policy
+
+- Canonical path: `aria_memories/memory/context.json`
+- Legacy mirror writes: **disabled by default**
+- Legacy prune: **enabled by default**
+
+Environment controls:
+
+- `ARIA_WM_WRITE_LEGACY_MIRROR=true` to temporarily re-enable legacy mirror writes
+- `ARIA_WM_PRUNE_LEGACY_SNAPSHOTS=true` to remove stale legacy snapshot files
+
+This policy prevents stale duplicate snapshots from masking current context while keeping compatibility fallback available during migration windows.
+
+---
+
 ## 🌐 API v3.0 — FastAPI + GraphQL
 
 Modular REST API with 18 routers, SQLAlchemy 2.0 async ORM, psycopg 3 driver, and Strawberry GraphQL:
@@ -420,7 +460,7 @@ Modular REST API with 18 routers, SQLAlchemy 2.0 async ORM, psycopg 3 driver, an
 | `records` | `/records` | General record management |
 | `admin` | `/admin`, `/soul` | Admin ops, soul file access, file browsers |
 | `models_config` | `/models/config`, `/models/pricing` | Model catalog from models.yaml |
-| `working_memory` | `/working-memory` | Working memory storage |
+| `working_memory` | `/working-memory` | Working memory CRUD, context ranking, checkpointing, file-snapshot visibility |
 | `skills` | `/skills` | Skill registry + seed endpoint |
 
 **Security middleware:** Rate limiting (per-IP), prompt injection scanning, SQL/XSS/path traversal detection, security headers on all responses.
@@ -438,7 +478,7 @@ Flask + Jinja2 dashboard with Chart.js visualizations, tabbed layouts, and auto-
 | **Dashboard** | Overview stats, service status, host metrics |
 | **Models** | LiteLLM models, wallets, 4 charts, spend tracking |
 | **Model Usage** | 3 tabs (Overview/LLM Models/Skills), usage analytics |
-| **Sessions** | 3 tabs (Overview/By Agent/Recent), 24h stacked bar chart |
+| **Sessions** | 3 tabs (Overview/By Agent/Recent), 24h stacked bar chart, `Show cron sessions` toggle (default clean view) |
 | **Goals** | Main goals + hourly goals tabs, 7-day stacked bar chart |
 | **Skills** | Skill registry with seed button, status overview |
 | **Performance** | 2 tabs (Reviews/Tasks), review periods chart |
@@ -448,7 +488,7 @@ Flask + Jinja2 dashboard with Chart.js visualizations, tabbed layouts, and auto-
 | **Heartbeat** | Heartbeat history + health indicators |
 | **Security** | Threat detection log, security events |
 | **API Key Rotations** | Key rotation tracking |
-| **Working Memory** | Context, checkpoints, item management |
+| **Working Memory** | DB context + checkpoint management + file snapshot path/mode visibility |
 | **Knowledge** | Knowledge graph entities + relations |
 | **Social** | Social posts, Moltbook integration |
 | **Activities** | Activity log with filtering |

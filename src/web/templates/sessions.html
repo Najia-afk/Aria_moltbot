@@ -7,6 +7,12 @@
     .filter-select { padding: 10px 14px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); cursor: pointer; font-size: 13px; }
     .search-box { flex: 1; min-width: 200px; padding: 10px 14px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); font-size: 13px; }
     .search-box:focus { outline: none; border-color: var(--accent-blue); }
+    .inline-toggle { display: inline-flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: 12px; user-select: none; }
+    .inline-toggle input { accent-color: var(--accent-primary); }
+    .sync-meta { color: var(--text-muted); font-size: 12px; margin-left: auto; }
+    .sync-meta.fresh { color: var(--success); }
+    .sync-meta.stale { color: #f59e0b; }
+    .sync-meta.error { color: var(--danger); }
 
     /* Tabs */
     .tabs { display: flex; gap: 0; margin-bottom: 25px; border-bottom: 2px solid var(--border-color); }
@@ -73,6 +79,17 @@
     <select class="filter-select" id="agent-filter">
         <option value="">All Agents</option>
     </select>
+    <select class="filter-select" id="channel-filter">
+        <option value="">All Channels</option>
+        <option value="webchat">webchat</option>
+        <option value="whatsapp">whatsapp</option>
+        <option value="heartbeat">heartbeat</option>
+    </select>
+    <label class="inline-toggle" title="Show OpenClaw cron sessions in the dashboard">
+        <input type="checkbox" id="cron-toggle">
+        Show cron sessions
+    </label>
+    <span class="sync-meta" id="sync-meta">Data sync: —</span>
     <input type="text" class="search-box" id="search-input" placeholder="Search by session or agent...">
     <button class="btn btn-primary" onclick="loadSessionDashboard()">Refresh</button>
 </div>
@@ -177,6 +194,8 @@
             <tr>
                 <th>Session ID</th>
                 <th>Agent</th>
+                <th>Label</th>
+                <th>Channel</th>
                 <th>Type</th>
                 <th>Status</th>
                 <th>Tokens</th>
@@ -200,8 +219,14 @@
 // ── Globals ─────────────────────────────────────────────────────────────────
 let _stats = null;
 let _sessions = [];
+let _hourly = [];
 let _charts = {};
 let sessionsPager;
+
+function includeCronEvents() {
+    const el = document.getElementById('cron-toggle');
+    return Boolean(el && el.checked);
+}
 
 // ── Tabs ────────────────────────────────────────────────────────────────────
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -229,7 +254,15 @@ function fmtDuration(startStr, endStr) {
 // ── Load Stats ──────────────────────────────────────────────────────────────
 async function loadSessionStats() {
     try {
-        _stats = await fetchAriaData(`${API_BASE_URL}/sessions/stats`);
+        const includeCron = includeCronEvents();
+        const channel = document.getElementById('channel-filter').value;
+        const status = document.getElementById('status-filter').value;
+        const agent = document.getElementById('agent-filter').value;
+        let url = `${API_BASE_URL}/sessions/stats?include_cron_events=${includeCron ? 'true' : 'false'}`;
+        if (channel) url += `&source_channel=${encodeURIComponent(channel)}`;
+        if (status) url += `&status=${encodeURIComponent(status)}`;
+        if (agent) url += `&agent_id=${encodeURIComponent(agent)}`;
+        _stats = await fetchAriaData(url);
         renderSessionOverview();
         renderAgentTab();
             populateAgentFilter();
@@ -244,20 +277,75 @@ async function loadSessionStats() {
 // ── Load Sessions ───────────────────────────────────────────────────────────
 async function loadSessions(page = 1, limit = 50) {
     const status = document.getElementById('status-filter').value;
-        const agent = document.getElementById('agent-filter').value;
+    const agent = document.getElementById('agent-filter').value;
+    const channel = document.getElementById('channel-filter').value;
+    const includeCron = includeCronEvents();
     let url = `${API_BASE_URL}/sessions?limit=${limit}&page=${page}`;
     if (status) url += `&status=${status}`;
-        if (agent) url += `&agent_id=${encodeURIComponent(agent)}`;
+    if (agent) url += `&agent_id=${encodeURIComponent(agent)}`;
+    if (channel) url += `&source_channel=${encodeURIComponent(channel)}`;
+    url += `&include_cron_events=${includeCron ? 'true' : 'false'}`;
     try {
         const data = await fetchAriaData(url);
         _sessions = data.items || data.sessions || [];
+        updateSyncMeta();
         renderRecent();
-        renderHourlyChart();
         if (sessionsPager && data.pages) sessionsPager.update(data);
     } catch (e) {
         console.error('Sessions error:', e);
         showErrorState('#sessions-body',
             'Could not load sessions — ' + e.message, () => loadSessions(page, limit));
+        const target = document.getElementById('sync-meta');
+        if (target) {
+            target.classList.remove('fresh', 'stale');
+            target.classList.add('error');
+            target.textContent = 'Data sync: unavailable';
+        }
+    }
+}
+
+function updateSyncMeta() {
+    const target = document.getElementById('sync-meta');
+    if (!target) return;
+    target.classList.remove('fresh', 'stale', 'error');
+    let latest = null;
+    for (const row of _sessions || []) {
+        const ts = row?.metadata?.synced_at;
+        if (!ts) continue;
+        const dt = new Date(ts);
+        if (!Number.isNaN(dt.getTime()) && (!latest || dt > latest)) {
+            latest = dt;
+        }
+    }
+    if (!latest) {
+        target.textContent = `Data sync: — · rows ${(_sessions || []).length}`;
+        return;
+    }
+    const ageMs = Date.now() - latest.getTime();
+    const freshWindowMs = 60 * 1000;
+    if (ageMs <= freshWindowMs) {
+        target.classList.add('fresh');
+    } else {
+        target.classList.add('stale');
+    }
+    target.textContent = `Data sync: ${latest.toLocaleString()} · rows ${(_sessions || []).length}`;
+}
+
+async function loadHourlySeries(hours = 24) {
+    try {
+        const includeCron = includeCronEvents();
+        const channel = document.getElementById('channel-filter').value;
+        const status = document.getElementById('status-filter').value;
+        const agent = document.getElementById('agent-filter').value;
+        let url = `${API_BASE_URL}/sessions/hourly?hours=${hours}&include_cron_events=${includeCron ? 'true' : 'false'}`;
+        if (channel) url += `&source_channel=${encodeURIComponent(channel)}`;
+        if (status) url += `&status=${encodeURIComponent(status)}`;
+        if (agent) url += `&agent_id=${encodeURIComponent(agent)}`;
+        const data = await fetchAriaData(url);
+        _hourly = data.items || [];
+        renderHourlyChart();
+    } catch (e) {
+        console.error('Hourly series error:', e);
     }
 }
 
@@ -416,6 +504,8 @@ function renderRecent() {
             <tr>
                 <td><code style="font-size:11px">${s.id.slice(0,8)}...</code></td>
                 <td><span class="agent-badge">🤖 ${s.agent_id}</span></td>
+                <td>${(s.metadata?.openclaw_session?.label || s.metadata?.label || '-')}</td>
+                <td>${(s.source_channel || s.metadata?.openclaw_source_channel || s.metadata?.openclaw_session?.channel || '-')}</td>
                 <td><span class="type-badge">${s.session_type}</span></td>
                 <td><span class="status-badge ${s.status}">${s.status}</span></td>
                 <td>${s.tokens_used ? formatNumber(s.tokens_used) : '-'}</td>
@@ -425,7 +515,7 @@ function renderRecent() {
             </tr>
         `).join('');
     } else {
-        body.innerHTML = '<tr><td colspan="8" class="empty-state">No sessions found</td></tr>';
+        body.innerHTML = '<tr><td colspan="10" class="empty-state">No sessions found</td></tr>';
     }
 }
 
@@ -433,30 +523,40 @@ function renderRecent() {
 // 24H HOURLY CHART BY AGENT
 // ════════════════════════════════════════════════════════════════════════════
 function renderHourlyChart() {
-    if (!_sessions || _sessions.length === 0) return;
+    if (!_hourly || _hourly.length === 0) return;
     const now = new Date();
-    const cutoff = new Date(now.getTime() - 24 * 3600000);
-    const recent = _sessions.filter(s => s.started_at && new Date(s.started_at) >= cutoff);
-    const agents = [...new Set(recent.map(s => s.agent_id))];
+    const currentUtcHour = new Date(Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate(),
+        now.getUTCHours(),
+        0,
+        0,
+        0
+    ));
+    const agents = [...new Set(_hourly.map(row => row.agent_id).filter(Boolean))];
     const agentColors = ['#3b82f6','#22c55e','#a855f7','#f59e0b','#ef4444','#ec4899','#06b6d4','#84cc16'];
 
-    // Build 24 hourly buckets from now backwards
+    // Build 24 UTC hourly buckets from now backwards
     const hours = [];
     for (let i = 23; i >= 0; i--) {
-        const h = new Date(now.getTime() - i * 3600000);
+        const h = new Date(currentUtcHour.getTime() - i * 3600000);
         hours.push({
-            label: h.toLocaleTimeString('en', { hour: '2-digit', hour12: false }) + ':00',
-            start: new Date(h.getFullYear(), h.getMonth(), h.getDate(), h.getHours()),
-            end:   new Date(h.getFullYear(), h.getMonth(), h.getDate(), h.getHours() + 1),
+            key: h.toISOString().slice(0, 13),
+            label: `${String(h.getUTCHours()).padStart(2, '0')}:00`,
         });
     }
+
+    const counts = new Map();
+    _hourly.forEach(row => {
+        if (!row || !row.hour || !row.agent_id) return;
+        const key = `${new Date(row.hour).toISOString().slice(0, 13)}|${row.agent_id}`;
+        counts.set(key, Number(row.count || 0));
+    });
+
     const datasets = agents.map((agent, idx) => ({
         label: agent,
-        data: hours.map(h => recent.filter(s =>
-            s.agent_id === agent &&
-            new Date(s.started_at) >= h.start &&
-            new Date(s.started_at) < h.end
-        ).length),
+        data: hours.map(h => counts.get(`${h.key}|${agent}`) || 0),
         backgroundColor: agentColors[idx % agentColors.length],
         borderRadius: 3,
     }));
@@ -470,11 +570,14 @@ async function loadSessionDashboard() {
     await AriaModels.init();
     loadSessionStats();
     loadSessions();
+    loadHourlySeries(24);
 }
 
-document.getElementById('status-filter').addEventListener('change', () => loadSessions());
-document.getElementById('agent-filter').addEventListener('change', () => loadSessions());
+document.getElementById('status-filter').addEventListener('change', () => loadSessionDashboard());
+document.getElementById('agent-filter').addEventListener('change', () => loadSessionDashboard());
+document.getElementById('channel-filter').addEventListener('change', () => loadSessionDashboard());
 document.getElementById('search-input').addEventListener('input', renderRecent);
+document.getElementById('cron-toggle').addEventListener('change', () => loadSessionDashboard());
 
 sessionsPager = new AriaPagination('sessions-pagination', {
     onPageChange: (page, limit) => loadSessions(page, limit),
