@@ -10,22 +10,36 @@ VAULT_DIR="${HOME}/aria_vault"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 KEEP_DAYS=14
 DB_CONTAINER="aria-db"
-DB_USER="${DB_USER:-admin}"
+
+# Source environment from stacks/brain/.env when available
+ENV_FILE="${ARIA_DIR}/stacks/brain/.env"
+if [ -f "${ENV_FILE}" ]; then
+    while IFS='=' read -r key value; do
+        [[ "$key" =~ ^#.*$ || -z "$key" || "$value" == *" "* ]] && continue
+        export "$key=$value"
+    done < <(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "${ENV_FILE}" | sed 's/\r$//')
+fi
+
+DB_USER="${DB_USER:-aria_admin}"
 
 mkdir -p "${VAULT_DIR}"
 
 echo "[$(date -Iseconds)] Backup starting..."
 
 # 1. aria_warehouse (Aria tables)
+TMP_ARIA_WAREHOUSE="${VAULT_DIR}/.aria_warehouse_${TIMESTAMP}.sql.gz.tmp"
 docker exec "${DB_CONTAINER}" pg_dump -U "${DB_USER}" -d aria_warehouse \
     --no-owner --no-acl --clean --if-exists \
-    | gzip > "${VAULT_DIR}/aria_warehouse_${TIMESTAMP}.sql.gz"
+    | gzip > "${TMP_ARIA_WAREHOUSE}"
+mv "${TMP_ARIA_WAREHOUSE}" "${VAULT_DIR}/aria_warehouse_${TIMESTAMP}.sql.gz"
 echo "[$(date -Iseconds)] aria_warehouse: $(du -h "${VAULT_DIR}/aria_warehouse_${TIMESTAMP}.sql.gz" | cut -f1)"
 
 # 2. litellm (LLM proxy data)
+TMP_LITELLM="${VAULT_DIR}/.litellm_${TIMESTAMP}.sql.gz.tmp"
 docker exec "${DB_CONTAINER}" pg_dump -U "${DB_USER}" -d litellm \
     --no-owner --no-acl --clean --if-exists \
-    | gzip > "${VAULT_DIR}/litellm_${TIMESTAMP}.sql.gz"
+    | gzip > "${TMP_LITELLM}"
+mv "${TMP_LITELLM}" "${VAULT_DIR}/litellm_${TIMESTAMP}.sql.gz"
 echo "[$(date -Iseconds)] litellm: $(du -h "${VAULT_DIR}/litellm_${TIMESTAMP}.sql.gz" | cut -f1)"
 
 # 3. aria_memories snapshot
