@@ -72,7 +72,12 @@ async def api_activities(
         {
             "id": str(a.id),
             "type": a.action,
+            "action": a.action,
+            "skill": a.skill,
+            "success": bool(a.success),
+            "status": "ok" if a.success else "error",
             "description": _extract_description(a.details),
+            "details": a.details,
             "created_at": a.created_at.isoformat() if a.created_at else None,
         }
         for a in rows

@@ -3,99 +3,74 @@
 
 {% block extra_css %}
 <style>
-    .page-controls {
-        display: flex;
-        gap: 15px;
-        margin-bottom: 25px;
-        flex-wrap: wrap;
-    }
+    .page-controls { display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; align-items: center; }
     .search-box {
         flex: 1;
-        min-width: 250px;
-        padding: 12px 16px;
+        min-width: 220px;
+        padding: 10px 14px;
         background: var(--bg-secondary);
         border: 1px solid var(--border-color);
         border-radius: 8px;
         color: var(--text-primary);
-        font-size: 14px;
+        font-size: 13px;
     }
-    .search-box:focus {
-        outline: none;
-        border-color: var(--accent-blue);
-    }
+    .search-box:focus { outline: none; border-color: var(--accent-blue); }
     .filter-select {
-        padding: 12px 16px;
+        padding: 10px 14px;
         background: var(--bg-secondary);
         border: 1px solid var(--border-color);
         border-radius: 8px;
         color: var(--text-primary);
         cursor: pointer;
+        font-size: 13px;
     }
+    .sync-meta { margin-left: auto; font-size: 12px; color: var(--text-muted); }
+
     .data-table {
         width: 100%;
         background: var(--bg-secondary);
-        border-radius: 12px;
-        overflow: hidden;
         border: 1px solid var(--border-color);
+        border-radius: 12px;
+        border-collapse: collapse;
+        overflow: hidden;
     }
-    .data-table th, .data-table td {
-        padding: 15px;
-        text-align: left;
-        border-bottom: 1px solid var(--border-color);
-    }
+    .data-table th, .data-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border-color); }
     .data-table th {
         background: rgba(0,0,0,0.2);
         font-weight: 600;
         color: var(--text-secondary);
-        font-size: 12px;
+        font-size: 11px;
         text-transform: uppercase;
+        letter-spacing: 0.03em;
     }
-    .data-table tr:hover {
-        background: rgba(0,212,255,0.05);
-    }
-    .data-table tr:last-child td {
-        border-bottom: none;
-    }
-    .activity-type {
-        display: inline-block;
-        padding: 4px 10px;
-        border-radius: 15px;
-        font-size: 12px;
-        font-weight: 500;
-    }
-    .activity-type.action { background: rgba(34,197,94,0.2); color: var(--success); }
-    .activity-type.thought { background: rgba(168,85,247,0.2); color: #a855f7; }
-    .activity-type.event { background: rgba(59,130,246,0.2); color: #3b82f6; }
-    .activity-type.error { background: rgba(239,68,68,0.2); color: var(--danger); }
-    .empty-state {
-        text-align: center;
-        padding: 60px 20px;
-        color: var(--text-secondary);
-    }
-    .empty-state svg {
-        width: 64px;
-        height: 64px;
-        margin-bottom: 20px;
-        opacity: 0.5;
-    }
+    .data-table tr:hover { background: rgba(0,212,255,0.04); }
+    .data-table tr:last-child td { border-bottom: none; }
+
+    .status-pill { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; }
+    .status-pill.ok { background: rgba(34,197,94,0.2); color: var(--success); }
+    .status-pill.err { background: rgba(239,68,68,0.2); color: var(--danger); }
+    .status-pill.unk { background: rgba(100,100,100,0.2); color: var(--text-muted); }
+
+    .time-col { white-space: nowrap; color: var(--text-secondary); font-size: 12px; }
+    .desc-col { max-width: 640px; word-break: break-word; }
+    .empty-state { text-align: center; padding: 26px 16px; color: var(--text-secondary); }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="page-header">
     <h1>⚡ Activities</h1>
-    <p>View and search Aria's activities and actions</p>
+    <p>Real-time activity feed for Aria execution events</p>
 </div>
 
 <div class="page-controls">
-    <input type="text" class="search-box" id="search-input" placeholder="Search activities...">
-    <select class="filter-select" id="type-filter">
-        <option value="">All Types</option>
-        <option value="action">Actions</option>
-        <option value="thought">Thoughts</option>
-        <option value="event">Events</option>
-        <option value="error">Errors</option>
+    <input type="text" class="search-box" id="search-input" placeholder="Search action / skill / description...">
+    <select class="filter-select" id="status-filter">
+        <option value="">All Status</option>
+        <option value="ok">OK</option>
+        <option value="error">Error</option>
     </select>
+    <span class="sync-meta" id="sync-meta">Data sync: —</span>
     <button class="btn btn-primary" onclick="loadActivities()">Refresh</button>
 </div>
 
@@ -103,14 +78,15 @@
     <table class="data-table" id="activities-table">
         <thead>
             <tr>
-                <th>ID</th>
-                <th>Type</th>
+                <th>Time</th>
+                <th>Action</th>
+                <th>Skill</th>
+                <th>Status</th>
                 <th>Description</th>
-                <th>Timestamp</th>
             </tr>
         </thead>
         <tbody id="activities-body">
-            <tr><td colspan="4" class="empty-state">Loading...</td></tr>
+            <tr><td colspan="5" class="empty-state">Loading...</td></tr>
         </tbody>
     </table>
     <div id="activities-pagination"></div>
@@ -122,21 +98,31 @@
     let allActivities = [];
     let activitiesPager;
 
+    function esc(v) {
+        return String(v ?? '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#39;');
+    }
+
     function loadActivities(page = 1, limit = 25) {
-        document.getElementById('activities-body').innerHTML = '<tr><td colspan="4" class="empty-state">Loading...</td></tr>';
-        
+        document.getElementById('activities-body').innerHTML = '<tr><td colspan="5" class="empty-state">Loading...</td></tr>';
+
         fetch(`${window.ARIA_API_BASE_URL}/activities?limit=${limit}&page=${page}`)
             .then(r => r.json())
             .then(data => {
                 allActivities = data.items || data;
                 renderActivities(allActivities);
                 if (activitiesPager && data.pages) activitiesPager.update(data);
+                document.getElementById('sync-meta').textContent = `Data sync: ${new Date().toLocaleTimeString()}`;
             })
             .catch(e => {
                 document.getElementById('activities-body').innerHTML = `
-                    <tr><td colspan="4" class="empty-state">
+                    <tr><td colspan="5" class="empty-state">
                         <div>Could not load activities</div>
-                        <div style="font-size:12px;margin-top:10px">${e.message}</div>
+                        <div style="font-size:12px;margin-top:10px">${esc(e.message)}</div>
                     </td></tr>`;
             });
     }
@@ -144,23 +130,32 @@
     function renderActivities(data) {
         if (!data || data.length === 0) {
             document.getElementById('activities-body').innerHTML = `
-                <tr><td colspan="4" class="empty-state">
-                    <svg fill="currentColor" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 4.995z"/></svg>
+                <tr><td colspan="5" class="empty-state">
                     <div>No activities found</div>
-                    <div style="font-size:14px;margin-top:10px">Aria hasn't recorded any activities yet</div>
+                    <div style="font-size:12px;margin-top:8px">No events in this filter window.</div>
                 </td></tr>`;
             return;
         }
 
         let html = '';
         data.forEach(a => {
-            const d = a.created_at ? new Date(a.created_at).toLocaleString() : '-';
-            const typeClass = (a.type || 'event').toLowerCase();
+            const timeText = a.created_at ? new Date(a.created_at).toLocaleString() : '-';
+            const action = a.action || a.type || '-';
+            const skill = a.skill || '-';
+            const statusRaw = (a.status || (a.success ? 'ok' : 'error') || 'unknown').toLowerCase();
+            const statusLabel = statusRaw === 'ok' ? 'OK' : (statusRaw === 'error' ? 'Error' : 'Unknown');
+            const statusClass = statusRaw === 'ok' ? 'ok' : (statusRaw === 'error' ? 'err' : 'unk');
+            let description = a.description || '';
+            if (!description && a.details) {
+                try { description = typeof a.details === 'string' ? a.details : JSON.stringify(a.details); }
+                catch { description = String(a.details); }
+            }
             html += `<tr>
-                <td>${a.id}</td>
-                <td><span class="activity-type ${typeClass}">${a.type || 'event'}</span></td>
-                <td>${a.description || '-'}</td>
-                <td>${d}</td>
+                <td class="time-col">${esc(timeText)}</td>
+                <td>${esc(action)}</td>
+                <td>${esc(skill)}</td>
+                <td><span class="status-pill ${statusClass}">${statusLabel}</span></td>
+                <td class="desc-col">${esc(description || '-')}</td>
             </tr>`;
         });
         document.getElementById('activities-body').innerHTML = html;
@@ -168,26 +163,27 @@
 
     function filterActivities() {
         const search = document.getElementById('search-input').value.toLowerCase();
-        const typeFilter = document.getElementById('type-filter').value;
-        
+        const statusFilter = document.getElementById('status-filter').value;
+
         let filtered = allActivities;
-        
+
         if (search) {
-            filtered = filtered.filter(a => 
-                (a.description && a.description.toLowerCase().includes(search)) ||
-                (a.type && a.type.toLowerCase().includes(search))
+            filtered = filtered.filter(a =>
+                (a.description && String(a.description).toLowerCase().includes(search)) ||
+                (a.action && String(a.action).toLowerCase().includes(search)) ||
+                (a.skill && String(a.skill).toLowerCase().includes(search))
             );
         }
-        
-        if (typeFilter) {
-            filtered = filtered.filter(a => a.type === typeFilter);
+
+        if (statusFilter) {
+            filtered = filtered.filter(a => (a.status || (a.success ? 'ok' : 'error')) === statusFilter);
         }
-        
+
         renderActivities(filtered);
     }
 
     document.getElementById('search-input').addEventListener('input', filterActivities);
-    document.getElementById('type-filter').addEventListener('change', filterActivities);
+    document.getElementById('status-filter').addEventListener('change', filterActivities);
 
     activitiesPager = new AriaPagination('activities-pagination', {
         onPageChange: (page, limit) => loadActivities(page, limit),
