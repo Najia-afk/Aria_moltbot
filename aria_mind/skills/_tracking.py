@@ -6,7 +6,8 @@ import json
 import logging
 import os
 
-_API_BASE = os.environ.get("ARIA_API_URL", "http://aria-api:8000/api").rstrip("/")
+_API_BASE = (os.environ.get("ARIA_API_URL") or "").rstrip("/")
+_API_PATH = (os.environ.get("ARIA_API_PATH") or "").strip()
 
 try:
     import httpx  # type: ignore[import-not-found]
@@ -18,19 +19,52 @@ except ImportError:
 _tracker_log = logging.getLogger("aria.skill_tracker")
 
 
+def _api_base_candidates() -> list[str]:
+    seen = set()
+    candidates = []
+
+    def _add(base: str):
+        b = (base or "").rstrip("/")
+        if b and b not in seen:
+            seen.add(b)
+            candidates.append(b)
+
+    if not _API_BASE:
+        return []
+
+    _add(_API_BASE)
+    if _API_PATH:
+        _add(f"{_API_BASE}/{_API_PATH.strip('/')}")
+    if _API_BASE.endswith("/api"):
+        _add(_API_BASE[:-4])
+    else:
+        _add(f"{_API_BASE}/api")
+
+    return candidates
+
+
 async def _api_post(endpoint: str, payload: dict) -> bool:
     """Fire-and-forget POST to aria-api. Returns True on success."""
     if not _HAS_HTTPX:
         _tracker_log.debug("httpx not installed — skipping tracking POST")
         return False
-    try:
-        async with httpx.AsyncClient(timeout=5) as client:
-            resp = await client.post(f"{_API_BASE}{endpoint}", json=payload)
-            resp.raise_for_status()
-            return True
-    except Exception as exc:
-        _tracker_log.debug("Tracking POST %s failed: %s", endpoint, exc)
+    bases = _api_base_candidates()
+    if not bases:
+        _tracker_log.debug("ARIA_API_URL is not set — skipping tracking POST %s", endpoint)
         return False
+
+    last_exc = None
+    async with httpx.AsyncClient(timeout=5) as client:
+        for base in bases:
+            try:
+                resp = await client.post(f"{base}{endpoint}", json=payload)
+                resp.raise_for_status()
+                return True
+            except Exception as exc:
+                last_exc = exc
+                continue
+    _tracker_log.debug("Tracking POST %s failed: %s", endpoint, last_exc)
+    return False
 
 
 def _log_locally(event_type: str, data: dict) -> None:
@@ -100,3 +134,18 @@ async def _log_skill_invocation(
     ok = await _api_post("/skills/invocations", payload)
     if not ok:
         _log_locally("skill_invocation", payload)
+
+    activity_payload = {
+        "action": f"skill.{function_name}",
+        "skill": skill_name,
+        "success": success,
+        "error_message": error_msg,
+        "details": {
+            "function": function_name,
+            "duration_ms": round(duration_ms, 2),
+            "source": "run_skill",
+        },
+    }
+    activity_ok = await _api_post("/activities", activity_payload)
+    if not activity_ok:
+        _log_locally("activity", activity_payload)
