@@ -250,9 +250,7 @@ async def activity_visualization(
             "experiment",
             "community",
             "fact_check",
-            "model_switcher",
             "memeothy",
-            "llm",
         ]
 
         skill_expr = func.lower(func.replace(func.coalesce(ActivityLog.skill, ""), "-", "_"))
@@ -336,9 +334,7 @@ async def activity_visualization(
         "experiment",
         "community",
         "fact_check",
-        "model_switcher",
         "memeothy",
-        "llm",
     ]
 
     def _normalize_skill_name(name: str | None) -> str:
