@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% block title %}Creative Pulse{% endblock %}
+
+{% block extra_css %}
+<style>
+    .page-controls { display:flex; gap:12px; margin-bottom:18px; flex-wrap:wrap; align-items:center; }
+    .filter-select { padding:10px 14px; background: var(--bg-secondary); border:1px solid var(--border-color); border-radius:8px; color: var(--text-primary); font-size:13px; }
+    .stats-grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin-bottom:20px; }
+    .stat-card { background: var(--bg-secondary); border:1px solid var(--border-color); border-radius:10px; padding:16px; }
+    .stat-card h4 { margin:0 0 6px; font-size:11px; text-transform: uppercase; color: var(--text-muted); }
+    .stat-card .value { font-size:24px; font-weight:700; color:var(--text-primary); }
+    .chart-grid { display:grid; grid-template-columns: 1fr 1fr; gap:18px; margin-bottom:20px; }
+    .chart-card { background: var(--bg-secondary); border:1px solid var(--border-color); border-radius:12px; padding:16px; }
+    .chart-card h4 { margin:0 0 10px; font-size:13px; color:var(--text-secondary); }
+    .chart-card canvas { max-height:280px; }
+    .chart-empty {
+        min-height: 220px;
+        border: 1px dashed var(--border-color);
+        border-radius: 10px;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-muted);
+        font-size: 13px;
+    }
+    .chart-empty.visible { display: flex; }
+    .data-table { width:100%; background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:12px; border-collapse: collapse; overflow:hidden; }
+    .data-table th, .data-table td { padding:10px 12px; font-size:13px; text-align:left; border-bottom:1px solid var(--border-color); }
+    .data-table th { font-size:11px; text-transform:uppercase; color:var(--text-secondary); background: rgba(0,0,0,0.2); }
+    .status-pill { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; }
+    .status-pill.ok { background: rgba(34,197,94,0.2); color: var(--success); }
+    .status-pill.err { background: rgba(239,68,68,0.2); color: var(--danger); }
+    .sync-meta { margin-left:auto; font-size:12px; color:var(--text-muted); }
+    @media (max-width: 900px) { .chart-grid { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>✨ Creative Pulse</h1>
+    <p>Live view of what Aria is doing: activity flow, top actions, top skills, and recent execution feed.</p>
+</div>
+
+<div class="page-controls">
+    <select id="hours-filter" class="filter-select">
+        <option value="6">Last 6 Hours</option>
+        <option value="12">Last 12 Hours</option>
+        <option value="24" selected>Last 24 Hours</option>
+        <option value="72">Last 3 Days</option>
+    </select>
+    <button class="btn btn-primary" onclick="loadCreativePulse()">Refresh</button>
+    <span id="sync-meta" class="sync-meta">Data sync: —</span>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card"><h4>Total Events</h4><div id="stat-total" class="value">-</div></div>
+    <div class="stat-card"><h4>Successful</h4><div id="stat-success" class="value">-</div></div>
+    <div class="stat-card"><h4>Failed</h4><div id="stat-fail" class="value">-</div></div>
+    <div class="stat-card"><h4>Success Rate</h4><div id="stat-rate" class="value">-</div></div>
+</div>
+
+<div class="chart-grid">
+    <div class="chart-card" id="hourly-card">
+        <h4>⏱️ Activity by Hour</h4>
+        <canvas id="hourly-chart"></canvas>
+        <div id="hourly-empty" class="chart-empty">No hourly activity data in selected window.</div>
+    </div>
+    <div class="chart-card" id="actions-card">
+        <h4>🎯 Top Actions</h4>
+        <canvas id="actions-chart"></canvas>
+        <div id="actions-empty" class="chart-empty">No action data in selected window.</div>
+    </div>
+</div>
+
+<div class="chart-card" style="margin-bottom:20px;" id="skills-card">
+    <h4>🔧 Top Skills</h4>
+    <canvas id="skills-chart"></canvas>
+    <div id="skills-empty" class="chart-empty">No skill data in selected window.</div>
+</div>
+
+<h3 style="margin:0 0 10px;">Recent Activity Feed</h3>
+<table class="data-table">
+    <thead>
+        <tr><th>Time</th><th>Action</th><th>Skill</th><th>Status</th><th>Description</th></tr>
+    </thead>
+    <tbody id="recent-body">
+        <tr><td colspan="5">Loading...</td></tr>
+    </tbody>
+</table>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script data-page-script>
+let _charts = {};
+
+function destroyChart(id) {
+    if (_charts[id]) {
+        _charts[id].destroy();
+        _charts[id] = null;
+    }
+}
+
+function fmtPct(n) { return `${Math.round(n)}%`; }
+
+function setChartVisibility(canvasId, emptyId, hasData) {
+    const canvas = document.getElementById(canvasId);
+    const empty = document.getElementById(emptyId);
+    if (!canvas || !empty) return;
+    canvas.style.display = hasData ? 'block' : 'none';
+    empty.classList.toggle('visible', !hasData);
+}
+
+function renderRecent(rows) {
+    const body = document.getElementById('recent-body');
+    if (!rows || !rows.length) {
+        body.innerHTML = '<tr><td colspan="5">No activity in selected window.</td></tr>';
+        return;
+    }
+    body.innerHTML = rows.map(row => {
+        const statusClass = row.success ? 'ok' : 'err';
+        const statusText = row.success ? 'OK' : 'Error';
+        const time = row.created_at ? new Date(row.created_at).toLocaleString() : '-';
+        return `<tr>
+            <td>${time}</td>
+            <td>${row.action || '-'}</td>
+            <td>${row.skill || '-'}</td>
+            <td><span class="status-pill ${statusClass}">${statusText}</span></td>
+            <td>${(row.description || '').slice(0, 180)}</td>
+        </tr>`;
+    }).join('');
+}
+
+function renderCharts(data) {
+    destroyChart('hourly');
+    destroyChart('actions');
+    destroyChart('skills');
+
+    const hourlyData = data.hourly || [];
+    const actionData = data.actions || [];
+    const skillData = data.skills || [];
+
+    setChartVisibility('hourly-chart', 'hourly-empty', hourlyData.length > 0);
+    setChartVisibility('actions-chart', 'actions-empty', actionData.length > 0);
+    setChartVisibility('skills-chart', 'skills-empty', skillData.length > 0);
+
+    if (hourlyData.length > 0) {
+        const hourlyLabels = hourlyData.map(x => new Date(x.hour).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}));
+        const hourlyValues = hourlyData.map(x => x.count);
+        _charts.hourly = new Chart(document.getElementById('hourly-chart'), {
+            type: 'line',
+            data: { labels: hourlyLabels, datasets: [{ label: 'Events', data: hourlyValues, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.2)', fill: true, tension: 0.25 }] },
+            options: { responsive: true, plugins: { legend: { display: false } } }
+        });
+    }
+
+    if (actionData.length > 0) {
+        const actionLabels = actionData.map(x => x.action);
+        const actionValues = actionData.map(x => x.count);
+        _charts.actions = new Chart(document.getElementById('actions-chart'), {
+            type: 'bar',
+            data: { labels: actionLabels, datasets: [{ label: 'Count', data: actionValues, backgroundColor: 'rgba(99,102,241,0.7)' }] },
+            options: { responsive: true, plugins: { legend: { display: false } } }
+        });
+    }
+
+    if (skillData.length > 0) {
+        const skillLabels = skillData.map(x => x.skill);
+        const skillValues = skillData.map(x => x.count);
+        _charts.skills = new Chart(document.getElementById('skills-chart'), {
+            type: 'bar',
+            data: { labels: skillLabels, datasets: [{ label: 'Count', data: skillValues, backgroundColor: 'rgba(16,185,129,0.7)' }] },
+            options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: false } } }
+        });
+    }
+}
+
+async function loadCreativePulse() {
+    const hours = document.getElementById('hours-filter').value;
+    const url = `${API_BASE_URL}/activities/visualization?hours=${encodeURIComponent(hours)}&limit=30`;
+    const data = await fetchAriaData(url);
+
+    const total = data.summary?.total || 0;
+    const success = data.summary?.success || 0;
+    const fail = data.summary?.fail || 0;
+    const rate = total ? (success * 100 / total) : 0;
+
+    document.getElementById('stat-total').textContent = formatNumber(total);
+    document.getElementById('stat-success').textContent = formatNumber(success);
+    document.getElementById('stat-fail').textContent = formatNumber(fail);
+    document.getElementById('stat-rate').textContent = fmtPct(rate);
+    document.getElementById('sync-meta').textContent = `Data sync: ${new Date().toLocaleTimeString()}`;
+
+    renderCharts(data);
+    renderRecent(data.recent || []);
+}
+
+document.getElementById('hours-filter').addEventListener('change', loadCreativePulse);
+loadCreativePulse().catch(err => {
+    console.error(err);
+    document.getElementById('recent-body').innerHTML = `<tr><td colspan="5">Error loading Creative Pulse: ${err.message}</td></tr>`;
+    setChartVisibility('hourly-chart', 'hourly-empty', false);
+    setChartVisibility('actions-chart', 'actions-empty', false);
+    setChartVisibility('skills-chart', 'skills-empty', false);
+});
+</script>
+{% endblock %}

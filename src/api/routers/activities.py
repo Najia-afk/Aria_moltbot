@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Request
-from sqlalchemy import Float, cast, desc, func, select
+from sqlalchemy import Float, case, cast, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import ActivityLog, SocialPost
@@ -191,15 +191,17 @@ async def activity_visualization(hours: int = 24, limit: int = 25, db: AsyncSess
     cutoff = now_utc - timedelta(hours=max(1, min(hours, 24 * 30)))
     limit = max(1, min(limit, 200))
 
+    hour_bucket = func.date_trunc("hour", ActivityLog.created_at).label("hour")
+
     hourly_rows = (
         await db.execute(
             select(
-                func.date_trunc("hour", ActivityLog.created_at).label("hour"),
+                hour_bucket,
                 func.count(ActivityLog.id).label("count"),
             )
             .where(ActivityLog.created_at >= cutoff)
-            .group_by(func.date_trunc("hour", ActivityLog.created_at))
-            .order_by(func.date_trunc("hour", ActivityLog.created_at))
+            .group_by(hour_bucket)
+            .order_by(hour_bucket)
         )
     ).all()
 
@@ -213,14 +215,16 @@ async def activity_visualization(hours: int = 24, limit: int = 25, db: AsyncSess
         )
     ).all()
 
+    skill_bucket = func.coalesce(ActivityLog.skill, "unknown").label("skill")
+
     skills_rows = (
         await db.execute(
             select(
-                func.coalesce(ActivityLog.skill, "unknown").label("skill"),
+                skill_bucket,
                 func.count(ActivityLog.id).label("count"),
             )
             .where(ActivityLog.created_at >= cutoff)
-            .group_by(func.coalesce(ActivityLog.skill, "unknown"))
+            .group_by(skill_bucket)
             .order_by(desc(func.count(ActivityLog.id)))
             .limit(12)
         )

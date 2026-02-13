@@ -105,8 +105,8 @@ def create_app():
 
     @app.route('/activity-visualization')
     @app.route('/creative-pulse')
-    def activity_visualization():
-        return render_template('activity_visualization.html')
+    def creative_pulse():
+        return render_template('creative_pulse.html')
     
     @app.route('/thoughts')
     def thoughts():
