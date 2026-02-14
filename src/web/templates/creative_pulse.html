@@ -27,6 +27,15 @@
     .data-table { width:100%; background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:12px; border-collapse: collapse; overflow:hidden; }
     .data-table th, .data-table td { padding:10px 12px; font-size:13px; text-align:left; border-bottom:1px solid var(--border-color); }
     .data-table th { font-size:11px; text-transform:uppercase; color:var(--text-secondary); background: rgba(0,0,0,0.2); }
+    .expand-btn { padding:4px 8px; font-size:11px; border:1px solid var(--border-color); border-radius:8px; background: transparent; color: var(--text-secondary); cursor:pointer; }
+    .expand-btn:hover { color: var(--text-primary); border-color: var(--text-secondary); }
+    .detail-row { display: none; }
+    .detail-row.open { display: table-row; }
+    .detail-cell { background: rgba(0, 0, 0, 0.15); padding: 12px !important; }
+    .detail-grid { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px; }
+    .detail-block { border:1px solid var(--border-color); border-radius:8px; padding:10px; background: var(--bg-tertiary); }
+    .detail-block h5 { margin:0 0 8px; font-size:11px; text-transform: uppercase; color: var(--text-muted); }
+    .detail-pre { margin:0; font-size:11px; color:var(--text-secondary); white-space:pre-wrap; word-break: break-word; max-height: 160px; overflow: auto; }
     .status-pill { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; }
     .status-pill.ok { background: rgba(34,197,94,0.2); color: var(--success); }
     .status-pill.err { background: rgba(239,68,68,0.2); color: var(--danger); }
@@ -37,7 +46,10 @@
     .insight-main { font-weight:600; color:var(--text-primary); margin-bottom:8px; }
     .insight-meta { font-size:12px; color:var(--text-muted); margin-top:6px; }
     .context-chip { display:inline-block; font-size:11px; margin:2px 4px 0 0; padding:2px 8px; border-radius:10px; border:1px solid var(--border-color); color:var(--text-secondary); }
-    @media (max-width: 900px) { .chart-grid, .insight-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 900px) {
+        .chart-grid, .insight-grid { grid-template-columns: 1fr; }
+        .detail-grid { grid-template-columns: 1fr; }
+    }
 </style>
 {% endblock %}
 
@@ -189,20 +201,57 @@ function renderRecent(rows) {
         body.innerHTML = '<tr><td colspan="6">No activity in selected window.</td></tr>';
         return;
     }
-    body.innerHTML = rows.map(row => {
+    body.innerHTML = rows.map((row, idx) => {
         const statusClass = row.success ? 'ok' : 'err';
         const statusText = row.success ? 'OK' : 'Error';
         const time = row.created_at ? new Date(row.created_at).toLocaleString() : '-';
         const contextHtml = formatContextChips(row.details || {});
+        const details = row.details && typeof row.details === 'object' ? row.details : {};
+        const detailsId = `detail-row-${idx}`;
+        const argsPreview = esc(details.args_preview || '-');
+        const resultPreview = esc(details.result_preview || '-');
+        const creativeContext = esc(JSON.stringify(details.creative_context || {}, null, 2));
         return `<tr>
             <td>${esc(time)}</td>
             <td>${esc(row.action || '-')}</td>
             <td>${esc(row.skill || '-')}</td>
             <td><span class="status-pill ${statusClass}">${statusText}</span></td>
             <td>${contextHtml}</td>
-            <td>${esc((row.description || '').slice(0, 180))}</td>
+            <td>
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                    <span>${esc((row.description || '').slice(0, 180))}</span>
+                    <button class="expand-btn" data-detail-id="${detailsId}" onclick="toggleDetailRow(this)">Details</button>
+                </div>
+            </td>
+        </tr>
+        <tr id="${detailsId}" class="detail-row">
+            <td colspan="6" class="detail-cell">
+                <div class="detail-grid">
+                    <div class="detail-block">
+                        <h5>Args Preview</h5>
+                        <pre class="detail-pre">${argsPreview}</pre>
+                    </div>
+                    <div class="detail-block">
+                        <h5>Result Preview</h5>
+                        <pre class="detail-pre">${resultPreview}</pre>
+                    </div>
+                    <div class="detail-block">
+                        <h5>Creative Context</h5>
+                        <pre class="detail-pre">${creativeContext}</pre>
+                    </div>
+                </div>
+            </td>
         </tr>`;
     }).join('');
+}
+
+function toggleDetailRow(btn) {
+    const detailId = btn?.dataset?.detailId;
+    if (!detailId) return;
+    const row = document.getElementById(detailId);
+    if (!row) return;
+    const isOpen = row.classList.toggle('open');
+    btn.textContent = isOpen ? 'Hide' : 'Details';
 }
 
 function renderCharts(data) {
