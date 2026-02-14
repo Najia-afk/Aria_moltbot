@@ -184,7 +184,7 @@
         <option value="24">Last 24 Hours</option>
         <option value="72">Last 3 Days</option>
         <option value="168">Last Week</option>
-        <option value="720">Last Month</option>
+        <option value="720" selected>Last Month</option>
     </select>
     <button class="btn btn-primary" onclick="loadModelUsageDashboard()">Refresh</button>
 </div>
@@ -395,6 +395,8 @@
 // ── Globals ─────────────────────────────────────────────────────────────────
 let _statsData = null;     // /model-usage/stats response
 let _usageData = null;     // /model-usage response (recent records)
+let _llmUsageData = null;  // /model-usage?source=litellm response
+let _skillsUsageData = null; // /model-usage?source=skills response
 let _charts = {};          // Chart.js instances
 let usagePager;
 
@@ -442,9 +444,25 @@ async function loadModelUsageStats() {
 // ── Load Recent Usage ───────────────────────────────────────────────────────
 async function loadUsage(page = 1, limit = 50) {
     try {
-        _usageData = await fetchAriaData(`${API_BASE_URL}/model-usage?limit=${limit}&page=${page}`);
+        const [allResp, llmResp, skillsResp] = await Promise.all([
+            fetchAriaData(`${API_BASE_URL}/model-usage?limit=${limit}&page=${page}`),
+            fetchAriaData(`${API_BASE_URL}/model-usage?source=litellm&limit=25&page=1`),
+            fetchAriaData(`${API_BASE_URL}/model-usage?source=skills&limit=25&page=1`),
+        ]);
+
+        _usageData = allResp;
+        _llmUsageData = llmResp;
+        _skillsUsageData = skillsResp;
+
         const items = _usageData.items || _usageData.usage || [];
         _usageData._allItems = items;
+
+        const llmItems = _llmUsageData.items || _llmUsageData.usage || [];
+        _llmUsageData._allItems = llmItems;
+
+        const skillItems = _skillsUsageData.items || _skillsUsageData.usage || [];
+        _skillsUsageData._allItems = skillItems;
+
         renderRecentLLM();
         renderRecentSkills();
         if (usagePager && _usageData.pages) usagePager.update(_usageData);
@@ -617,8 +635,8 @@ function renderLLMTab() {
 }
 
 function renderRecentLLM() {
-    if (!_usageData) return;
-    const llmRecent = (_usageData._allItems || _usageData.usage || []).filter(u => u.source === 'litellm').slice(0, 25);
+    if (!_llmUsageData) return;
+    const llmRecent = (_llmUsageData._allItems || _llmUsageData.usage || []).slice(0, 25);
     const body = document.getElementById('llm-recent-body');
     if (llmRecent.length > 0) {
         body.innerHTML = llmRecent.map(u => `
@@ -711,8 +729,8 @@ function renderSkillsTab() {
 }
 
 function renderRecentSkills() {
-    if (!_usageData) return;
-    const skillRecent = (_usageData._allItems || _usageData.usage || []).filter(u => u.source === 'skills').slice(0, 25);
+    if (!_skillsUsageData) return;
+    const skillRecent = (_skillsUsageData._allItems || _skillsUsageData.usage || []).slice(0, 25);
     const body = document.getElementById('skill-recent-body');
     if (skillRecent.length > 0) {
         body.innerHTML = skillRecent.map(u => {
