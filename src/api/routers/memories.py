@@ -37,6 +37,11 @@ _NOISE_NAME_MARKERS = (
     "moltbook test",
     "abc123",
     "post 42",
+    "x: 1",
+    "\"x\": 1",
+    "{\"x\": 1}",
+    "{\"x\":1}",
+    "x; 1",
 )
 
 
@@ -89,6 +94,8 @@ def _is_noise_memory_payload(
     key_s = (key or "").lower().strip()
     source_s = (source or "").lower().strip()
     if key_s.startswith(("test-", "test_", "goal-test", "goal_test", "skill-test", "skill_test")):
+        return True
+    if key_s.startswith("lookup-") and any(token in hay.lower() for token in ("\"x\": 1", "{\"x\":1}", "x: 1")):
         return True
     if source_s in {"pytest", "test", "test_runner", "sandbox_test"}:
         return True

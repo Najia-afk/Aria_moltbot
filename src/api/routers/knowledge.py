@@ -37,6 +37,14 @@ def _is_test_kg_payload(*values: str) -> bool:
         "moltbook test",
         "abc123",
         "post 42",
+        "testentity_",
+        "searchable_",
+        "trav_",
+        "rel_a_",
+        "rel_b_",
+        "pytest-entity",
+        "rel-src",
+        "rel-dst",
     )
     text_blob = " ".join((v or "") for v in values).lower()
     if any(marker in text_blob for marker in markers):
