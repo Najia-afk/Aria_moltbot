@@ -22,6 +22,8 @@ def _is_noisy_goal_payload(goal_id: str | None, title: str | None, description: 
     noisy_markers = [
         "live test goal",
         "test goal",
+        "testing skill functionality",
+        "creative pulse ingestion test",
         "fetch test",
         "update test",
         "goal_test",
@@ -410,6 +412,13 @@ async def get_hourly_goals(
 @router.post("/hourly-goals")
 async def create_hourly_goal(request: Request, db: AsyncSession = Depends(get_db)):
     data = await request.json()
+    if _is_noisy_goal_payload(
+        None,
+        data.get("goal_type"),
+        data.get("description"),
+    ):
+        return {"created": False, "skipped": True, "reason": "test_or_patch_noise"}
+
     goal = HourlyGoal(
         hour_slot=data.get("hour_slot"),
         goal_type=data.get("goal_type"),

@@ -29,6 +29,8 @@ _NOISE_NAME_MARKERS = (
     "test_entry",
     "live test goal",
     "test goal",
+    "testing skill functionality",
+    "creative pulse ingestion test",
     "creative pulse full visualization test",
     "pulse-exp-",
     "live test post",

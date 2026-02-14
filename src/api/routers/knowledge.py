@@ -29,6 +29,8 @@ def _is_test_kg_payload(*values: str) -> bool:
         "test_entry",
         "live test goal",
         "test goal",
+        "testing skill functionality",
+        "creative pulse ingestion test",
         "creative pulse full visualization test",
         "pulse-exp-",
         "live test post",
