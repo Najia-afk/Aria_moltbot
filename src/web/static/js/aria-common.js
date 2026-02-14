@@ -143,9 +143,20 @@ async function fetchBalances(apiUrl) {
  * Returns { logs, totalSpend, todaySpend, weekSpend, monthSpend, inputTokens, outputTokens, totalTokens, requestCount }.
  */
 async function fetchSpendSummary(apiUrl, limit = 50) {
-    const resp = await fetch(`${apiUrl}/litellm/spend?limit=${limit}&lite=true`);
-    const raw = await resp.json();
-    const logs = raw.logs || (Array.isArray(raw) ? raw : []);
+    const [logsResp, globalResp] = await Promise.all([
+        fetch(`${apiUrl}/litellm/spend?limit=${limit}&lite=true`),
+        fetch(`${apiUrl}/litellm/global-spend`),
+    ]);
+
+    const rawLogs = await logsResp.json();
+    const logs = rawLogs.logs || (Array.isArray(rawLogs) ? rawLogs : []);
+
+    let global = null;
+    try {
+        global = await globalResp.json();
+    } catch (_) {
+        global = null;
+    }
 
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -166,6 +177,25 @@ async function fetchSpendSummary(apiUrl, limit = 50) {
         if (logDate >= weekStart) weekSpend += cost;
         if (logDate >= monthStart) monthSpend += cost;
     });
+
+    if (global && typeof global === 'object' && !global.error) {
+        totalSpend = Number(global.spend || 0);
+        inputTokens = Number(global.input_tokens || 0);
+        outputTokens = Number(global.output_tokens || 0);
+        totalTokens = Number(global.total_tokens || (inputTokens + outputTokens));
+        const apiRequests = Number(global.api_requests || 0);
+        return {
+            logs,
+            totalSpend,
+            todaySpend,
+            weekSpend,
+            monthSpend,
+            inputTokens,
+            outputTokens,
+            totalTokens,
+            requestCount: apiRequests,
+        };
+    }
 
     return { logs, totalSpend, todaySpend, weekSpend, monthSpend, inputTokens, outputTokens, totalTokens, requestCount: logs.length };
 }
