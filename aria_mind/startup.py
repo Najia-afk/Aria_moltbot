@@ -8,9 +8,11 @@ Run this when Aria first wakes up to:
 3. Log to database
 """
 import asyncio
+import ast
 import json
 import logging
 import os
+from pathlib import Path
 from datetime import datetime, timezone
 
 logging.basicConfig(
@@ -18,6 +20,90 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger("aria.startup")
+
+
+def _resolve_path(*candidates: str) -> Path | None:
+    """Resolve first existing file from candidate paths."""
+    for candidate in candidates:
+        path = Path(candidate)
+        if path.exists() and path.is_file():
+            return path
+    return None
+
+
+def _verify_markdown_file(path: Path) -> tuple[bool, str]:
+    """Check markdown file is readable and non-empty."""
+    try:
+        content = path.read_text(encoding="utf-8")
+        if not content.strip():
+            return False, "empty file"
+        return True, f"{len(content)} chars"
+    except Exception as exc:
+        return False, str(exc)
+
+
+def _verify_python_file(path: Path) -> tuple[bool, str]:
+    """Check Python file is readable and syntactically valid."""
+    try:
+        source = path.read_text(encoding="utf-8")
+        ast.parse(source, filename=str(path))
+        return True, f"{len(source.splitlines())} lines"
+    except Exception as exc:
+        return False, str(exc)
+
+
+def review_boot_assets() -> bool:
+    """
+    Review and validate core Aria docs/scripts before startup.
+
+    Enforces ordered checks so boot fails early if core context is missing
+    or syntactically invalid.
+    """
+    docs_in_order = [
+        "BOOTSTRAP.md",
+        "SOUL.md",
+        "IDENTITY.md",
+        "SECURITY.md",
+        "MEMORY.md",
+        "AGENTS.md",
+        "SKILLS.md",
+        "TOOLS.md",
+        "ORCHESTRATION.md",
+    ]
+    scripts_in_order = [
+        "startup.py",
+        "cognition.py",
+        "memory.py",
+        "security.py",
+        "heartbeat.py",
+    ]
+
+    print("🧾 Phase 0: Reviewing Core Files...")
+    all_ok = True
+
+    for filename in docs_in_order:
+        resolved = _resolve_path(f"aria_mind/{filename}", filename)
+        if not resolved:
+            print(f"   ✗ {filename}: missing")
+            all_ok = False
+            continue
+        ok, detail = _verify_markdown_file(resolved)
+        emoji = "✓" if ok else "✗"
+        print(f"   {emoji} {filename}: {detail}")
+        all_ok = all_ok and ok
+
+    for filename in scripts_in_order:
+        resolved = _resolve_path(f"aria_mind/{filename}", filename)
+        if not resolved:
+            print(f"   ✗ {filename}: missing")
+            all_ok = False
+            continue
+        ok, detail = _verify_python_file(resolved)
+        emoji = "✓" if ok else "✗"
+        print(f"   {emoji} {filename}: {detail}")
+        all_ok = all_ok and ok
+
+    return all_ok
 
 
 def validate_env():
@@ -51,6 +137,15 @@ async def run_startup():
     print("⚡️ ARIA BLUE - AWAKENING SEQUENCE")
     print("=" * 60)
     print()
+
+    strict_boot_review = os.getenv("ARIA_STRICT_BOOT_REVIEW", "true").lower() == "true"
+    reviewed_ok = review_boot_assets()
+    if not reviewed_ok:
+        message = "Core startup review failed (missing/invalid .md or .py files)"
+        if strict_boot_review:
+            raise RuntimeError(message)
+        logger.warning(message)
+        print(f"   ⚠ {message}")
     
     from aria_skills import SkillRegistry, SkillStatus
     from aria_agents import AgentCoordinator
@@ -64,7 +159,10 @@ async def run_startup():
     registry = SkillRegistry()
     
     try:
-        await registry.load_from_config("aria_mind/TOOLS.md")
+        tools_md = _resolve_path("aria_mind/TOOLS.md", "TOOLS.md")
+        if not tools_md:
+            raise FileNotFoundError("TOOLS.md not found in aria_mind/ or workspace root")
+        await registry.load_from_config(str(tools_md))
         print(f"   ✓ Loaded skill configs: {registry.list()}")
     except Exception as e:
         logger.warning(f"Could not load TOOLS.md: {e}")
@@ -135,7 +233,10 @@ async def run_startup():
     ]
     
     try:
-        await coordinator.load_from_file("aria_mind/AGENTS.md")
+        agents_md = _resolve_path("aria_mind/AGENTS.md", "AGENTS.md")
+        if not agents_md:
+            raise FileNotFoundError("AGENTS.md not found in aria_mind/ or workspace root")
+        await coordinator.load_from_file(str(agents_md))
         from aria_agents.loader import AgentLoader
         missing = AgentLoader.missing_expected_agents(coordinator._configs, expected_agents)
         if missing:
