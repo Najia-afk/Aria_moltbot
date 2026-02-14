@@ -25,6 +25,8 @@ _NOISE_NAME_MARKERS = (
     "[test]",
     "pytest",
     "goal_test",
+    "skill_test",
+    "test_entry",
     "live test goal",
     "test goal",
     "creative pulse full visualization test",
@@ -39,6 +41,8 @@ _NOISE_NAME_MARKERS = (
 def _contains_noise_name(text: str) -> bool:
     normalized = (text or "").lower()
     if any(marker in normalized for marker in _NOISE_NAME_MARKERS):
+        return True
+    if any(prefix in normalized for prefix in ("test-", "test_", "goal-test", "goal_test", "skill-test", "skill_test")):
         return True
     # token-aware fallback for standalone "test"
     return bool(re.search(r"\btest\b", normalized))
@@ -77,7 +81,17 @@ def _is_noise_memory_payload(
             json_lib.dumps(metadata or {}, default=str),
         ]
     )
-    return _contains_noise_name(hay)
+    if _contains_noise_name(hay):
+        return True
+
+    key_s = (key or "").lower().strip()
+    source_s = (source or "").lower().strip()
+    if key_s.startswith(("test-", "test_", "goal-test", "goal_test", "skill-test", "skill_test")):
+        return True
+    if source_s in {"pytest", "test", "test_runner", "sandbox_test"}:
+        return True
+
+    return False
 
 
 @router.get("/memories")

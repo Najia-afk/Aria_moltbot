@@ -25,6 +25,8 @@ def _is_noisy_goal_payload(goal_id: str | None, title: str | None, description: 
         "fetch test",
         "update test",
         "goal_test",
+        "skill_test",
+        "test_entry",
         "creative pulse full visualization test",
         "pulse-exp-",
         "live test post",
@@ -38,7 +40,14 @@ def _is_noisy_goal_payload(goal_id: str | None, title: str | None, description: 
         return True
 
     goal_id_s = (goal_id or "").lower().strip()
-    if goal_id_s.startswith("test-") or goal_id_s.startswith("goal-test"):
+    if (
+        goal_id_s.startswith("test-")
+        or goal_id_s.startswith("test_")
+        or goal_id_s.startswith("goal-test")
+        or goal_id_s.startswith("goal_test")
+        or goal_id_s.startswith("skill-test")
+        or goal_id_s.startswith("skill_test")
+    ):
         return True
 
     return False

@@ -25,6 +25,8 @@ def _is_test_kg_payload(*values: str) -> bool:
         "[test]",
         "pytest",
         "goal_test",
+        "skill_test",
+        "test_entry",
         "live test goal",
         "test goal",
         "creative pulse full visualization test",
@@ -36,6 +38,9 @@ def _is_test_kg_payload(*values: str) -> bool:
     )
     text_blob = " ".join((v or "") for v in values).lower()
     if any(marker in text_blob for marker in markers):
+        return True
+
+    if any(prefix in text_blob for prefix in ("test-", "test_", "goal-test", "goal_test", "skill-test", "skill_test")):
         return True
 
     # Token-aware fallback for explicit test tagging without matching unrelated words.
