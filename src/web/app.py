@@ -36,6 +36,12 @@ def create_app():
     def add_header(response):
         # Disable Chrome's speculative loading that causes prefetch storms
         response.headers['Supports-Loading-Mode'] = 'fenced-frame'
+
+        # Force fresh dashboard HTML to avoid stale templates/scripts after deploys
+        if response.content_type and response.content_type.startswith('text/html'):
+            response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+            response.headers['Pragma'] = 'no-cache'
+            response.headers['Expires'] = '0'
         return response
     
     # =========================================================================
