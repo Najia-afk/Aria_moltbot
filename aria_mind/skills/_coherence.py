@@ -116,9 +116,9 @@ def validate_skill_coherence(
 
 
 def write_aria_mind_run_report(report: dict, workspace_root_fn: Callable[[], Path]) -> None:
-    """Persist mandatory skill-run report into aria_mind/skills."""
+    """Persist mandatory skill-run report into aria_memories/logs."""
     root = workspace_root_fn()
-    reports_dir = root / "aria_mind" / "skills"
+    reports_dir = root / "aria_memories" / "logs"
     reports_dir.mkdir(parents=True, exist_ok=True)
 
     payload = {**report, "reported_at": datetime.now(timezone.utc).isoformat()}

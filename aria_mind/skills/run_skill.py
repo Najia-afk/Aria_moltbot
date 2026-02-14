@@ -36,7 +36,6 @@ try:
         workspace_root as _coh_workspace_root,
         has_skill_changes as _coh_has_skill_changes,
         validate_skill_coherence as _coh_validate_skill_coherence,
-        write_aria_mind_run_report as _coh_write_aria_mind_run_report,
         collect_skill_alignment_report as _coh_collect_skill_alignment_report,
         write_skill_alignment_report as _coh_write_skill_alignment_report,
     )
@@ -55,7 +54,6 @@ except ModuleNotFoundError:
         workspace_root as _coh_workspace_root,
         has_skill_changes as _coh_has_skill_changes,
         validate_skill_coherence as _coh_validate_skill_coherence,
-        write_aria_mind_run_report as _coh_write_aria_mind_run_report,
         collect_skill_alignment_report as _coh_collect_skill_alignment_report,
         write_skill_alignment_report as _coh_write_skill_alignment_report,
     )
@@ -96,10 +94,10 @@ def _validate_skill_coherence(skill_name: str) -> dict:
 
 
 def _write_aria_mind_run_report(report: dict):
-    try:
-        _coh_write_aria_mind_run_report(report, workspace_root_fn=_workspace_root)
-    except Exception:
-        pass
+    # Data already persisted to DB via _log_session / _log_model_usage /
+    # _log_skill_invocation.  Local JSON files were never read back, so we
+    # skip writing them to avoid filesystem clutter.
+    pass
 
 
 def _collect_skill_alignment_report(include_support: bool = False) -> dict:

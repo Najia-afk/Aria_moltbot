@@ -37,9 +37,9 @@ aria_memories/**
 
 # mirrored runtime memory snapshots
 aria_mind/aria_memories/
-aria_mind/aria_memories/**
-aria_mind/skills/aria_memories/
-aria_mind/skills/aria_memories/**
+# Removed nested copies (cleaned up, no longer exist)
+# aria_mind/aria_memories/ — deleted
+# aria_mind/skills/aria_memories/ — deleted
 
 # plans - Sensitive strategic documents (never commit)
 #plans/
@@ -79,6 +79,10 @@ dist/
 build/
 *.egg-info/
 .eggs/
+
+# Runtime artifacts (regenerated on skill runs)
+
+pheromone_scores.json
 
 # Test artifacts
 .pytest_cache/

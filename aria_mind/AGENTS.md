@@ -150,6 +150,7 @@ Knowledge storage and retrieval. No specific focus - serves all.
 
 ```yaml
 id: memory
+focus: memory
 model: qwen3-mlx
 fallback: qwen3-next-free
 parent: aria
@@ -166,7 +167,7 @@ Conversational interface for direct user interaction. Inherits core identity fro
 
 ```yaml
 id: aria_talk
-focus: conversational
+focus: social
 model: qwen3-mlx
 fallback: trinity-free
 parent: aria
