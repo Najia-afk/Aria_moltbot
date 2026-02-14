@@ -73,6 +73,7 @@ async def get_working_memory_context(
     weight_recency: float = 0.4,
     weight_importance: float = 0.4,
     weight_access: float = 0.2,
+    touch_access: bool = True,
     category: str = None,
     db: AsyncSession = Depends(get_db),
 ):
@@ -84,7 +85,7 @@ async def get_working_memory_context(
               + (weight_access * access_score)
 
     where:
-      recency_score = 1.0 / (1.0 + hours_since_accessed)
+            recency_score = 1.0 / (1.0 + hours_since_updated)
       access_score  = min(1.0, access_count / 10)
     """
     stmt = select(WorkingMemory)
@@ -100,11 +101,11 @@ async def get_working_memory_context(
     now = datetime.now(timezone.utc)
     scored = []
     for row in rows:
-        accessed = row.accessed_at or row.created_at
-        if accessed.tzinfo is None:
+        updated = row.updated_at or row.created_at
+        if updated.tzinfo is None:
             from datetime import timezone as tz
-            accessed = accessed.replace(tzinfo=tz.utc)
-        hours_since = max((now - accessed).total_seconds() / 3600.0, 0.0)
+            updated = updated.replace(tzinfo=tz.utc)
+        hours_since = max((now - updated).total_seconds() / 3600.0, 0.0)
         recency_score = 1.0 / (1.0 + hours_since)
         access_score = min(1.0, (row.access_count or 0) / 10.0)
         importance = row.importance if row.importance is not None else 0.5
@@ -119,11 +120,13 @@ async def get_working_memory_context(
     scored.sort(key=lambda x: x[0], reverse=True)
     top = scored[:limit]
 
-    # Bump access counts for returned items
-    for _, row in top:
-        row.access_count = (row.access_count or 0) + 1
-        row.accessed_at = now
-    await db.commit()
+    # Optionally bump access stats for returned items.
+    # UI polling should pass touch_access=false to avoid distorting relevance.
+    if touch_access and top:
+        for _, row in top:
+            row.access_count = (row.access_count or 0) + 1
+            row.accessed_at = now
+        await db.commit()
 
     return {
         "context": [

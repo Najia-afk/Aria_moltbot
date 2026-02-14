@@ -439,7 +439,7 @@ async function cleanupExpired() {
 // ── Load Context ────────────────────────────────────────────────────────────
 async function loadContext() {
     try {
-        const res = await fetch(`${API_BASE_URL}/working-memory/context?limit=20`);
+        const res = await fetch(`${API_BASE_URL}/working-memory/context?limit=20&touch_access=false`);
         const data = await res.json();
         const items = data.context || data.items || [];
 
