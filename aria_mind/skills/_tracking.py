@@ -120,6 +120,9 @@ async def _log_skill_invocation(
     duration_ms: float,
     success: bool,
     error_msg: str | None = None,
+    args_preview: str | None = None,
+    result_preview: str | None = None,
+    creative_context: dict | None = None,
 ) -> None:
     """Log invocation to /skills/invocations for Skill Stats dashboard."""
     payload = {
@@ -144,6 +147,9 @@ async def _log_skill_invocation(
             "function": function_name,
             "duration_ms": round(duration_ms, 2),
             "source": "run_skill",
+            "args_preview": args_preview or "",
+            "result_preview": result_preview or "",
+            "creative_context": creative_context or {},
         },
     }
     activity_ok = await _api_post("/activities", activity_payload)

@@ -363,6 +363,30 @@ async def activity_visualization(
     ]
     creative_total = sum(item["count"] for item in creative_skills)
 
+    latest_brainstorm = None
+    latest_experiment = None
+    for item in creative_recent_items:
+        details = item.details if isinstance(item.details, dict) else {}
+        context = details.get("creative_context") if isinstance(details.get("creative_context"), dict) else {}
+        normalized_skill = _normalize_skill_name(item.skill)
+        if normalized_skill == "brainstorm" and latest_brainstorm is None:
+            latest_brainstorm = {
+                "topic": context.get("topic") or (details.get("args_preview") or ""),
+                "session_id": context.get("session_id"),
+                "idea_count": context.get("idea_count"),
+                "created_at": item.created_at.isoformat() if item.created_at else None,
+            }
+        if normalized_skill == "experiment" and latest_experiment is None:
+            latest_experiment = {
+                "name": context.get("experiment_name") or (details.get("args_preview") or ""),
+                "hypothesis": context.get("hypothesis"),
+                "status": context.get("status"),
+                "experiment_id": context.get("experiment_id"),
+                "created_at": item.created_at.isoformat() if item.created_at else None,
+            }
+        if latest_brainstorm and latest_experiment:
+            break
+
     return {
         "window_hours": hours,
         "generated_at": now_utc.isoformat(),
@@ -404,9 +428,14 @@ async def activity_visualization(
                     "success": bool(item.success),
                     "created_at": item.created_at.isoformat() if item.created_at else None,
                     "description": _extract_description(item.details),
+                    "details": item.details if isinstance(item.details, dict) else {},
                 }
                 for item in creative_recent_items
             ],
+            "insights": {
+                "latest_brainstorm": latest_brainstorm,
+                "latest_experiment": latest_experiment,
+            },
         } if include_creative else None,
         "recent": [
             {
@@ -416,6 +445,7 @@ async def activity_visualization(
                 "success": bool(item.success),
                 "created_at": item.created_at.isoformat() if item.created_at else None,
                 "description": _extract_description(item.details),
+                "details": item.details if isinstance(item.details, dict) else {},
             }
             for item in recent_items
         ],

@@ -118,6 +118,79 @@ def _write_skill_alignment_report(include_support: bool = False) -> dict:
     )
 
 
+def _safe_preview(value, max_len: int = 220) -> str:
+    try:
+        if isinstance(value, (dict, list)):
+            text = json.dumps(value, ensure_ascii=False, default=str)
+        else:
+            text = str(value)
+    except Exception:
+        text = str(value)
+    if len(text) <= max_len:
+        return text
+    return text[: max_len - 1] + "…"
+
+
+def _extract_result_payload(result) -> dict:
+    if hasattr(result, 'success') and hasattr(result, 'data'):
+        return {
+            'success': bool(getattr(result, 'success', True)),
+            'data': getattr(result, 'data', None),
+            'error': getattr(result, 'error', None),
+        }
+    if hasattr(result, 'value'):
+        return {'success': True, 'data': getattr(result, 'value', None), 'error': None}
+    if isinstance(result, dict):
+        return result
+    return {'success': True, 'data': result, 'error': None}
+
+
+def _build_creative_context(skill_name: str, function_name: str, args: dict, result_payload: dict) -> dict:
+    data = result_payload.get('data') if isinstance(result_payload, dict) else None
+    data_dict = data if isinstance(data, dict) else {}
+    context = {
+        'skill': skill_name,
+        'function': function_name,
+    }
+
+    if skill_name == 'brainstorm':
+        topic = args.get('topic') or data_dict.get('topic')
+        if topic:
+            context['topic'] = topic
+        ideas = data_dict.get('ideas')
+        if isinstance(ideas, list):
+            context['idea_count'] = len(ideas)
+        session_id = data_dict.get('session_id')
+        if session_id:
+            context['session_id'] = session_id
+    elif skill_name == 'experiment':
+        name = args.get('name') or data_dict.get('name') or data_dict.get('experiment_name')
+        if name:
+            context['experiment_name'] = name
+        hypothesis = args.get('hypothesis') or data_dict.get('hypothesis')
+        if hypothesis:
+            context['hypothesis'] = hypothesis
+        status = data_dict.get('status') or data_dict.get('state')
+        if status:
+            context['status'] = status
+        experiment_id = data_dict.get('experiment_id')
+        if experiment_id:
+            context['experiment_id'] = experiment_id
+    elif skill_name == 'fact_check':
+        claim = args.get('claim') or args.get('claim_text') or data_dict.get('claim')
+        if claim:
+            context['claim'] = claim
+        verdict = data_dict.get('verdict') or data_dict.get('confidence')
+        if verdict is not None:
+            context['verdict'] = verdict
+    elif skill_name == 'community':
+        context['operation'] = function_name
+    elif skill_name == 'memeothy':
+        context['operation'] = function_name
+
+    return context
+
+
 async def run_skill(skill_name: str, function_name: str, args: dict):
     """Run a skill function with the given arguments. Logs session + usage."""
     t0 = time.monotonic()
@@ -240,13 +313,24 @@ async def run_skill(skill_name: str, function_name: str, args: dict):
         else:
             result = func(**args)
 
+        result_payload = _extract_result_payload(result)
+        creative_context = _build_creative_context(skill_name, function_name, args, result_payload)
+
         duration_ms = (time.monotonic() - t0) * 1000
 
         # P2.1/P2.2 — best-effort tracking (don't block on failure)
         try:
             await _log_session(skill_name, function_name, duration_ms, True)
             await _log_model_usage(skill_name, function_name, duration_ms)
-            await _log_skill_invocation(skill_name, function_name, duration_ms, True)
+            await _log_skill_invocation(
+                skill_name,
+                function_name,
+                duration_ms,
+                True,
+                args_preview=_safe_preview(args),
+                result_preview=_safe_preview(result_payload.get('data')),
+                creative_context=creative_context,
+            )
         except Exception:
             pass
 
@@ -279,7 +363,16 @@ async def run_skill(skill_name: str, function_name: str, args: dict):
         # P2.1 — log failed session
         try:
             await _log_session(skill_name, function_name, duration_ms, False, str(e))
-            await _log_skill_invocation(skill_name, function_name, duration_ms, False, str(e))
+            await _log_skill_invocation(
+                skill_name,
+                function_name,
+                duration_ms,
+                False,
+                str(e),
+                args_preview=_safe_preview(args),
+                result_preview='',
+                creative_context={'skill': skill_name, 'function': function_name},
+            )
         except Exception:
             pass
 
