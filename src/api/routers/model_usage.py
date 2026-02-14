@@ -224,6 +224,7 @@ def _litellm_fallback_from_logs(logs: list[dict]) -> tuple[dict, list[dict]]:
 async def get_model_usage(
     page: int = 1,
     limit: int = 50,
+    hours: Optional[int] = None,
     model: Optional[str] = None,
     provider: Optional[str] = None,
     source: Optional[str] = None,
@@ -232,10 +233,15 @@ async def get_model_usage(
 ):
     """Merged model usage from skill executions (DB) + LLM calls (LiteLLM)."""
     results: list[dict] = []
+    cutoff: Optional[datetime] = None
+    if hours is not None and int(hours) > 0:
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=int(hours))
 
     # 1. DB skill executions
     if source in (None, "", "skills", "all"):
         stmt = select(ModelUsage).where(_db_non_test_usage_filter()).order_by(ModelUsage.created_at.desc()).limit(limit)
+        if cutoff is not None:
+            stmt = stmt.where(ModelUsage.created_at > cutoff)
         if model:
             stmt = stmt.where(ModelUsage.model == model)
         if provider:
@@ -262,7 +268,7 @@ async def get_model_usage(
 
     # 2. LiteLLM logs (direct DB query)
     if source in (None, "", "litellm", "all"):
-        litellm_logs = await _fetch_litellm_spend_logs(litellm_db, limit=limit)
+        litellm_logs = await _fetch_litellm_spend_logs(litellm_db, limit=limit, since=cutoff)
         if model:
             litellm_logs = [l for l in litellm_logs if model.lower() in (l.get("model") or "").lower()]
         if provider:

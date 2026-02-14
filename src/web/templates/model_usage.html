@@ -399,6 +399,8 @@ let _llmUsageData = null;  // /model-usage?source=litellm response
 let _skillsUsageData = null; // /model-usage?source=skills response
 let _charts = {};          // Chart.js instances
 let usagePager;
+let _usageRequestSeq = 0;
+let _dashboardRefreshInFlight = false;
 
 function safeModelName(model) {
     const value = (model ?? '').toString().trim();
@@ -443,12 +445,17 @@ async function loadModelUsageStats() {
 
 // ── Load Recent Usage ───────────────────────────────────────────────────────
 async function loadUsage(page = 1, limit = 50) {
+    const requestSeq = ++_usageRequestSeq;
     try {
+        const hours = document.getElementById('hours-filter').value;
+        const cacheBust = Date.now();
         const [allResp, llmResp, skillsResp] = await Promise.all([
-            fetchAriaData(`${API_BASE_URL}/model-usage?limit=${limit}&page=${page}`),
-            fetchAriaData(`${API_BASE_URL}/model-usage?source=litellm&limit=25&page=1`),
-            fetchAriaData(`${API_BASE_URL}/model-usage?source=skills&limit=25&page=1`),
+            fetchAriaData(`${API_BASE_URL}/model-usage?hours=${hours}&limit=${limit}&page=${page}&_ts=${cacheBust}`),
+            fetchAriaData(`${API_BASE_URL}/model-usage?hours=${hours}&source=litellm&limit=25&page=1&_ts=${cacheBust}`),
+            fetchAriaData(`${API_BASE_URL}/model-usage?hours=${hours}&source=skills&limit=25&page=1&_ts=${cacheBust}`),
         ]);
+
+        if (requestSeq !== _usageRequestSeq) return;
 
         _usageData = allResp;
         _llmUsageData = llmResp;
@@ -458,7 +465,17 @@ async function loadUsage(page = 1, limit = 50) {
         _usageData._allItems = items;
 
         const llmItems = _llmUsageData.items || _llmUsageData.usage || [];
-        _llmUsageData._allItems = llmItems;
+        const llmRequestsInWindow = safeNumber(_statsData?.sources?.litellm?.requests || 0);
+        let effectiveLlmItems = llmItems;
+        if (llmItems.length === 0 && llmRequestsInWindow > 0) {
+            const retryResp = await fetchAriaData(
+                `${API_BASE_URL}/model-usage?hours=${hours}&source=litellm&limit=50&page=1&_ts=${Date.now()}`
+            );
+            if (requestSeq !== _usageRequestSeq) return;
+            _llmUsageData = retryResp;
+            effectiveLlmItems = _llmUsageData.items || _llmUsageData.usage || [];
+        }
+        _llmUsageData._allItems = effectiveLlmItems;
 
         const skillItems = _skillsUsageData.items || _skillsUsageData.usage || [];
         _skillsUsageData._allItems = skillItems;
@@ -467,6 +484,7 @@ async function loadUsage(page = 1, limit = 50) {
         renderRecentSkills();
         if (usagePager && _usageData.pages) usagePager.update(_usageData);
     } catch (e) {
+        if (requestSeq !== _usageRequestSeq) return;
         console.error('Error loading usage:', e);
         showErrorState('#llm-recent-body',
             'Could not load usage data — ' + e.message, () => loadUsage(page, limit));
@@ -754,12 +772,21 @@ function renderRecentSkills() {
 // INIT
 // ════════════════════════════════════════════════════════════════════════════
 async function loadModelUsageDashboard() {
-    await AriaModels.init();
-    loadModelUsageStats();
-    loadUsage();
+    if (_dashboardRefreshInFlight) return;
+    _dashboardRefreshInFlight = true;
+    try {
+        await AriaModels.init();
+        await loadModelUsageStats();
+        await loadUsage(usagePager?.page || 1, usagePager?.limit || 50);
+    } finally {
+        _dashboardRefreshInFlight = false;
+    }
 }
 
-document.getElementById('hours-filter').addEventListener('change', () => { loadModelUsageStats(); });
+document.getElementById('hours-filter').addEventListener('change', () => {
+    loadModelUsageStats();
+    loadUsage(1, usagePager?.limit || 50);
+});
 
 usagePager = new AriaPagination('usage-pagination', {
     onPageChange: (page, limit) => loadUsage(page, limit),
