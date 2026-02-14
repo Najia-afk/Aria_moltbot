@@ -49,11 +49,24 @@ def _social_content_from_activity(action: str, skill: str | None, details: dict 
     return " · ".join(parts)
 
 
+def _is_test_like_payload(action: str | None, skill: str | None, details: dict | None) -> bool:
+    markers = ["live test", "test_action", "goal_test", "test goal", "dry_run", "moltbook test"]
+    haystack_parts = [action or "", skill or ""]
+    if isinstance(details, dict):
+        haystack_parts.append(json_lib.dumps(details, ensure_ascii=False))
+        if bool(details.get("test")) or bool(details.get("is_test")):
+            return True
+    haystack = " ".join(haystack_parts).lower()
+    return any(marker in haystack for marker in markers)
+
+
 async def _maybe_upsert_work_cycle_memory(data: dict, db: AsyncSession) -> None:
     """Persist a daily work_cycle memory entry when cron_execution logs arrive."""
     action = (data.get("action") or "").strip().lower()
     details = data.get("details")
     if action != "cron_execution" or not isinstance(details, dict):
+        return
+    if _is_test_like_payload(data.get("action"), data.get("skill"), details):
         return
 
     job_name = (details.get("job") or "").strip().lower()

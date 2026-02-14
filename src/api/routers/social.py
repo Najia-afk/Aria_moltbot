@@ -25,6 +25,20 @@ router = APIRouter(tags=["Social"])
 _DEFAULT_MOLTBOOK_API = "https://www.moltbook.com/api/v1"
 
 
+def _is_test_social_payload(platform: str | None, content: str | None, metadata: dict | None) -> bool:
+    markers = ["live test", "test post", "moltbook test", "goal_test", "[test]"]
+    parts = [platform or "", content or ""]
+    if isinstance(metadata, dict):
+        if bool(metadata.get("test")) or bool(metadata.get("is_test")) or bool(metadata.get("dry_run")):
+            return True
+        try:
+            parts.append(json_lib.dumps(metadata, ensure_ascii=False))
+        except Exception:
+            parts.append(str(metadata))
+    haystack = " ".join(parts).lower()
+    return any(marker in haystack for marker in markers)
+
+
 def _extract_items(payload):
     if isinstance(payload, list):
         return payload
@@ -129,15 +143,22 @@ async def get_social_posts(
 @router.post("/social")
 async def create_social_post(request: Request, db: AsyncSession = Depends(get_db)):
     data = await request.json()
+    platform = data.get("platform", "moltbook")
+    content = data.get("content")
+    metadata = data.get("metadata", {})
+
+    if _is_test_social_payload(platform, content, metadata):
+        return {"created": False, "skipped": True, "reason": "test_payload"}
+
     post = SocialPost(
         id=uuid.uuid4(),
-        platform=data.get("platform", "moltbook"),
+        platform=platform,
         post_id=data.get("post_id"),
-        content=data.get("content"),
+        content=content,
         visibility=data.get("visibility", "public"),
         reply_to=data.get("reply_to"),
         url=data.get("url"),
-        metadata_json=data.get("metadata", {}),
+        metadata_json=metadata,
     )
     db.add(post)
     await db.commit()
