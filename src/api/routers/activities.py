@@ -258,7 +258,6 @@ async def activity_visualization(
         creative_candidates.update({f"aria_{name}" for name in creative_skill_targets})
         creative_candidates.update({
             "factcheck",
-            "modelswitcher",
         })
 
         creative_filter = or_(*[skill_expr == value for value in sorted(creative_candidates)])
