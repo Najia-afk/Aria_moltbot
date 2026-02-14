@@ -17,6 +17,20 @@ from pagination import paginate_query, build_paginated_response
 router = APIRouter(tags=["Goals"])
 
 
+def _is_noisy_goal_payload(goal_id: str | None, title: str | None, description: str | None) -> bool:
+    text = " ".join([goal_id or "", title or "", description or ""]).lower().strip()
+    noisy_markers = [
+        "live test goal",
+        "test goal",
+        "fetch test",
+        "update test",
+        "goal_test",
+        "patchable",
+        "dry run",
+    ]
+    return any(marker in text for marker in noisy_markers)
+
+
 # ── Goals ────────────────────────────────────────────────────────────────────
 
 @router.get("/goals")
@@ -44,11 +58,18 @@ async def list_goals(
 async def create_goal(request: Request, db: AsyncSession = Depends(get_db)):
     data = await request.json()
     new_id = uuid.uuid4()
+    goal_id = data.get("goal_id", f"goal-{str(new_id)[:8]}")
+    title = data.get("title")
+    description = data.get("description", "")
+
+    if _is_noisy_goal_payload(goal_id, title, description):
+        return {"created": False, "skipped": True, "reason": "test_or_patch_noise"}
+
     goal = Goal(
         id=new_id,
-        goal_id=data.get("goal_id", f"goal-{str(new_id)[:8]}"),
-        title=data.get("title"),
-        description=data.get("description", ""),
+        goal_id=goal_id,
+        title=title,
+        description=description,
         status=data.get("status", "pending"),
         progress=data.get("progress", 0),
         priority=data.get("priority", 2),
@@ -82,6 +103,11 @@ async def update_goal(
     goal_id: str, request: Request, db: AsyncSession = Depends(get_db)
 ):
     data = await request.json()
+    next_title = data.get("title")
+    next_description = data.get("description")
+    if _is_noisy_goal_payload(goal_id, next_title, next_description):
+        return {"updated": False, "skipped": True, "reason": "test_or_patch_noise"}
+
     values: dict = {}
     if data.get("status") is not None:
         values["status"] = data["status"]
