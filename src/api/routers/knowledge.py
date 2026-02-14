@@ -20,6 +20,28 @@ from deps import get_db
 router = APIRouter(tags=["Knowledge Graph"])
 
 
+def _is_test_kg_payload(*values: str) -> bool:
+    markers = (
+        "[test]",
+        "pytest",
+        "goal_test",
+        "live test goal",
+        "test goal",
+        "creative pulse full visualization test",
+        "pulse-exp-",
+        "live test post",
+        "moltbook test",
+        "abc123",
+        "post 42",
+    )
+    text_blob = " ".join((v or "") for v in values).lower()
+    if any(marker in text_blob for marker in markers):
+        return True
+
+    # Token-aware fallback for explicit test tagging without matching unrelated words.
+    return " test " in f" {text_blob} "
+
+
 # ── Pydantic schemas for input validation ─────────────────────────────────────
 
 class EntityCreate(BaseModel):
@@ -201,6 +223,9 @@ async def get_knowledge_relations(
 
 @router.post("/knowledge-graph/entities")
 async def create_knowledge_entity(body: EntityCreate, db: AsyncSession = Depends(get_db)):
+    if _is_test_kg_payload(body.name, body.type, json_lib.dumps(body.properties or {}, default=str)):
+        return {"created": False, "skipped": True, "reason": "test_or_noise_payload"}
+
     entity = KnowledgeEntity(
         id=uuid.uuid4(),
         name=body.name,
@@ -218,6 +243,9 @@ async def create_knowledge_entity(body: EntityCreate, db: AsyncSession = Depends
 
 @router.post("/knowledge-graph/relations")
 async def create_knowledge_relation(body: RelationCreate, db: AsyncSession = Depends(get_db)):
+    if _is_test_kg_payload(body.relation_type, json_lib.dumps(body.properties or {}, default=str)):
+        return {"created": False, "skipped": True, "reason": "test_or_noise_payload"}
+
     relation = KnowledgeRelation(
         id=uuid.uuid4(),
         from_entity=body.from_entity,

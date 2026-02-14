@@ -19,6 +19,25 @@ except ImportError:
 _tracker_log = logging.getLogger("aria.skill_tracker")
 
 
+def _is_noise_invocation(skill_name: str, function_name: str, success: bool) -> bool:
+    """Filter high-frequency low-value noise from activity stream."""
+    if not success:
+        return False
+
+    skill = (skill_name or "").strip().lower()
+    fn = (function_name or "").strip().lower()
+
+    # Routine health probes are useful for status but noisy for activity/memory views.
+    if fn == "health_check" and skill in {"health", "api_client", "agent_manager"}:
+        return True
+
+    # Successful test runs can be frequent and should not pollute memory/KG summaries.
+    if skill in {"pytest", "pytest_runner"} and fn in {"run_tests", "health_check", "get_last_result"}:
+        return True
+
+    return False
+
+
 def _api_base_candidates() -> list[str]:
     seen = set()
     candidates = []
@@ -125,6 +144,9 @@ async def _log_skill_invocation(
     creative_context: dict | None = None,
 ) -> None:
     """Log invocation to /skills/invocations for Skill Stats dashboard."""
+    if _is_noise_invocation(skill_name, function_name, success):
+        return
+
     payload = {
         "skill_name": skill_name,
         "tool_name": function_name,

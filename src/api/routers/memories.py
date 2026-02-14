@@ -4,6 +4,7 @@ Memories endpoints — CRUD with upsert by key + semantic memory (S5-01).
 
 import json as json_lib
 import os
+import re
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -19,6 +20,64 @@ LITELLM_URL = os.environ.get("LITELLM_URL", "http://litellm:4000")
 LITELLM_KEY = os.environ.get("LITELLM_MASTER_KEY", "")
 
 router = APIRouter(tags=["Memories"])
+
+_NOISE_NAME_MARKERS = (
+    "[test]",
+    "pytest",
+    "goal_test",
+    "live test goal",
+    "test goal",
+    "creative pulse full visualization test",
+    "pulse-exp-",
+    "live test post",
+    "moltbook test",
+    "abc123",
+    "post 42",
+)
+
+
+def _contains_noise_name(text: str) -> bool:
+    normalized = (text or "").lower()
+    if any(marker in normalized for marker in _NOISE_NAME_MARKERS):
+        return True
+    # token-aware fallback for standalone "test"
+    return bool(re.search(r"\btest\b", normalized))
+
+
+def _is_noise_activity_for_summary(action: str | None, skill: str | None, details: dict | None) -> bool:
+    action_s = (action or "").lower()
+    skill_s = (skill or "").lower()
+    details_s = json_lib.dumps(details or {}, default=str).lower()
+
+    hay = f"{action_s} {skill_s} {details_s}"
+    if _contains_noise_name(hay):
+        return True
+
+    if action_s in {"heartbeat", "cron_execution"}:
+        return True
+
+    return "health_check" in hay
+
+
+def _is_noise_memory_payload(
+    key: str | None = None,
+    value: str | None = None,
+    content: str | None = None,
+    summary: str | None = None,
+    source: str | None = None,
+    metadata: dict | None = None,
+) -> bool:
+    hay = " ".join(
+        [
+            key or "",
+            str(value or ""),
+            content or "",
+            summary or "",
+            source or "",
+            json_lib.dumps(metadata or {}, default=str),
+        ]
+    )
+    return _contains_noise_name(hay)
 
 
 @router.get("/memories")
@@ -51,6 +110,8 @@ async def create_or_update_memory(
     category = data.get("category", "general")
     if not key:
         raise HTTPException(status_code=400, detail="key is required")
+    if _is_noise_memory_payload(key=key, value=str(value), metadata={"category": category}):
+        return {"stored": False, "skipped": True, "reason": "test_or_noise_payload"}
 
     # Try update first
     result = await db.execute(select(Memory).where(Memory.key == key))
@@ -104,6 +165,8 @@ async def store_semantic_memory(
     source = data.get("source", "api")
     summary = data.get("summary") or content[:100]
     metadata = data.get("metadata", {})
+    if _is_noise_memory_payload(content=content, summary=summary, source=source, metadata=metadata):
+        return {"stored": False, "skipped": True, "reason": "test_or_noise_payload"}
 
     try:
         embedding = await generate_embedding(content)
@@ -179,7 +242,11 @@ async def summarize_session(
         .limit(100)
     )
     result = await db.execute(stmt)
-    activities = result.scalars().all()
+    activities = [
+        item
+        for item in result.scalars().all()
+        if not _is_noise_activity_for_summary(item.action, item.skill, item.details if isinstance(item.details, dict) else {})
+    ]
 
     if not activities:
         return {"summary": "No recent activities to summarize.", "decisions": [], "stored": False}

@@ -25,10 +25,23 @@ def _is_noisy_goal_payload(goal_id: str | None, title: str | None, description: 
         "fetch test",
         "update test",
         "goal_test",
+        "creative pulse full visualization test",
+        "pulse-exp-",
+        "live test post",
+        "moltbook test",
+        "abc123",
+        "post 42",
         "patchable",
         "dry run",
     ]
-    return any(marker in text for marker in noisy_markers)
+    if any(marker in text for marker in noisy_markers):
+        return True
+
+    goal_id_s = (goal_id or "").lower().strip()
+    if goal_id_s.startswith("test-") or goal_id_s.startswith("goal-test"):
+        return True
+
+    return False
 
 
 # ── Goals ────────────────────────────────────────────────────────────────────

@@ -33,7 +33,7 @@ jobs:
   #   delivery: none
 
   - name: health_check
-    cron: "0 0 0,6,12,18 * * *"
+    cron: "0 0 0 * * *"
     text: "Run health check on all systems: exec python3 /root/.openclaw/workspace/skills/run_skill.py health health_check '{}', exec python3 /root/.openclaw/workspace/skills/run_skill.py api_client health_check '{}'. If any check fails, log an alert via api_client. If all pass, silently continue."
     agent: main
     session: isolated
