@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy import Float, case, cast, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.models import ActivityLog, SocialPost, WorkingMemory
+from db.models import ActivityLog, SocialPost
 from deps import get_db
 from pagination import paginate_query, build_paginated_response
 
@@ -47,74 +47,6 @@ def _social_content_from_activity(action: str, skill: str | None, details: dict 
     if error_message:
         parts.append(f"error={error_message}")
     return " · ".join(parts)
-
-
-def _is_test_like_payload(action: str | None, skill: str | None, details: dict | None) -> bool:
-    markers = ["live test", "test_action", "goal_test", "test goal", "dry_run", "moltbook test"]
-    haystack_parts = [action or "", skill or ""]
-    if isinstance(details, dict):
-        haystack_parts.append(json_lib.dumps(details, ensure_ascii=False))
-        if bool(details.get("test")) or bool(details.get("is_test")):
-            return True
-    haystack = " ".join(haystack_parts).lower()
-    return any(marker in haystack for marker in markers)
-
-
-async def _maybe_upsert_work_cycle_memory(data: dict, db: AsyncSession) -> None:
-    """Persist a daily work_cycle memory entry when cron_execution logs arrive."""
-    action = (data.get("action") or "").strip().lower()
-    details = data.get("details")
-    if action != "cron_execution" or not isinstance(details, dict):
-        return
-    if _is_test_like_payload(data.get("action"), data.get("skill"), details):
-        return
-
-    job_name = (details.get("job") or "").strip().lower()
-    if job_name != "work_cycle":
-        return
-
-    now = datetime.now(timezone.utc)
-    key = f"work_cycle_{now.date().isoformat()}"
-    value = {
-        "action": details.get("action") or "work_cycle_progress",
-        "job": "work_cycle",
-        "goal_id": details.get("goal_id"),
-        "progress": details.get("progress"),
-        "estimated_tokens": details.get("estimated_tokens"),
-        "timestamp": now.isoformat(),
-        "source_activity": "cron_execution",
-    }
-    value = {k: v for k, v in value.items() if v is not None}
-
-    existing = (
-        await db.execute(
-            select(WorkingMemory).where(
-                WorkingMemory.category == "general",
-                WorkingMemory.key == key,
-            )
-        )
-    ).scalar_one_or_none()
-
-    if existing:
-        existing.value = value
-        existing.importance = max(float(existing.importance or 0.5), 0.7)
-        existing.source = "cron/work_cycle"
-        existing.updated_at = now
-        existing.accessed_at = now
-        existing.access_count = (existing.access_count or 0) + 1
-        return
-
-    db.add(
-        WorkingMemory(
-            category="general",
-            key=key,
-            value=value,
-            importance=0.7,
-            source="cron/work_cycle",
-            accessed_at=now,
-            access_count=1,
-        )
-    )
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
@@ -186,8 +118,6 @@ async def create_activity(request: Request, db: AsyncSession = Depends(get_db)):
         error_message=data.get("error_message"),
     )
     db.add(activity)
-
-    await _maybe_upsert_work_cycle_memory(data, db)
 
     # Mirror commit/comment-style events into social feed for dashboard visibility.
     action = data.get("action") or ""
