@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Request
-from sqlalchemy import func, select, text
+from sqlalchemy import and_, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import LITELLM_MASTER_KEY, SERVICE_URLS
@@ -20,6 +20,21 @@ from deps import get_db, get_litellm_db
 from pagination import build_paginated_response
 
 router = APIRouter(tags=["Model Usage"])
+
+
+_TEST_MODEL_NAMES = {"test-model", "test_model"}
+
+
+def _is_test_usage_entry(model: Optional[str], provider: Optional[str]) -> bool:
+    provider_l = (provider or "").strip().lower()
+    model_l = (model or "").strip().lower()
+    return provider_l == "pytest" or model_l in _TEST_MODEL_NAMES
+
+
+def _db_non_test_usage_filter():
+    model_l = func.lower(func.coalesce(ModelUsage.model, ""))
+    provider_l = func.lower(func.coalesce(ModelUsage.provider, ""))
+    return and_(provider_l != "pytest", ~model_l.in_(list(_TEST_MODEL_NAMES)))
 
 
 # ── LiteLLM helper (direct DB) ──────────────────────────────────────────────
@@ -220,13 +235,15 @@ async def get_model_usage(
 
     # 1. DB skill executions
     if source in (None, "", "skills", "all"):
-        stmt = select(ModelUsage).order_by(ModelUsage.created_at.desc()).limit(limit)
+        stmt = select(ModelUsage).where(_db_non_test_usage_filter()).order_by(ModelUsage.created_at.desc()).limit(limit)
         if model:
             stmt = stmt.where(ModelUsage.model == model)
         if provider:
             stmt = stmt.where(ModelUsage.provider == provider)
         rows = (await db.execute(stmt)).scalars().all()
         for r in rows:
+            if _is_test_usage_entry(r.model, r.provider):
+                continue
             results.append({
                 "id": str(r.id),
                 "model": r.model,
@@ -292,7 +309,7 @@ async def get_model_usage_stats(
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
 
     # 1. DB stats
-    window_filter = ModelUsage.created_at > cutoff
+    window_filter = and_(ModelUsage.created_at > cutoff, _db_non_test_usage_filter())
     db_total = (
         await db.execute(select(func.count(ModelUsage.id)).where(window_filter))
     ).scalar() or 0
