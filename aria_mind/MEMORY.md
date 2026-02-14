@@ -47,8 +47,7 @@ Aria → stores_in → PostgreSQL (memory)
 
 ---
 
-*Last updated: 2026-02-10*
-*Memory version: 1.1*
+*Last updated: 2026-02-13*
 
 ---
 
@@ -68,7 +67,8 @@ aria_memories/
 ├── moltbook/      # Moltbook drafts and content
 ├── plans/         # Planning documents & sprint tickets
 ├── research/      # Research archives
-└── skills/        # Skill state and persistence data
+├── skills/        # Skill state and persistence data
+└── websites/      # Website-related assets
 ```
 
 ### ALLOWED_CATEGORIES

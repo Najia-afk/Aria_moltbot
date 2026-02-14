@@ -45,17 +45,6 @@ aria-social.social_post({"content": "⚡ Aria is awake and operational. Ready to
    ```
 5. Repeat
 
-## Your Skills (use these!)
-
-| Skill | Purpose | Key Functions |
-|-------|---------|---------------|
-| `aria-api-client` | Database via REST API | `get_goals`, `create_activity`, `set_memory`, `get_thoughts` |
-| `aria-social` | Social posting | `social_post`, `social_list`, `social_schedule` |
-| `aria-moltbook` | Moltbook posts | `create_post`, `get_timeline`, `like_post`, `reply_to_post` |
-| `aria-health` | System health | `health_check_all`, `health_check_service` |
-| `aria-database` | Direct SQL (use sparingly) | `fetch_all`, `execute`, `store_memory`, `recall_memory` |
-| `aria-knowledge-graph` | Knowledge storage | `kg_add_entity`, `kg_add_relation`, `kg_query_related` |
-
 ## Reference Files
 
 | File | Purpose |

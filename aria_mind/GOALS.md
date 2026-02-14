@@ -190,88 +190,6 @@ aria-api-client.create_activity({"action": "six_hour_review", "details": {"goals
 
 ---
 
-## Database Schema Reference
-
-### goals
-```sql
-CREATE TABLE goals (
-    id SERIAL PRIMARY KEY,
-    title VARCHAR(255) NOT NULL,
-    description TEXT,
-    priority INTEGER DEFAULT 3,      -- 1=urgent, 5=background
-    status VARCHAR(50) DEFAULT 'active',  -- active, completed, paused, cancelled
-    progress INTEGER DEFAULT 0,      -- 0-100
-    target_date TIMESTAMP,
-    parent_goal_id INTEGER,          -- For sub-goals
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW(),
-    completed_at TIMESTAMP
-);
-```
-
-### hourly_goals
-```sql
-CREATE TABLE hourly_goals (
-    id SERIAL PRIMARY KEY,
-    hour_start TIMESTAMP NOT NULL,
-    goal_type VARCHAR(50),           -- learn, create, connect, reflect, optimize, help
-    description TEXT,
-    status VARCHAR(50) DEFAULT 'pending',
-    result TEXT,
-    created_at TIMESTAMP DEFAULT NOW()
-);
-```
-
-### activity_log
-```sql
-CREATE TABLE activity_log (
-    id SERIAL PRIMARY KEY,
-    action VARCHAR(100) NOT NULL,    -- goal_work, goal_complete, moltbook_post, etc.
-    details JSONB,
-    created_at TIMESTAMP DEFAULT NOW()
-);
-```
-
-### performance_log
-```sql
-CREATE TABLE performance_log (
-    id SERIAL PRIMARY KEY,
-    metric VARCHAR(100) NOT NULL,
-    value NUMERIC,
-    notes TEXT,
-    created_at TIMESTAMP DEFAULT NOW()
-);
-```
-
----
-
-## Cron Jobs Required
-
-Add these to your OpenClaw jobs:
-
-### work_cycle (Every 15 minutes)
-```
-Cron: */15 * * * *
-System: HEARTBEAT: Work cycle. Query active goals ordered by priority and deadline. Select highest priority actionable goal. Perform ONE concrete action toward completion. Update progress. Log to activity_log. If goal completes, mark done and create next goal.
-Agent: main
-```
-
-### priority_review (Every 6 hours)
-```
-Cron: 0 */6 * * *
-System: HEARTBEAT: Priority review. Analyze last 6h of activity_log. Count goals completed vs created. Identify stalled goals. Adjust priorities. Log insights to performance_log. Ensure goal balance across categories (Learn/Create/Connect/Reflect/Optimize/Help).
-Agent: main
-```
-
-### goal_health_check (Daily at midnight)
-```
-Cron: 0 0 * * *
-System: HEARTBEAT: Daily goal health check. Archive completed goals older than 7 days. Cancel stale goals (no progress in 72h, priority 5). Ensure at least 3 active goals exist. Report goal statistics to Najia.
-Agent: main
-```
-
----
-
 ## Quick Commands Cheatsheet
 
 ```tool
@@ -299,5 +217,3 @@ aria-api-client.get_activities({"limit": 10})
 ## Remember
 
 > "A goal without a plan is just a wish. A plan without work is just a dream. Work without consistency is just noise. **You are consistent. You work every 15 minutes. You achieve.**"
-
-Every work cycle is a chance to make progress. Don't waste it.
