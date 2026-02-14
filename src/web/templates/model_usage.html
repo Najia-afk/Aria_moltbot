@@ -398,6 +398,21 @@ let _usageData = null;     // /model-usage response (recent records)
 let _charts = {};          // Chart.js instances
 let usagePager;
 
+function safeModelName(model) {
+    const value = (model ?? '').toString().trim();
+    return value || 'unknown';
+}
+
+function safeNumber(value, fallback = 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function skillDisplayName(model) {
+    const name = safeModelName(model);
+    return name.startsWith('skill:') ? name.slice(6) : name;
+}
+
 // ── Tabs ────────────────────────────────────────────────────────────────────
 document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -482,7 +497,7 @@ function renderModelUsageOverview() {
     const providerTokens = {};
     llmModels.forEach(m => {
         const prov = m.provider || 'unknown';
-        providerTokens[prov] = (providerTokens[prov] || 0) + (m.input_tokens || 0) + (m.output_tokens || 0);
+        providerTokens[prov] = (providerTokens[prov] || 0) + safeNumber(m.input_tokens) + safeNumber(m.output_tokens);
     });
     const provLabels = Object.keys(providerTokens);
     const provColors = provLabels.map(p => getProviderColor(p));
@@ -502,11 +517,11 @@ function renderModelUsageOverview() {
     if (topLLM.length > 0) {
         overviewLLMBody.innerHTML = topLLM.map(m => `
             <tr>
-                <td><span class="model-name">${m.model}</span></td>
+                <td><span class="model-name">${safeModelName(m.model)}</span></td>
                 <td><span class="provider-badge">${m.provider || '-'}</span></td>
-                <td>${m.requests}</td>
-                <td>${formatNumber((m.input_tokens||0)+(m.output_tokens||0))}</td>
-                <td>${formatCost(m.cost)}</td>
+                <td>${safeNumber(m.requests)}</td>
+                <td>${formatNumber(safeNumber(m.input_tokens) + safeNumber(m.output_tokens))}</td>
+                <td>${formatCost(safeNumber(m.cost))}</td>
             </tr>
         `).join('');
     } else {
@@ -519,9 +534,9 @@ function renderModelUsageOverview() {
     if (topSkills.length > 0) {
         overviewSkillsBody.innerHTML = topSkills.map(m => `
             <tr>
-                <td><span class="model-name">${m.model.replace('skill:', '⚡ ')}</span></td>
-                <td>${m.requests}</td>
-                <td>${m.avg_latency ? m.avg_latency + 'ms' : '-'}</td>
+                <td><span class="model-name">⚡ ${skillDisplayName(m.model)}</span></td>
+                <td>${safeNumber(m.requests)}</td>
+                <td>${safeNumber(m.avg_latency) ? safeNumber(m.avg_latency) + 'ms' : '-'}</td>
                 <td><span class="success-badge success">✓</span></td>
             </tr>
         `).join('');
@@ -539,10 +554,10 @@ function renderLLMTab() {
     const llmModels = (s.by_model || []).filter(m => m.source !== 'skills');
 
     // Stats
-    const llmRequests = llmModels.reduce((a, m) => a + m.requests, 0);
-    const llmInput = llmModels.reduce((a, m) => a + (m.input_tokens || 0), 0);
-    const llmOutput = llmModels.reduce((a, m) => a + (m.output_tokens || 0), 0);
-    const llmCost = llmModels.reduce((a, m) => a + (m.cost || 0), 0);
+    const llmRequests = llmModels.reduce((a, m) => a + safeNumber(m.requests), 0);
+    const llmInput = llmModels.reduce((a, m) => a + safeNumber(m.input_tokens), 0);
+    const llmOutput = llmModels.reduce((a, m) => a + safeNumber(m.output_tokens), 0);
+    const llmCost = llmModels.reduce((a, m) => a + safeNumber(m.cost), 0);
 
     document.getElementById('llm-stat-requests').textContent = formatNumber(llmRequests);
     document.getElementById('llm-stat-input').textContent = formatNumber(llmInput);
@@ -550,8 +565,8 @@ function renderLLMTab() {
     document.getElementById('llm-stat-cost').textContent = formatCost(llmCost);
 
     // ── Chart: Requests per Model (horizontal bar) ──
-    const modelNames = llmModels.slice(0, 10).map(m => m.model);
-    const modelReqs = llmModels.slice(0, 10).map(m => m.requests);
+    const modelNames = llmModels.slice(0, 10).map(m => safeModelName(m.model));
+    const modelReqs = llmModels.slice(0, 10).map(m => safeNumber(m.requests));
     const modelColors = modelNames.map(n => getProviderColor(getProvider(n)));
     ARIAChartHelpers.renderChart(_charts, 'chart-llm-models', 'bar', {
         labels: modelNames,
@@ -564,19 +579,19 @@ function renderLLMTab() {
     }, { indexAxis: 'y', maxTicksLimit: 10 });
 
     // ── Chart: Input vs Output tokens (bar) ──
-    const topByTokens = llmModels.filter(m => (m.input_tokens||0)+(m.output_tokens||0) > 0).slice(0, 8);
+    const topByTokens = llmModels.filter(m => safeNumber(m.input_tokens) + safeNumber(m.output_tokens) > 0).slice(0, 8);
     ARIAChartHelpers.renderChart(_charts, 'chart-llm-tokens', 'bar', {
-        labels: topByTokens.map(m => m.model),
+        labels: topByTokens.map(m => safeModelName(m.model)),
         datasets: [
             {
                 label: 'Input',
-                data: topByTokens.map(m => m.input_tokens || 0),
+                data: topByTokens.map(m => safeNumber(m.input_tokens)),
                 backgroundColor: '#3b82f6',
                 borderRadius: 4,
             },
             {
                 label: 'Output',
-                data: topByTokens.map(m => m.output_tokens || 0),
+                data: topByTokens.map(m => safeNumber(m.output_tokens)),
                 backgroundColor: '#22c55e',
                 borderRadius: 4,
             }
@@ -588,12 +603,12 @@ function renderLLMTab() {
     if (llmModels.length > 0) {
         llmBody.innerHTML = llmModels.map(m => `
             <tr>
-                <td><span class="model-name">🧠 ${m.model}</span></td>
+                <td><span class="model-name">🧠 ${safeModelName(m.model)}</span></td>
                 <td><span class="provider-badge">${m.provider || '-'}</span></td>
-                <td>${m.requests}</td>
-                <td>${formatNumber(m.input_tokens)}</td>
-                <td>${formatNumber(m.output_tokens)}</td>
-                <td>${formatCost(m.cost)}</td>
+                <td>${safeNumber(m.requests)}</td>
+                <td>${formatNumber(safeNumber(m.input_tokens))}</td>
+                <td>${formatNumber(safeNumber(m.output_tokens))}</td>
+                <td>${formatCost(safeNumber(m.cost))}</td>
             </tr>
         `).join('');
     } else {
@@ -608,11 +623,11 @@ function renderRecentLLM() {
     if (llmRecent.length > 0) {
         body.innerHTML = llmRecent.map(u => `
             <tr>
-                <td><span class="model-name">🧠 ${u.model}</span></td>
+                <td><span class="model-name">🧠 ${safeModelName(u.model)}</span></td>
                 <td><span class="provider-badge">${u.provider || '-'}</span></td>
-                <td>${formatNumber(u.input_tokens)}</td>
-                <td>${formatNumber(u.output_tokens)}</td>
-                <td>${formatCost(u.cost_usd)}</td>
+                <td>${formatNumber(safeNumber(u.input_tokens))}</td>
+                <td>${formatNumber(safeNumber(u.output_tokens))}</td>
+                <td>${formatCost(safeNumber(u.cost_usd))}</td>
                 <td><span class="success-badge ${u.success ? 'success' : 'error'}">${u.success ? '✓' : '✗'}</span></td>
                 <td>${formatDate(u.created_at)}</td>
             </tr>
@@ -630,9 +645,9 @@ function renderSkillsTab() {
     const skills = (_statsData.by_model || []).filter(m => m.source === 'skills');
 
     // Stats
-    const totalCalls = skills.reduce((a, m) => a + m.requests, 0);
-    const avgLat = skills.length > 0
-        ? Math.round(skills.reduce((a, m) => a + (m.avg_latency || 0) * m.requests, 0) / totalCalls)
+    const totalCalls = skills.reduce((a, m) => a + safeNumber(m.requests), 0);
+    const avgLat = totalCalls > 0
+        ? Math.round(skills.reduce((a, m) => a + safeNumber(m.avg_latency) * safeNumber(m.requests), 0) / totalCalls)
         : 0;
 
     document.getElementById('skill-stat-calls').textContent = formatNumber(totalCalls);
@@ -643,10 +658,10 @@ function renderSkillsTab() {
     // ── Chart: Calls per Skill (horizontal bar) ──
     const topSkills = skills.slice(0, 12);
     ARIAChartHelpers.renderChart(_charts, 'chart-skill-calls', 'bar', {
-        labels: topSkills.map(m => m.model.replace('skill:', '')),
+        labels: topSkills.map(m => skillDisplayName(m.model)),
         datasets: [{
             label: 'Calls',
-            data: topSkills.map(m => m.requests),
+            data: topSkills.map(m => safeNumber(m.requests)),
             backgroundColor: '#a855f7',
             borderRadius: 6,
         }]
@@ -655,12 +670,13 @@ function renderSkillsTab() {
     // ── Chart: Latency Distribution (bar) ──
     const latencyBuckets = { '<50ms': 0, '50-100ms': 0, '100-200ms': 0, '200-500ms': 0, '>500ms': 0 };
     skills.forEach(m => {
-        const lat = m.avg_latency || 0;
-        if (lat < 50) latencyBuckets['<50ms'] += m.requests;
-        else if (lat < 100) latencyBuckets['50-100ms'] += m.requests;
-        else if (lat < 200) latencyBuckets['100-200ms'] += m.requests;
-        else if (lat < 500) latencyBuckets['200-500ms'] += m.requests;
-        else latencyBuckets['>500ms'] += m.requests;
+        const lat = safeNumber(m.avg_latency);
+        const req = safeNumber(m.requests);
+        if (lat < 50) latencyBuckets['<50ms'] += req;
+        else if (lat < 100) latencyBuckets['50-100ms'] += req;
+        else if (lat < 200) latencyBuckets['100-200ms'] += req;
+        else if (lat < 500) latencyBuckets['200-500ms'] += req;
+        else latencyBuckets['>500ms'] += req;
     });
     ARIAChartHelpers.renderChart(_charts, 'chart-skill-latency', 'bar', {
         labels: Object.keys(latencyBuckets),
@@ -676,13 +692,13 @@ function renderSkillsTab() {
     const body = document.getElementById('skill-summary-body');
     if (skills.length > 0) {
         body.innerHTML = skills.map(m => {
-            const lat = m.avg_latency || 0;
+            const lat = safeNumber(m.avg_latency);
             const barClass = lat < 100 ? 'fast' : lat < 300 ? 'medium' : 'slow';
             const barWidth = Math.min(lat / 10, 80);
             return `
             <tr>
-                <td><span class="model-name">⚡ ${m.model.replace('skill:', '')}</span></td>
-                <td>${m.requests}</td>
+                <td><span class="model-name">⚡ ${skillDisplayName(m.model)}</span></td>
+                <td>${safeNumber(m.requests)}</td>
                 <td><span class="latency-bar ${barClass}" style="width:${barWidth}px"></span>${lat}ms</td>
                 <td>${lat > 0 ? Math.max(Math.round(lat * 0.5), 10) + 'ms' : '-'}</td>
                 <td>${lat > 0 ? Math.round(lat * 1.8) + 'ms' : '-'}</td>
@@ -700,12 +716,12 @@ function renderRecentSkills() {
     const body = document.getElementById('skill-recent-body');
     if (skillRecent.length > 0) {
         body.innerHTML = skillRecent.map(u => {
-            const lat = u.latency_ms || 0;
+            const lat = safeNumber(u.latency_ms);
             const barClass = lat < 100 ? 'fast' : lat < 300 ? 'medium' : 'slow';
             const barWidth = Math.min(lat / 10, 80);
             return `
             <tr>
-                <td><span class="model-name">⚡ ${u.model.replace('skill:', '')}</span></td>
+                <td><span class="model-name">⚡ ${skillDisplayName(u.model)}</span></td>
                 <td><span class="latency-bar ${barClass}" style="width:${barWidth}px"></span>${lat ? lat + 'ms' : '-'}</td>
                 <td><span class="success-badge ${u.success ? 'success' : 'error'}">${u.success ? '✓' : '✗'}</span></td>
                 <td>${formatDate(u.created_at)}</td>

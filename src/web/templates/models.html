@@ -778,7 +778,28 @@ async function loadModels() {
     
     try {
         const data = await fetchWithTimeout(`${API_URL}/litellm/models`);
-        allModels = data.data || [];
+        const rawModels = Array.isArray(data?.data)
+            ? data.data
+            : Array.isArray(data?.models)
+                ? data.models
+                : Array.isArray(data)
+                    ? data
+                    : [];
+
+        allModels = rawModels
+            .map(entry => {
+                if (typeof entry === 'string') {
+                    return { id: entry, max_tokens: null };
+                }
+                const id = entry?.id || entry?.model || entry?.name || entry?.model_name || '';
+                if (!id) return null;
+                return {
+                    ...entry,
+                    id,
+                    max_tokens: entry?.max_tokens ?? entry?.maxTokens ?? null,
+                };
+            })
+            .filter(Boolean);
         
         // Update stat
         document.getElementById('stat-models').textContent = allModels.length;
@@ -804,7 +825,7 @@ function renderModels(filter) {
     
     let models = allModels;
     if (filter !== 'all') {
-        models = allModels.filter(m => getProvider(m.id) === filter);
+        models = allModels.filter(m => getProvider((m && m.id) || '') === filter);
     }
     
     if (models.length === 0) {
@@ -818,14 +839,15 @@ function renderModels(filter) {
     }
     
     grid.innerHTML = models.map(model => {
-        const provider = getProvider(model.id);
-        const pricing = getModelPricing(model.id);
+        const modelId = (model && model.id) || 'unknown';
+        const provider = getProvider(modelId);
+        const pricing = getModelPricing(modelId);
         const isFree = pricing.input === 0 && pricing.output === 0;
         
         return `
             <div class="model-card" data-provider="${provider}">
                 <div class="model-card-header">
-                    <span class="model-name">${model.id}</span>
+                    <span class="model-name">${modelId}</span>
                     <span class="model-provider ${provider}">${provider}</span>
                 </div>
                 <div class="model-pricing">

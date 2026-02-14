@@ -156,6 +156,53 @@ async def _litellm_by_model_stats(
         return []
 
 
+def _litellm_fallback_from_logs(logs: list[dict]) -> tuple[dict, list[dict]]:
+    """Build aggregate + per-model stats from raw LiteLLM logs as a safe fallback."""
+    agg = {
+        "requests": 0,
+        "tokens": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cost": 0.0,
+    }
+    by_model: dict[tuple[str, str], dict] = {}
+
+    for log in logs:
+        model_name = (log.get("model") or "unknown").strip() or "unknown"
+        provider = (log.get("provider") or "litellm").strip() or "litellm"
+        input_tokens = int(log.get("input_tokens") or 0)
+        output_tokens = int(log.get("output_tokens") or 0)
+        total_tokens = int(log.get("total_tokens") or (input_tokens + output_tokens))
+        cost = float(log.get("cost_usd") or 0)
+
+        agg["requests"] += 1
+        agg["tokens"] += total_tokens
+        agg["input_tokens"] += input_tokens
+        agg["output_tokens"] += output_tokens
+        agg["cost"] += cost
+
+        key = (model_name, provider)
+        if key not in by_model:
+            by_model[key] = {
+                "model": model_name,
+                "provider": provider,
+                "requests": 0,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cost": 0.0,
+                "avg_latency": 0,
+                "source": "litellm",
+            }
+
+        bucket = by_model[key]
+        bucket["requests"] += 1
+        bucket["input_tokens"] += input_tokens
+        bucket["output_tokens"] += output_tokens
+        bucket["cost"] += cost
+
+    return agg, sorted(by_model.values(), key=lambda x: x["requests"], reverse=True)
+
+
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
 @router.get("/model-usage")
@@ -293,6 +340,27 @@ async def get_model_usage_stats(
     # 2. LiteLLM stats (direct DB aggregation — no more HTTP proxy)
     llm_agg = await _litellm_aggregate_stats(litellm_db, since=cutoff)
     llm_by_model = await _litellm_by_model_stats(litellm_db, since=cutoff)
+
+    # Fallback path: derive stats from raw logs when aggregate/group queries fail
+    # or return empty due schema drift/permission issues.
+    if not llm_by_model or int(llm_agg.get("requests", 0)) == 0:
+        fallback_logs = await _fetch_litellm_spend_logs(litellm_db, limit=5000, since=cutoff)
+        if fallback_logs:
+            fallback_agg, fallback_by_model = _litellm_fallback_from_logs(fallback_logs)
+            if int(llm_agg.get("requests", 0)) == 0:
+                llm_agg = fallback_agg
+            if not llm_by_model:
+                llm_by_model = [
+                    {
+                        "display_model": item["model"],
+                        "provider": item["provider"],
+                        "requests": item["requests"],
+                        "input_tokens": item["input_tokens"],
+                        "output_tokens": item["output_tokens"],
+                        "cost": item["cost"],
+                    }
+                    for item in fallback_by_model
+                ]
 
     for entry in llm_by_model:
         model_name = entry.get("display_model") or "unknown"
