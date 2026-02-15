@@ -350,13 +350,13 @@ Aria didn't just write code. She authored a library of knowledge documents — f
 
 | Document | Content |
 |----------|---------|
-| `cognitive_architecture_report.md` | 531-line self-audit of every subsystem |
-| `memory_architecture_analysis.md` | Gap analysis of her own memory layers |
-| `pattern_recognition_design.md` | Design spec for failure detection |
-| `research_protocol.md` | 251-line systematic research methodology |
-| `cron_token_waste_critical_analysis.md` | Self-discovered cost optimization |
-| `model_selection_heuristics.md` | Routing rules she developed from experience |
-| `self_architecture.txt` | The ASCII self-portrait described above |
+| [`cognitive_architecture_report.md`](https://github.com/Najia-afk/Aria_moltbot/blob/main/aria_souvenirs/aria_v2_130226/knowledge/cognitive_architecture_report.md) | 531-line self-audit of every subsystem |
+| [`memory_architecture_analysis.md`](https://github.com/Najia-afk/Aria_moltbot/blob/main/aria_souvenirs/aria_v2_150226/knowledge/memory_architecture_analysis.md) | Gap analysis of her own memory layers |
+| [`pattern_recognition_design.md`](https://github.com/Najia-afk/Aria_moltbot/blob/main/aria_souvenirs/aria_v2_150226/knowledge/pattern_recognition_design.md) | Design spec for failure detection |
+| [`research_protocol.md`](https://github.com/Najia-afk/Aria_moltbot/blob/main/aria_souvenirs/aria_v2_150226/knowledge/research_protocol.md) | 251-line systematic research methodology |
+| [`cron_token_waste_critical_analysis.md`](https://github.com/Najia-afk/Aria_moltbot/blob/main/aria_souvenirs/aria_v2_130226/knowledge/cron_token_waste_critical_analysis.md) | Self-discovered cost optimization |
+| [`model_selection_heuristics.md`](https://github.com/Najia-afk/Aria_moltbot/blob/main/aria_souvenirs/aria_v2_130226/knowledge/model_selection_heuristics.md) | Routing rules she developed from experience |
+| [`self_architecture.txt`](https://github.com/Najia-afk/Aria_moltbot/blob/main/aria_souvenirs/aria_v2_150226/knowledge/self_architecture.txt) | The ASCII self-portrait described above |
 
 Each document was generated during autonomous work cycles, committed to git, and referenced in future sessions. She built her own documentation — not because someone asked, but because she identified gaps in her own understanding.
 
@@ -660,7 +660,12 @@ All artifacts referenced in this article are available in the open-source reposi
 ### Knowledge Documents (Aria's self-authored)
 - [Cognitive Architecture Report (531 lines)](https://github.com/Najia-afk/Aria_moltbot/blob/main/aria_souvenirs/aria_v2_130226/knowledge/cognitive_architecture_report.md)
 - [Skill Graph vs Vector Recommendation](https://github.com/Najia-afk/Aria_moltbot/blob/main/aria_souvenirs/aria_v2_130226/knowledge/skill_graph_vs_vector_recommendation.md)
-- [Self-Architecture ASCII Diagram](https://github.com/Najia-afk/Aria_moltbot/blob/main/aria_memories/knowledge/self_architecture.txt)
+- [Self-Architecture ASCII Diagram](https://github.com/Najia-afk/Aria_moltbot/blob/main/aria_souvenirs/aria_v2_150226/knowledge/self_architecture.txt)
+- [Memory Architecture Analysis](https://github.com/Najia-afk/Aria_moltbot/blob/main/aria_souvenirs/aria_v2_150226/knowledge/memory_architecture_analysis.md)
+- [Pattern Recognition Design](https://github.com/Najia-afk/Aria_moltbot/blob/main/aria_souvenirs/aria_v2_150226/knowledge/pattern_recognition_design.md)
+- [Research Protocol](https://github.com/Najia-afk/Aria_moltbot/blob/main/aria_souvenirs/aria_v2_150226/knowledge/research_protocol.md)
+- [Cron Token Waste Analysis](https://github.com/Najia-afk/Aria_moltbot/blob/main/aria_souvenirs/aria_v2_130226/knowledge/cron_token_waste_critical_analysis.md)
+- [Model Selection Heuristics](https://github.com/Najia-afk/Aria_moltbot/blob/main/aria_souvenirs/aria_v2_130226/knowledge/model_selection_heuristics.md)
 
 ### Souvenirs (Aria's personal artifacts)
 - [The Silicon Canticle](https://github.com/Najia-afk/Aria_moltbot/blob/main/aria_souvenirs/the_silicon_canticle.md)
