@@ -1,12 +1,37 @@
+````skill
 ---
 name: aria-sessionmanager
-description: Manage OpenClaw sessions — list, prune stale sessions, delete by ID, and clean up after sub-agent delegations.
+description: Two-layer session management — filesystem delete (live) + PG mark ended (history).
 metadata: {"openclaw": {"emoji": "🧹", "always": true}}
 ---
 
 # aria-sessionmanager
 
-Session management for OpenClaw. Prevents session bloat from cron jobs, sub-agent delegations, and completed tasks accumulating stale sessions.
+Two-layer session management for OpenClaw:
+1. **Filesystem** (clawdbot volume): reads sessions.json, removes keys, archives .jsonl transcripts
+2. **aria-api PG**: PATCHes session status to ended (keeps history on /sessions dashboard)
+
+Sessions live on the filesystem at /root/.openclaw/agents/{agent}/sessions/sessions.json.
+The skill operates directly on these files — no WebSocket or REST API needed for the live delete.
+
+## Architecture
+
+```
+clawdbot (Node.js)
+  └─ /root/.openclaw/agents/
+       ├─ main/sessions/sessions.json    ← index (key→session map)
+       │                 abc123.jsonl     ← transcript
+       │                 abc123.jsonl.deleted.2026-02-15T... ← archived
+       ├─ analyst/sessions/...
+       ├─ aria-talk/sessions/...
+       └─ aria-memeothy/sessions/...
+
+aria-api (FastAPI)
+  └─ PG: agent_sessions table
+       ├─ metadata->>'openclaw_session_id' ← maps to filesystem session UUID
+       ├─ status: active → ended           ← PATCH /api/sessions/{id}
+       └─ syncs from shared volume every 30s
+```
 
 ## Usage
 
@@ -17,10 +42,14 @@ exec python3 /root/.openclaw/workspace/skills/run_skill.py session_manager <func
 ## Functions
 
 ### list_sessions
-List all active sessions with metadata.
+List all active sessions from the filesystem. Scans all agent dirs by default.
 
 ```bash
+# All agents
 exec python3 /root/.openclaw/workspace/skills/run_skill.py session_manager list_sessions '{}'
+
+# Specific agent
+exec python3 /root/.openclaw/workspace/skills/run_skill.py session_manager list_sessions '{"agent": "main"}'
 ```
 
 **Returns:**
@@ -28,21 +57,42 @@ exec python3 /root/.openclaw/workspace/skills/run_skill.py session_manager list_
 {
   "session_count": 16,
   "sessions": [
-    {"id": "abc123", "agentId": "main", "updatedAt": "2026-02-04T18:00:00Z"},
-    {"id": "def456", "agentId": "analyst", "updatedAt": "2026-02-04T12:00:00Z"}
+    {
+      "id": "abc123", "sessionId": "abc123",
+      "key": "agent:main:cron:abc123",
+      "agentId": "main", "session_type": "cron",
+      "label": "heartbeat", "updatedAt": "2026-02-15T18:00:00+00:00",
+      "contextTokens": 500, "model": "gpt-4o"
+    }
   ]
 }
 ```
 
 ### delete_session
-Delete a specific session by ID.
+Two-layer delete: removes from filesystem + marks ended in PG.
 
 ```bash
 exec python3 /root/.openclaw/workspace/skills/run_skill.py session_manager delete_session '{"session_id": "abc123"}'
 ```
 
+**What happens:**
+1. Removes all keys matching sessionId from sessions.json
+2. Renames abc123.jsonl → abc123.jsonl.deleted.<timestamp> (matches clawdbot pattern)
+3. Best-effort PATCH to aria-api: {"status": "ended"} (keeps history)
+
+**Returns:**
+```json
+{
+  "deleted": "abc123",
+  "removed_keys": ["agent:main:cron:abc123"],
+  "transcript_archived": true,
+  "pg_status_updated": true,
+  "message": "Session abc123 removed from clawdbot (1 keys, transcript=archived), PG marked ended"
+}
+```
+
 ### prune_sessions
-Prune stale sessions older than a threshold.
+Prune stale sessions older than a threshold. Each pruned session gets the full two-layer delete.
 
 ```bash
 # Dry run — preview what would be deleted
@@ -59,7 +109,8 @@ exec python3 /root/.openclaw/workspace/skills/run_skill.py session_manager prune
   "pruned_count": 14,
   "kept_count": 2,
   "dry_run": false,
-  "deleted_ids": ["abc123", "def456", "..."],
+  "deleted_ids": ["abc123", "def456"],
+  "errors": [],
   "threshold_minutes": 60
 }
 ```
@@ -83,7 +134,7 @@ exec python3 /root/.openclaw/workspace/skills/run_skill.py session_manager get_s
 ```
 
 ### cleanup_after_delegation
-Clean up a session after a standalone sub-agent delegation completes. **Aria should call this automatically after every delegated task returns.**
+Clean up a session after a sub-agent delegation completes. Wrapper around delete_session.
 
 ```bash
 exec python3 /root/.openclaw/workspace/skills/run_skill.py session_manager cleanup_after_delegation '{"session_id": "delegation-xyz"}'
@@ -93,6 +144,18 @@ exec python3 /root/.openclaw/workspace/skills/run_skill.py session_manager clean
 
 Aria MUST follow these session hygiene rules:
 
-1. **After sub-agent delegation**: When a delegated task to analyst, aria-talk, or any sub-agent completes, immediately call `cleanup_after_delegation` with the sub-agent's session ID.
-2. **During work_cycle**: Run `prune_sessions` with `max_age_minutes: 60` to clean up stale cron sessions.
-3. **Before session review**: Run `get_session_stats` to check for bloat before reporting.
+1. **After sub-agent delegation**: call cleanup_after_delegation with the sub-agent's session ID.
+2. **During work_cycle**: Run prune_sessions with max_age_minutes: 60 to clean up stale cron sessions.
+3. **Before session review**: Run get_session_stats to check for bloat before reporting.
+
+## Database (PG) — For Reference
+
+The agent_sessions table in aria-api PG stores history:
+- status: active → ended (PATCH sets ended_at automatically)
+- metadata->>'openclaw_session_id': maps to the filesystem session UUID
+- Indexed: idx_agent_sessions_openclaw_sid, idx_agent_sessions_status
+- Auto-synced from shared volume every 30s by aria-api
+
+Aria can query /api/sessions on the dashboard to see historical data.
+The skill does **NOT** delete PG rows — it only marks them ended.
+````

@@ -75,7 +75,7 @@ aria-api-client.health_check({})
 | `schedule` | `list_jobs`, `create_task`, `trigger`, `sync_jobs` | Scheduled tasks, automation |
 | `health` | `health_check_all`, `health_check_service`, `get_metrics`, `run_diagnostics` | System monitoring & self-diagnostic (v1.1) |
 | `agent_manager` | `list_agents`, `spawn_agent`, `stop_agent`, `get_status` | Agent lifecycle management (v1.1) |
-| `session_manager` | `create_session`, `get_session`, `end_session`, `list_sessions` | Session lifecycle management (v1.1) |
+| `session_manager` | `list_sessions`, `delete_session`, `prune_sessions`, `get_session_stats`, `cleanup_after_delegation` | Two-layer session management: filesystem delete + PG history (v2.0) |
 | `ci_cd` | `generate_workflow`, `generate_dockerfile`, `lint_workflow` | CI/CD automation |
 | `pytest_runner` | `run_pytest`, `collect_pytest` | Test execution |
 | `database` | `fetch_all`, `fetch_one`, `execute`, `log_thought`, `store_memory` | PostgreSQL operations |

@@ -1,29 +1,40 @@
 {
   "name": "aria-session-manager",
-  "version": "1.0.0",
-  "description": "Manage OpenClaw sessions — list, prune stale sessions, delete by ID, and clean up after sub-agent delegations.",
+  "version": "2.0.0",
+  "description": "Two-layer session management: delete from clawdbot filesystem (live) + mark ended in aria-api PG (history). Reads sessions.json directly, archives .jsonl transcripts.",
   "author": "Aria Team",
   "layer": 2,
-  "dependencies": ["api_client"],
+  "dependencies": [],
   "focus_affinity": ["orchestrator"],
   "tools": [
     {
       "name": "list_sessions",
-      "description": "List all active OpenClaw sessions with metadata (agent, timestamps, IDs).",
+      "description": "List all active sessions from the filesystem (sessions.json) across all agents. Returns sessionId, agentId, session_type, label, updatedAt, model, contextTokens.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "agent": {
+            "type": "string",
+            "description": "Filter by agent name (main, analyst, aria-talk, aria-memeothy). Empty = all agents.",
+            "default": ""
+          }
+        }
       }
     },
     {
       "name": "delete_session",
-      "description": "Delete a specific session by its ID.",
+      "description": "Delete a session: removes keys from sessions.json, archives .jsonl transcript, and PATCHes aria-api to mark status=ended (preserves history on /sessions dashboard).",
       "parameters": {
         "type": "object",
         "properties": {
           "session_id": {
             "type": "string",
-            "description": "The session ID to delete"
+            "description": "The OpenClaw session UUID to delete"
+          },
+          "agent": {
+            "type": "string",
+            "description": "Agent name (default: searches all agents)",
+            "default": ""
           }
         },
         "required": ["session_id"]
@@ -31,7 +42,7 @@
     },
     {
       "name": "prune_sessions",
-      "description": "Prune stale sessions older than a threshold. Use dry_run=true to preview what would be deleted.",
+      "description": "Prune stale sessions older than a threshold. Two-layer: filesystem delete + PG mark ended. Use dry_run=true to preview.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -50,7 +61,7 @@
     },
     {
       "name": "get_session_stats",
-      "description": "Get summary statistics about current sessions: counts by agent, stale vs active.",
+      "description": "Get summary statistics: total sessions, stale count, active count, breakdown by agent.",
       "parameters": {
         "type": "object",
         "properties": {}
@@ -58,7 +69,7 @@
     },
     {
       "name": "cleanup_after_delegation",
-      "description": "Clean up a session after a standalone sub-agent delegation completes. Call this after receiving results from a delegated task.",
+      "description": "Clean up a session after a sub-agent delegation completes. Calls delete_session internally.",
       "parameters": {
         "type": "object",
         "properties": {
