@@ -53,6 +53,13 @@ try:
 except ImportError:
     HAS_PROMETHEUS = False
 
+# In-process skill health dashboard (lightweight aggregator for cognition)
+try:
+    from aria_mind.skill_health_dashboard import record_skill_execution as _record_dashboard_metric
+    HAS_HEALTH_DASHBOARD = True
+except ImportError:
+    HAS_HEALTH_DASHBOARD = False
+
 T = TypeVar('T')
 
 
@@ -356,6 +363,18 @@ class BaseSkill(ABC):
                 except Exception:
                     pass  # Never let observability break the skill
             
+            # In-process health dashboard (for cognition-level routing)
+            if HAS_HEALTH_DASHBOARD:
+                try:
+                    _record_dashboard_metric(
+                        skill_name=self.name,
+                        execution_time_ms=latency_ms,
+                        success=success,
+                        error_type=error_type,
+                    )
+                except Exception:
+                    pass  # Never let observability break the skill
+
             # Prometheus metrics
             if HAS_PROMETHEUS:
                 SKILL_CALLS.labels(

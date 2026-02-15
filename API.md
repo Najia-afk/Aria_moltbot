@@ -1,0 +1,90 @@
+# Aria Blue ⚡️ — API & Dashboard
+
+## API — FastAPI v3.0
+
+Aria's backend is a FastAPI application with async SQLAlchemy 2.0 ORM, psycopg 3 driver, and Strawberry GraphQL.
+
+The API is the **sole database gateway** — all skills and agents access data through it, never directly.
+
+### REST Routers
+
+All routers live in `src/api/routers/`. Each file is a self-contained FastAPI router module. Browse the directory for the current list — do not maintain a hardcoded inventory elsewhere.
+
+**→ [`src/api/routers/`](src/api/routers/)**
+
+Key endpoints:
+
+| Prefix | Purpose |
+|--------|---------|
+| `/health`, `/status`, `/stats` | Liveness, readiness, service status |
+| `/activities` | Activity log CRUD + stats |
+| `/goals`, `/hourly-goals` | Goal tracking + micro-goals |
+| `/working-memory` | Working memory CRUD, context ranking, checkpointing |
+| `/knowledge-graph` | Knowledge graph entities + relations |
+| `/model-usage` | LLM usage metrics + cost tracking |
+| `/security-events` | Security audit log + threat detection |
+
+Full interactive docs are served at `/api/docs` (Swagger) when the stack is running.
+
+### GraphQL
+
+Strawberry GraphQL schema at `/graphql` — query activities, thoughts, memories, goals with filtering and pagination.
+
+Source: `src/api/gql/`
+
+### Security Middleware
+
+- Per-IP rate limiting
+- Prompt injection scanning
+- SQL/XSS/path traversal detection
+- Security headers on all responses
+
+Source: `src/api/security_middleware.py`
+
+### Database ORM
+
+SQLAlchemy 2.0 async models and session management:
+
+- Models: `src/api/db/models.py`
+- Session: `src/api/db/session.py`
+- Documentation: `src/api/db/MODELS.md`
+- Migrations: `src/api/alembic/`
+
+---
+
+## Dashboard — Flask + Chart.js
+
+A Flask application with Jinja2 templates, Chart.js visualizations, tabbed layouts, and auto-refresh.
+
+The Flask app includes a reverse proxy for seamless `/api/*` and `/clawdbot/*` forwarding.
+
+### Source
+
+- App: `src/web/app.py`
+- Templates: `src/web/templates/`
+- Static assets: `src/web/static/`
+
+### Key Pages
+
+| Page | Features |
+|------|----------|
+| Dashboard | Overview stats, service status, host metrics |
+| Models | LLM routing, wallets, spend tracking |
+| Sessions | Agent sessions with cron toggle |
+| Goals | Main goals + hourly goals, progress charts |
+| Skills | Skill registry with status overview |
+| Operations | Cron jobs, scheduled tasks, heartbeat |
+| Security | Threat detection, security events |
+| Working Memory | DB context + checkpoint management + file snapshot |
+| Knowledge | Knowledge graph entities + relations |
+| Soul | Soul documents + file browsers (`aria_mind/`, `aria_memories/`) |
+
+Browse `src/web/templates/*.html` for the full list.
+
+---
+
+## Related
+
+- [ARCHITECTURE.md](ARCHITECTURE.md) — System design and data flow
+- [AUDIT_REPORT.md](AUDIT_REPORT.md) — Per-page web audit with API call analysis
+- [DEPLOYMENT.md](DEPLOYMENT.md) — Service URLs and how to access

@@ -539,3 +539,172 @@ async def skills_insights(
         "recent_invocations": recent_invocations,
         "recent_graph_queries": recent_graph_queries,
     }
+
+
+# ── Skill Health Dashboard (DB-backed health scoring + pattern detection) ────
+
+
+def _health_score(total: int, failures: int, avg_duration_ms: float) -> float:
+    """
+    Compute a 0-100 health score from invocation data.
+    Factors: error rate (50 pts), latency (30 pts), activity (20 pts).
+    """
+    if total == 0:
+        return 100.0  # No data = assume healthy
+
+    error_rate = failures / total
+    error_penalty = min(error_rate * 100, 50.0)  # Up to 50 pts lost
+
+    # Latency penalty: 0 pts under 2s, scales to 30 pts at 30s+
+    latency_penalty = min(max(avg_duration_ms - 2000, 0) / 28000 * 30, 30.0)
+
+    # Activity bonus: skills with more usage get benefit of the doubt
+    activity_bonus = min(total / 50, 1.0) * 20  # Full 20 pts at 50+ calls
+
+    return round(min(100.0, max(0.0, 100.0 - error_penalty - latency_penalty + activity_bonus)), 1)
+
+
+def _health_status(score: float) -> str:
+    if score >= 80:
+        return "healthy"
+    elif score >= 50:
+        return "degraded"
+    return "unhealthy"
+
+
+# Prevention suggestion heuristics for recurring error types
+_PREVENTION_HINTS: dict[str, str] = {
+    "ConnectionError": "Check network/DNS. Consider connection pooling or retry backoff.",
+    "TimeoutError": "Increase timeout or add circuit breaker. Check if upstream service is overloaded.",
+    "HTTPStatusError": "Review API credentials and rate limits. Add response-code-specific retry logic.",
+    "JSONDecodeError": "Upstream returned non-JSON. Add response content-type validation.",
+    "OperationalError": "Database connection issue. Verify connection pool health and max connections.",
+    "RateLimitError": "Back off on this skill. Consider request throttling or queue-based execution.",
+    "AuthenticationError": "API key expired or invalid. Rotate credentials.",
+    "ValueError": "Input validation gap. Add stricter param checking before execution.",
+}
+
+
+@router.get("/skills/health/dashboard")
+async def skill_health_dashboard(
+    hours: int = 24,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Skill Health Dashboard — health scores, recurring failure patterns,
+    and prevention suggestions.  DB-backed, no in-memory dependency.
+    """
+    safe_hours = max(1, min(hours, 24 * 30))
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=safe_hours)
+
+    # ── Per-skill health scoring ─────────────────────────────────────────
+    skill_rows = (
+        await db.execute(
+            select(
+                SkillInvocation.skill_name,
+                func.count().label("total"),
+                func.sum(case((SkillInvocation.success == True, 1), else_=0)).label("successes"),
+                func.sum(case((SkillInvocation.success == False, 1), else_=0)).label("failures"),
+                func.avg(SkillInvocation.duration_ms).label("avg_ms"),
+                func.max(SkillInvocation.duration_ms).label("max_ms"),
+                func.min(SkillInvocation.duration_ms).label("min_ms"),
+                func.coalesce(func.sum(SkillInvocation.tokens_used), 0).label("tokens"),
+                func.max(SkillInvocation.created_at).label("last_seen"),
+            )
+            .where(SkillInvocation.created_at >= cutoff)
+            .group_by(SkillInvocation.skill_name)
+            .order_by(func.count().desc())
+        )
+    ).all()
+
+    skills = []
+    total_invocations = 0
+    total_failures = 0
+    for row in skill_rows:
+        total = int(row.total or 0)
+        failures = int(row.failures or 0)
+        avg_ms = float(row.avg_ms or 0)
+        score = _health_score(total, failures, avg_ms)
+        total_invocations += total
+        total_failures += failures
+        skills.append({
+            "skill_name": row.skill_name,
+            "health_score": score,
+            "status": _health_status(score),
+            "total_calls": total,
+            "successes": int(row.successes or 0),
+            "failures": failures,
+            "error_rate": round((failures / max(total, 1)) * 100, 1),
+            "avg_duration_ms": round(avg_ms, 1),
+            "max_duration_ms": int(row.max_ms or 0),
+            "min_duration_ms": int(row.min_ms or 0),
+            "total_tokens": int(row.tokens or 0),
+            "last_seen": row.last_seen.isoformat() if row.last_seen else None,
+        })
+
+    overall_score = (
+        round(sum(s["health_score"] for s in skills) / len(skills), 1)
+        if skills else 100.0
+    )
+
+    # ── Recurring failure patterns (GROUP BY error_type) ─────────────────
+    pattern_rows = (
+        await db.execute(
+            select(
+                SkillInvocation.skill_name,
+                SkillInvocation.error_type,
+                func.count().label("count"),
+                func.min(SkillInvocation.created_at).label("first_seen"),
+                func.max(SkillInvocation.created_at).label("last_seen"),
+            )
+            .where(SkillInvocation.created_at >= cutoff)
+            .where(SkillInvocation.success == False)
+            .where(SkillInvocation.error_type.isnot(None))
+            .group_by(SkillInvocation.skill_name, SkillInvocation.error_type)
+            .having(func.count() >= 2)
+            .order_by(func.count().desc())
+            .limit(20)
+        )
+    ).all()
+
+    patterns = []
+    for row in pattern_rows:
+        error_type = row.error_type or "unknown"
+        suggestion = _PREVENTION_HINTS.get(
+            error_type,
+            f"Recurring {error_type} in {row.skill_name} ({row.count}x). "
+            "Investigate logs and consider adding targeted error handling.",
+        )
+        patterns.append({
+            "skill_name": row.skill_name,
+            "error_type": error_type,
+            "count": int(row.count),
+            "first_seen": row.first_seen.isoformat() if row.first_seen else None,
+            "last_seen": row.last_seen.isoformat() if row.last_seen else None,
+            "suggestion": suggestion,
+        })
+
+    # ── Unhealthy + slow skill shortlists ────────────────────────────────
+    unhealthy = [s for s in skills if s["status"] == "unhealthy"]
+    degraded = [s for s in skills if s["status"] == "degraded"]
+    slow = [s for s in skills if s["avg_duration_ms"] >= 5000]
+
+    return {
+        "hours": safe_hours,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "overall": {
+            "health_score": overall_score,
+            "status": _health_status(overall_score),
+            "total_invocations": total_invocations,
+            "total_failures": total_failures,
+            "skills_monitored": len(skills),
+            "unhealthy_count": len(unhealthy),
+            "degraded_count": len(degraded),
+            "slow_count": len(slow),
+        },
+        "skills": skills,
+        "patterns": patterns,
+        "unhealthy_skills": unhealthy,
+        "degraded_skills": degraded,
+        "slow_skills": slow,
+    }

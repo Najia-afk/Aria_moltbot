@@ -200,6 +200,10 @@ def create_app():
     def skill_stats():
         return render_template('skill_stats.html')
 
+    @app.route('/skill-health')
+    def skill_health():
+        return render_template('skill_health.html')
+
     @app.route('/soul')
     def soul():
         return render_template('soul.html')

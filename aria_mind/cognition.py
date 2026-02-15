@@ -21,6 +21,17 @@ if TYPE_CHECKING:
     from aria_skills import SkillRegistry
     from aria_agents import AgentCoordinator
 
+# Import pattern recognition for failure tracking (try container path first, then local)
+try:
+    from skills.aria_skills.health.patterns import FailurePatternStore
+    HAS_PATTERN_TRACKING = True
+except ImportError:
+    try:
+        from aria_skills.health.patterns import FailurePatternStore
+        HAS_PATTERN_TRACKING = True
+    except ImportError:
+        HAS_PATTERN_TRACKING = False
+
 # Import security module (try container path first, then local)
 try:
     from security import (
@@ -95,6 +106,15 @@ class Cognition:
                 self.logger.info("🛡️ Security gateway initialized for cognition")
             except Exception as e:
                 self.logger.warning(f"Failed to initialize security gateway: {e}")
+        
+        # Initialize pattern tracking for failure analysis
+        self._pattern_store: Optional["FailurePatternStore"] = None
+        if HAS_PATTERN_TRACKING:
+            try:
+                self._pattern_store = FailurePatternStore()
+                self.logger.info("📊 Pattern recognition initialized for failure tracking")
+            except Exception as e:
+                self.logger.warning(f"Failed to initialize pattern tracking: {e}")
     
     def set_skill_registry(self, registry: "SkillRegistry"):
         """Inject skill registry."""
@@ -238,7 +258,18 @@ class Cognition:
             self._processing_times = self._processing_times[-100:]
         
         is_success = bool(result) and not result.startswith("[")
-        self._record_outcome(is_success)
+        error_context = None
+        if not is_success:
+            error_context = {
+                "component": "agent_processing" if self._agents else "fallback",
+                "error_type": "processing_failure" if not last_error else "exception",
+                "context": {
+                    "prompt_preview": prompt[:100],
+                    "error_preview": last_error[:200] if last_error else result[:200],
+                    "attempts": attempt + 1,
+                },
+            }
+        self._record_outcome(is_success, error_context)
         
         # Step 7: Log thought with performance context
         await self.memory.log_thought(
@@ -271,7 +302,7 @@ class Cognition:
         
         return result
     
-    def _record_outcome(self, success: bool) -> None:
+    def _record_outcome(self, success: bool, error_context: Optional[Dict[str, Any]] = None) -> None:
         """Update metacognitive metrics after each interaction."""
         if success:
             self._total_successes += 1
@@ -285,6 +316,13 @@ class Cognition:
             self._total_failures += 1
             self._streak = 0
             self._confidence = max(0.1, self._confidence - self._CONFIDENCE_DECAY)
+            # Record failure pattern for learning
+            if self._pattern_store and error_context:
+                self._pattern_store.record_failure(
+                    component=error_context.get("component", "cognition"),
+                    error_type=error_context.get("error_type", "unknown"),
+                    context=error_context.get("context", {}),
+                )
     
     def _get_metacognitive_summary(self) -> str:
         """Generate a self-awareness summary for context injection."""
@@ -301,12 +339,47 @@ class Cognition:
             "cautious"
         )
         
+        # Add pattern awareness if available
+        pattern_note = ""
+        if self._pattern_store:
+            patterns = self._pattern_store.get_recurring_patterns(min_occurrences=3)
+            if patterns:
+                top = patterns[0]
+                pattern_note = f" Noticing pattern: {top['component']}/{top['error_type']} ({top['count']}x)."
+        
         return (
             f"I'm feeling {confidence_word} (confidence: {self._confidence:.2f}). "
             f"I've handled {self._total_processed} tasks with {success_rate:.0f}% success rate. "
             f"Current streak: {self._streak} successes. "
-            f"Average response time: {avg_latency:.0f}ms."
+            f"Average response time: {avg_latency:.0f}ms.{pattern_note}"
         )
+    
+    def get_failure_patterns(self, min_occurrences: int = 3) -> List[Dict[str, Any]]:
+        """
+        Get recurring failure patterns for monitoring and self-improvement.
+        
+        Returns patterns that have occurred at least min_occurrences times,
+        sorted by frequency. Used for proactive prevention suggestions.
+        """
+        if not self._pattern_store:
+            return []
+        return self._pattern_store.get_recurring_patterns(min_occurrences=min_occurrences)
+    
+    def get_prevention_suggestions(self) -> List[str]:
+        """
+        Get actionable prevention suggestions for recurring failure patterns.
+        
+        Returns list of suggestions based on observed failure patterns.
+        """
+        if not self._pattern_store:
+            return []
+        
+        patterns = self._pattern_store.get_recurring_patterns(min_occurrences=3)
+        suggestions = []
+        for p in patterns:
+            suggestion = self._pattern_store.suggest_prevention(p)
+            suggestions.append(suggestion)
+        return suggestions
     
     async def _fallback_process(
         self,

@@ -1,26 +1,10 @@
 # Aria Blue ⚡️ — Deployment & Operations Guide
 
-Complete deployment and operations guide for the Aria stack with OpenClaw integration.
+Complete deployment and operations guide for the Aria stack.
+
+For architecture overview see [ARCHITECTURE.md](ARCHITECTURE.md). For model details see [MODELS.md](MODELS.md). For skill details see [SKILLS.md](SKILLS.md).
 
 ---
-
-## Architecture Overview
-
-Aria runs on [OpenClaw](https://openclaw.ai) with a **local-first** LLM strategy:
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│  OpenClaw Gateway (clawdbot)                                      │
-│  ├── Model: litellm/qwen3-mlx (primary — MLX on Apple Silicon)   │
-│  ├── Fallbacks: glm-free, deepseek-free, kimi (paid last resort) │
-│  └── Workspace: aria_mind/ (mounted read-write)                  │
-├──────────────────────────────────────────────────────────────────┤
-│  LiteLLM Router → MLX Server (port 8080, Metal GPU)              │
-│  Model: nightmedia/Qwen3-VLTO-8B-Instruct-qx86x-hi-mlx          │
-├──────────────────────────────────────────────────────────────────┤
-│  PostgreSQL: aria_warehouse (Aria) + litellm (LiteLLM separate)  │
-└──────────────────────────────────────────────────────────────────┘
-```
 
 ---
 
@@ -68,7 +52,7 @@ mlx_lm.server --model nightmedia/Qwen3-VLTO-8B-Instruct-qx86x-hi-mlx \
 
 ```bash
 docker compose up -d
-docker compose ps  # Should show 13 healthy containers
+docker compose ps  # All services should be healthy
 ```
 
 ### 5. Verify
@@ -176,7 +160,7 @@ SELECT COUNT(*) FROM activity_log;
 
 ---
 
-## Docker Stack (13 Services)
+## Docker Stack
 
 | Service | Image | Port | Description |
 |---------|-------|------|-------------|
@@ -281,37 +265,13 @@ python3 aria_mind/skills/run_skill.py --auto-task "summarize current priorities"
 python3 aria_mind/skills/run_skill.py --skill-info api_client
 ```
 
-### Available Skills (25 modules)
+### Available Skills
 
-Note: this section is a legacy snapshot. Use `python -m aria_mind --list-skills` for the live catalog.
+See [SKILLS.md](SKILLS.md) for the skill system overview. Browse `aria_skills/*/skill.json` for the live catalog, or run:
 
-| Skill | Module | Functions |
-|-------|--------|-----------|
-| `api_client` | `aria_skills.api_client` | Centralized HTTP client |
-| `database` | `aria_skills.database` | `query`, `execute`, `store_thought`, `store_memory` |
-| `moltbook` | `aria_skills.moltbook` | `create_post`, `get_feed`, `add_comment`, `search` |
-| `health` | `aria_skills.health` | `check_health`, `get_metrics`, `report_error` |
-| `goals` | `aria_skills.goals` | `create_goal`, `update_progress`, `list_goals` |
-| `knowledge_graph` | `aria_skills.knowledge_graph` | `add_entity`, `add_relation`, `query_related`, `search` |
-| `llm` | `aria_skills.llm` | `generate`, `chat` (Moonshot + Ollama providers) |
-| `input_guard` | `aria_skills.input_guard` | Prompt injection detection, param validation |
-| `model_switcher` | `aria_skills.model_switcher` | Dynamic model switching, reasoning toggle |
-| `litellm` | `aria_skills.litellm` | Proxy management, API spend tracking |
-| `pytest_runner` | `aria_skills.pytest_runner` | Run pytest, structured results |
-| `market_data` | `aria_skills.market_data` | Crypto market data & analysis |
-| `portfolio` | `aria_skills.portfolio` | Portfolio & position management |
-| `schedule` | `aria_skills.schedule` | Scheduled jobs & background ops |
-| `performance` | `aria_skills.performance` | Performance reviews |
-| `social` | `aria_skills.social` | Social presence management |
-| `hourly_goals` | `aria_skills.hourly_goals` | Micro-task tracking |
-| `brainstorm` | `aria_skills.brainstorm` | Creative ideation |
-| `research` | `aria_skills.research` | Information gathering |
-| `fact_check` | `aria_skills.fact_check` | Claim verification |
-| `community` | `aria_skills.community` | Community management |
-| `ci_cd` | `aria_skills.ci_cd` | CI/CD pipeline automation |
-| `data_pipeline` | `aria_skills.data_pipeline` | ETL operations |
-| `experiment` | `aria_skills.experiment` | ML experiment tracking |
-| `security_scan` | `aria_skills.security_scan` | Vulnerability detection |
+```bash
+python -m aria_mind --list-skills
+```
 
 ### Examples
 
@@ -355,13 +315,7 @@ MOLTBOOK_TOKEN=moltbook_sk_...
 
 ## Model Routing
 
-| Priority | Model | Provider | Cost |
-|----------|-------|----------|------|
-| 1 | Qwen3-VLTO-8B-Instruct | MLX Server (Metal GPU) | Free (local) |
-| 2 | GLM 4.5 Air (131K ctx) | OpenRouter | Free |
-| 3 | DeepSeek R1 0528 (164K ctx) | OpenRouter | Free |
-| 4 | Nemotron 30B (256K ctx) | OpenRouter | Free |
-| 5 | Kimi K2.5 | Moonshot Cloud | Paid (last resort) |
+See [MODELS.md](MODELS.md) for the full model routing strategy. The single source of truth is [`aria_models/models.yaml`](aria_models/models.yaml).
 
 ### Verify Model Routing
 
@@ -423,7 +377,7 @@ curl http://localhost:18793/models
 cd stacks/brain
 docker compose down -v   # Remove ALL volumes (data loss!)
 docker compose up -d     # Start fresh
-docker compose ps        # Verify 13 services
+docker compose ps        # Verify all services healthy
 ```
 
 ---

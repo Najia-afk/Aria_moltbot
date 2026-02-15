@@ -1,0 +1,326 @@
+{% extends "base.html" %}
+{% block title %}Skill Health{% endblock %}
+
+{% block extra_css %}
+<style>
+    .page-header { margin-bottom: 24px; }
+    .page-header h1 { font-size: 22px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+    .page-header p { color: var(--text-secondary); font-size: 13px; margin-top: 4px; }
+
+    .page-controls { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+    .filter-select { padding: 10px 14px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); cursor: pointer; font-size: 13px; }
+    .refresh-btn { padding: 10px 18px; background: var(--accent-primary); color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
+    .refresh-btn:hover { opacity: 0.85; }
+
+    /* Overall Health Banner */
+    .health-banner {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        padding: 20px 24px;
+        border-radius: 12px;
+        margin-bottom: 24px;
+        border: 1px solid var(--border-color);
+    }
+    .health-banner.healthy { background: linear-gradient(135deg, rgba(34,197,94,0.08), rgba(34,197,94,0.02)); border-color: rgba(34,197,94,0.3); }
+    .health-banner.degraded { background: linear-gradient(135deg, rgba(245,158,11,0.08), rgba(245,158,11,0.02)); border-color: rgba(245,158,11,0.3); }
+    .health-banner.unhealthy { background: linear-gradient(135deg, rgba(239,68,68,0.08), rgba(239,68,68,0.02)); border-color: rgba(239,68,68,0.3); }
+
+    .health-score-ring {
+        position: relative;
+        width: 80px;
+        height: 80px;
+        flex-shrink: 0;
+    }
+    .health-score-ring svg { transform: rotate(-90deg); }
+    .health-score-ring .score-text {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+    .health-banner-details { flex: 1; }
+    .health-banner-title { font-size: 18px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; }
+    .health-banner-meta { display: flex; gap: 20px; font-size: 13px; color: var(--text-secondary); flex-wrap: wrap; }
+    .health-banner-meta span { display: flex; align-items: center; gap: 4px; }
+
+    /* Stats Grid */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 24px; }
+    .stat-card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px; }
+    .stat-card h4 { font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.03em; }
+    .stat-card .value { font-size: 24px; font-weight: 700; color: var(--text-primary); }
+    .stat-card.green .value { color: var(--success); }
+    .stat-card.orange .value { color: #f59e0b; }
+    .stat-card.red .value { color: var(--danger); }
+    .stat-card.blue .value { color: var(--accent-primary); }
+
+    /* Section Headers */
+    .section-header { font-size: 15px; font-weight: 700; color: var(--text-primary); margin: 24px 0 12px; display: flex; align-items: center; gap: 8px; }
+
+    /* Skill Health Cards */
+    .health-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; margin-bottom: 24px; }
+    .health-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 16px;
+        transition: border-color 0.2s, box-shadow 0.2s;
+        cursor: pointer;
+    }
+    .health-card:hover { border-color: var(--accent-primary); box-shadow: 0 0 0 1px var(--accent-primary); }
+    .health-card.expanded .health-card-detail { display: block; }
+
+    .health-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .health-card-name { font-size: 14px; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
+    .health-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+    .health-dot.healthy { background: var(--success); box-shadow: 0 0 6px var(--success); }
+    .health-dot.degraded { background: #f59e0b; box-shadow: 0 0 6px #f59e0b; }
+    .health-dot.unhealthy { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
+
+    .score-badge {
+        font-size: 13px;
+        font-weight: 700;
+        padding: 2px 10px;
+        border-radius: 999px;
+    }
+    .score-badge.healthy { background: rgba(34,197,94,0.15); color: #22c55e; }
+    .score-badge.degraded { background: rgba(245,158,11,0.15); color: #f59e0b; }
+    .score-badge.unhealthy { background: rgba(239,68,68,0.15); color: #ef4444; }
+
+    .health-card-stats { display: flex; gap: 14px; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; flex-wrap: wrap; }
+    .health-card-stats span { display: flex; align-items: center; gap: 3px; }
+
+    .health-bar-container { height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden; }
+    .health-bar { height: 100%; border-radius: 2px; transition: width 0.5s ease; }
+    .health-bar.healthy { background: var(--success); }
+    .health-bar.degraded { background: #f59e0b; }
+    .health-bar.unhealthy { background: var(--danger); }
+
+    .health-card-detail { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-color); font-size: 12px; color: var(--text-secondary); }
+    .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; }
+    .meta-grid dt { color: var(--text-muted); font-size: 11px; }
+    .meta-grid dd { color: var(--text-primary); font-size: 12px; margin: 0; }
+
+    /* Pattern Alerts */
+    .pattern-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; }
+    .pattern-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        padding: 14px 16px;
+        border-left: 3px solid;
+    }
+    .pattern-card.warning { border-left-color: #f59e0b; }
+    .pattern-card.critical { border-left-color: var(--danger); }
+    .pattern-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+    .pattern-title { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+    .pattern-count { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: rgba(239,68,68,0.15); color: #ef4444; }
+    .pattern-suggestion { font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-top: 4px; }
+    .pattern-meta { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+
+    .empty-state { text-align: center; padding: 40px; color: var(--text-secondary); }
+    .empty-state .icon { font-size: 40px; margin-bottom: 8px; }
+    .loading-spinner { text-align: center; padding: 40px; color: var(--text-secondary); }
+
+    @media (max-width: 768px) {
+        .health-grid { grid-template-columns: 1fr; }
+        .health-banner { flex-direction: column; text-align: center; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>🩺 Skill Health Dashboard</h1>
+    <p>Health scores, failure patterns, and prevention suggestions for all Aria skills</p>
+</div>
+
+<div class="page-controls">
+    <select class="filter-select" id="hours-filter">
+        <option value="24">Last 24 Hours</option>
+        <option value="72">Last 3 Days</option>
+        <option value="168">Last Week</option>
+        <option value="720">Last Month</option>
+    </select>
+    <button class="refresh-btn" onclick="loadHealthDashboard()">↻ Refresh</button>
+</div>
+
+<!-- Overall Health Banner -->
+<div class="health-banner healthy" id="health-banner">
+    <div class="health-score-ring" id="score-ring">
+        <svg width="80" height="80" viewBox="0 0 80 80">
+            <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="6"/>
+            <circle id="score-circle" cx="40" cy="40" r="34" fill="none" stroke="var(--success)"
+                    stroke-width="6" stroke-linecap="round"
+                    stroke-dasharray="213.6" stroke-dashoffset="0"/>
+        </svg>
+        <div class="score-text" id="score-value">—</div>
+    </div>
+    <div class="health-banner-details">
+        <div class="health-banner-title" id="banner-title">Loading…</div>
+        <div class="health-banner-meta">
+            <span>📊 <strong id="meta-invocations">—</strong> invocations</span>
+            <span>🔧 <strong id="meta-skills">—</strong> skills monitored</span>
+            <span>⚠️ <strong id="meta-unhealthy">—</strong> unhealthy</span>
+            <span>🐢 <strong id="meta-slow">—</strong> slow</span>
+        </div>
+    </div>
+</div>
+
+<!-- Stats Grid -->
+<div class="stats-grid">
+    <div class="stat-card green"><h4>Healthy</h4><div class="value" id="stat-healthy">—</div></div>
+    <div class="stat-card orange"><h4>Degraded</h4><div class="value" id="stat-degraded">—</div></div>
+    <div class="stat-card red"><h4>Unhealthy</h4><div class="value" id="stat-unhealthy">—</div></div>
+    <div class="stat-card blue"><h4>Total Failures</h4><div class="value" id="stat-failures">—</div></div>
+</div>
+
+<!-- Failure Patterns -->
+<div class="section-header" id="patterns-header">🔍 Recurring Failure Patterns</div>
+<div id="patterns-container" class="pattern-list">
+    <div class="loading-spinner">Loading…</div>
+</div>
+
+<!-- Skill Health Cards -->
+<div class="section-header">🔧 Per-Skill Health</div>
+<div id="health-container" class="health-grid">
+    <div class="loading-spinner">Loading…</div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    async function loadHealthDashboard() {
+        const hours = document.getElementById('hours-filter').value;
+
+        try {
+            const resp = await fetch(`${API_BASE_URL}/skills/health/dashboard?hours=${hours}`);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const data = await resp.json();
+            renderBanner(data.overall);
+            renderStats(data.overall);
+            renderPatterns(data.patterns);
+            renderSkillCards(data.skills);
+        } catch (err) {
+            document.getElementById('health-container').innerHTML =
+                `<div class="empty-state"><div class="icon">⚠️</div><p>Failed to load: ${escapeHtml(err.message)}</p></div>`;
+        }
+    }
+
+    function renderBanner(overall) {
+        const banner = document.getElementById('health-banner');
+        banner.className = `health-banner ${overall.status}`;
+
+        // Score ring
+        const score = overall.health_score;
+        const circle = document.getElementById('score-circle');
+        const circumference = 213.6; // 2 * PI * 34
+        const offset = circumference * (1 - score / 100);
+        circle.style.strokeDashoffset = offset;
+        circle.style.stroke = score >= 80 ? 'var(--success)' : score >= 50 ? '#f59e0b' : 'var(--danger)';
+        document.getElementById('score-value').textContent = score;
+
+        // Title
+        const titleEl = document.getElementById('banner-title');
+        if (score >= 90) titleEl.textContent = 'All Systems Healthy';
+        else if (score >= 80) titleEl.textContent = 'Systems Mostly Healthy';
+        else if (score >= 50) titleEl.textContent = 'Some Skills Degraded';
+        else titleEl.textContent = 'Attention Required';
+
+        // Meta
+        document.getElementById('meta-invocations').textContent = overall.total_invocations.toLocaleString();
+        document.getElementById('meta-skills').textContent = overall.skills_monitored;
+        document.getElementById('meta-unhealthy').textContent = overall.unhealthy_count;
+        document.getElementById('meta-slow').textContent = overall.slow_count;
+    }
+
+    function renderStats(overall) {
+        const healthy = overall.skills_monitored - overall.unhealthy_count - overall.degraded_count;
+        document.getElementById('stat-healthy').textContent = healthy;
+        document.getElementById('stat-degraded').textContent = overall.degraded_count;
+        document.getElementById('stat-unhealthy').textContent = overall.unhealthy_count;
+        document.getElementById('stat-failures').textContent = overall.total_failures.toLocaleString();
+    }
+
+    function renderPatterns(patterns) {
+        const container = document.getElementById('patterns-container');
+        const header = document.getElementById('patterns-header');
+
+        if (!patterns || patterns.length === 0) {
+            header.textContent = '🔍 Recurring Failure Patterns';
+            container.innerHTML = '<div class="empty-state"><div class="icon">✅</div><p>No recurring failure patterns detected.</p></div>';
+            return;
+        }
+
+        header.textContent = `🔍 Recurring Failure Patterns (${patterns.length})`;
+        container.innerHTML = patterns.map(p => {
+            const severity = p.count >= 5 ? 'critical' : 'warning';
+            const lastSeen = p.last_seen ? new Date(p.last_seen).toLocaleString() : '—';
+            return `
+                <div class="pattern-card ${severity}">
+                    <div class="pattern-header">
+                        <span class="pattern-title">${escapeHtml(p.skill_name)} → ${escapeHtml(p.error_type)}</span>
+                        <span class="pattern-count">${p.count}×</span>
+                    </div>
+                    <div class="pattern-suggestion">💡 ${escapeHtml(p.suggestion)}</div>
+                    <div class="pattern-meta">Last seen: ${lastSeen}</div>
+                </div>`;
+        }).join('');
+    }
+
+    function renderSkillCards(skills) {
+        const container = document.getElementById('health-container');
+
+        if (!skills || skills.length === 0) {
+            container.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>No skill invocations recorded yet.</p></div>';
+            return;
+        }
+
+        // Sort: unhealthy first, then degraded, then healthy
+        const order = { unhealthy: 0, degraded: 1, healthy: 2 };
+        skills.sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9) || a.health_score - b.health_score);
+
+        container.innerHTML = skills.map(s => {
+            const lastSeen = s.last_seen ? new Date(s.last_seen).toLocaleString() : '—';
+            return `
+                <div class="health-card" onclick="this.classList.toggle('expanded')">
+                    <div class="health-card-header">
+                        <div class="health-card-name">
+                            <span class="health-dot ${s.status}"></span>
+                            ${escapeHtml(s.skill_name)}
+                        </div>
+                        <span class="score-badge ${s.status}">${s.health_score}</span>
+                    </div>
+                    <div class="health-card-stats">
+                        <span>▶ ${s.total_calls} calls</span>
+                        <span>✔ ${s.successes}</span>
+                        <span>✖ ${s.failures}</span>
+                        <span>⏱ ${s.avg_duration_ms}ms</span>
+                    </div>
+                    <div class="health-bar-container">
+                        <div class="health-bar ${s.status}" style="width: ${s.health_score}%"></div>
+                    </div>
+                    <div class="health-card-detail">
+                        <dl class="meta-grid">
+                            <dt>Error Rate</dt><dd>${s.error_rate}%</dd>
+                            <dt>Max Latency</dt><dd>${s.max_duration_ms}ms</dd>
+                            <dt>Min Latency</dt><dd>${s.min_duration_ms}ms</dd>
+                            <dt>Tokens Used</dt><dd>${(s.total_tokens || 0).toLocaleString()}</dd>
+                            <dt>Last Seen</dt><dd>${lastSeen}</dd>
+                        </dl>
+                    </div>
+                </div>`;
+        }).join('');
+    }
+
+    // Bind filter change
+    document.getElementById('hours-filter').addEventListener('change', loadHealthDashboard);
+
+    // Initial load
+    loadHealthDashboard();
+</script>
+{% endblock %}

@@ -1,6 +1,6 @@
 [project]
 name = "aria-blue"
-version = "1.0.0"
+version = "1.2.0"
 description = "Autonomous AI agent platform with local-first LLM inference, modular skills, and multi-agent orchestration"
 readme = "README.md"
 requires-python = ">=3.12"

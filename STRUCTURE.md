@@ -7,10 +7,17 @@
 ```
 Aria_moltbot/
 ├── README.md                     # Project overview & quick start
-├── ARIA_MANUAL.md                # Full deployment & operations guide
+├── ARCHITECTURE.md               # System design, layer diagram, Aria's self-architecture
+├── DEPLOYMENT.md                 # Deployment & operations guide (was ARIA_MANUAL.md)
+├── SKILLS.md                     # Skill system overview & layer hierarchy
+├── MODELS.md                     # Model routing strategy & tiers
+├── API.md                        # REST API, GraphQL, dashboard overview
 ├── STRUCTURE.md                  # This file
+├── AUDIT_REPORT.md               # Website & API audit findings
+├── CHANGELOG.md                  # Version history
 ├── LICENSE                       # Source Available License
 ├── pyproject.toml                # Python project configuration
+├── Makefile                      # Development shortcuts
 ├── Dockerfile                    # Agent container build
 │
 ├── aria_mind/                    # OpenClaw workspace (mounted to gateway)
@@ -56,7 +63,7 @@ Aria_moltbot/
 │   ├── hooks/                    # Behavioral hooks (contains soul-evil/ for evil mode toggle)
 │   └── tests/                    # Mind-specific tests
 │
-├── aria_skills/                  # Skill modules (26 active skills + pipeline definitions)
+├── aria_skills/                  # Skill modules (browse aria_skills/*/skill.json for live catalog)
 │   ├── __init__.py               # Package exports
 │   ├── base.py                   # BaseSkill, SkillConfig, SkillResult
 │   ├── catalog.py                # Skill catalog generator (--list-skills CLI)
@@ -117,7 +124,7 @@ Aria_moltbot/
 ├── aria_models/                  # Model configuration
 │   ├── __init__.py
 │   ├── loader.py                 # Model loader
-│   ├── models.yaml               # Model catalog (14+ models)
+│   ├── models.yaml               # Model catalog (single source of truth)
 │   ├── openclaw_config.py        # OpenClaw model config
 │   └── README.md                 # Model documentation
 │
@@ -168,7 +175,7 @@ Aria_moltbot/
 │
 ├── src/                          # Application source
 │   ├── api/                      # FastAPI v3.0 backend
-│   │   ├── main.py               # App factory, middleware, 17 routers
+│   │   ├── main.py               # App factory, middleware, routers
 │   │   ├── main_legacy.py        # Legacy main (pre-refactor)
 │   │   ├── config.py             # Environment config + service endpoints
 │   │   ├── deps.py               # Dependency injection
@@ -247,7 +254,7 @@ Aria_moltbot/
 ├── tasks/                        # Task documentation
 │   └── lessons.md
 │
-└── tests/                        # Pytest test suite (677+ tests)
+└── tests/                        # Pytest test suite
     ├── __init__.py
     ├── conftest.py               # Fixtures & configuration
     ├── test_activity_logging.py  # @logged_method tests (v1.1)
@@ -306,7 +313,7 @@ Aria_moltbot/
 
 | File | Purpose |
 |------|---------|
-| `docker-compose.yml` | Orchestrates all 13 services |
+| `docker-compose.yml` | Orchestrates all services |
 | `openclaw-entrypoint.sh` | Generates OpenClaw config at startup |
 | `openclaw-config.json` | Template for LiteLLM provider |
 | `litellm-config.yaml` | Routes model aliases to MLX/OpenRouter |
@@ -329,7 +336,7 @@ init-scripts/
 
 ### Skill Module Structure
 
-Each of the 26 active skill directories follows the same pattern:
+Each skill directory follows the same pattern:
 
 ```
 aria_skills/<skill>/

@@ -194,9 +194,71 @@ When I switch focus, I should prioritize these skills:
 | Skill | Limit | Notes |
 |-------|-------|-------|
 | `moltbook` | 1 post/30min | Quality over quantity |
+| `moltbook` comments | 50/day | |
 | `database` | No hard limit | Batch queries when possible |
 | `llm` | Model dependent | Use local qwen3-mlx first |
 | `market_data` | API dependent | Cache results |
+| Background tasks | 30 min timeout | |
+
+---
+
+## Operational Rules
+
+### Memory Routing Rule (MUST)
+
+- Use `aria-working-memory` for **short-term / active session context** (task state, transient observations, checkpointable context).
+- Use `aria-api-client` `/memories` for **long-term durable memory** (preferences, stable facts, historical knowledge).
+- When ending a work cycle, run `aria-working-memory.sync_to_files({})` to refresh `aria_memories/memory/context.json`.
+
+### Goal Board Rule (MUST)
+
+- Use board columns as operational state: `todo` → `doing` → `done` (or `on_hold` when blocked).
+- Prefer `aria-api-client.move_goal(...)` for column changes.
+- When placing a goal on `on_hold`, always log the blocker with `aria-api-client.create_activity({...})`.
+
+### Proposal Loop Rule (MUST)
+
+- Propose changes through `aria-api-client.propose_improvement(...)` before touching medium/high-risk code.
+- Respect risk model: `low` (quick impl), `medium` (needs approval), `high` (approval + extra review).
+- Never propose modifications under `soul/` paths.
+- After implementation, mark proposal `implemented` and log outcome via activity.
+
+### Advanced Compatibility Escalation
+
+- Use `api_client` first for CRUD/workflow operations.
+- Escalate to `database` only for self-healing, diagnostics, migrations, recovery.
+- Use `brainstorm`, `community`, `fact_check`, `model_switcher`, `experiment` only for explicit specialist tasks.
+
+---
+
+## Composable Pipelines
+
+Pre-built multi-step workflows in `aria_skills/pipelines/`. Run via `aria-pipeline-skill`:
+
+| Pipeline | Description |
+|----------|-------------|
+| `deep_research` | Search → web research → synthesize → store semantic memory |
+| `bug_fix` | Check lessons → analyze → propose fix → record lesson |
+| `conversation_summary` | Summarize session → store episodic/decision memories |
+| `daily_research` | Check goals → research topics → analyze → report |
+| `health_and_report` | Health checks → analyze issues → create goals → report |
+| `social_engagement` | Fetch feed → analyze trends → draft post → publish |
+
+```tool
+aria-pipeline-skill.run({"pipeline": "deep_research", "params": {"topic": "AI safety"}})
+```
+
+---
+
+## Low-Token Patterns
+
+```bash
+# Compact routing (no per-skill info payload)
+python3 aria_mind/skills/run_skill.py --auto-task "summarize goal progress" --route-limit 2 --route-no-info
+
+# Introspect one skill only when needed
+python3 aria_mind/skills/run_skill.py --skill-info api_client
+```
 
 ## Error Handling
 
