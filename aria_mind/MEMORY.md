@@ -47,7 +47,37 @@ Aria → stores_in → PostgreSQL (memory)
 
 ---
 
-*Last updated: 2026-02-13*
+*Last updated: 2026-02-15*
+
+---
+
+## Importance Scoring System
+
+`MemoryManager` now supports automatic importance scoring on short-term memories. This lets Aria prioritize what to focus on and surface critical information.
+
+### Key Functions
+
+| Method | Purpose |
+|---|---|
+| `calculate_importance_score(content, category)` | Returns 0.0–1.0 score based on keyword/category/action analysis |
+| `remember_with_score(content, category, threshold)` | Stores memory with auto-calculated score; auto-flags if ≥ threshold |
+| `recall_short(limit, sort_by, min_importance)` | Recall memories by `"time"` or `"importance"`, with optional floor |
+| `get_high_importance_memories(threshold, limit)` | Get top-scored memories above threshold, sorted descending |
+
+### Scoring Factors
+
+- **Keywords** (up to 0.4): critical, urgent, error, security, secret, password, goal, najia, etc.
+- **Action patterns** (up to 0.2): todo, task, fix, review, verify
+- **Category bonuses** (up to 0.2): security=0.2, error=0.2, goal=0.15, preference=0.15
+- **Content length** (+0.1 for 50–500 chars, -0.1 for <20 or >2000)
+- **Emotional weight** (up to 0.1 from exclamation marks)
+
+### Integration Points
+
+- `cognition.py` calls `remember_short()` and `recall_short()` — both are backward-compatible
+- `heartbeat.py` calls `consolidate()` — unchanged
+- `__init__.py` calls `flag_important()` — now also called automatically by `remember_with_score`
+- `get_status()` now includes `importance_scoring` stats
 
 ---
 

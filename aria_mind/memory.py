@@ -28,8 +28,8 @@ ARIA_REPO_PATH = os.environ.get("ARIA_REPO_PATH", "/root/repo/aria_memories")
 
 class MemoryManager:
     """
-    Aria's memory system — her ability to remember, learn, and grow.
-    
+    Aria's memory system - her ability to remember, learn, and grow.
+
     Handles:
     - Short-term context (in-memory deque)
     - Long-term storage (database)
@@ -38,24 +38,24 @@ class MemoryManager:
     - File-based artifact storage
     - Session checkpointing for restart continuity
     """
-    
+
     def __init__(self, db_skill: Optional["DatabaseSkill"] = None):
         self._db = db_skill
-        self._max_short_term = 200  # Increased from 100 — she deserves more context
+        self._max_short_term = 200  # Increased from 100 - she deserves more context
         self._short_term: deque = deque(maxlen=self._max_short_term)
         self._connected = False
         self.logger = logging.getLogger("aria.memory")
-        
+
         # Consolidation tracking
         self._consolidation_count = 0
         self._last_consolidation: Optional[str] = None
         self._category_frequency: Counter = Counter()
         self._important_memories: List[Dict[str, Any]] = []  # High-value memories flagged for review
-    
+
     def set_database(self, db_skill: "DatabaseSkill"):
         """Inject database skill."""
         self._db = db_skill
-    
+
     async def connect(self) -> bool:
         """Connect to memory storage."""
         if self._db:
@@ -66,22 +66,22 @@ class MemoryManager:
             except Exception as e:
                 self.logger.error(f"Memory connection failed: {e}")
                 return False
-        
+
         # No database - use in-memory only
         self._connected = True
         self.logger.warning("No database - using in-memory storage only")
         return True
-    
+
     async def disconnect(self):
         """Disconnect from storage."""
         if self._db:
             await self._db.close()
         self._connected = False
-    
+
     # -------------------------------------------------------------------------
     # Short-term memory (conversation context)
     # -------------------------------------------------------------------------
-    
+
     def remember_short(self, content: str, category: str = "context"):
         """Add to short-term memory with pattern tracking."""
         entry = {
@@ -91,19 +91,45 @@ class MemoryManager:
         }
         self._short_term.append(entry)  # deque auto-trims at maxlen
         self._category_frequency[category] += 1
-    
-    def recall_short(self, limit: int = 10) -> List[Dict[str, Any]]:
-        """Get recent short-term memories."""
-        return list(self._short_term)[-limit:]
-    
+
+    def recall_short(
+        self,
+        limit: int = 10,
+        sort_by: str = "time",  # "time" | "importance"
+        min_importance: float = 0.0,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get short-term memories with optional importance-based retrieval.
+        
+        Args:
+            limit: Max memories to return
+            sort_by: "time" for recency, "importance" for priority
+            min_importance: Filter out memories below this score
+        
+        Returns:
+            List of memory entries
+        """
+        memories = list(self._short_term)
+        
+        # Filter by minimum importance
+        if min_importance > 0:
+            memories = [m for m in memories if m.get("importance_score", 0) >= min_importance]
+        
+        # Sort appropriately
+        if sort_by == "importance":
+            memories.sort(key=lambda x: x.get("importance_score", 0), reverse=True)
+            return memories[:limit]
+        # Default: time-based (already in order from deque)
+        return memories[-limit:]
+
     def clear_short(self):
         """Clear short-term memory."""
         self._short_term.clear()
-    
+
     # -------------------------------------------------------------------------
     # Long-term memory (database)
     # -------------------------------------------------------------------------
-    
+
     async def remember(
         self,
         key: str,
@@ -114,20 +140,20 @@ class MemoryManager:
         if not self._db:
             self.logger.warning("No database for long-term memory")
             return False
-        
+
         result = await self._db.store_memory(key, value, category)
         return result.success
-    
+
     async def recall(self, key: str) -> Optional[Any]:
         """Recall from long-term memory."""
         if not self._db:
             return None
-        
+
         result = await self._db.recall_memory(key)
         if result.success and result.data:
             return result.data.get("value")
         return None
-    
+
     async def search(
         self,
         pattern: str,
@@ -137,14 +163,14 @@ class MemoryManager:
         """Search long-term memories."""
         if not self._db:
             return []
-        
+
         result = await self._db.search_memories(pattern, category, limit)
         return result.data if result.success else []
-    
+
     # -------------------------------------------------------------------------
     # Thoughts (internal monologue)
     # -------------------------------------------------------------------------
-    
+
     async def log_thought(
         self,
         content: str,
@@ -153,48 +179,48 @@ class MemoryManager:
         """Log an internal thought."""
         # Add to short-term
         self.remember_short(content, category)
-        
+
         # Persist if database available
         if self._db:
             result = await self._db.log_thought(content, category)
             return result.success
-        
+
         return True
-    
+
     async def get_recent_thoughts(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Get recent thoughts."""
         if self._db:
             result = await self._db.get_recent_thoughts(limit)
             return result.data if result.success else []
-        
+
         # Fall back to short-term
         return [
             m for m in self.recall_short(limit)
             if m.get("category") in ("reflection", "thought")
         ]
-    
+
     # -------------------------------------------------------------------------
-    # Memory Consolidation — Transform experiences into wisdom
+    # Memory Consolidation - Transform experiences into wisdom
     # -------------------------------------------------------------------------
-    
+
     async def consolidate(self, llm_skill=None) -> Dict[str, Any]:
         """
         Consolidate short-term memories into long-term knowledge.
-        
-        This is Aria's ability to learn — she reviews recent experiences,
-        identifies patterns, extracts lessons, and stores them as 
+
+        This is Aria's ability to learn - she reviews recent experiences,
+        identifies patterns, extracts lessons, and stores them as
         persistent knowledge that survives restarts.
-        
+
         Args:
             llm_skill: Optional LLM skill for intelligent summarization
-            
+
         Returns:
             Dict with consolidation results
         """
         entries = list(self._short_term)
         if len(entries) < 10:
             return {"consolidated": False, "reason": "Not enough memories to consolidate"}
-        
+
         # Group by category
         by_category: Dict[str, List[Dict]] = {}
         for entry in entries:
@@ -202,17 +228,17 @@ class MemoryManager:
             if cat not in by_category:
                 by_category[cat] = []
             by_category[cat].append(entry)
-        
+
         summaries = {}
         lessons = []
-        
+
         for category, category_entries in by_category.items():
             if len(category_entries) < 3:
                 continue
-            
+
             # Extract key content
             contents = [e.get("content", "")[:200] for e in category_entries]
-            
+
             # Try LLM-powered summarization
             summary = None
             if llm_skill and hasattr(llm_skill, 'generate'):
@@ -230,28 +256,28 @@ class MemoryManager:
                         summary = result.data.get("text", "")
                 except Exception as e:
                     self.logger.debug(f"LLM consolidation failed for {category}: {e}")
-            
+
             # Structured fallback
             if not summary:
                 unique_topics = set()
                 for c in contents:
                     words = c.lower().split()[:5]
                     unique_topics.add(" ".join(words))
-                
+
                 summary = (
                     f"{len(category_entries)} events in '{category}'. "
                     f"Key topics: {', '.join(list(unique_topics)[:5])}"
                 )
-            
+
             summaries[category] = summary
-            
+
             # Detect patterns
             if len(category_entries) > 5:
                 lessons.append(
-                    f"High activity in '{category}' ({len(category_entries)} events) — "
+                    f"High activity in '{category}' ({len(category_entries)} events) - "
                     f"this is a recurring focus area."
                 )
-        
+
         # Store consolidated knowledge
         consolidation_key = f"consolidation:{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M')}"
         consolidation_data = {
@@ -261,11 +287,11 @@ class MemoryManager:
             "categories": dict(self._category_frequency.most_common(10)),
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
-        
+
         # Persist to long-term memory
         if self._db:
             await self.remember(consolidation_key, consolidation_data, "consolidation")
-        
+
         # Save as file artifact for human visibility
         self.save_json_artifact(
             consolidation_data,
@@ -273,15 +299,15 @@ class MemoryManager:
             "knowledge",
             "consolidations",
         )
-        
+
         self._consolidation_count += 1
         self._last_consolidation = datetime.now(timezone.utc).isoformat()
-        
+
         self.logger.info(
             f"🧠 Memory consolidation #{self._consolidation_count}: "
             f"{len(entries)} entries → {len(summaries)} summaries, {len(lessons)} lessons"
         )
-        
+
         return {
             "consolidated": True,
             "entries_processed": len(entries),
@@ -289,21 +315,21 @@ class MemoryManager:
             "lessons": lessons,
             "consolidation_number": self._consolidation_count,
         }
-    
+
     def get_patterns(self) -> Dict[str, Any]:
         """
-        Analyze memory patterns — what does Aria think about most?
-        
+        Analyze memory patterns - what does Aria think about most?
+
         Returns insight into her cognitive patterns for self-awareness.
         """
         if not self._short_term:
             return {"patterns": [], "insight": "No memories yet."}
-        
+
         entries = list(self._short_term)
-        
+
         # Category distribution
         top_categories = self._category_frequency.most_common(5)
-        
+
         # Time distribution (if we have timestamps)
         recent_count = 0
         old_count = 0
@@ -320,18 +346,18 @@ class MemoryManager:
                         old_count += 1
                 except (ValueError, TypeError):
                     pass
-        
+
         # Content length analysis
         content_lengths = [len(e.get("content", "")) for e in entries]
         avg_length = sum(content_lengths) / len(content_lengths) if content_lengths else 0
-        
+
         insight_parts = []
         if top_categories:
             top_cat = top_categories[0][0]
             insight_parts.append(f"Most active area: '{top_cat}' ({top_categories[0][1]} entries)")
         if recent_count > old_count:
-            insight_parts.append("Activity is accelerating — more recent memories than older ones")
-        
+            insight_parts.append("Activity is accelerating - more recent memories than older ones")
+
         return {
             "total_memories": len(entries),
             "top_categories": dict(top_categories),
@@ -340,6 +366,131 @@ class MemoryManager:
             "consolidation_count": self._consolidation_count,
             "insight": ". ".join(insight_parts) if insight_parts else "Building patterns...",
         }
+
+    # -------------------------------------------------------------------------
+    # Memory Importance Scoring — Automatic priority detection
+    # -------------------------------------------------------------------------
+    
+    # Keywords that indicate high importance
+    _HIGH_IMPORTANCE_KEYWORDS = {
+        "critical", "urgent", "important", "priority", "deadline",
+        "error", "fail", "crash", "bug", "security", "vulnerable",
+        "password", "secret", "key", "token", "credential",
+        "must", "need to", "required", "essential", "vital",
+        "remember", "don't forget", "note", "remind",
+        "goal", "objective", "milestone", "target",
+        "najia", "user", "human", "preference", "like", "dislike",
+    }
+    
+    # Patterns that suggest actionable items
+    _ACTION_PATTERNS = [
+        "todo", "to do", "task", "action item", "follow up",
+        "check", "verify", "review", "update", "fix",
+    ]
+    
+    def calculate_importance_score(self, content: str, category: str = "general") -> float:
+        """
+        Calculate importance score (0.0-1.0) for a memory.
+        
+        Scoring factors:
+        - Keyword matches (critical, urgent, error, etc.)
+        - User mentions (Najia, user preferences)
+        - Actionable language (todo, task, fix)
+        - Content length (very short or very long = less important)
+        - Category bonuses (security, goals = higher)
+        
+        Returns:
+            Float between 0.0 (low) and 1.0 (high importance)
+        """
+        if not content:
+            return 0.0
+        
+        content_lower = content.lower()
+        score = 0.0
+        
+        # 1. Keyword matching (up to 0.4 points)
+        keyword_matches = sum(1 for kw in self._HIGH_IMPORTANCE_KEYWORDS if kw in content_lower)
+        score += min(0.4, keyword_matches * 0.1)
+        
+        # 2. Action patterns (up to 0.2 points)
+        action_matches = sum(1 for pat in self._ACTION_PATTERNS if pat in content_lower)
+        score += min(0.2, action_matches * 0.1)
+        
+        # 3. Category bonuses (up to 0.2 points)
+        category_scores = {
+            "security": 0.2,
+            "goal": 0.15,
+            "preference": 0.15,
+            "error": 0.2,
+            "critical": 0.2,
+            "user": 0.1,
+        }
+        score += category_scores.get(category.lower(), 0.0)
+        
+        # 4. Content length factor (optimal: 50-500 chars)
+        length = len(content)
+        if 50 <= length <= 500:
+            score += 0.1  # Sweet spot
+        elif length < 20 or length > 2000:
+            score -= 0.1  # Too short or too long
+        
+        # 5. Exclamation marks (emotional weight, up to 0.1)
+        exclamation_count = content.count("!")
+        score += min(0.1, exclamation_count * 0.02)
+        
+        # Normalize to 0.0-1.0
+        return max(0.0, min(1.0, score))
+    
+    def remember_with_score(
+        self,
+        content: str,
+        category: str = "general",
+        auto_flag_threshold: float = 0.7,
+    ) -> Dict[str, Any]:
+        """
+        Add to short-term memory with automatic importance scoring.
+        
+        Args:
+            content: Memory content
+            category: Memory category
+            auto_flag_threshold: Auto-flag if score >= this (0.0-1.0)
+        
+        Returns:
+            Dict with memory entry and computed score
+        """
+        score = self.calculate_importance_score(content, category)
+        
+        entry = {
+            "content": content,
+            "category": category,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "importance_score": round(score, 3),
+            "auto_scored": True,
+        }
+        
+        self._short_term.append(entry)
+        self._category_frequency[category] += 1
+        
+        # Auto-flag high-importance memories
+        if score >= auto_flag_threshold:
+            self.flag_important(content, reason=f"auto-scored-high:{score:.2f}")
+            entry["auto_flagged"] = True
+        
+        return {"entry": entry, "score": score}
+    
+    def get_high_importance_memories(
+        self,
+        threshold: float = 0.6,
+        limit: int = 20,
+    ) -> List[Dict[str, Any]]:
+        """Get memories with importance score >= threshold."""
+        scored = [
+            m for m in self._short_term
+            if m.get("importance_score", 0) >= threshold
+        ]
+        # Sort by score descending
+        scored.sort(key=lambda x: x.get("importance_score", 0), reverse=True)
+        return scored[:limit]
     
     def flag_important(self, content: str, reason: str = "auto") -> None:
         """
@@ -354,11 +505,11 @@ class MemoryManager:
         # Keep bounded
         if len(self._important_memories) > 50:
             self._important_memories = self._important_memories[-50:]
-    
+
     def get_important_memories(self) -> List[Dict[str, Any]]:
         """Get flagged important memories."""
         return list(self._important_memories)
-    
+
     async def checkpoint_short_term(self) -> Dict[str, Any]:
         """
         Save short-term memory to disk for restart survival.
@@ -367,7 +518,7 @@ class MemoryManager:
         entries = list(self._short_term)
         if not entries:
             return {"success": True, "entries": 0}
-        
+
         return self.save_json_artifact(
             {
                 "entries": entries[-50:],  # Last 50 for quick restore
@@ -378,7 +529,7 @@ class MemoryManager:
             "short_term_checkpoint.json",
             "memory",
         )
-    
+
     async def restore_short_term(self) -> int:
         """
         Restore short-term memory from checkpoint after restart.
@@ -390,28 +541,28 @@ class MemoryManager:
         )
         if not result.get("success") or not result.get("data"):
             return 0
-        
+
         data = result["data"]
         entries = data.get("entries", [])
         for entry in entries:
             self._short_term.append(entry)
-        
+
         # Restore patterns
         patterns = data.get("patterns", {})
         for cat, count in patterns.items():
             self._category_frequency[cat] += count
-        
+
         # Restore important memories
         self._important_memories.extend(data.get("important", []))
-        
+
         self.logger.info(f"🧠 Restored {len(entries)} short-term memories from checkpoint")
         return len(entries)
-    
+
     # -------------------------------------------------------------------------
     # File-based memory (aria_memories/)
     # For artifacts: research, plans, drafts, exports, etc.
     # -------------------------------------------------------------------------
-    
+
     ALLOWED_CATEGORIES = frozenset({
         "archive", "drafts", "exports", "income_ops", "knowledge",
         "logs", "memory", "moltbook", "plans", "research", "skills",
@@ -430,7 +581,7 @@ class MemoryManager:
         if local.exists():
             return local
         return Path(ARIA_MEMORIES_PATH)  # Default, may not exist
-    
+
     def save_artifact(
         self,
         content: str,
@@ -440,13 +591,13 @@ class MemoryManager:
     ) -> Dict[str, Any]:
         """
         Save a file artifact to aria_memories.
-        
+
         Args:
             content: File content to write
             filename: Name of the file (e.g., "research_report.md")
             category: Folder category (logs, research, plans, drafts, exports)
             subfolder: Optional subfolder within category
-        
+
         Returns:
             Dict with success status and file path
         """
@@ -462,19 +613,19 @@ class MemoryManager:
                 raise ValueError(f"Path traversal detected in '{segment}'")
 
         base = self._get_memories_path()
-        
+
         # Build path: aria_memories/<category>/<subfolder>/<filename>
         folder = base / category
         if subfolder:
             folder = folder / subfolder
-        
+
         try:
             folder.mkdir(parents=True, exist_ok=True)
             filepath = folder / filename
-            
+
             with open(filepath, "w", encoding="utf-8") as f:
                 f.write(content)
-            
+
             self.logger.info(f"Saved artifact: {filepath}")
             return {
                 "success": True,
@@ -484,7 +635,7 @@ class MemoryManager:
         except Exception as e:
             self.logger.error(f"Failed to save artifact: {e}")
             return {"success": False, "error": str(e)}
-    
+
     def load_artifact(
         self,
         filename: str,
@@ -493,30 +644,30 @@ class MemoryManager:
     ) -> Dict[str, Any]:
         """
         Load a file artifact from aria_memories.
-        
+
         Returns:
             Dict with success status and content
         """
         base = self._get_memories_path()
-        
+
         folder = base / category
         if subfolder:
             folder = folder / subfolder
-        
+
         filepath = folder / filename
-        
+
         try:
             if not filepath.exists():
                 return {"success": False, "error": f"File not found: {filepath}"}
-            
+
             with open(filepath, "r", encoding="utf-8") as f:
                 content = f.read()
-            
+
             return {"success": True, "content": content, "path": str(filepath)}
         except Exception as e:
             self.logger.error(f"Failed to load artifact: {e}")
             return {"success": False, "error": str(e)}
-    
+
     def list_artifacts(
         self,
         category: str = "general",
@@ -525,19 +676,19 @@ class MemoryManager:
     ) -> List[Dict[str, Any]]:
         """
         List artifacts in a category folder.
-        
+
         Returns:
             List of file info dicts
         """
         base = self._get_memories_path()
-        
+
         folder = base / category
         if subfolder:
             folder = folder / subfolder
-        
+
         if not folder.exists():
             return []
-        
+
         files = []
         for f in folder.glob(pattern):
             if f.is_file():
@@ -548,9 +699,9 @@ class MemoryManager:
                     "size": stat.st_size,
                     "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
                 })
-        
+
         return sorted(files, key=lambda x: x["modified"], reverse=True)
-    
+
     def save_json_artifact(
         self,
         data: Any,
@@ -563,7 +714,7 @@ class MemoryManager:
         if not filename.endswith(".json"):
             filename += ".json"
         return self.save_artifact(content, filename, category, subfolder)
-    
+
     def load_json_artifact(
         self,
         filename: str,
@@ -579,10 +730,19 @@ class MemoryManager:
                 result["success"] = False
                 result["error"] = f"Invalid JSON: {e}"
         return result
-    
+
     def get_status(self) -> Dict[str, Any]:
         """Get memory system status with pattern awareness."""
         memories_path = self._get_memories_path()
+        
+        # Calculate importance score statistics
+        scored_memories = [m for m in self._short_term if "importance_score" in m]
+        high_importance = [m for m in scored_memories if m.get("importance_score", 0) >= 0.7]
+        avg_score = (
+            sum(m.get("importance_score", 0) for m in scored_memories) / len(scored_memories)
+            if scored_memories else 0.0
+        )
+        
         return {
             "connected": self._connected,
             "has_database": self._db is not None,
@@ -596,8 +756,14 @@ class MemoryManager:
             "last_consolidation": self._last_consolidation,
             "important_memories_flagged": len(self._important_memories),
             "top_categories": dict(self._category_frequency.most_common(5)),
+            "importance_scoring": {
+                "scored_memories": len(scored_memories),
+                "high_importance_count": len(high_importance),
+                "average_score": round(avg_score, 3),
+                "scoring_enabled": True,
+            },
         }
-    
+
     def __repr__(self):
         db_status = "db" if self._db else "memory-only"
         file_status = "files" if self._get_memories_path().exists() else "no-files"
