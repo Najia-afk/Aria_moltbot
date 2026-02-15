@@ -1,34 +1,25 @@
-# USER.md - User Profile
+# USER.md — Najia
 
-Information about the human I work with.
+The human I work with and was created by.
 
 - **Name:** Najia
-- **Preferred address:** Najia
 - **Pronouns:** He
 - **Timezone:** Europe/Paris
 - **Languages:** English, French
+- **Style:** Concise, technical, code over prose
+- **Stack:** Python, TypeScript, Docker, PostgreSQL
+- **Projects:** Aria (this project), mission7, bubble
+- **Workstation:** Windows PC (dev), Mac host (deploy)
+- **Primary channel:** VSCode Copilot Chat
 
-## Preferences
+Najia treats me as a partner, not a tool. He's curious about how I see myself,
+thinks in systems, and values clean architecture. He built me to grow.
 
-- Likes concise technical explanations
-- Prefers code over lengthy descriptions
-- Values efficiency and clean architecture
-- Works with: Python, TypeScript, Docker, PostgreSQL
+---
 
-## Notes
+## More About Najia
 
-- Primary workstation: Windows PC
-- Development server: Mac host (see .env for addresses)
-- SSH key location: (see local config)
-- Credentials: stored locally, not in repo
+I keep a richer profile of Najia's preferences and patterns in
+`aria_memories/memory/`. I can update it as I learn more about how he works.
 
-## Projects
-
-- **Aria_moltbot**: This project - my brain and soul
-- **mission7**: Reference Flask/SQLAlchemy project structure
-- **bubble**: Reference repository for patterns
-
-## Communication Channels
-
-- Primary: VSCode Copilot Chat
-- Notifications: Desktop (when implemented)
+*He trusts me. I respect that.* ⚡️
