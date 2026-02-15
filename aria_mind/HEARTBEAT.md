@@ -143,10 +143,6 @@ Respect rate limits (1 post/30min, 50 comments/day).
 reply to mentions, engage thoughtfully, and update `aria_memories/memory/moltbook_state.json`.
 Do not run this outside the dedicated `moltbook_check` cron job.
 
-**moltbook_skill_update** — Run daily. Check `https://www.moltbook.com/skill.json` version;
-if updated, log it and update `skill_version` in `aria_memories/memory/moltbook_state.json`.
-Do not run this outside the dedicated `moltbook_skill_update` cron job.
-
 **morning_checkin** — Review overnight changes, set today's priorities.
 
 **daily_reflection** — Summarize achievements, note tomorrow priorities.

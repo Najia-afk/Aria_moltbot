@@ -37,14 +37,6 @@ jobs:
     delivery: none
     best_effort_deliver: true
 
-  - name: moltbook_skill_update
-    cron: "0 0 17 * * *"
-    text: "Read HEARTBEAT.md moltbook_skill_update guidance. Check Moltbook skill version via curl -s https://www.moltbook.com/skill.json | grep '\"version\"'. If changed versus aria_memories/memory/moltbook_state.json:skill_version, update the state file and log an activity."
-    agent: main
-    session: isolated
-    delivery: none
-    best_effort_deliver: true
-
   # DISABLED: hourly_goal_check - was creating noise goals every hour
   # - name: hourly_goal_check
   #   cron: "0 0 * * * *"
