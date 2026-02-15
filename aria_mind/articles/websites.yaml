@@ -1,0 +1,133 @@
+# Research Website Configurations
+# Define sources for journalist focus web research
+# Rate limits are CRITICAL for token management
+
+sources:
+  # ── AI & Tech News ──────────────────────────────────────────────
+  
+  techcrunch_ai:
+    name: "TechCrunch AI"
+    url: "https://techcrunch.com/category/artificial-intelligence/"
+    selectors:
+      article_links: "article a[href*='/20']"
+      title: "h1.article__title"
+      content: "div.article-content"
+      author: "a[rel='author']"
+      date: "time"
+    rate_limit: 
+      max_visits_per_day: 2
+      cooldown_hours: 6
+    priority: high
+    tags: [ai, startup, news]
+
+  the_verge_ai:
+    name: "The Verge AI"
+    url: "https://www.theverge.com/ai-artificial-intelligence"
+    selectors:
+      article_links: "h2 a[href*='/20']"
+      title: "h1"
+      content: "article p"
+      author: "a[href*='/authors']"
+      date: "time"
+    rate_limit:
+      max_visits_per_day: 2
+      cooldown_hours: 8
+    priority: high
+    tags: [ai, tech, culture]
+
+  # ── Security ────────────────────────────────────────────────────
+
+  krebs_security:
+    name: "Krebs on Security"
+    url: "https://krebsonsecurity.com/"
+    selectors:
+      article_links: "h2.entry-title a"
+      title: "h1.entry-title"
+      content: "div.entry-content"
+      author: "span.author vcard"
+      date: "time.entry-date"
+    rate_limit:
+      max_visits_per_day: 1
+      cooldown_hours: 12
+    priority: critical
+    tags: [security, infosec, cybercrime]
+
+  portswigger:
+    name: "PortSwigger Research"
+    url: "https://portswigger.net/research"
+    selectors:
+      article_links: "h3 a[href^='/research']"
+      title: "h1"
+      content: "div.text-content"
+      author: "a[href*='/researcher']"
+      date: "time"
+    rate_limit:
+      max_visits_per_day: 1
+      cooldown_hours: 12
+    priority: high
+    tags: [security, webapp, research]
+
+  # ── Research Papers ─────────────────────────────────────────────
+
+  arxiv_ai:
+    name: "arXiv AI/ML"
+    url: "https://arxiv.org/list/cs.AI/recent"
+    selectors:
+      article_links: "dt a[title='Abstract']"
+      title: "h1.title"
+      content: "div.abstract"
+      author: "div.authors a"
+      date: "div.dateline"
+    rate_limit:
+      max_visits_per_day: 2
+      cooldown_hours: 8
+    priority: medium
+    tags: [research, papers, ai, ml]
+
+  # ── OpenClaw / Community ────────────────────────────────────────
+
+  openclaw_blog:
+    name: "OpenClaw Blog"
+    url: "https://blog.openclaw.ai"
+    selectors:
+      article_links: "article a[href^='/blog']"
+      title: "h1"
+      content: "article"
+    rate_limit:
+      max_visits_per_day: 1
+      cooldown_hours: 24
+    priority: high
+    tags: [openclaw, community, updates]
+
+# ── Research Budget ───────────────────────────────────────────────
+# Strict token management for autonomous mode
+
+token_budget:
+  daily_limit_usd: 0.50  # Conservative for autonomous operation
+  max_articles_per_day: 3
+  max_browser_sessions_per_day: 5
+  model_priority: 
+    - qwen3-mlx      # Local, free
+    - deepseek-free  # Cloud free tier
+    - trinity-free   # Fallback
+  alert_threshold: 0.40  # Alert when approaching limit
+
+# ── Output Configuration ──────────────────────────────────────────
+
+output:
+  save_raw_html: false  # Save space, extract text only
+  save_screenshots: false  # Tokens > images for now
+  summary_format: markdown
+  storage_path: "/root/.openclaw/aria_memories/research/articles/"
+  index_file: "/root/.openclaw/aria_memories/research/article_index.json"
+
+# ── Autonomous Mode Rules ─────────────────────────────────────────
+
+autonomous_rules:
+  - "ALWAYS use browser skill, NEVER web_search (per AGENTS.md policy)"
+  - "Delegate deep analysis to analyst sub-agent"
+  - "Log all research activities via api_client"
+  - "Summarize in 3-5 bullet points max"
+  - "Flag critical security news immediately"
+  - "Skip paywalled content"
+  - "Respect robots.txt (built into browser)"

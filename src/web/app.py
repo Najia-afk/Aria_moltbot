@@ -3,7 +3,7 @@
 # Flask app with GraphQL, Grid, Search for Aria activities and records
 # =============================================================================
 
-from flask import Flask, render_template, make_response, request, Response
+from flask import Flask, render_template, make_response, request, Response, send_from_directory
 import os
 import requests as http_requests
 
@@ -43,6 +43,10 @@ def create_app():
             response.headers['Pragma'] = 'no-cache'
             response.headers['Expires'] = '0'
         return response
+
+    @app.route('/favicon.ico')
+    def favicon_ico():
+        return send_from_directory(app.static_folder, 'favicon.svg', mimetype='image/svg+xml')
     
     # =========================================================================
     # API Reverse Proxy - forwards /api/* to aria-api backend

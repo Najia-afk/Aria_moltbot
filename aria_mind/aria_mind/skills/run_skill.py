@@ -1,0 +1,1 @@
+/root/.openclaw/workspace/skills/run_skill.py
