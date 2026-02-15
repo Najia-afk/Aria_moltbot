@@ -49,7 +49,7 @@ class TestInit:
     def test_init_empty_config(self, empty_config):
         s = SessionManagerSkill(empty_config)
         assert s._stale_threshold_minutes == 60
-        assert "localhost" in s._gateway_url
+        assert s._gateway_url.endswith("/api")
         assert s._client is not None
 
     def test_init_custom_config(self, custom_config):

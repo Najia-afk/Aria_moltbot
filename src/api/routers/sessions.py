@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 import httpx
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import delete, func, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -709,6 +709,24 @@ async def update_agent_session(
         )
         await db.commit()
     return {"updated": True}
+
+
+@router.delete("/sessions/{session_id}")
+async def delete_agent_session(session_id: str, db: AsyncSession = Depends(get_db)):
+    try:
+        session_uuid = uuid.UUID(session_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid session_id") from exc
+
+    result = await db.execute(
+        delete(AgentSession).where(AgentSession.id == session_uuid)
+    )
+    await db.commit()
+
+    if not (result.rowcount or 0):
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    return {"deleted": True, "id": session_id}
 
 
 @router.get("/sessions/stats")

@@ -67,11 +67,17 @@ class SessionManagerSkill(BaseSkill):
         self._stale_threshold_minutes: int = int(
             config.config.get("stale_threshold_minutes", 60)
         )
-        self._gateway_url = config.config.get(
-            "openclaw_gateway_url",
-            os.environ.get("CLAWDBOT_URL", f"http://localhost:{os.environ.get('OPENCLAW_GATEWAY_PORT', '18789')}")
+        self._gateway_url = (
+            config.config.get("api_url")
+            or config.config.get("openclaw_gateway_url")
+            or os.environ.get("ARIA_API_URL")
+            or "http://aria-api:8000/api"
+        ).rstrip("/")
+        self._client = httpx.AsyncClient(
+            base_url=self._gateway_url,
+            timeout=httpx.Timeout(30.0),
+            headers={"Content-Type": "application/json"},
         )
-        self._client = httpx.AsyncClient(timeout=httpx.Timeout(30.0))
 
     @property
     def name(self) -> str:
@@ -94,8 +100,8 @@ class SessionManagerSkill(BaseSkill):
         """List all active sessions with basic metadata."""
         try:
             resp = await self._client.get(
-                f"{self._gateway_url}/api/sessions",
-                headers={"Content-Type": "application/json"},
+                "/sessions",
+                params={"include_cron_events": "true"},
             )
             resp.raise_for_status()
             sessions = _parse_sessions_from_api(resp.text)
@@ -115,11 +121,15 @@ class SessionManagerSkill(BaseSkill):
         if not session_id:
             return SkillResult.fail("session_id is required")
         try:
-            resp = await self._client.delete(
-                f"{self._gateway_url}/api/sessions/{session_id}",
-                headers={"Content-Type": "application/json"},
-            )
-            resp.raise_for_status()
+            resp = await self._client.delete(f"/sessions/{session_id}")
+            if resp.status_code == 404:
+                fallback = await self._client.patch(
+                    f"/sessions/{session_id}",
+                    json={"status": "ended"},
+                )
+                fallback.raise_for_status()
+            else:
+                resp.raise_for_status()
             return SkillResult.ok({
                 "deleted": session_id,
                 "message": f"Session {session_id} deleted successfully",
