@@ -115,7 +115,7 @@ class SessionManagerSkill(BaseSkill):
             return SkillResult.fail(f"Error listing sessions: {e}")
 
     async def delete_session(self, session_id: str = "", **kwargs) -> SkillResult:
-        """Delete a specific session by ID."""
+        """Delete a specific session by ID (PG uuid from aria-api)."""
         if not session_id:
             session_id = kwargs.get("session_id", "")
         if not session_id:
@@ -123,13 +123,10 @@ class SessionManagerSkill(BaseSkill):
         try:
             resp = await self._client.delete(f"/sessions/{session_id}")
             if resp.status_code == 404:
-                fallback = await self._client.patch(
-                    f"/sessions/{session_id}",
-                    json={"status": "ended"},
+                return SkillResult.fail(
+                    f"Session {session_id} not found — it may have already been cleaned up"
                 )
-                fallback.raise_for_status()
-            else:
-                resp.raise_for_status()
+            resp.raise_for_status()
             return SkillResult.ok({
                 "deleted": session_id,
                 "message": f"Session {session_id} deleted successfully",
