@@ -72,6 +72,9 @@ def _load_manifest_text(skill_dir: Path) -> tuple[dict, str]:
 def _local_manifest_route(task: str, limit: int, workspace_root_fn: Callable[[], Path]) -> list[dict]:
     root = workspace_root_fn() / "aria_skills"
     if not root.exists():
+        # Container layout: skills/aria_skills/
+        root = workspace_root_fn() / "skills" / "aria_skills"
+    if not root.exists():
         return []
 
     query_tokens = _tokens(task)

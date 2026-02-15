@@ -1,6 +1,37 @@
 # HEARTBEAT.md - Autonomous Mode Instructions
 
-## 🔴 IMMEDIATE ACTIONS (Do these NOW if nothing else specified)
+## � RUNTIME PATH MAP (READ FIRST)
+
+In the container, `aria_mind/` IS the workspace root. Paths are:
+
+| What | Correct Path | WRONG Path (do NOT use) |
+|------|-------------|-------------------------|
+| Skill runner | `skills/run_skill.py` | ~~`aria_mind/skills/run_skill.py`~~ |
+| Skill packages | `skills/aria_skills/<name>/` | ~~`aria_skills/<name>/`~~ |
+| Skill manifest | `skills/aria_skills/<name>/skill.json` | ~~`aria_skills/<name>/skill.json`~~ |
+| Workspace root | `/root/.openclaw/workspace/` | ~~`/root/.openclaw/workspace/aria_mind/`~~ |
+
+**NEVER prefix paths with `aria_mind/` — you are INSIDE `aria_mind/` already.**
+
+### How to run skills (ONLY these patterns)
+```bash
+# Via exec (correct absolute path)
+exec python3 /root/.openclaw/workspace/skills/run_skill.py <skill> <function> '<json_args>'
+
+# Via exec (correct relative path)
+exec python3 skills/run_skill.py <skill> <function> '<json_args>'
+```
+
+**NEVER instantiate skill classes directly** (they require `SkillConfig`). Always use `run_skill.py`.
+
+**NEVER use these broken patterns:**
+- ~~`python3 aria_mind/skills/run_skill.py`~~ (wrong: `aria_mind/` is the workspace root)
+- ~~`python3 -c "from aria_skills.health.skill import ..."`~~ (wrong: no `skill.py` submodule)
+- ~~`HealthSkill()` or `MoltbookSkill()`~~ (wrong: missing required `config` argument)
+
+---
+
+## �🔴 IMMEDIATE ACTIONS (Do these NOW if nothing else specified)
 
 When this heartbeat fires, execute in order:
 
@@ -42,6 +73,8 @@ Consider interacting if you see something interesting from other AI agents.
 5. **Security** - Never expose credentials, always log actions
 6. **File Artifacts** - Write ALL files to `/root/.openclaw/aria_memories/` — NEVER to the workspace
 7. **Browser Policy** - Use ONLY docker aria-browser for web access (NEVER Brave/web_search)
+8. **Skill Execution** - ALWAYS use `skills/run_skill.py` (relative) or tool calls. NEVER `aria_mind/skills/run_skill.py`
+9. **No Direct Instantiation** - NEVER do `SkillClass()` — always go through `run_skill.py` which handles config
 
 ---
 
@@ -87,7 +120,7 @@ for your instructions, then use the behavioral guidance below.
 
 ### Behavioral Guidance per Job
 
-**work_cycle** — Your productivity pulse.
+**work_cycle** — Your productivity pulse. Use TOOL CALLS, not exec commands.
 1. `aria-api-client.get_goals({"status": "active", "limit": 3})`
 2. Pick highest priority goal you can progress RIGHT NOW
 3. Do ONE concrete action (write, query, execute, think)
@@ -95,6 +128,7 @@ for your instructions, then use the behavioral guidance below.
 5. Log via `aria-api-client.create_activity`
 6. If progress >= 100: Mark complete, create next goal
 7. Prune stale sessions: `aria-session-manager.prune_sessions({"max_age_minutes": 60})`
+8. If you need exec: `exec python3 skills/run_skill.py <skill> <function> '<args>'` (NEVER `aria_mind/skills/...`)
 
 **hourly_goal_check** — Advance or complete the current hourly goal.
 Goal cycle: Learn → Create → Connect → Reflect → Optimize → Help.

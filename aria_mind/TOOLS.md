@@ -183,15 +183,26 @@ aria-database.fetch_all({"query": "SELECT * FROM goals LIMIT 5"})
 
 ## Low-Token Runner Patterns
 
+> **⚠️ PATH RULE:** In the container, `aria_mind/` IS the workspace root.
+> Use `skills/run_skill.py` (relative) or `/root/.openclaw/workspace/skills/run_skill.py` (absolute).
+> **NEVER** use `aria_mind/skills/run_skill.py` — that path does not exist at runtime.
+
 Prefer compact discovery before execution:
 
 ```bash
 # Compact routing (no per-skill info payload)
-python3 aria_mind/skills/run_skill.py --auto-task "summarize goal progress" --route-limit 2 --route-no-info
+exec python3 skills/run_skill.py --auto-task "summarize goal progress" --route-limit 2 --route-no-info
 
 # Introspect one skill only when needed
-python3 aria_mind/skills/run_skill.py --skill-info api_client
+exec python3 skills/run_skill.py --skill-info api_client
+
+# Run a specific skill function
+exec python3 skills/run_skill.py health health_check '{}'
+exec python3 skills/run_skill.py api_client get_activities '{"limit": 5}'
 ```
+
+**NEVER instantiate skills directly** (e.g., `MoltbookSkill()`, `HealthSkill()`).
+All skills require a `SkillConfig` object. Use `run_skill.py` which handles this automatically.
 
 ## Rate Limits
 

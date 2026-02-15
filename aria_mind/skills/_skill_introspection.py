@@ -23,7 +23,12 @@ def collect_skill_info(
     """Return merged runtime + manifest + docs + coherence metadata for a skill."""
     normalized = _normalize_skill_name(skill_name)
     root = workspace_root_fn()
+    # Handle both local and container layouts
     skill_path = root / "aria_skills" / normalized
+    if not skill_path.exists():
+        alt_path = root / "skills" / "aria_skills" / normalized
+        if alt_path.exists():
+            skill_path = alt_path
     canonical_name = f"aria-{normalized.replace('_', '-')}"
 
     out: dict = {

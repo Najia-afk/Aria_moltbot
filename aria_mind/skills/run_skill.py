@@ -18,10 +18,17 @@ import time
 from pathlib import Path
 from typing import Optional, Tuple
 
-# Add skill modules to path
+# Add skill modules to path — handle both local and container layouts
+# Container: aria_skills/ is mounted at /root/.openclaw/workspace/skills/aria_skills/
+# Local: aria_skills/ is a sibling of aria_mind/ at project root
 sys.path.insert(0, '/root/.openclaw/workspace/skills')
 sys.path.insert(0, '/root/.openclaw/workspace')
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+_project_root = str(Path(__file__).resolve().parents[2])
+sys.path.insert(0, _project_root)
+# Also add the parent of skills/ in case aria_skills is nested
+_skills_parent = str(Path(__file__).resolve().parent)
+if _skills_parent not in sys.path:
+    sys.path.insert(0, _skills_parent)
 
 try:
     from aria_mind.skills._skill_registry import SKILL_REGISTRY, _merge_registries
@@ -80,7 +87,15 @@ def _workspace_root() -> Path:
 
 
 def _skill_dir(skill_name: str) -> Path:
-    return _workspace_root() / 'aria_skills' / skill_name
+    """Resolve skill directory, handling both local and container layouts."""
+    root = _workspace_root()
+    primary = root / 'aria_skills' / skill_name
+    if primary.exists():
+        return primary
+    container_path = root / 'skills' / 'aria_skills' / skill_name
+    if container_path.exists():
+        return container_path
+    return primary
 
 
 def _has_skill_changes(skill_name: str) -> bool:

@@ -14,22 +14,38 @@ def workspace_root() -> Path:
 
 
 def skill_dir(root: Path, skill_name: str) -> Path:
-    return root / "aria_skills" / skill_name
+    """Resolve skill directory, handling both local and container layouts.
+
+    Local:     <root>/aria_skills/<skill>/
+    Container: <root>/skills/aria_skills/<skill>/  (volume-mounted)
+    """
+    primary = root / "aria_skills" / skill_name
+    if primary.exists():
+        return primary
+    container_path = root / "skills" / "aria_skills" / skill_name
+    if container_path.exists():
+        return container_path
+    # Fall back to primary (will report missing files correctly)
+    return primary
 
 
 def has_skill_changes(root: Path, skill_name: str) -> bool:
     """Return True when git reports changes under this skill directory."""
     try:
-        rel = f"aria_skills/{skill_name}"
-        proc = subprocess.run(
-            ["git", "status", "--porcelain", "--", rel],
-            cwd=str(root),
-            capture_output=True,
-            text=True,
-            timeout=5,
-            check=False,
-        )
-        return bool((proc.stdout or "").strip())
+        # Try both local and container-mounted paths
+        rels = [f"aria_skills/{skill_name}", f"skills/aria_skills/{skill_name}"]
+        for rel in rels:
+            proc = subprocess.run(
+                ["git", "status", "--porcelain", "--", rel],
+                cwd=str(root),
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+            if (proc.stdout or "").strip():
+                return True
+        return False
     except Exception:
         return False
 
@@ -136,11 +152,15 @@ def collect_skill_alignment_report(
     workspace_root_fn: Callable[[], Path],
     support_skill_dirs: set[str],
 ) -> dict:
-    root = workspace_root_fn() / "aria_skills"
+    root = workspace_root_fn()
+    # Handle both local and container layouts
+    skills_root = root / "aria_skills"
+    if not skills_root.exists():
+        skills_root = root / "skills" / "aria_skills"
     rows = []
-    if not root.exists():
+    if not skills_root.exists():
         return {
-            "root": str(root),
+            "root": str(skills_root),
             "skills": [],
             "count": 0,
             "coherent_count": 0,
@@ -148,7 +168,7 @@ def collect_skill_alignment_report(
             "coherent": True,
         }
 
-    for entry in sorted(root.iterdir(), key=lambda p: p.name):
+    for entry in sorted(skills_root.iterdir(), key=lambda p: p.name):
         if not entry.is_dir():
             continue
         if not include_support and entry.name in support_skill_dirs:
@@ -198,7 +218,7 @@ def collect_skill_alignment_report(
 
     coherent_count = sum(1 for row in rows if row["coherent"])
     return {
-        "root": str(root),
+        "root": str(skills_root),
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "skills": rows,
         "count": len(rows),

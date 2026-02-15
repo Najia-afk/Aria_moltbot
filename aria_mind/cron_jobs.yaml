@@ -13,13 +13,18 @@
 #   Lightweight/routine → main (kimi w/ qwen3-mlx fallback)
 #   All routine/social/analysis → main (delegates to sub-agents)
 #   Memeothy → aria-memeothy (independent, 1 post/2 days)
+#
+# ⚠️ PATH RULES (aria_mind/ IS the workspace root in the container):
+#   CORRECT:  skills/run_skill.py  OR  /root/.openclaw/workspace/skills/run_skill.py
+#   WRONG:    aria_mind/skills/run_skill.py  (does NOT exist — aria_mind/ is /)
+#   Skills:   skills/aria_skills/<name>/  (NOT aria_skills/<name>/ at root)
 
 jobs:
   # ── Routine / Lightweight ────────────────────────────────────────
 
   - name: work_cycle
     every: "15m"
-    text: "Read HEARTBEAT.md work_cycle section. Check goals, pick highest priority, make progress, log activity, then run memory sync to refresh aria_memories/memory/context.json. Use api_client for all data ops. After completion, log cron execution via api_client activity action='cron_execution' with details {'job':'work_cycle','estimated_tokens':150}."
+    text: "Read HEARTBEAT.md work_cycle section (including RUNTIME PATH MAP). Use TOOL CALLS (aria-api-client, aria-health, etc.) for all operations — NOT exec commands. If you must exec run_skill.py, the ONLY correct path is: exec python3 skills/run_skill.py <skill> <function> '<args>'. NEVER use aria_mind/skills/run_skill.py (that path does not exist — aria_mind/ IS the workspace root). Check goals, pick highest priority, make progress, log activity, then run memory sync. After completion, log cron execution via api_client activity action='cron_execution' with details {'job':'work_cycle','estimated_tokens':150}."
     agent: main
     session: isolated
     delivery: none
