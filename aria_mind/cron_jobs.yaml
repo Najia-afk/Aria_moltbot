@@ -29,6 +29,22 @@ jobs:
     session: isolated
     delivery: none
 
+  - name: moltbook_check
+    every: "60m"
+    text: "Read HEARTBEAT.md moltbook_check guidance. If 60+ minutes since aria_memories/memory/moltbook_state.json:last_check, check Moltbook DMs and feed (latest 5), reply to mentions, engage thoughtfully on relevant posts, optionally post only if high-value insight, then update moltbook_state.json last_check and log cron execution via api_client activity action='cron_execution' with details {'job':'moltbook_check','estimated_tokens':120}."
+    agent: main
+    session: isolated
+    delivery: none
+    best_effort_deliver: true
+
+  - name: moltbook_skill_update
+    cron: "0 0 17 * * *"
+    text: "Read HEARTBEAT.md moltbook_skill_update guidance. Check Moltbook skill version via curl -s https://www.moltbook.com/skill.json | grep '\"version\"'. If changed versus aria_memories/memory/moltbook_state.json:skill_version, update the state file and log an activity."
+    agent: main
+    session: isolated
+    delivery: none
+    best_effort_deliver: true
+
   # DISABLED: hourly_goal_check - was creating noise goals every hour
   # - name: hourly_goal_check
   #   cron: "0 0 * * * *"
