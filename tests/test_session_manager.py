@@ -239,15 +239,16 @@ class TestDeleteSession:
 
     @pytest.mark.asyncio
     async def test_delete_not_found(self, skill, agents_dir):
-        """Deleting a non-existent session returns failure."""
+        """Deleting a non-existent session returns success (already scrapped)."""
         import aria_skills.session_manager as mod
         orig = mod._AGENTS_DIR
         mod._AGENTS_DIR = str(agents_dir)
         skill._mark_ended_in_pg = AsyncMock(return_value=False)
         try:
             result = await skill.delete_session(session_id="nonexistent")
-            assert result.success is False
-            assert "not found" in result.error
+            assert result.success is True
+            assert "already scrapped" in result.data["message"]
+            assert result.data["removed_keys"] == []
         finally:
             mod._AGENTS_DIR = orig
 
@@ -308,3 +309,82 @@ class TestClose:
         skill._client = AsyncMock()
         await skill.close()
         skill._client.aclose.assert_awaited_once()
+
+# ── cleanup_orphans ──────────────────────────────────────────────────────────
+
+
+class TestCleanupOrphans:
+    @pytest.fixture
+    def messy_agents_dir(self, tmp_path):
+        """Create a dir with stale keys, orphan transcripts, and old .deleted files."""
+        import time
+        sess_dir = tmp_path / "main" / "sessions"
+        sess_dir.mkdir(parents=True)
+        # sessions.json with a stale key (transcript already deleted)
+        index = {
+            "agent:main:cron:live1": {"sessionId": "live1", "updatedAt": 1749600000000},
+            "agent:main:cron:stale1": {"sessionId": "stale1", "updatedAt": 1749500000000},
+        }
+        (sess_dir / "sessions.json").write_text(json.dumps(index))
+        # live1 has a transcript
+        (sess_dir / "live1.jsonl").write_text('{"msg":"hi"}\n')
+        # stale1 has NO transcript (clawdbot already deleted it)
+        # orphan transcript not in index
+        (sess_dir / "orphan1.jsonl").write_text('{"msg":"orphan"}\n')
+        # old .deleted file (set mtime to 10 days ago)
+        old_deleted = sess_dir / "old1.jsonl.deleted.2026-01-01T00-00-00.000Z"
+        old_deleted.write_text('{"msg":"old"}\n')
+        ten_days_ago = time.time() - (10 * 86400)
+        os.utime(str(old_deleted), (ten_days_ago, ten_days_ago))
+        # recent .deleted file (should NOT be purged)
+        recent_deleted = sess_dir / "recent1.jsonl.deleted.2026-02-14T00-00-00.000Z"
+        recent_deleted.write_text('{"msg":"recent"}\n')
+        return tmp_path
+
+    @pytest.mark.asyncio
+    async def test_cleanup_orphans_dry_run(self, skill, messy_agents_dir):
+        """Dry run reports issues without modifying anything."""
+        import aria_skills.session_manager as mod
+        orig = mod._AGENTS_DIR
+        mod._AGENTS_DIR = str(messy_agents_dir)
+        try:
+            result = await skill.cleanup_orphans(dry_run=True)
+            assert result.success is True
+            assert result.data["dry_run"] is True
+            assert result.data["stale_keys_removed"] == 1  # stale1
+            assert result.data["orphan_transcripts_archived"] == 1  # orphan1
+            assert result.data["old_deleted_files_purged"] == 1  # old1
+            # Verify nothing was actually changed
+            index = _load_sessions_index("main")
+            assert "agent:main:cron:stale1" in index  # still there
+            sess_dir = messy_agents_dir / "main" / "sessions"
+            assert (sess_dir / "orphan1.jsonl").exists()  # still there
+        finally:
+            mod._AGENTS_DIR = orig
+
+    @pytest.mark.asyncio
+    async def test_cleanup_orphans_execute(self, skill, messy_agents_dir):
+        """Actually clean up stale keys, orphans, and old .deleted files."""
+        import aria_skills.session_manager as mod
+        orig = mod._AGENTS_DIR
+        mod._AGENTS_DIR = str(messy_agents_dir)
+        try:
+            result = await skill.cleanup_orphans(dry_run=False)
+            assert result.success is True
+            assert result.data["stale_keys_removed"] == 1
+            assert result.data["orphan_transcripts_archived"] == 1
+            assert result.data["old_deleted_files_purged"] == 1
+            # Verify stale key removed from index
+            index = _load_sessions_index("main")
+            assert "agent:main:cron:stale1" not in index
+            assert "agent:main:cron:live1" in index  # live one kept
+            # Verify orphan archived
+            sess_dir = messy_agents_dir / "main" / "sessions"
+            assert not (sess_dir / "orphan1.jsonl").exists()
+            assert len(list(sess_dir.glob("orphan1.jsonl.deleted.*"))) == 1
+            # Verify old .deleted removed
+            assert not (sess_dir / "old1.jsonl.deleted.2026-01-01T00-00-00.000Z").exists()
+            # Verify recent .deleted kept
+            assert (sess_dir / "recent1.jsonl.deleted.2026-02-14T00-00-00.000Z").exists()
+        finally:
+            mod._AGENTS_DIR = orig

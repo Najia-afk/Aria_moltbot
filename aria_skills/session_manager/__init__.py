@@ -253,9 +253,14 @@ class SessionManagerSkill(BaseSkill):
                 archived = True
 
         if not removed_keys:
-            return SkillResult.fail(
-                f"Session {session_id} not found in any agent sessions.json"
-            )
+            # Session may have been scrapped by clawdbot or the user already
+            return SkillResult.ok({
+                "deleted": session_id,
+                "removed_keys": [],
+                "transcript_archived": False,
+                "pg_status_updated": await self._mark_ended_in_pg(session_id),
+                "message": f"Session {session_id} not in sessions.json (already scrapped by clawdbot/user), PG updated",
+            })
 
         # Best-effort: mark as ended in PG for dashboard history
         pg_updated = await self._mark_ended_in_pg(session_id)
@@ -407,6 +412,93 @@ class SessionManagerSkill(BaseSkill):
                 "session_id is required — pass the ID of the completed delegation session"
             )
         return await self.delete_session(session_id=session_id)
+
+    @logged_method()
+    async def cleanup_orphans(self, dry_run: bool = False, **kwargs) -> SkillResult:
+        """
+        Clean up filesystem inconsistencies left by clawdbot's own session management.
+
+        Handles three cases:
+        1. **Stale keys**: keys in sessions.json whose transcript was already deleted
+           by clawdbot → removes the key from the index.
+        2. **Orphan transcripts**: .jsonl files on disk not listed in sessions.json
+           → archives them (renames to .deleted pattern).
+        3. **Old .deleted files**: archived transcripts older than 7 days
+           → permanently removes them to free disk space.
+
+        Args:
+            dry_run: If true, report what would be cleaned without doing it.
+        """
+        dry_run = kwargs.get("dry_run", dry_run)
+        if isinstance(dry_run, str):
+            dry_run = dry_run.lower() in ("true", "1", "yes")
+
+        agents = _list_all_agents()
+        stale_keys_removed: List[Dict[str, str]] = []
+        orphans_archived: List[Dict[str, str]] = []
+        deleted_purged: List[Dict[str, str]] = []
+        now = datetime.now(timezone.utc)
+        seven_days_ago = now - timedelta(days=7)
+
+        for ag in agents:
+            sess_dir = os.path.join(_AGENTS_DIR, ag, "sessions")
+            index = _load_sessions_index(ag)
+            index_modified = False
+
+            # 1. Stale keys: key exists in index but transcript is already .deleted
+            keys_to_remove = []
+            index_sids: set = set()
+            for k, v in index.items():
+                if not isinstance(v, dict):
+                    continue
+                sid = v.get("sessionId", "")
+                if not sid:
+                    continue
+                index_sids.add(sid)
+                jsonl = os.path.join(sess_dir, f"{sid}.jsonl")
+                if not os.path.exists(jsonl):
+                    # Transcript gone (deleted by clawdbot or missing)
+                    keys_to_remove.append((k, sid))
+
+            for k, sid in keys_to_remove:
+                stale_keys_removed.append({"agent": ag, "key": k, "sessionId": sid})
+                if not dry_run:
+                    del index[k]
+                    index_modified = True
+
+            if index_modified:
+                _save_sessions_index(index, ag)
+
+            # 2. Orphan transcripts: .jsonl exists but not in sessions.json
+            for jf in glob.glob(os.path.join(sess_dir, "*.jsonl")):
+                sid = os.path.basename(jf).replace(".jsonl", "")
+                if sid not in index_sids:
+                    orphans_archived.append({"agent": ag, "sessionId": sid})
+                    if not dry_run:
+                        _archive_transcript(sid, ag)
+
+            # 3. Old .deleted files (>7 days)
+            for df in glob.glob(os.path.join(sess_dir, "*.deleted.*")):
+                try:
+                    mtime = datetime.fromtimestamp(os.path.getmtime(df), tz=timezone.utc)
+                    if mtime < seven_days_ago:
+                        deleted_purged.append({"agent": ag, "file": os.path.basename(df)})
+                        if not dry_run:
+                            os.remove(df)
+                except OSError:
+                    pass
+
+        return SkillResult.ok({
+            "dry_run": dry_run,
+            "stale_keys_removed": len(stale_keys_removed),
+            "orphan_transcripts_archived": len(orphans_archived),
+            "old_deleted_files_purged": len(deleted_purged),
+            "details": {
+                "stale_keys": stale_keys_removed,
+                "orphans": orphans_archived,
+                "purged": deleted_purged,
+            },
+        })
 
     async def close(self):
         """Close the HTTP client."""

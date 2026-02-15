@@ -80,6 +80,20 @@
         },
         "required": ["session_id"]
       }
+    },
+    {
+      "name": "cleanup_orphans",
+      "description": "Clean up filesystem inconsistencies left by clawdbot's own session management: stale keys in index, orphan .jsonl transcripts not in index, and old .deleted files (>7 days). Run this periodically or after noticing session bloat.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "dry_run": {
+            "type": "boolean",
+            "description": "If true, report what would be cleaned without doing it",
+            "default": false
+          }
+        }
+      }
     }
   ],
   "run": "python3 /root/.openclaw/workspace/skills/run_skill.py session_manager {{tool}} '{{args_json}}'"
