@@ -108,13 +108,14 @@ _KNOWN_SKILLS = [
     ("database", "L1"), ("experiment", "L3"), ("fact_check", "L2"),
     ("goals", "L2"), ("health", "L1"), ("hourly_goals", "L2"),
     ("input_guard", "L1"), ("knowledge_graph", "L2"), ("litellm", "L1"),
-    ("llm", "L1"), ("market_data", "L2"), ("memeothy", "L3"),
-    ("model_switcher", "L2"), ("moltbook", "L3"), ("moonshot", "L2"),
-    ("ollama", "L1"), ("performance", "L2"), ("pipeline_skill", "L2"),
-    ("pipelines", "L2"), ("portfolio", "L3"), ("pytest_runner", "L2"),
-    ("research", "L3"), ("sandbox", "L2"), ("schedule", "L2"),
-    ("security_scan", "L2"), ("session_manager", "L2"), ("social", "L3"),
-    ("telegram", "L2"), ("working_memory", "L1"),
+    ("llm", "L1"), ("market_data", "L2"), ("memory_compression", "L3"),
+    ("memeothy", "L3"), ("model_switcher", "L2"), ("moltbook", "L3"),
+    ("moonshot", "L2"), ("ollama", "L1"), ("pattern_recognition", "L3"),
+    ("performance", "L2"), ("pipeline_skill", "L2"), ("pipelines", "L2"),
+    ("portfolio", "L3"), ("pytest_runner", "L2"), ("research", "L3"),
+    ("sandbox", "L2"), ("schedule", "L2"), ("security_scan", "L2"),
+    ("sentiment_analysis", "L3"), ("session_manager", "L2"), ("social", "L3"),
+    ("telegram", "L2"), ("unified_search", "L3"), ("working_memory", "L1"),
 ]
 
 

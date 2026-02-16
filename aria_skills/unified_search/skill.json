@@ -1,0 +1,85 @@
+{
+  "name": "aria-unified-search",
+  "version": "2.0.0",
+  "description": "Unified search across semantic memories, knowledge graph, and traditional memories with Reciprocal Rank Fusion (RRF)",
+  "author": "Aria Team",
+  "layer": 3,
+  "category": "cognitive",
+  "dependencies": ["api_client"],
+  "focus_affinity": ["data", "orchestrator", "memory"],
+  "tools": [
+    {
+      "name": "search",
+      "description": "Unified search across all backends (semantic + graph + memory) with RRF merge. Returns deduplicated, ranked results.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search query text"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max results to return (default: 20)",
+            "default": 20
+          },
+          "backends": {
+            "type": "array",
+            "description": "Which backends to use: semantic, graph, memory (default: all)",
+            "items": {"type": "string"}
+          },
+          "category": {
+            "type": "string",
+            "description": "Optional category filter for semantic/memory backends"
+          },
+          "min_importance": {
+            "type": "number",
+            "description": "Minimum importance threshold (default: 0.0)",
+            "default": 0.0
+          }
+        },
+        "required": ["query"]
+      }
+    },
+    {
+      "name": "semantic_search",
+      "description": "Search semantic memories only (pgvector cosine similarity).",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string", "description": "Search query text" },
+          "limit": { "type": "integer", "description": "Max results (default: 20)", "default": 20 },
+          "category": { "type": "string", "description": "Optional category filter" }
+        },
+        "required": ["query"]
+      }
+    },
+    {
+      "name": "graph_search",
+      "description": "Search knowledge graph only (ILIKE text match on entities and relations).",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string", "description": "Search query text" },
+          "limit": { "type": "integer", "description": "Max results (default: 20)", "default": 20 }
+        },
+        "required": ["query"]
+      }
+    },
+    {
+      "name": "memory_search",
+      "description": "Search traditional key-value memories only (text match).",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string", "description": "Search query text" },
+          "limit": { "type": "integer", "description": "Max results (default: 20)", "default": 20 },
+          "category": { "type": "string", "description": "Optional category filter" }
+        },
+        "required": ["query"]
+      }
+    }
+  ],
+  "rate_limit": {"max_per_minute": 30},
+  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py unified_search {{tool}} '{{args_json}}'"
+}

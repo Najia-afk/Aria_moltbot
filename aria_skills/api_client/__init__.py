@@ -1249,6 +1249,26 @@ class AriaAPIClient(BaseSkill):
         except Exception as e:
             return SkillResult.fail(f"Failed to search semantic memories: {e}")
 
+    async def list_semantic_memories(
+        self, category: str = None, source: str = None,
+        limit: int = 50, page: int = 1,
+        min_importance: float = 0.0,
+    ) -> SkillResult:
+        """List semantic memories with optional category/source filter (no embedding query needed)."""
+        try:
+            params: Dict[str, Any] = {"limit": limit, "page": page}
+            if category:
+                params["category"] = category
+            if source:
+                params["source"] = source
+            if min_importance > 0:
+                params["min_importance"] = min_importance
+            resp = await self._client.get("/memories/semantic", params=params)
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to list semantic memories: {e}")
+
     async def summarize_session(self, hours_back: int = 24) -> SkillResult:
         """Summarize recent session into episodic memory."""
         try:

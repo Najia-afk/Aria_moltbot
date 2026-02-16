@@ -1,6 +1,6 @@
 # TOOLS.md - Skill Quick Reference
 
-**Full documentation: See SKILLS.md for complete skill reference (26 active skills)**
+**Full documentation: See SKILLS.md for complete skill reference (30 active skills)**
 
 Skills are auto-discovered from `aria_skills/*/skill.json`.
 
@@ -118,7 +118,7 @@ aria-api-client.mark_proposal_implemented({"proposal_id": "UUID", "reviewed_by":
 - Never propose modifications under `soul/` paths.
 - After implementation, mark proposal status to `implemented` and log execution outcome via activity.
 
-## All 26 Active Skills
+## All 30 Active Skills
 
 | Category | Skills |
 |----------|--------|
@@ -128,7 +128,7 @@ aria-api-client.mark_proposal_implemented({"proposal_id": "UUID", "reviewed_by":
 | 📈 Trading | `aria-market-data`, `aria-portfolio` |
 | 🎨 Creative | `aria-llm`, `aria-memeothy` |
 | 🌐 Social | `aria-moltbook`, `aria-social`, `aria-telegram` |
-| 🧠 Cognitive | `aria-working-memory`, `aria-pipeline-skill`, `aria-conversation-summary` |
+| 🧠 Cognitive | `aria-working-memory`, `aria-pipeline-skill`, `aria-conversation-summary`, `aria-memory-compression`, `aria-sentiment-analysis`, `aria-pattern-recognition`, `aria-unified-search` |
 | ⚡ Utility | `aria-api-client`, `aria-litellm` |
 
 > **Advanced compatibility skills (targeted use, not default routing):** `aria-database`, `aria-brainstorm`, `aria-community`, `aria-fact-check`, `aria-model-switcher`, `aria-experiment`
@@ -173,6 +173,18 @@ aria-knowledge-graph.kg_add_entity({"name": "Python", "type": "language"})
 
 # Direct SQL (self-healing / recovery path — prefer aria-api-client first)
 aria-database.fetch_all({"query": "SELECT * FROM goals LIMIT 5"})
+
+# Compress session memories
+aria-memory-compression.compress_session({"hours_back": 6})
+
+# Analyze user sentiment
+aria-sentiment-analysis.analyze_message({"text": "..."})
+
+# Detect patterns in memory
+aria-pattern-recognition.detect_patterns({})
+
+# Unified search (RRF merge)
+aria-unified-search.search({"query": "security"})
 ```
 
 ## LLM Priority

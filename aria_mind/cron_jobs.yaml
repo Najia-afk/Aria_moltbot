@@ -148,4 +148,14 @@ jobs:
     session: isolated
     delivery: none
 
+  # ── Cognitive Memory Bridge (seed semantic_memories from activity_log + thoughts) ──
+
+  - name: memory_bridge
+    cron: "0 0 */3 * * *"
+    text: "Bridge activity data into semantic memory for cognitive skills. Call POST /api/analysis/seed-memories?limit=100&skip_existing=true via api_client. This backfills recent activities and thoughts into semantic_memories so pattern_recognition, sentiment_analysis, and unified_search have fresh data. Log result to activity_log via api_client activity action='cron_execution' with details {'job':'memory_bridge','estimated_tokens':50}."
+    agent: main
+    session: isolated
+    delivery: none
+    best_effort_deliver: true
+
   # memory_sync merged into work_cycle (S2-01)

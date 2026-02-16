@@ -172,6 +172,33 @@ async def generate_embedding(text: str) -> list[float]:
         return resp.json()["data"][0]["embedding"]
 
 
+@router.get("/memories/semantic")
+async def list_semantic_memories(
+    category: str = None,
+    source: str = None,
+    limit: int = 50,
+    page: int = 1,
+    min_importance: float = 0.0,
+    db: AsyncSession = Depends(get_db),
+):
+    """List semantic memories with optional category/source filter. No embedding query needed."""
+    base = select(SemanticMemory).order_by(SemanticMemory.created_at.desc())
+    if category:
+        base = base.where(SemanticMemory.category == category)
+    if source:
+        base = base.where(SemanticMemory.source == source)
+    if min_importance > 0:
+        base = base.where(SemanticMemory.importance >= min_importance)
+
+    count_stmt = select(func.count()).select_from(base.subquery())
+    total = (await db.execute(count_stmt)).scalar() or 0
+
+    stmt, _ = paginate_query(base, page, limit)
+    rows = (await db.execute(stmt)).scalars().all()
+    items = [m.to_dict() for m in rows]
+    return build_paginated_response(items, total, page, limit)
+
+
 @router.post("/memories/semantic")
 async def store_semantic_memory(
     request: Request,

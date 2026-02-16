@@ -1,0 +1,84 @@
+{
+  "name": "aria-sentiment-analysis",
+  "version": "2.0.0",
+  "description": "Multi-dimensional sentiment analysis — valence/arousal/dominance, lexicon+LLM blend, conversation trajectory, adaptive tone profiles",
+  "author": "Aria Team",
+  "layer": 3,
+  "category": "cognitive",
+  "dependencies": ["api_client"],
+  "focus_affinity": ["data", "social", "memory"],
+  "tools": [
+    {
+      "name": "analyze_message",
+      "description": "Analyze sentiment of a single message — returns valence, arousal, dominance, frustration, satisfaction, confusion, and tone recommendation.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "Text to analyze for sentiment"
+          },
+          "context": {
+            "type": "array",
+            "description": "Optional list of prior messages for context"
+          },
+          "store": {
+            "type": "boolean",
+            "description": "Store result in semantic memory (default: true)",
+            "default": true
+          }
+        },
+        "required": ["text"]
+      }
+    },
+    {
+      "name": "analyze_conversation",
+      "description": "Analyze sentiment trajectory of a full conversation — detects improving/declining/volatile patterns, turning points, resolution.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "description": "List of message dicts with 'role' and 'content' keys"
+          },
+          "store": {
+            "type": "boolean",
+            "description": "Store summary in semantic memory (default: true)",
+            "default": true
+          }
+        },
+        "required": ["messages"]
+      }
+    },
+    {
+      "name": "get_tone_recommendation",
+      "description": "Get adaptive tone recommendation (empathetic/step-by-step/celebratory/neutral) for a message based on its sentiment.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "Text to get tone recommendation for"
+          }
+        },
+        "required": ["text"]
+      }
+    },
+    {
+      "name": "get_sentiment_history",
+      "description": "Return recent sentiment analysis results from session memory and semantic storage.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "description": "Max results to return (default: 20)",
+            "default": 20
+          }
+        }
+      }
+    }
+  ],
+  "rate_limit": {"max_per_minute": 60},
+  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py sentiment_analysis {{tool}} '{{args_json}}'"
+}

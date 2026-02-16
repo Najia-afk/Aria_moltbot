@@ -243,6 +243,37 @@ SKILL_REGISTRY = {
         "SessionManagerSkill",
         lambda: {"stale_threshold_minutes": int(os.environ.get("SESSION_STALE_MINUTES", "60"))},
     ),
+    # === Advanced Memory Skills ===
+    "memory_compression": (
+        "aria_skills.memory_compression",
+        "MemoryCompressionSkill",
+        lambda: {
+            "api_url": os.environ.get("ARIA_API_URL", "http://aria-api:8000/api"),
+            "litellm_url": os.environ.get("LITELLM_URL", "http://litellm:4000"),
+        },
+    ),
+    "sentiment_analysis": (
+        "aria_skills.sentiment_analysis",
+        "SentimentAnalysisSkill",
+        lambda: {
+            "api_url": os.environ.get("ARIA_API_URL", "http://aria-api:8000/api"),
+            "litellm_url": os.environ.get("LITELLM_URL", "http://litellm:4000"),
+        },
+    ),
+    "pattern_recognition": (
+        "aria_skills.pattern_recognition",
+        "PatternRecognitionSkill",
+        lambda: {
+            "api_url": os.environ.get("ARIA_API_URL", "http://aria-api:8000/api"),
+        },
+    ),
+    "unified_search": (
+        "aria_skills.unified_search",
+        "UnifiedSearchSkill",
+        lambda: {
+            "api_url": os.environ.get("ARIA_API_URL", "http://aria-api:8000/api"),
+        },
+    ),
     # === Raw Database — LAST on purpose: prefer api_client for data ops ===
     "database": ("aria_skills.database", "DatabaseSkill", lambda: {"dsn": os.environ.get("DATABASE_URL")}),
 }

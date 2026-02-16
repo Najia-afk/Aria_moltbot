@@ -1,0 +1,68 @@
+{
+  "name": "aria-memory-compression",
+  "version": "2.0.0",
+  "description": "3-tier hierarchical memory compression — importance scoring, LLM summarization, context budgeting",
+  "author": "Aria Team",
+  "layer": 3,
+  "category": "cognitive",
+  "dependencies": ["api_client"],
+  "focus_affinity": ["data", "orchestrator", "memory"],
+  "tools": [
+    {
+      "name": "compress_memories",
+      "description": "Compress a list of memories through the 3-tier pipeline (raw → recent → archive). Stores summaries in semantic memory.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "memories": {
+            "type": "array",
+            "description": "List of memory dicts with content, category, timestamp, importance"
+          },
+          "store_semantic": {
+            "type": "boolean",
+            "description": "Store compressed summaries in semantic memory (default: true)",
+            "default": true
+          }
+        }
+      }
+    },
+    {
+      "name": "compress_session",
+      "description": "Compress recent session activity via api_client.summarize_session().",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "hours_back": {
+            "type": "integer",
+            "description": "Hours of activity to compress (1-48, default: 6)",
+            "default": 6
+          }
+        }
+      }
+    },
+    {
+      "name": "get_context_budget",
+      "description": "Retrieve working memory context within a token budget, including compressed summaries.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "max_tokens": {
+            "type": "integer",
+            "description": "Max tokens for context (default: 2000)",
+            "default": 2000
+          }
+        }
+      }
+    },
+    {
+      "name": "get_compression_stats",
+      "description": "Get statistics from the last compression run — ratio, tokens saved, tier counts.",
+      "input_schema": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  ],
+  "rate_limit": {"max_per_minute": 10},
+  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py memory_compression {{tool}} '{{args_json}}'"
+}

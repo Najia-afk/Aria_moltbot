@@ -1,0 +1,73 @@
+{
+  "name": "aria-pattern-recognition",
+  "version": "1.0.0",
+  "description": "Detect behavioral patterns in memory streams — topic recurrence, temporal habits, sentiment drift, emerging interests, knowledge gaps",
+  "author": "Aria Team",
+  "layer": 3,
+  "category": "cognitive",
+  "dependencies": ["api_client"],
+  "focus_affinity": ["data", "orchestrator", "memory"],
+  "tools": [
+    {
+      "name": "detect_patterns",
+      "description": "Run full pattern detection on a list of memories. Fetches from semantic memory if none provided.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "memories": {
+            "type": "array",
+            "description": "List of memory dicts (optional — auto-fetches if empty)"
+          },
+          "min_confidence": {
+            "type": "number",
+            "description": "Minimum confidence threshold (0.0-1.0, default: 0.3)",
+            "default": 0.3
+          },
+          "store": {
+            "type": "boolean",
+            "description": "Store detected patterns in semantic memory (default: true)",
+            "default": true
+          }
+        }
+      }
+    },
+    {
+      "name": "get_recurring",
+      "description": "Get recurring topic patterns from the frequency tracker.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "min_frequency": {
+            "type": "number",
+            "description": "Minimum frequency threshold (events/day, default: 0.3)",
+            "default": 0.3
+          }
+        }
+      }
+    },
+    {
+      "name": "get_emerging",
+      "description": "Get newly emerging topics with growth rate above threshold.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "min_growth_rate": {
+            "type": "number",
+            "description": "Minimum growth rate multiplier (default: 2.0)",
+            "default": 2.0
+          }
+        }
+      }
+    },
+    {
+      "name": "get_pattern_stats",
+      "description": "Get statistics from the last pattern detection run — counts by type, new vs persistent.",
+      "input_schema": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  ],
+  "rate_limit": {"max_per_minute": 20},
+  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py pattern_recognition {{tool}} '{{args_json}}'"
+}
