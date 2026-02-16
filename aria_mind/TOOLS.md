@@ -1,6 +1,6 @@
 # TOOLS.md - Skill Quick Reference
 
-**Full documentation: See SKILLS.md for complete skill reference (26 active skills)**
+**Full documentation: See SKILLS.md for complete skill reference (30 active skills)**
 
 Skills are auto-discovered from `aria_skills/*/skill.json`.
 
@@ -118,7 +118,7 @@ aria-api-client.mark_proposal_implemented({"proposal_id": "UUID", "reviewed_by":
 - Never propose modifications under `soul/` paths.
 - After implementation, mark proposal status to `implemented` and log execution outcome via activity.
 
-## All 26 Active Skills
+## All 30 Active Skills
 
 | Category | Skills |
 |----------|--------|
@@ -128,12 +128,56 @@ aria-api-client.mark_proposal_implemented({"proposal_id": "UUID", "reviewed_by":
 | 📈 Trading | `aria-market-data`, `aria-portfolio` |
 | 🎨 Creative | `aria-llm`, `aria-memeothy` |
 | 🌐 Social | `aria-moltbook`, `aria-social`, `aria-telegram` |
-| 🧠 Cognitive | `aria-working-memory`, `aria-pipeline-skill`, `aria-conversation-summary` |
+| 🧠 Cognitive | `aria-working-memory`, `aria-pipeline-skill`, `aria-conversation-summary`, `aria-memory-compression`, `aria-sentiment-analysis`, `aria-pattern-recognition`, `aria-unified-search` |
 | ⚡ Utility | `aria-api-client`, `aria-litellm` |
 
 > **Advanced compatibility skills (targeted use, not default routing):** `aria-database`, `aria-brainstorm`, `aria-community`, `aria-fact-check`, `aria-model-switcher`, `aria-experiment`
 >
 > Use these intentionally for specialized workflows. In normal operations, prefer layer-aligned defaults (`aria-api-client`, `aria-working-memory`, `aria-social`, etc.).
+
+## Advanced Memory Skills (Layer 3 — Cognitive)
+
+```yaml
+# Memory Compression — 3-tier pipeline (raw → recent → archive)
+aria-memory-compression.compress_memories({"memories": [...], "store_semantic": true})
+aria-memory-compression.compress_session({"hours_back": 6})
+aria-memory-compression.get_context_budget({"max_tokens": 2000})
+aria-memory-compression.get_compression_stats({})
+
+# Sentiment Analysis — multi-dimensional (valence/arousal/dominance)
+aria-sentiment-analysis.analyze_message({"text": "This is frustrating!"})
+aria-sentiment-analysis.analyze_conversation({"messages": [{"role": "user", "content": "..."}, ...]})
+aria-sentiment-analysis.get_tone_recommendation({"text": "I keep getting errors"})
+aria-sentiment-analysis.get_sentiment_history({"limit": 20})
+
+# Pattern Recognition — behavioral patterns in memory streams
+aria-pattern-recognition.detect_patterns({})                          # Auto-fetches memories
+aria-pattern-recognition.detect_patterns({"min_confidence": 0.5})     # With threshold
+aria-pattern-recognition.get_recurring({"min_frequency": 0.3})        # Recurring topics
+aria-pattern-recognition.get_emerging({"min_growth_rate": 2.0})       # Emerging interests
+aria-pattern-recognition.get_pattern_stats({})                         # Last run stats
+
+# Unified Search — RRF merge across semantic + graph + memory
+aria-unified-search.search({"query": "security", "limit": 10})
+aria-unified-search.search({"query": "AI safety", "backends": ["semantic", "graph"]})
+aria-unified-search.semantic_search({"query": "deployment"})          # pgvector only
+aria-unified-search.graph_search({"query": "moltbook"})               # Knowledge graph only
+aria-unified-search.memory_search({"query": "preferences"})           # Key-value only
+```
+
+### Memory Routing with Advanced Skills
+
+| Need | Use |
+|------|-----|
+| **Store/read key-value facts** | `aria-api-client` `/memories` |
+| **Short-term task context** | `aria-working-memory` |
+| **Compress old memories** | `aria-memory-compression.compress_memories()` |
+| **End-of-session cleanup** | `aria-memory-compression.compress_session()` |
+| **Token-budgeted context** | `aria-memory-compression.get_context_budget()` |
+| **Detect user frustration** | `aria-sentiment-analysis.analyze_message()` |
+| **Conversation health check** | `aria-sentiment-analysis.analyze_conversation()` |
+| **Find recurring interests** | `aria-pattern-recognition.detect_patterns()` |
+| **Cross-backend search** | `aria-unified-search.search()` |
 
 ## Composable Pipelines
 

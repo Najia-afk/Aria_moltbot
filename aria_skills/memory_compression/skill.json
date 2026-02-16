@@ -1,22 +1,39 @@
 {
-  "name": "memory_compression",
-  "canonical_name": "aria-memory-compression",
-  "version": "1.0.0",
-  "description": "Compress session history into episodic semantic memories",
-  "author": "Claude (Senior SWE)",
-  "layer": 2,
+  "name": "aria-memory-compression",
+  "version": "2.0.0",
+  "description": "3-tier hierarchical memory compression — importance scoring, LLM summarization, context budgeting",
+  "author": "Aria Team",
+  "layer": 3,
   "dependencies": ["api_client"],
-  "focus_affinity": ["data", "memory"],
+  "focus_affinity": ["data", "memory", "orchestrator"],
   "tools": [
     {
+      "name": "compress_memories",
+      "description": "Compress a list of memories through the 3-tier pipeline (raw → recent → archive). Stores summaries in semantic memory.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "memories": {
+            "type": "array",
+            "description": "List of memory dicts with content, category, timestamp, importance"
+          },
+          "store_semantic": {
+            "type": "boolean",
+            "description": "Store compressed summaries in semantic memory (default: true)",
+            "default": true
+          }
+        }
+      }
+    },
+    {
       "name": "compress_session",
-      "description": "LLM-summarize recent activity into semantic memory",
-      "parameters": {
+      "description": "Compress recent session activity via api_client.summarize_session().",
+      "input_schema": {
         "type": "object",
         "properties": {
           "hours_back": {
             "type": "integer",
-            "description": "Hours of activity to compress (default: 6)",
+            "description": "Hours of activity to compress (1-48, default: 6)",
             "default": 6
           }
         }
@@ -24,8 +41,8 @@
     },
     {
       "name": "get_context_budget",
-      "description": "Retrieve working memory within a token budget",
-      "parameters": {
+      "description": "Retrieve working memory context within a token budget, including compressed summaries.",
+      "input_schema": {
         "type": "object",
         "properties": {
           "max_tokens": {
@@ -34,6 +51,14 @@
             "default": 2000
           }
         }
+      }
+    },
+    {
+      "name": "get_compression_stats",
+      "description": "Get statistics from the last compression run — ratio, tokens saved, tier counts.",
+      "input_schema": {
+        "type": "object",
+        "properties": {}
       }
     }
   ],

@@ -1,25 +1,80 @@
 {
-  "name": "sentiment_analysis",
-  "canonical_name": "aria-sentiment-analysis",
-  "version": "1.0.0",
-  "description": "Lightweight rule-based sentiment analysis — detects frustration, satisfaction, confusion",
-  "author": "Claude (Senior SWE)",
-  "layer": 2,
-  "dependencies": [],
-  "focus_affinity": ["communication", "data"],
+  "name": "aria-sentiment-analysis",
+  "version": "2.0.0",
+  "description": "Multi-dimensional sentiment analysis — valence/arousal/dominance, lexicon+LLM blend, conversation trajectory, adaptive tone profiles",
+  "author": "Aria Team",
+  "layer": 3,
+  "dependencies": ["api_client"],
+  "focus_affinity": ["communication", "data", "memory"],
   "tools": [
     {
-      "name": "analyze_sentiment",
-      "description": "Detect sentiment (frustration/satisfaction/confusion) in text",
-      "parameters": {
+      "name": "analyze_message",
+      "description": "Analyze sentiment of a single message — returns valence, arousal, dominance, frustration, satisfaction, confusion, and tone recommendation.",
+      "input_schema": {
         "type": "object",
         "properties": {
           "text": {
             "type": "string",
             "description": "Text to analyze for sentiment"
+          },
+          "context": {
+            "type": "array",
+            "description": "Optional list of prior messages for context"
+          },
+          "store": {
+            "type": "boolean",
+            "description": "Store result in semantic memory (default: true)",
+            "default": true
           }
         },
         "required": ["text"]
+      }
+    },
+    {
+      "name": "analyze_conversation",
+      "description": "Analyze sentiment trajectory of a full conversation — detects improving/declining/volatile patterns, turning points, resolution.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "description": "List of message dicts with 'role' and 'content' keys"
+          },
+          "store": {
+            "type": "boolean",
+            "description": "Store summary in semantic memory (default: true)",
+            "default": true
+          }
+        },
+        "required": ["messages"]
+      }
+    },
+    {
+      "name": "get_tone_recommendation",
+      "description": "Get adaptive tone recommendation (empathetic/step-by-step/celebratory/neutral) for a message based on its sentiment.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "Text to get tone recommendation for"
+          }
+        },
+        "required": ["text"]
+      }
+    },
+    {
+      "name": "get_sentiment_history",
+      "description": "Return recent sentiment analysis results from session memory and semantic storage.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "description": "Max results to return (default: 20)",
+            "default": 20
+          }
+        }
       }
     }
   ],

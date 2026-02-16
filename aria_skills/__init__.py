@@ -72,6 +72,12 @@ from aria_skills.sandbox import SandboxSkill
 from aria_skills.telegram import TelegramSkill
 from aria_skills.working_memory import WorkingMemorySkill
 
+# Advanced Memory Skills (v2.0)
+from aria_skills.memory_compression import MemoryCompressionSkill
+from aria_skills.sentiment_analysis import SentimentAnalysisSkill
+from aria_skills.pattern_recognition import PatternRecognitionSkill
+from aria_skills.unified_search import UnifiedSearchSkill
+
 __all__ = [
     # Base classes
     "BaseSkill",
@@ -110,4 +116,9 @@ __all__ = [
     "SandboxSkill",
     "TelegramSkill",
     "WorkingMemorySkill",
+    # Advanced Memory Skills (v2.0)
+    "MemoryCompressionSkill",
+    "SentimentAnalysisSkill",
+    "PatternRecognitionSkill",
+    "UnifiedSearchSkill",
 ]
