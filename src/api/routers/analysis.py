@@ -376,7 +376,6 @@ class RealtimeSentimentRequest(BaseModel):
     conversation_id: Optional[str] = None
     external_session_id: Optional[str] = None
     agent_id: Optional[str] = None
-    role: str = "user"  # user | assistant | system
     source_channel: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
     store_semantic: bool = True
@@ -714,11 +713,9 @@ async def analyze_realtime_user_reply_sentiment(
 
         message_hash = hashlib.sha1(text.encode("utf-8")).hexdigest()
 
-        msg_role = req.role or "user"
-
         dedupe_stmt = (
             select(SessionMessage)
-            .where(SessionMessage.role == msg_role)
+            .where(SessionMessage.role == "user")
             .where(SessionMessage.content_hash == message_hash)
             .order_by(SessionMessage.created_at.desc())
             .limit(1)
@@ -734,7 +731,7 @@ async def analyze_realtime_user_reply_sentiment(
                 session_id=parsed_session_id,
                 external_session_id=conversation_id,
                 agent_id=req.agent_id,
-                role=msg_role,
+                role="user",
                 content=text,
                 content_hash=message_hash,
                 source_channel=req.source_channel,
@@ -796,7 +793,7 @@ async def analyze_realtime_user_reply_sentiment(
             message_id=message_row.id,
             session_id=parsed_session_id,
             external_session_id=conversation_id,
-            speaker=msg_role,
+            speaker=message_row.role or "user",
             agent_id=req.agent_id or message_row.agent_id,
             sentiment_label=sentiment_label,
             primary_emotion=sentiment.primary_emotion,
@@ -869,7 +866,7 @@ async def backfill_sentiment_from_session_messages(
 
         stmt = (
             select(SessionMessage)
-            .where(SessionMessage.role.in_(["user", "assistant"]))
+            .where(SessionMessage.role == "user")
             .order_by(SessionMessage.created_at.desc())
             .limit(req.limit)
         )
