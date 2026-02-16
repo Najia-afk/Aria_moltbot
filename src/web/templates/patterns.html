@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+{% block title %}Patterns{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px; margin-bottom: 25px; }
+    .stat-card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 18px; }
+    .stat-card h4 { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.03em; }
+    .stat-card .value { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+    .stat-card.blue .value { color: var(--accent-blue); }
+    .stat-card.green .value { color: var(--success); }
+    .stat-card.orange .value { color: #f59e0b; }
+    .stat-card.purple .value { color: #a855f7; }
+    .stat-card.red .value { color: #ef4444; }
+
+    .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 25px; }
+    .chart-card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; }
+    .chart-card h4 { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 12px; }
+    .chart-card canvas { max-height: 280px; }
+
+    .pattern-list { display: grid; gap: 10px; }
+    .pattern-card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 14px 16px; display: flex; gap: 14px; align-items: flex-start; }
+    .pattern-type-indicator { width: 4px; border-radius: 4px; min-height: 40px; flex-shrink: 0; }
+    .pattern-type-indicator.topic { background: #3b82f6; }
+    .pattern-type-indicator.temporal { background: #a855f7; }
+    .pattern-type-indicator.sentiment { background: #f59e0b; }
+    .pattern-type-indicator.emergence { background: #22c55e; }
+    .pattern-type-indicator.gap { background: #ef4444; }
+    .pattern-body { flex: 1; min-width: 0; }
+    .pattern-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+    .pattern-subject { font-weight: 600; font-size: 13px; color: var(--text-primary); }
+    .pattern-time { font-size: 11px; color: var(--text-muted); }
+    .pattern-content { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+    .pattern-meta { display: flex; gap: 10px; margin-top: 6px; font-size: 11px; color: var(--text-muted); }
+    .pattern-badge { padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+    .pattern-badge.topic { background: rgba(59,130,246,0.15); color: #3b82f6; }
+    .pattern-badge.temporal { background: rgba(168,85,247,0.15); color: #a855f7; }
+    .pattern-badge.sentiment { background: rgba(245,158,11,0.15); color: #f59e0b; }
+    .pattern-badge.emergence { background: rgba(34,197,94,0.15); color: #22c55e; }
+    .pattern-badge.gap { background: rgba(239,68,68,0.15); color: #ef4444; }
+
+    .confidence-bar { background: var(--bg-tertiary); border-radius: 4px; height: 6px; width: 80px; display: inline-block; vertical-align: middle; }
+    .confidence-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, #3b82f6, #22c55e); }
+
+    .page-controls { display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+    .page-controls select { padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-secondary); color: var(--text-primary); font-size: 13px; }
+    .page-controls button { padding: 8px 16px; border: 1px solid var(--accent-blue); border-radius: 8px; background: var(--accent-blue); color: white; font-size: 13px; cursor: pointer; font-weight: 600; }
+    .page-controls button:hover { opacity: 0.9; }
+    .empty-state { text-align: center; padding: 50px 20px; color: var(--text-secondary); background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; }
+
+    @media (max-width: 768px) { .charts-row { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>🔍 Pattern Recognition</h1>
+    <p>Detect recurring themes, temporal behaviours, emerging interests, and knowledge gaps</p>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card blue">
+        <h4>Total Patterns</h4>
+        <div class="value" id="stat-total">-</div>
+    </div>
+    <div class="stat-card green">
+        <h4>Topic Recurrence</h4>
+        <div class="value" id="stat-topic">-</div>
+    </div>
+    <div class="stat-card purple">
+        <h4>Temporal</h4>
+        <div class="value" id="stat-temporal">-</div>
+    </div>
+    <div class="stat-card orange">
+        <h4>Emerging</h4>
+        <div class="value" id="stat-emerging">-</div>
+    </div>
+    <div class="stat-card red">
+        <h4>Knowledge Gaps</h4>
+        <div class="value" id="stat-gap">-</div>
+    </div>
+</div>
+
+<div class="charts-row">
+    <div class="chart-card">
+        <h4>Patterns by Type</h4>
+        <canvas id="typeChart"></canvas>
+    </div>
+    <div class="chart-card">
+        <h4>Confidence Distribution</h4>
+        <canvas id="confidenceChart"></canvas>
+    </div>
+</div>
+
+<div class="page-controls">
+    <select id="typeFilter">
+        <option value="">All Types</option>
+        <option value="topic_recurrence">Topic Recurrence</option>
+        <option value="temporal_pattern">Temporal Pattern</option>
+        <option value="sentiment_drift">Sentiment Drift</option>
+        <option value="interest_emergence">Interest Emergence</option>
+        <option value="knowledge_gap">Knowledge Gap</option>
+    </select>
+    <button id="btnDetect" onclick="runDetection()">🔄 Run Detection</button>
+</div>
+
+<div id="patternList" class="pattern-list">
+    <div class="empty-state">Loading patterns...</div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+const API = window.location.origin.replace(':5000', ':8000');
+let allPatterns = [];
+let typeChart, confidenceChart;
+
+const TYPE_COLORS = {
+    topic_recurrence: '#3b82f6',
+    temporal_pattern: '#a855f7',
+    sentiment_drift: '#f59e0b',
+    interest_emergence: '#22c55e',
+    knowledge_gap: '#ef4444',
+    behavior_cycle: '#6366f1',
+};
+
+const TYPE_CLASS = {
+    topic_recurrence: 'topic',
+    temporal_pattern: 'temporal',
+    sentiment_drift: 'sentiment',
+    interest_emergence: 'emergence',
+    knowledge_gap: 'gap',
+};
+
+async function loadPatterns() {
+    try {
+        const resp = await fetch(`${API}/analysis/patterns/history?limit=100`);
+        const data = await resp.json();
+        allPatterns = data.items || [];
+        updateStats();
+        updateCharts();
+        renderList();
+    } catch(e) {
+        document.getElementById('patternList').innerHTML =
+            '<div class="empty-state">Failed to load patterns — API may be offline</div>';
+    }
+}
+
+function updateStats() {
+    document.getElementById('stat-total').textContent = allPatterns.length;
+    const byType = {};
+    allPatterns.forEach(p => {
+        const t = (p.metadata || {}).pattern_type || 'unknown';
+        byType[t] = (byType[t] || 0) + 1;
+    });
+    document.getElementById('stat-topic').textContent = byType.topic_recurrence || 0;
+    document.getElementById('stat-temporal').textContent = byType.temporal_pattern || 0;
+    document.getElementById('stat-emerging').textContent = (byType.interest_emergence || 0);
+    document.getElementById('stat-gap').textContent = byType.knowledge_gap || 0;
+}
+
+function updateCharts() {
+    const byType = {};
+    const confidenceBuckets = { '0.0-0.3': 0, '0.3-0.5': 0, '0.5-0.7': 0, '0.7-0.9': 0, '0.9-1.0': 0 };
+
+    allPatterns.forEach(p => {
+        const m = p.metadata || {};
+        const t = m.pattern_type || 'unknown';
+        byType[t] = (byType[t] || 0) + 1;
+        const c = m.confidence || p.importance || 0;
+        if (c < 0.3) confidenceBuckets['0.0-0.3']++;
+        else if (c < 0.5) confidenceBuckets['0.3-0.5']++;
+        else if (c < 0.7) confidenceBuckets['0.5-0.7']++;
+        else if (c < 0.9) confidenceBuckets['0.7-0.9']++;
+        else confidenceBuckets['0.9-1.0']++;
+    });
+
+    const typeLabels = Object.keys(byType);
+    const typeData = Object.values(byType);
+    const typeColors = typeLabels.map(t => TYPE_COLORS[t] || '#6b7280');
+
+    if (typeChart) typeChart.destroy();
+    typeChart = new Chart(document.getElementById('typeChart'), {
+        type: 'doughnut',
+        data: { labels: typeLabels.map(t => t.replace(/_/g, ' ')), datasets: [{ data: typeData, backgroundColor: typeColors, borderWidth: 0 }] },
+        options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: '#aaa', font: { size: 11 } } } } }
+    });
+
+    if (confidenceChart) confidenceChart.destroy();
+    confidenceChart = new Chart(document.getElementById('confidenceChart'), {
+        type: 'bar',
+        data: {
+            labels: Object.keys(confidenceBuckets),
+            datasets: [{ data: Object.values(confidenceBuckets), backgroundColor: '#3b82f6', borderRadius: 6 }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { display: false }, ticks: { color: '#aaa' } },
+                y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#aaa', stepSize: 1 } }
+            }
+        }
+    });
+}
+
+function renderList() {
+    const filter = document.getElementById('typeFilter').value;
+    const filtered = filter
+        ? allPatterns.filter(p => (p.metadata || {}).pattern_type === filter)
+        : allPatterns;
+
+    if (!filtered.length) {
+        document.getElementById('patternList').innerHTML =
+            '<div class="empty-state">No patterns detected yet. Run detection to analyze memories.</div>';
+        return;
+    }
+
+    document.getElementById('patternList').innerHTML = filtered.map(p => {
+        const m = p.metadata || {};
+        const pType = m.pattern_type || 'unknown';
+        const cls = TYPE_CLASS[pType] || 'topic';
+        const conf = (m.confidence || p.importance || 0);
+        const confPct = Math.round(conf * 100);
+        const evidence = (m.evidence || []).join(', ') || '';
+        const dt = p.created_at ? new Date(p.created_at).toLocaleString() : '';
+
+        return `
+        <div class="pattern-card">
+            <div class="pattern-type-indicator ${cls}"></div>
+            <div class="pattern-body">
+                <div class="pattern-header">
+                    <span class="pattern-subject">${m.subject || p.content}</span>
+                    <span class="pattern-time">${dt}</span>
+                </div>
+                <div class="pattern-content">${p.content}</div>
+                <div class="pattern-meta">
+                    <span class="pattern-badge ${cls}">${pType.replace(/_/g, ' ')}</span>
+                    <span>Confidence: <span class="confidence-bar"><span class="confidence-fill" style="width:${confPct}%"></span></span> ${confPct}%</span>
+                    ${evidence ? `<span>Evidence: ${evidence}</span>` : ''}
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+async function runDetection() {
+    const btn = document.getElementById('btnDetect');
+    btn.disabled = true;
+    btn.textContent = '⏳ Running...';
+    try {
+        const resp = await fetch(`${API}/analysis/patterns/detect`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ min_confidence: 0.3, store: true })
+        });
+        const data = await resp.json();
+        btn.textContent = `✅ Found ${data.patterns_found || 0} patterns`;
+        setTimeout(() => { btn.textContent = '🔄 Run Detection'; btn.disabled = false; }, 3000);
+        loadPatterns();
+    } catch(e) {
+        btn.textContent = '❌ Failed';
+        setTimeout(() => { btn.textContent = '🔄 Run Detection'; btn.disabled = false; }, 3000);
+    }
+}
+
+document.getElementById('typeFilter').addEventListener('change', renderList);
+loadPatterns();
+</script>
+{% endblock %}

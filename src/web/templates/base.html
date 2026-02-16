@@ -172,7 +172,7 @@
 
                     <!-- Intelligence Dropdown -->
                     <div class="nav-dropdown">
-                        <button class="nav-dropdown-toggle {% if '/sprint-board' in request.path or '/knowledge' in request.path or '/skill-graph' in request.path or '/working-memory' in request.path or '/sentiment' in request.path or '/skills' in request.path or '/skill-health' in request.path or '/activity-visualization' in request.path or '/creative-pulse' in request.path %}active{% endif %}">
+                        <button class="nav-dropdown-toggle {% if '/sprint-board' in request.path or '/knowledge' in request.path or '/skill-graph' in request.path or '/working-memory' in request.path or '/sentiment' in request.path or '/patterns' in request.path or '/skills' in request.path or '/skill-health' in request.path or '/activity-visualization' in request.path or '/creative-pulse' in request.path %}active{% endif %}">
                             Intelligence
                             <svg class="chevron" viewBox="0 0 16 16" fill="currentColor">
                                 <path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
@@ -193,6 +193,9 @@
                             </a>
                             <a href="/sentiment" class="{% if '/sentiment' in request.path %}active{% endif %}">
                                 💭 Sentiment
+                            </a>
+                            <a href="/patterns" class="{% if '/patterns' in request.path %}active{% endif %}">
+                                🔍 Patterns
                             </a>
                             <a href="/skills" class="{% if '/skills' == request.path %}active{% endif %}">
                                 🔧 Skills

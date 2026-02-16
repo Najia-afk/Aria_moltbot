@@ -32,6 +32,13 @@ except ImportError:
     except ImportError:
         HAS_PATTERN_TRACKING = False
 
+# Import sentiment analysis for adaptive tone
+try:
+    from aria_skills.sentiment_analysis import SentimentAnalyzer, SentimentLexicon, ResponseTuner
+    HAS_SENTIMENT = True
+except ImportError:
+    HAS_SENTIMENT = False
+
 # Import security module (try container path first, then local)
 try:
     from security import (
@@ -115,6 +122,17 @@ class Cognition:
                 self.logger.info("📊 Pattern recognition initialized for failure tracking")
             except Exception as e:
                 self.logger.warning(f"Failed to initialize pattern tracking: {e}")
+
+        # Initialize sentiment analyzer for adaptive tone
+        self._sentiment_analyzer: Optional["SentimentAnalyzer"] = None
+        self._response_tuner: Optional["ResponseTuner"] = None
+        if HAS_SENTIMENT:
+            try:
+                self._sentiment_analyzer = SentimentAnalyzer()
+                self._response_tuner = ResponseTuner()
+                self.logger.info("💭 Sentiment analysis initialized for adaptive tone")
+            except Exception as e:
+                self.logger.warning(f"Failed to initialize sentiment analyzer: {e}")
     
     def set_skill_registry(self, registry: "SkillRegistry"):
         """Inject skill registry."""
@@ -177,7 +195,23 @@ class Cognition:
         
         # Step 2: Add to short-term memory
         self.memory.remember_short(prompt, "user_input")
-        
+
+        # Step 2.1: Sentiment analysis for adaptive tone
+        if self._sentiment_analyzer:
+            try:
+                recent_context = [m.get("content", "") for m in self.memory.recall_short(limit=3) if isinstance(m, dict)]
+                sentiment = await self._sentiment_analyzer.analyze(prompt, recent_context)
+                context["user_sentiment"] = sentiment.to_dict()
+                context["derived_sentiment"] = {
+                    "frustration": round(sentiment.frustration, 3),
+                    "satisfaction": round(sentiment.satisfaction, 3),
+                    "confusion": round(sentiment.confusion, 3),
+                }
+                if self._response_tuner:
+                    context["tone_recommendation"] = self._response_tuner.select_tone(sentiment)
+            except Exception as e:
+                self.logger.debug(f"Sentiment analysis skipped: {e}")
+
         # Step 2.5: Inject working memory context
         if self._skills:
             wm = self._skills.get("working_memory")
