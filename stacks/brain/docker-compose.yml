@@ -386,6 +386,7 @@ services:
       # Mount templates for live reload during development
       - ../../src/web/templates:/app/templates:ro
       - ../../src/web/static:/app/static:ro
+      - ../../src/web/app.py:/app/app.py:ro
     ports:
       - "5000:5000"
     depends_on:
