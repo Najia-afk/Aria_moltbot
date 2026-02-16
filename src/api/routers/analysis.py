@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.models import SemanticMemory
+from db.models import ActivityLog, SemanticMemory, Thought
 from deps import get_db
 
 LITELLM_URL = os.environ.get("LITELLM_URL", "http://litellm:4000")
@@ -341,4 +341,170 @@ async def get_compression_history(limit: int = 50, db: AsyncSession = Depends(ge
             for m in items
         ],
         "total": len(items),
+    }
+
+
+# ── Seed: backfill semantic_memories from activity_log + thoughts ────────────
+
+
+@router.post("/seed-memories")
+async def seed_semantic_memories(
+    limit: int = 200,
+    skip_existing: bool = True,
+    db: AsyncSession = Depends(get_db),
+):
+    """Backfill semantic_memories from activity_log + thoughts.
+
+    Reads recent activities and thoughts, generates embeddings via LiteLLM,
+    and stores them in semantic_memories so pattern_recognition,
+    sentiment_analysis, and unified_search have data to work with.
+    """
+    import logging
+
+    logger = logging.getLogger("aria.analysis.seed")
+    seeded = 0
+    skipped = 0
+    errors = 0
+    batch_size = 10
+
+    # ── 1. Thoughts → semantic_memories ──
+    thought_stmt = (
+        select(Thought)
+        .order_by(Thought.created_at.desc())
+        .limit(limit)
+    )
+    thoughts = (await db.execute(thought_stmt)).scalars().all()
+
+    for i in range(0, len(thoughts), batch_size):
+        batch = thoughts[i : i + batch_size]
+        for t in batch:
+            content = t.content.strip()
+            if not content or len(content) < 10:
+                skipped += 1
+                continue
+
+            if skip_existing:
+                fp = content[:100]
+                exists = await db.execute(
+                    select(func.count())
+                    .select_from(SemanticMemory)
+                    .where(
+                        SemanticMemory.source == "seed_thoughts",
+                        SemanticMemory.summary == fp,
+                    )
+                )
+                if (exists.scalar() or 0) > 0:
+                    skipped += 1
+                    continue
+
+            try:
+                embedding = await _generate_embedding(content[:2000])
+            except Exception as e:
+                logger.warning("Embedding failed for thought %s: %s", t.id, e)
+                embedding = [0.0] * 768
+                errors += 1
+
+            cat = t.category or "general"
+            mem = SemanticMemory(
+                content=content[:5000],
+                summary=content[:100],
+                category=f"thought_{cat}",
+                embedding=embedding,
+                importance=0.6,
+                source="seed_thoughts",
+                metadata_json={
+                    "original_id": str(t.id),
+                    "thought_category": cat,
+                    "created_at": t.created_at.isoformat() if t.created_at else None,
+                },
+            )
+            db.add(mem)
+            seeded += 1
+        await db.commit()
+
+    # ── 2. Activities → semantic_memories ──
+    activity_stmt = (
+        select(ActivityLog)
+        .where(
+            ActivityLog.action.notin_(["skill.health_check", "heartbeat"]),
+            ActivityLog.error_message.is_(None),
+        )
+        .order_by(ActivityLog.created_at.desc())
+        .limit(limit)
+    )
+    activities = (await db.execute(activity_stmt)).scalars().all()
+
+    for i in range(0, len(activities), batch_size):
+        batch = activities[i : i + batch_size]
+        for a in batch:
+            details = a.details or {}
+            result_preview = details.get("result_preview", "")
+            args_preview = details.get("args_preview", "")
+            content = (
+                f"Action: {a.action}"
+                + (f" | Skill: {a.skill}" if a.skill else "")
+                + (f" | {result_preview[:200]}" if result_preview else "")
+                + (f" | Args: {args_preview[:100]}" if args_preview else "")
+            )
+            content = content.strip()
+            if len(content) < 15:
+                skipped += 1
+                continue
+
+            if skip_existing:
+                fp = content[:100]
+                exists = await db.execute(
+                    select(func.count())
+                    .select_from(SemanticMemory)
+                    .where(
+                        SemanticMemory.source == "seed_activities",
+                        SemanticMemory.summary == fp,
+                    )
+                )
+                if (exists.scalar() or 0) > 0:
+                    skipped += 1
+                    continue
+
+            try:
+                embedding = await _generate_embedding(content[:2000])
+            except Exception as e:
+                logger.warning("Embedding failed for activity %s: %s", a.id, e)
+                embedding = [0.0] * 768
+                errors += 1
+
+            importance = 0.4
+            if a.action.startswith("goal"):
+                importance = 0.7
+            elif a.action == "cron_execution":
+                importance = 0.3
+            elif not a.success:
+                importance = 0.6
+
+            mem = SemanticMemory(
+                content=content[:5000],
+                summary=content[:100],
+                category="activity",
+                embedding=embedding,
+                importance=importance,
+                source="seed_activities",
+                metadata_json={
+                    "original_id": str(a.id),
+                    "action": a.action,
+                    "skill": a.skill,
+                    "success": a.success,
+                    "created_at": a.created_at.isoformat() if a.created_at else None,
+                },
+            )
+            db.add(mem)
+            seeded += 1
+        await db.commit()
+
+    return {
+        "seeded": seeded,
+        "skipped": skipped,
+        "errors": errors,
+        "sources": {
+            "thoughts": len(thoughts),
+            "activities": len(activities),
+        },
     }

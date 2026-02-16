@@ -477,6 +477,51 @@ class PatternRecognitionSkill(BaseSkill):
                         memories = items
                 except Exception:
                     pass
+
+            # ── DB fallback: pull from activities + thoughts when semantic_memories empty ──
+            if (not memories or len(memories) < 10) and self._api:
+                fallback_items: List[Dict[str, Any]] = []
+                try:
+                    r = await self._api.get_activities(limit=150)
+                    if r.success:
+                        acts = r.data if isinstance(r.data, list) else (r.data or {}).get("items", [])
+                        for a in (acts or []):
+                            details = a.get("details", {}) or {}
+                            content = (
+                                f"{a.get('action', '')} | {a.get('skill', '')} "
+                                f"| {details.get('result_preview', '')[:200]}"
+                            ).strip()
+                            if len(content) > 10:
+                                fallback_items.append({
+                                    "content": content,
+                                    "category": a.get("action", "activity"),
+                                    "created_at": a.get("created_at", ""),
+                                    "id": str(a.get("id", "")),
+                                    "importance": 0.4,
+                                    "source": "activity_log_fallback",
+                                })
+                except Exception:
+                    pass
+                try:
+                    r = await self._api.get_thoughts(limit=80)
+                    if r.success:
+                        tlist = r.data if isinstance(r.data, list) else (r.data or {}).get("items", [])
+                        for t in (tlist or []):
+                            content = (t.get("content") or "").strip()
+                            if len(content) > 10:
+                                fallback_items.append({
+                                    "content": content,
+                                    "category": t.get("category", "thought"),
+                                    "created_at": t.get("created_at", ""),
+                                    "id": str(t.get("id", "")),
+                                    "importance": 0.6,
+                                    "source": "thoughts_fallback",
+                                })
+                except Exception:
+                    pass
+                if fallback_items:
+                    memories = (memories or []) + fallback_items
+
             if not memories:
                 return SkillResult.fail("No memories provided and could not fetch from API")
 

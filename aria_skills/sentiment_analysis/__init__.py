@@ -614,9 +614,46 @@ class SentimentAnalysisSkill(BaseSkill):
             except Exception:
                 pass
 
+        # ── DB fallback: pull from activities + thoughts when no stored sentiment ──
+        fallback: List[Dict[str, Any]] = []
+        if not stored and not history and self._api:
+            try:
+                r = await self._api.get_activities(limit=limit * 3)
+                if r.success:
+                    acts = r.data if isinstance(r.data, list) else (r.data or {}).get("items", [])
+                    for a in (acts or [])[:limit]:
+                        details = a.get("details", {}) or {}
+                        content = (
+                            f"{a.get('action', '')} | {a.get('skill', '')} "
+                            f"| {details.get('result_preview', '')[:200]}"
+                        ).strip()
+                        if len(content) > 10:
+                            fallback.append({
+                                "content": content,
+                                "source": "activity_log_fallback",
+                                "created_at": a.get("created_at", ""),
+                            })
+            except Exception:
+                pass
+            try:
+                r = await self._api.get_thoughts(limit=limit)
+                if r.success:
+                    tlist = r.data if isinstance(r.data, list) else (r.data or {}).get("items", [])
+                    for t in (tlist or []):
+                        content = (t.get("content") or "").strip()
+                        if len(content) > 10:
+                            fallback.append({
+                                "content": content,
+                                "source": "thoughts_fallback",
+                                "created_at": t.get("created_at", ""),
+                            })
+            except Exception:
+                pass
+
         return SkillResult.ok({
             "session_history": history,
             "stored_history": stored,
+            "fallback_data": fallback,
             "total_analyses_this_session": self._analysis_count,
         })
 
