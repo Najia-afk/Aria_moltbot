@@ -109,13 +109,23 @@
 const API = window.ARIA_API_BASE_URL || '';
 const _charts = {};
 let _allItems = [];
+let _seedItems = [];  // all seeded memories for context
 
 async function loadSentiment() {
     try {
-        // Fetch all sentiment memories (paginated, up to 200)
+        // 1. Fetch sentiment-specific memories
         const resp = await fetchWithRetry(`${API}/memories/semantic?category=sentiment&limit=200`);
         const data = await resp.json();
         _allItems = data.items || [];
+
+        // 2. If no sentiment data, also fetch all seeded memories as context
+        if (_allItems.length === 0) {
+            try {
+                const seedResp = await fetchWithRetry(`${API}/memories/semantic?limit=100`);
+                const seedData = await seedResp.json();
+                _seedItems = seedData.items || [];
+            } catch(e) { _seedItems = []; }
+        }
 
         renderStats(_allItems);
         renderCharts(_allItems);
@@ -134,7 +144,7 @@ function renderStats(items) {
         ? (items.reduce((s, i) => s + (i.importance || 0), 0) / items.length).toFixed(2)
         : '-';
 
-    document.getElementById('stat-total').textContent = items.length;
+    document.getElementById('stat-total').textContent = items.length || (_seedItems.length ? `0 (${_seedItems.length} memories available)` : '0');
     document.getElementById('stat-positive').textContent = positive;
     document.getElementById('stat-negative').textContent = negative;
     document.getElementById('stat-uncertain').textContent = uncertain;
@@ -154,10 +164,30 @@ function getEmotion(item) {
 }
 
 function renderCharts(items) {
+    if (items.length === 0) {
+        // Show placeholder charts with zero data
+        const emptyData = { positive: 0, negative: 0, uncertain: 0, neutral: 0 };
+        renderDistChart(emptyData);
+        renderTimelineChart({});
+        return;
+    }
+
     const counts = { positive: 0, negative: 0, uncertain: 0, neutral: 0 };
     items.forEach(i => { const s = getSentiment(i); counts[s] = (counts[s] || 0) + 1; });
+    renderDistChart(counts);
 
-    // Distribution pie chart
+    const byDay = {};
+    items.forEach(i => {
+        const day = (i.created_at || '').slice(0, 10);
+        if (!day) return;
+        if (!byDay[day]) byDay[day] = { positive: 0, negative: 0, uncertain: 0 };
+        const s = getSentiment(i);
+        if (byDay[day][s] !== undefined) byDay[day][s]++;
+    });
+    renderTimelineChart(byDay);
+}
+
+function renderDistChart(counts) {
     if (_charts['dist']) _charts['dist'].destroy();
     _charts['dist'] = new Chart(document.getElementById('chart-distribution'), {
         type: 'doughnut',
@@ -175,23 +205,15 @@ function renderCharts(items) {
             plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 12 } } } }
         }
     });
+}
 
-    // Timeline chart — group by day
-    const byDay = {};
-    items.forEach(i => {
-        const day = (i.created_at || '').slice(0, 10);
-        if (!day) return;
-        if (!byDay[day]) byDay[day] = { positive: 0, negative: 0, uncertain: 0 };
-        const s = getSentiment(i);
-        if (byDay[day][s] !== undefined) byDay[day][s]++;
-    });
+function renderTimelineChart(byDay) {
     const days = Object.keys(byDay).sort();
-
     if (_charts['timeline']) _charts['timeline'].destroy();
     _charts['timeline'] = new Chart(document.getElementById('chart-timeline'), {
         type: 'bar',
         data: {
-            labels: days,
+            labels: days.length ? days : ['No data yet'],
             datasets: [
                 { label: 'Positive', data: days.map(d => byDay[d].positive), backgroundColor: '#22c55e', stack: 'a' },
                 { label: 'Negative', data: days.map(d => byDay[d].negative), backgroundColor: '#ef4444', stack: 'a' },
@@ -220,8 +242,17 @@ function renderList(items) {
     document.getElementById('result-count').textContent = `${filtered.length} event${filtered.length !== 1 ? 's' : ''}`;
 
     if (filtered.length === 0) {
-        document.getElementById('sentiment-list').innerHTML =
-            '<div class="empty-state">No sentiment events recorded yet. Aria will detect sentiment as conversations happen.</div>';
+        // Show a helpful zero-state with seeded memory context
+        let html = '<div class="empty-state">';
+        html += '<h3 style="margin-bottom:10px">💭 No sentiment analysis yet</h3>';
+        if (_seedItems.length > 0) {
+            html += `<p style="margin-bottom:15px">${_seedItems.length} memories are available in the knowledge base. Sentiment analysis will populate as Aria processes conversations.</p>`;
+            html += '<p style="font-size:12px;color:var(--text-muted)">You can trigger analysis via: <code>POST /api/analysis/sentiment/message</code></p>';
+        } else {
+            html += '<p>Aria will detect sentiment as conversations happen. The memory bridge cron job seeds data every 3 hours.</p>';
+        }
+        html += '</div>';
+        document.getElementById('sentiment-list').innerHTML = html;
         return;
     }
 
