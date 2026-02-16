@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+{% block title %}Sentiment{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px; margin-bottom: 25px; }
+    .stat-card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 18px; }
+    .stat-card h4 { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.03em; }
+    .stat-card .value { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+    .stat-card.green .value { color: var(--success); }
+    .stat-card.red .value { color: #ef4444; }
+    .stat-card.yellow .value { color: #f59e0b; }
+    .stat-card.blue .value { color: var(--accent-blue); }
+    .stat-card.purple .value { color: #a855f7; }
+
+    .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 25px; }
+    .chart-card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; }
+    .chart-card h4 { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 12px; }
+    .chart-card canvas { max-height: 260px; }
+
+    .sentiment-list { display: grid; gap: 10px; }
+    .sentiment-card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 14px 16px; display: flex; gap: 14px; align-items: flex-start; }
+    .sentiment-indicator { width: 4px; border-radius: 4px; min-height: 40px; flex-shrink: 0; }
+    .sentiment-indicator.positive { background: #22c55e; }
+    .sentiment-indicator.negative { background: #ef4444; }
+    .sentiment-indicator.uncertain { background: #f59e0b; }
+    .sentiment-indicator.neutral { background: #6b7280; }
+    .sentiment-body { flex: 1; min-width: 0; }
+    .sentiment-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+    .sentiment-emotion { font-weight: 600; font-size: 13px; text-transform: capitalize; }
+    .sentiment-emotion.positive { color: #22c55e; }
+    .sentiment-emotion.negative { color: #ef4444; }
+    .sentiment-emotion.uncertain { color: #f59e0b; }
+    .sentiment-time { font-size: 11px; color: var(--text-muted); }
+    .sentiment-content { font-size: 13px; color: var(--text-secondary); line-height: 1.5; word-break: break-word; }
+    .sentiment-meta { display: flex; gap: 10px; margin-top: 6px; font-size: 11px; color: var(--text-muted); }
+    .sentiment-badge { padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+    .sentiment-badge.positive { background: rgba(34,197,94,0.15); color: #22c55e; }
+    .sentiment-badge.negative { background: rgba(239,68,68,0.15); color: #ef4444; }
+    .sentiment-badge.uncertain { background: rgba(245,158,11,0.15); color: #f59e0b; }
+
+    .page-controls { display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+    .page-controls select, .page-controls input { padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-secondary); color: var(--text-primary); font-size: 13px; }
+    .empty-state { text-align: center; padding: 50px 20px; color: var(--text-secondary); background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; }
+
+    @media (max-width: 768px) { .charts-row { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>💭 Sentiment Dashboard</h1>
+    <p>Track user sentiment across sessions — helps Aria adapt tone and detect frustration</p>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card blue">
+        <h4>Total Events</h4>
+        <div class="value" id="stat-total">-</div>
+    </div>
+    <div class="stat-card green">
+        <h4>Positive</h4>
+        <div class="value" id="stat-positive">-</div>
+    </div>
+    <div class="stat-card red">
+        <h4>Negative</h4>
+        <div class="value" id="stat-negative">-</div>
+    </div>
+    <div class="stat-card yellow">
+        <h4>Uncertain</h4>
+        <div class="value" id="stat-uncertain">-</div>
+    </div>
+    <div class="stat-card purple">
+        <h4>Avg Importance</h4>
+        <div class="value" id="stat-importance">-</div>
+    </div>
+</div>
+
+<div class="charts-row">
+    <div class="chart-card">
+        <h4>📊 Sentiment Distribution</h4>
+        <canvas id="chart-distribution"></canvas>
+    </div>
+    <div class="chart-card">
+        <h4>📈 Sentiment Timeline</h4>
+        <canvas id="chart-timeline"></canvas>
+    </div>
+</div>
+
+<div class="page-controls">
+    <select id="filter-sentiment" onchange="loadSentiment()">
+        <option value="">All Sentiments</option>
+        <option value="positive">Positive</option>
+        <option value="negative">Negative</option>
+        <option value="uncertain">Uncertain</option>
+    </select>
+    <span style="font-size:13px;color:var(--text-muted)" id="result-count"></span>
+</div>
+
+<h3 style="font-size:15px;font-weight:600;margin-bottom:12px">💬 Recent Sentiment Events</h3>
+<div class="sentiment-list" id="sentiment-list">
+    <div class="empty-state">Loading sentiment data...</div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const API = window.ARIA_API_BASE_URL || '';
+const _charts = {};
+let _allItems = [];
+
+async function loadSentiment() {
+    try {
+        // Fetch all sentiment memories (paginated, up to 200)
+        const resp = await fetchWithRetry(`${API}/memories/semantic?category=sentiment&limit=200`);
+        const data = await resp.json();
+        _allItems = data.items || [];
+
+        renderStats(_allItems);
+        renderCharts(_allItems);
+        renderList(_allItems);
+    } catch (err) {
+        document.getElementById('sentiment-list').innerHTML =
+            `<div class="empty-state">Failed to load sentiment data: ${escapeHtml(err.message)}</div>`;
+    }
+}
+
+function renderStats(items) {
+    const positive = items.filter(i => getSentiment(i) === 'positive').length;
+    const negative = items.filter(i => getSentiment(i) === 'negative').length;
+    const uncertain = items.filter(i => getSentiment(i) === 'uncertain').length;
+    const avgImp = items.length > 0
+        ? (items.reduce((s, i) => s + (i.importance || 0), 0) / items.length).toFixed(2)
+        : '-';
+
+    document.getElementById('stat-total').textContent = items.length;
+    document.getElementById('stat-positive').textContent = positive;
+    document.getElementById('stat-negative').textContent = negative;
+    document.getElementById('stat-uncertain').textContent = uncertain;
+    document.getElementById('stat-importance').textContent = avgImp;
+}
+
+function getSentiment(item) {
+    const meta = item.metadata || {};
+    const sentData = meta.sentiment || {};
+    return sentData.sentiment || 'neutral';
+}
+
+function getEmotion(item) {
+    const meta = item.metadata || {};
+    const sentData = meta.sentiment || {};
+    return sentData.dominant_emotion || getSentiment(item);
+}
+
+function renderCharts(items) {
+    const counts = { positive: 0, negative: 0, uncertain: 0, neutral: 0 };
+    items.forEach(i => { const s = getSentiment(i); counts[s] = (counts[s] || 0) + 1; });
+
+    // Distribution pie chart
+    if (_charts['dist']) _charts['dist'].destroy();
+    _charts['dist'] = new Chart(document.getElementById('chart-distribution'), {
+        type: 'doughnut',
+        data: {
+            labels: ['Positive', 'Negative', 'Uncertain', 'Neutral'],
+            datasets: [{
+                data: [counts.positive, counts.negative, counts.uncertain, counts.neutral],
+                backgroundColor: ['#22c55e', '#ef4444', '#f59e0b', '#6b7280'],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 12 } } } }
+        }
+    });
+
+    // Timeline chart — group by day
+    const byDay = {};
+    items.forEach(i => {
+        const day = (i.created_at || '').slice(0, 10);
+        if (!day) return;
+        if (!byDay[day]) byDay[day] = { positive: 0, negative: 0, uncertain: 0 };
+        const s = getSentiment(i);
+        if (byDay[day][s] !== undefined) byDay[day][s]++;
+    });
+    const days = Object.keys(byDay).sort();
+
+    if (_charts['timeline']) _charts['timeline'].destroy();
+    _charts['timeline'] = new Chart(document.getElementById('chart-timeline'), {
+        type: 'bar',
+        data: {
+            labels: days,
+            datasets: [
+                { label: 'Positive', data: days.map(d => byDay[d].positive), backgroundColor: '#22c55e', stack: 'a' },
+                { label: 'Negative', data: days.map(d => byDay[d].negative), backgroundColor: '#ef4444', stack: 'a' },
+                { label: 'Uncertain', data: days.map(d => byDay[d].uncertain), backgroundColor: '#f59e0b', stack: 'a' },
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                x: { stacked: true, ticks: { color: '#94a3b8', font: { size: 11 } }, grid: { display: false } },
+                y: { stacked: true, beginAtZero: true, ticks: { color: '#94a3b8', stepSize: 1 }, grid: { color: 'rgba(255,255,255,0.05)' } }
+            },
+            plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 12 } } } }
+        }
+    });
+}
+
+function renderList(items) {
+    const filter = document.getElementById('filter-sentiment').value;
+    let filtered = items;
+    if (filter) {
+        filtered = items.filter(i => getSentiment(i) === filter);
+    }
+
+    document.getElementById('result-count').textContent = `${filtered.length} event${filtered.length !== 1 ? 's' : ''}`;
+
+    if (filtered.length === 0) {
+        document.getElementById('sentiment-list').innerHTML =
+            '<div class="empty-state">No sentiment events recorded yet. Aria will detect sentiment as conversations happen.</div>';
+        return;
+    }
+
+    document.getElementById('sentiment-list').innerHTML = filtered.map(item => {
+        const sentiment = getSentiment(item);
+        const emotion = getEmotion(item);
+        const meta = item.metadata || {};
+        const sentData = meta.sentiment || {};
+        const confidence = sentData.confidence ? `${Math.round(sentData.confidence * 100)}%` : '';
+        const signals = (sentData.signals || []).slice(0, 3).join(', ');
+        const time = item.created_at ? formatTime(item.created_at) : '';
+        const content = item.content || '';
+
+        return `
+        <div class="sentiment-card">
+            <div class="sentiment-indicator ${sentiment}"></div>
+            <div class="sentiment-body">
+                <div class="sentiment-header">
+                    <span class="sentiment-emotion ${sentiment}">
+                        ${emotion === 'frustration' ? '😤' : emotion === 'satisfaction' ? '😊' : emotion === 'confusion' ? '🤔' : '😐'}
+                        ${emotion}
+                        <span class="sentiment-badge ${sentiment}">${sentiment}</span>
+                    </span>
+                    <span class="sentiment-time">${time}</span>
+                </div>
+                <div class="sentiment-content">${escapeHtml(content)}</div>
+                <div class="sentiment-meta">
+                    ${confidence ? `<span>🎯 ${confidence} confidence</span>` : ''}
+                    ${signals ? `<span>📡 ${escapeHtml(signals)}</span>` : ''}
+                    <span>⭐ ${(item.importance || 0).toFixed(1)}</span>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function formatTime(iso) {
+    try {
+        const d = new Date(iso);
+        const now = new Date();
+        const diff = now - d;
+        if (diff < 60000) return 'just now';
+        if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+        if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    } catch { return iso; }
+}
+
+// Initial load
+loadSentiment();
+</script>
+{% endblock %}

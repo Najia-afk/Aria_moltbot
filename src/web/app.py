@@ -125,7 +125,11 @@ def create_app():
     @app.route('/memories')
     def memories():
         return render_template('memories.html')
-    
+
+    @app.route('/sentiment')
+    def sentiment():
+        return render_template('sentiment.html')
+
     @app.route('/records')
     def records():
         return render_template('records.html')
