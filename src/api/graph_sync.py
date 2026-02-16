@@ -32,6 +32,7 @@ FOCUS_MODES = {
     "creative": "Content creation, brainstorming, and art",
     "social": "Community management, social posting, and engagement",
     "journalist": "Research, fact-checking, and information gathering",
+    "memory": "Memory compression, sentiment analysis, pattern recognition, and search",
 }
 
 STANDARD_CATEGORIES = [

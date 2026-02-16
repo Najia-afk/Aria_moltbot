@@ -4,8 +4,9 @@
   "description": "Multi-dimensional sentiment analysis — valence/arousal/dominance, lexicon+LLM blend, conversation trajectory, adaptive tone profiles",
   "author": "Aria Team",
   "layer": 3,
+  "category": "cognitive",
   "dependencies": ["api_client"],
-  "focus_affinity": ["communication", "data", "memory"],
+  "focus_affinity": ["data", "social", "memory"],
   "tools": [
     {
       "name": "analyze_message",

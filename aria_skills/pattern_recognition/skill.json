@@ -4,8 +4,9 @@
   "description": "Detect behavioral patterns in memory streams — topic recurrence, temporal habits, sentiment drift, emerging interests, knowledge gaps",
   "author": "Aria Team",
   "layer": 3,
+  "category": "cognitive",
   "dependencies": ["api_client"],
-  "focus_affinity": ["data", "memory", "orchestrator"],
+  "focus_affinity": ["data", "orchestrator", "memory"],
   "tools": [
     {
       "name": "detect_patterns",

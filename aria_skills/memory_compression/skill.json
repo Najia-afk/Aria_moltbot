@@ -4,8 +4,9 @@
   "description": "3-tier hierarchical memory compression — importance scoring, LLM summarization, context budgeting",
   "author": "Aria Team",
   "layer": 3,
+  "category": "cognitive",
   "dependencies": ["api_client"],
-  "focus_affinity": ["data", "memory", "orchestrator"],
+  "focus_affinity": ["data", "orchestrator", "memory"],
   "tools": [
     {
       "name": "compress_memories",
