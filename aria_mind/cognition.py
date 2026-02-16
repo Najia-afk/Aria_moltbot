@@ -34,7 +34,9 @@ except ImportError:
 
 # Import sentiment analysis for adaptive tone
 try:
-    from aria_skills.sentiment_analysis import SentimentAnalyzer, SentimentLexicon, ResponseTuner
+    from aria_skills.sentiment_analysis import (
+        SentimentAnalyzer, SentimentLexicon, LLMSentimentClassifier, ResponseTuner,
+    )
     HAS_SENTIMENT = True
 except ImportError:
     HAS_SENTIMENT = False
@@ -128,9 +130,14 @@ class Cognition:
         self._response_tuner: Optional["ResponseTuner"] = None
         if HAS_SENTIMENT:
             try:
-                self._sentiment_analyzer = SentimentAnalyzer()
+                llm_clf = None
+                try:
+                    llm_clf = LLMSentimentClassifier()
+                except Exception:
+                    pass
+                self._sentiment_analyzer = SentimentAnalyzer(llm_classifier=llm_clf)
                 self._response_tuner = ResponseTuner()
-                self.logger.info("💭 Sentiment analysis initialized for adaptive tone")
+                self.logger.info("💭 Sentiment analysis initialized for adaptive tone (llm=%s)", llm_clf is not None)
             except Exception as e:
                 self.logger.warning(f"Failed to initialize sentiment analyzer: {e}")
     
@@ -196,7 +203,7 @@ class Cognition:
         # Step 2: Add to short-term memory
         self.memory.remember_short(prompt, "user_input")
 
-        # Step 2.1: Sentiment analysis for adaptive tone
+        # Step 2.1: Sentiment analysis for adaptive tone + persistence
         if self._sentiment_analyzer:
             try:
                 recent_context = [m.get("content", "") for m in self.memory.recall_short(limit=3) if isinstance(m, dict)]
@@ -209,6 +216,19 @@ class Cognition:
                 }
                 if self._response_tuner:
                     context["tone_recommendation"] = self._response_tuner.select_tone(sentiment)
+
+                # Persist sentiment to sentiment_events via api_client (S-47)
+                if self._skills:
+                    api = self._skills.get("api_client")
+                    if api and api.is_available:
+                        try:
+                            await api.store_sentiment_event(
+                                message=prompt,
+                                source_channel="cognition",
+                                store_semantic=True,
+                            )
+                        except Exception:
+                            pass  # non-blocking — don't break cognition for persistence
             except Exception as e:
                 self.logger.debug(f"Sentiment analysis skipped: {e}")
 

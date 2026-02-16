@@ -146,6 +146,18 @@ class TopicExtractor:
         "And", "For", "Not", "All", "Any", "Its", "Has", "Was", "Are", "Can",
     })
 
+    # Noise topics to skip — generic programming/system terms that inflate counts
+    NOISE_TOPICS = frozenset({
+        "args", "kwargs", "self", "none", "true", "false", "return", "result",
+        "function", "method", "class", "type", "value", "key", "name", "item",
+        "action", "next", "pattern", "status", "error", "success", "message",
+        "source", "details", "content", "data", "info", "log", "event",
+        "config", "params", "options", "default", "string", "list", "dict",
+        "created", "updated", "deleted", "db", "connect", "test", "run",
+        "file", "path", "url", "http", "request", "response", "output",
+        "input", "check", "set", "get", "post", "init", "start", "stop",
+    })
+
     def extract(self, memories: List[MemoryItem]) -> List[TopicMention]:
         mentions: List[TopicMention] = []
         for mem in memories:
@@ -177,6 +189,8 @@ class TopicExtractor:
                     topic=tech.lower(), timestamp=mem.timestamp,
                     memory_id=mem.id, category=mem.category))
 
+        # Filter out noise topics
+        mentions = [m for m in mentions if m.topic not in self.NOISE_TOPICS]
         return mentions
 
 
@@ -232,7 +246,7 @@ class FrequencyTracker:
                 if len(recent) >= min_recent_mentions:
                     emerging.append({
                         "topic": topic, "recent_mentions": len(recent),
-                        "growth_rate": float("inf"), "is_new": True})
+                        "growth_rate": 999.0, "is_new": True})
                 continue
 
             recent_freq = len(recent) / 3
@@ -299,7 +313,7 @@ class PatternRecognizer:
             patterns.append(Pattern(
                 type=PatternType.INTEREST_EMERGENCE, subject=em["topic"],
                 confidence=0.8 if em.get("is_new") else 0.6,
-                evidence=[f"Growth rate: {em.get('growth_rate', 1):.1f}x"],
+                evidence=["New topic" if em.get("is_new") else f"Growth rate: {em.get('growth_rate', 1):.1f}x"],
                 frequency_per_day=em.get("recent_freq_per_day", 0),
             ))
 
@@ -359,14 +373,24 @@ class PatternRecognizer:
         return patterns
 
     def _detect_sentiment_drift(self, memories: List[MemoryItem]) -> List[Pattern]:
-        scored = [m for m in memories if "sentiment" in m.metadata]
+        scored: List[tuple] = []
+        for m in memories:
+            val = m.metadata.get("valence")  # prefer valence from sentiment analysis
+            if val is None:
+                s = m.metadata.get("sentiment")
+                if isinstance(s, (int, float)):
+                    val = s
+                elif isinstance(s, dict):
+                    val = s.get("valence") or s.get("score")
+            if isinstance(val, (int, float)):
+                scored.append((m, float(val)))
         if len(scored) < 5:
             return []
 
-        scored.sort(key=lambda m: m.timestamp)
+        scored.sort(key=lambda pair: pair[0].timestamp)
         mid = len(scored) // 2
-        avg_first = sum(m.metadata["sentiment"] for m in scored[:mid]) / mid
-        avg_second = sum(m.metadata["sentiment"] for m in scored[mid:]) / (len(scored) - mid)
+        avg_first = sum(v for _, v in scored[:mid]) / mid
+        avg_second = sum(v for _, v in scored[mid:]) / (len(scored) - mid)
         diff = avg_second - avg_first
 
         if abs(diff) >= 0.3:

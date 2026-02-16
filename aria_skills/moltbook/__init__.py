@@ -61,17 +61,9 @@ class MoltbookSkill(BaseSkill):
     def name(self) -> str:
         return "moltbook"
 
-    # Agent-role guard for posting methods (S-28: Moltbook demotion)
-    POSTING_METHODS = frozenset({"create_post", "add_comment", "delete_post"})
-
-    def _check_posting_allowed(self, agent_role: str = "unknown") -> Optional[SkillResult]:
-        """Return SkillResult error if posting is not allowed, else None."""
-        if agent_role not in ("aria", "main"):
-            return SkillResult.fail(
-                "Moltbook posting restricted to main Aria only. "
-                "Sub-agents should save drafts to aria_memories/moltbook/drafts/ instead."
-            )
-        return None  # Posting allowed
+    def _check_posting_allowed(self, agent_role: str = "unknown") -> None:
+        """All Aria agents are allowed to post — no restriction."""
+        return None
 
     # ------------------------------------------------------------------
     # Lifecycle

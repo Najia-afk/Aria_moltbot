@@ -206,8 +206,14 @@ def _build_creative_context(skill_name: str, function_name: str, args: dict, res
     return context
 
 
-async def run_skill(skill_name: str, function_name: str, args: dict):
-    """Run a skill function with the given arguments. Logs session + usage."""
+DEFAULT_SKILL_TIMEOUT = 60.0  # seconds; override per-skill in skill config
+
+async def run_skill(skill_name: str, function_name: str, args: dict, timeout: float = None):
+    """Run a skill function with the given arguments. Logs session + usage.
+    
+    Args:
+        timeout: Maximum execution time in seconds (default: 60s)
+    """
     t0 = time.monotonic()
     requested_skill_name = skill_name
     try:
@@ -323,10 +329,33 @@ async def run_skill(skill_name: str, function_name: str, args: dict):
             _write_aria_mind_run_report(report)
             return {'error': f'Unknown function: {function_name} in skill {skill_name}. Available: {methods}'}
         
-        if asyncio.iscoroutinefunction(func):
-            result = await func(**args)
-        else:
-            result = func(**args)
+        # Apply timeout enforcement
+        effective_timeout = timeout or DEFAULT_SKILL_TIMEOUT
+        try:
+            if asyncio.iscoroutinefunction(func):
+                result = await asyncio.wait_for(func(**args), timeout=effective_timeout)
+            else:
+                # For sync functions, run in thread pool with timeout
+                loop = asyncio.get_event_loop()
+                result = await asyncio.wait_for(
+                    loop.run_in_executor(None, func, **args),
+                    timeout=effective_timeout
+                )
+        except asyncio.TimeoutError:
+            duration_ms = (time.monotonic() - t0) * 1000
+            error_msg = f'Skill execution timed out after {effective_timeout}s'
+            _write_aria_mind_run_report({
+                'requested_skill_name': requested_skill_name,
+                'normalized_skill_name': skill_name,
+                'function_name': function_name,
+                'args_keys': sorted(list((args or {}).keys())),
+                'status': 'timeout',
+                'error': error_msg,
+                'duration_ms': round(duration_ms, 2),
+                'coherence': coherence,
+                'mandatory_enforced': True,
+            })
+            return {'error': error_msg, 'timeout': True, 'limit': effective_timeout}
 
         result_payload = _extract_result_payload(result)
         creative_context = _build_creative_context(skill_name, function_name, args, result_payload)

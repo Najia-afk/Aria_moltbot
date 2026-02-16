@@ -272,6 +272,43 @@ async def search_memories(
     return {"memories": memories, "query": query}
 
 
+@router.post("/memories/search-by-vector")
+async def search_memories_by_vector(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Search memories by a pre-computed embedding vector (pgvector cosine distance).
+
+    Used by the EmbeddingSentimentClassifier when it already has an embedding
+    and wants to skip the redundant server-side embedding generation.
+    """
+    data = await request.json()
+    embedding = data.get("embedding")
+    if not embedding or not isinstance(embedding, list):
+        raise HTTPException(status_code=400, detail="embedding (list of floats) is required")
+
+    category = data.get("category")
+    limit = int(data.get("limit", 7))
+    min_importance = float(data.get("min_importance", 0.0))
+
+    distance_col = SemanticMemory.embedding.cosine_distance(embedding).label("distance")
+    stmt = select(SemanticMemory, distance_col).order_by("distance").limit(limit)
+
+    if category:
+        stmt = stmt.where(SemanticMemory.category == category)
+    if min_importance > 0:
+        stmt = stmt.where(SemanticMemory.importance >= min_importance)
+
+    result = await db.execute(stmt)
+    memories = []
+    for mem, dist in result.all():
+        d = mem.to_dict()
+        d["similarity"] = round(1 - dist, 4)
+        memories.append(d)
+
+    return {"memories": memories, "count": len(memories)}
+
+
 @router.post("/memories/summarize-session")
 async def summarize_session(
     request: Request,

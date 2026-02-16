@@ -405,6 +405,8 @@ services:
     container_name: aria-api
     restart: unless-stopped
     environment:
+      # /aria_skills is bind-mounted; PYTHONPATH=/ makes it importable
+      PYTHONPATH: /
       DATABASE_URL: postgresql://${DB_USER:-admin}:${DB_PASSWORD:-admin}@aria-db:5432/${DB_NAME:-aria_warehouse}
       GRAFANA_URL: http://grafana:3000
       PROMETHEUS_URL: http://prometheus:9090

@@ -35,11 +35,16 @@ class Base(DeclarativeBase):
         """Serialize model instance to a JSON-friendly dict.
 
         Uses DB column names as keys (e.g. ``metadata`` not ``metadata_json``).
+        Skips large vector/embedding columns to keep responses lean.
         """
         result: dict[str, Any] = {}
         mapper = sa_inspect(type(self))
         for attr in mapper.column_attrs:
             col_name = attr.columns[0].name          # DB column name
+            col_type = str(attr.columns[0].type)
+            # Skip embedding vectors — too large for API responses
+            if "VECTOR" in col_type.upper():
+                continue
             val = getattr(self, attr.key)             # Python attribute value
             if isinstance(val, datetime):
                 result[col_name] = val.isoformat()
@@ -458,6 +463,69 @@ Index("idx_agent_sessions_type", AgentSession.session_type)
 Index("idx_agent_sessions_agent_started", AgentSession.agent_id, AgentSession.started_at.desc())
 Index("idx_agent_sessions_metadata_gin", AgentSession.metadata_json, postgresql_using="gin")
 Index("idx_agent_sessions_openclaw_sid", text("(metadata ->> 'openclaw_session_id')"))
+Index("idx_agent_sessions_external_sid", text("(metadata ->> 'external_session_id')"))
+
+
+class SessionMessage(Base):
+    __tablename__ = "session_messages"
+
+    id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
+    session_id: Mapped[Any | None] = mapped_column(UUID(as_uuid=True), ForeignKey("agent_sessions.id", ondelete="SET NULL"))
+    external_session_id: Mapped[str | None] = mapped_column(String(120))
+    agent_id: Mapped[str | None] = mapped_column(String(100))
+    role: Mapped[str] = mapped_column(String(20), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_channel: Mapped[str | None] = mapped_column(String(50))
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSONB, server_default=text("'{}'::jsonb"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
+
+    __table_args__ = (
+        UniqueConstraint("external_session_id", "role", "content_hash", name="uq_session_message_ext_role_hash"),
+    )
+
+
+Index("idx_session_messages_session", SessionMessage.session_id)
+Index("idx_session_messages_external", SessionMessage.external_session_id)
+Index("idx_session_messages_role", SessionMessage.role)
+Index("idx_session_messages_created", SessionMessage.created_at.desc())
+Index("idx_session_messages_session_created", SessionMessage.session_id, SessionMessage.created_at.desc())
+Index("idx_session_messages_ext_created", SessionMessage.external_session_id, SessionMessage.created_at.desc())
+
+
+class SentimentEvent(Base):
+    __tablename__ = "sentiment_events"
+
+    id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
+    message_id: Mapped[Any] = mapped_column(UUID(as_uuid=True), ForeignKey("session_messages.id", ondelete="CASCADE"), nullable=False)
+    session_id: Mapped[Any | None] = mapped_column(UUID(as_uuid=True), ForeignKey("agent_sessions.id", ondelete="SET NULL"))
+    external_session_id: Mapped[str | None] = mapped_column(String(120))
+    speaker: Mapped[str | None] = mapped_column(String(20))       # user | assistant | system
+    agent_id: Mapped[str | None] = mapped_column(String(100))     # e.g. "main", "coder", …
+    sentiment_label: Mapped[str] = mapped_column(String(20), nullable=False)
+    primary_emotion: Mapped[str | None] = mapped_column(String(50))
+    valence: Mapped[float] = mapped_column(Float, nullable=False)
+    arousal: Mapped[float] = mapped_column(Float, nullable=False)
+    dominance: Mapped[float] = mapped_column(Float, nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    importance: Mapped[float] = mapped_column(Float, server_default=text("0.3"))
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSONB, server_default=text("'{}'::jsonb"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
+
+    __table_args__ = (
+        UniqueConstraint("message_id", name="uq_sentiment_event_message"),
+    )
+
+
+Index("idx_sentiment_events_message", SentimentEvent.message_id)
+Index("idx_sentiment_events_session", SentimentEvent.session_id)
+Index("idx_sentiment_events_external", SentimentEvent.external_session_id)
+Index("idx_sentiment_events_label", SentimentEvent.sentiment_label)
+Index("idx_sentiment_events_created", SentimentEvent.created_at.desc())
+Index("idx_sentiment_events_session_created", SentimentEvent.session_id, SentimentEvent.created_at.desc())
+Index("idx_sentiment_events_label_created", SentimentEvent.sentiment_label, SentimentEvent.created_at.desc())
+Index("idx_sentiment_events_speaker", SentimentEvent.speaker)
+Index("idx_sentiment_events_agent_id", SentimentEvent.agent_id)
 
 
 class ModelUsage(Base):

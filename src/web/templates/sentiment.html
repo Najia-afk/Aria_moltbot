@@ -31,13 +31,19 @@
     .sentiment-emotion.positive { color: #22c55e; }
     .sentiment-emotion.negative { color: #ef4444; }
     .sentiment-emotion.uncertain { color: #f59e0b; }
+    .sentiment-emotion.neutral { color: #6b7280; }
     .sentiment-time { font-size: 11px; color: var(--text-muted); }
     .sentiment-content { font-size: 13px; color: var(--text-secondary); line-height: 1.5; word-break: break-word; }
-    .sentiment-meta { display: flex; gap: 10px; margin-top: 6px; font-size: 11px; color: var(--text-muted); }
+    .sentiment-meta { display: flex; gap: 10px; margin-top: 6px; font-size: 11px; color: var(--text-muted); flex-wrap: wrap; }
+    .speaker-badge { display: inline-flex; align-items: center; gap: 3px; padding: 1px 7px; border-radius: 8px; font-size: 10px; font-weight: 600; }
+    .speaker-badge.user { background: rgba(99,102,241,0.15); color: #818cf8; }
+    .speaker-badge.assistant { background: rgba(14,165,233,0.15); color: #38bdf8; }
+    .speaker-badge.system { background: rgba(107,114,128,0.2); color: #9ca3af; }
     .sentiment-badge { padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
     .sentiment-badge.positive { background: rgba(34,197,94,0.15); color: #22c55e; }
     .sentiment-badge.negative { background: rgba(239,68,68,0.15); color: #ef4444; }
     .sentiment-badge.uncertain { background: rgba(245,158,11,0.15); color: #f59e0b; }
+    .sentiment-badge.neutral { background: rgba(107,114,128,0.2); color: #9ca3af; }
 
     .page-controls { display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
     .page-controls select, .page-controls input { padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-secondary); color: var(--text-primary); font-size: 13px; }
@@ -88,12 +94,23 @@
 </div>
 
 <div class="page-controls">
-    <select id="filter-sentiment" onchange="loadSentiment()">
+    <select id="filter-sentiment" onchange="renderFiltered()">
         <option value="">All Sentiments</option>
         <option value="positive">Positive</option>
         <option value="negative">Negative</option>
         <option value="uncertain">Uncertain</option>
+        <option value="neutral">Neutral</option>
     </select>
+    <select id="filter-speaker" onchange="renderFiltered()">
+        <option value="">All Speakers</option>
+        <option value="user">👤 User (Shiva)</option>
+        <option value="assistant">🤖 Aria</option>
+        <option value="system">⚙️ System</option>
+    </select>
+    <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-secondary);cursor:pointer">
+        <input type="checkbox" id="hide-neutral" checked onchange="renderFiltered()" style="accent-color:var(--accent-blue)">
+        Hide neutral
+    </label>
     <span style="font-size:13px;color:var(--text-muted)" id="result-count"></span>
 </div>
 
@@ -114,9 +131,9 @@ let _seedItems = [];  // all seeded memories for context
 async function loadSentiment() {
     try {
         // 1. Fetch sentiment-specific memories
-        const resp = await fetchWithRetry(`${API}/memories/semantic?category=sentiment&limit=200`);
+        const resp = await fetchWithRetry(`${API}/analysis/sentiment/history?limit=300`);
         const data = await resp.json();
-        _allItems = data.items || [];
+        _allItems = sanitizeSentimentItems(data.items || []);
 
         // 2. If no sentiment data, also fetch all seeded memories as context
         if (_allItems.length === 0) {
@@ -151,16 +168,86 @@ function renderStats(items) {
     document.getElementById('stat-importance').textContent = avgImp;
 }
 
-function getSentiment(item) {
+function inferSentimentFromValence(valence) {
+    if (typeof valence !== 'number') return 'neutral';
+    if (valence >= 0.25) return 'positive';
+    if (valence <= -0.25) return 'negative';
+    return 'neutral';
+}
+
+function normalizeSentimentLabel(raw) {
+    const value = String(raw || '').toLowerCase().trim();
+    if (value === 'positive' || value === 'negative' || value === 'uncertain' || value === 'neutral') return value;
+    if (value === 'mixed' || value === 'unknown' || value === 'confused') return 'uncertain';
+    if (value === 'frustration' || value === 'angry' || value === 'sad') return 'negative';
+    if (value === 'happy' || value === 'satisfaction' || value === 'satisfied' || value === 'excited') return 'positive';
+    return '';
+}
+
+function getSentData(item) {
     const meta = item.metadata || {};
-    const sentData = meta.sentiment || {};
-    return sentData.sentiment || 'neutral';
+    const nested = (meta.sentiment && typeof meta.sentiment === 'object') ? meta.sentiment : null;
+
+    const valence = typeof meta.valence === 'number' ? meta.valence : (nested && typeof nested.valence === 'number' ? nested.valence : null);
+    const primaryEmotion = (nested && nested.dominant_emotion) || meta.primary_emotion || 'neutral';
+    const inferredFromValence = inferSentimentFromValence(valence);
+    const sentiment = normalizeSentimentLabel(
+        (nested && nested.sentiment)
+        || meta.sentiment_label
+        || meta.primary_emotion
+        || inferredFromValence
+        || 'neutral'
+    ) || inferredFromValence;
+
+    const confidenceRaw =
+        (nested && nested.confidence != null ? nested.confidence : null)
+        ?? (meta.confidence != null ? meta.confidence : null)
+        ?? (typeof valence === 'number' ? Math.min(1, Math.max(0.35, Math.abs(valence) + 0.25)) : 0.5);
+
+    return {
+        sentiment,
+        dominant_emotion: String(primaryEmotion || sentiment || 'neutral').toLowerCase(),
+        confidence: (() => {
+            const parsedConfidence = Number(confidenceRaw);
+            const safeConfidence = Number.isFinite(parsedConfidence) ? parsedConfidence : 0.5;
+            return Math.max(0, Math.min(1, safeConfidence));
+        })(),
+        signals: (nested && Array.isArray(nested.signals)) ? nested.signals : (Array.isArray(meta.labels) ? meta.labels : []),
+    };
+}
+
+function isLikelyNoise(item) {
+    const text = String(item.content || '').trim();
+    const meta = item.metadata || {};
+    const snippet = String(meta.text_snippet || '').trim();
+    const combined = `${text} ${snippet}`.toLowerCase();
+
+    const hasSessionJson =
+        ((text.startsWith('[') || text.startsWith('{'))
+            && text.includes('"role"')
+            && text.includes('"content"'))
+        || combined.includes('"role":"user"')
+        || combined.includes("'role': 'user'");
+
+    const hasTestMarker = /\b(test|dummy|abc123|lorem ipsum|live test post|post 42)\b/i.test(combined);
+
+    return hasSessionJson || hasTestMarker;
+}
+
+function sanitizeSentimentItems(items) {
+    return items.filter(item => {
+        if (isLikelyNoise(item)) return false;
+        const sent = getSentData(item).sentiment;
+        return ['positive', 'negative', 'uncertain', 'neutral'].includes(sent);
+    });
+}
+
+function getSentiment(item) {
+    return getSentData(item).sentiment;
 }
 
 function getEmotion(item) {
-    const meta = item.metadata || {};
-    const sentData = meta.sentiment || {};
-    return sentData.dominant_emotion || getSentiment(item);
+    return getSentData(item).dominant_emotion || getSentiment(item);
 }
 
 function renderCharts(items) {
@@ -180,7 +267,7 @@ function renderCharts(items) {
     items.forEach(i => {
         const day = (i.created_at || '').slice(0, 10);
         if (!day) return;
-        if (!byDay[day]) byDay[day] = { positive: 0, negative: 0, uncertain: 0 };
+        if (!byDay[day]) byDay[day] = { positive: 0, negative: 0, uncertain: 0, neutral: 0 };
         const s = getSentiment(i);
         if (byDay[day][s] !== undefined) byDay[day][s]++;
     });
@@ -209,15 +296,18 @@ function renderDistChart(counts) {
 
 function renderTimelineChart(byDay) {
     const days = Object.keys(byDay).sort();
+    const labels = days.length ? days : ['No data yet'];
+    const series = (key) => days.length ? days.map(d => byDay[d][key] || 0) : [0];
     if (_charts['timeline']) _charts['timeline'].destroy();
     _charts['timeline'] = new Chart(document.getElementById('chart-timeline'), {
         type: 'bar',
         data: {
-            labels: days.length ? days : ['No data yet'],
+            labels,
             datasets: [
-                { label: 'Positive', data: days.map(d => byDay[d].positive), backgroundColor: '#22c55e', stack: 'a' },
-                { label: 'Negative', data: days.map(d => byDay[d].negative), backgroundColor: '#ef4444', stack: 'a' },
-                { label: 'Uncertain', data: days.map(d => byDay[d].uncertain), backgroundColor: '#f59e0b', stack: 'a' },
+                { label: 'Positive', data: series('positive'), backgroundColor: '#22c55e', stack: 'a' },
+                { label: 'Negative', data: series('negative'), backgroundColor: '#ef4444', stack: 'a' },
+                { label: 'Uncertain', data: series('uncertain'), backgroundColor: '#f59e0b', stack: 'a' },
+                { label: 'Neutral', data: series('neutral'), backgroundColor: '#6b7280', stack: 'a' },
             ]
         },
         options: {
@@ -234,9 +324,16 @@ function renderTimelineChart(byDay) {
 
 function renderList(items) {
     const filter = document.getElementById('filter-sentiment').value;
+    const hideNeutral = document.getElementById('hide-neutral').checked;
+    const speakerFilter = document.getElementById('filter-speaker').value;
     let filtered = items;
     if (filter) {
-        filtered = items.filter(i => getSentiment(i) === filter);
+        filtered = filtered.filter(i => getSentiment(i) === filter);
+    } else if (hideNeutral) {
+        filtered = filtered.filter(i => getSentiment(i) !== 'neutral');
+    }
+    if (speakerFilter) {
+        filtered = filtered.filter(i => (i.speaker || 'user') === speakerFilter);
     }
 
     document.getElementById('result-count').textContent = `${filtered.length} event${filtered.length !== 1 ? 's' : ''}`;
@@ -259,12 +356,32 @@ function renderList(items) {
     document.getElementById('sentiment-list').innerHTML = filtered.map(item => {
         const sentiment = getSentiment(item);
         const emotion = getEmotion(item);
-        const meta = item.metadata || {};
-        const sentData = meta.sentiment || {};
-        const confidence = sentData.confidence ? `${Math.round(sentData.confidence * 100)}%` : '';
+        const sentData = getSentData(item);
+        const confidence = sentData.confidence != null ? `${Math.round(sentData.confidence * 100)}%` : '';
         const signals = (sentData.signals || []).slice(0, 3).join(', ');
         const time = item.created_at ? formatTime(item.created_at) : '';
         const content = item.content || '';
+        const sentimentTitle = sentiment.charAt(0).toUpperCase() + sentiment.slice(1);
+        const emotionSubtitle = emotion && emotion !== sentiment && emotion !== 'neutral' ? ` • ${emotion}` : '';
+
+        // Speaker attribution
+        const speaker = item.speaker || 'user';
+        const agentId = item.agent_id || '';
+        const channel = item.source_channel || '';
+        let speakerLabel, speakerIcon, speakerClass;
+        if (speaker === 'assistant') {
+            speakerIcon = '🤖';
+            speakerLabel = agentId ? `Aria (${agentId})` : 'Aria';
+            speakerClass = 'assistant';
+        } else if (speaker === 'system') {
+            speakerIcon = '⚙️';
+            speakerLabel = 'System';
+            speakerClass = 'system';
+        } else {
+            speakerIcon = '👤';
+            speakerLabel = 'Shiva';
+            speakerClass = 'user';
+        }
 
         return `
         <div class="sentiment-card">
@@ -272,11 +389,13 @@ function renderList(items) {
             <div class="sentiment-body">
                 <div class="sentiment-header">
                     <span class="sentiment-emotion ${sentiment}">
-                        ${emotion === 'frustration' ? '😤' : emotion === 'satisfaction' ? '😊' : emotion === 'confusion' ? '🤔' : '😐'}
-                        ${emotion}
-                        <span class="sentiment-badge ${sentiment}">${sentiment}</span>
+                        ${({'frustration':'😤','frustrated':'😤','angry':'😡','satisfaction':'😊','satisfied':'😊','happy':'😄','excited':'🎉','sad':'😢','confusion':'🤔','confused':'🤔','neutral':'😶','assertive':'💪','positive':'😊','negative':'😟'})[emotion] || '😐'}
+                        ${sentimentTitle}${emotionSubtitle}
                     </span>
-                    <span class="sentiment-time">${time}</span>
+                    <span style="display:flex;align-items:center;gap:8px">
+                        <span class="speaker-badge ${speakerClass}">${speakerIcon} ${escapeHtml(speakerLabel)}</span>
+                        <span class="sentiment-time">${time}</span>
+                    </span>
                 </div>
                 <div class="sentiment-content">${escapeHtml(content)}</div>
                 <div class="sentiment-meta">
@@ -299,6 +418,11 @@ function formatTime(iso) {
         if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
         return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     } catch { return iso; }
+}
+
+// Re-render with current filters (no re-fetch)
+function renderFiltered() {
+    renderList(_allItems);
 }
 
 // Initial load

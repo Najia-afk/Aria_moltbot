@@ -111,6 +111,36 @@ async def ensure_schema() -> None:
                 failed.append(table.name)
                 logger.error("Failed to create table '%s': %s", table.name, e)
 
+        # ── Column migrations (add columns to existing tables) ─────────
+        _column_migrations = [
+            # (table, column, type_sql, default)
+            ("sentiment_events", "speaker", "VARCHAR(20)", None),
+            ("sentiment_events", "agent_id", "VARCHAR(100)", None),
+        ]
+        for tbl, col, col_type, default in _column_migrations:
+            try:
+                ddl = f"ALTER TABLE {tbl} ADD COLUMN IF NOT EXISTS {col} {col_type}"
+                if default is not None:
+                    ddl += f" DEFAULT {default}"
+                await conn.execute(text(ddl))
+                logger.info("Column '%s.%s' ensured", tbl, col)
+            except Exception as e:
+                logger.warning("Column migration '%s.%s' failed: %s", tbl, col, e)
+
+        # ── Backfill speaker/agent_id from session_messages ──────────
+        try:
+            await conn.execute(text("""
+                UPDATE sentiment_events se
+                SET speaker  = sm.role,
+                    agent_id = sm.agent_id
+                FROM session_messages sm
+                WHERE se.message_id = sm.id
+                  AND se.speaker IS NULL
+            """))
+            logger.info("Backfilled speaker/agent_id on sentiment_events")
+        except Exception as e:
+            logger.warning("Backfill speaker/agent_id failed: %s", e)
+
         # Indexes — same per-index error isolation
         for table in Base.metadata.sorted_tables:
             for index in table.indexes:

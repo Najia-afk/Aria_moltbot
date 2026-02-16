@@ -70,3 +70,14 @@
 - **`configure_python_environment` may return a stale venv path if the venv is missing.** Confirm executable exists before running test commands.
 - **Operational scripts need writable artifact targets.** Keep logs, state, backups, and alerts under `aria_memories/` to preserve write-boundary constraints.
 - **Deployment verification should include both API and web probes.** Checking container status alone misses route regressions.
+
+## Sprint S-47 — Sentiment Pipeline (2026-02-16)
+- **Cognition fire-and-forget pattern is a trap.** Computing analysis in `process()` and injecting into `context` dict without persistence means insights are lost. Any analysis step should persist results via api_client in a non-blocking try/except.
+- **Dual storage creates ghost data.** Skill wrote to `semantic_memories` (category=sentiment), dashboard read from `sentiment_events`. Always verify the full read/write path end-to-end before marking a feature done.
+- **Hardcoded model names accumulate silently.** Kimi was hardcoded at sentiment skill line 202, burning paid API credits on every call. models.yaml profiles must cover every use case — add profiles proactively.
+- **Alembic migrations for every new table.** Relying on `create_all()` is fragile in production with partial schemas. Always create an idempotent migration with `IF NOT EXISTS`.
+- **api_client needs methods for every persistence path.** If a table exists in the DB, there must be a corresponding api_client method. The absence of `store_sentiment_event()` was the direct cause of the broken pipeline.
+- **OpenClaw JSONL `content` is a list, not a string.** OpenClaw stores message content as `[{"type":"text","text":"..."}]`. Any parser that does `isinstance(content, str)` silently drops ALL messages. Always handle both `str` and `list[dict]` formats.
+- **Lexicon word lists need common conversational words.** "better", "clean", "easy", "works" were missing — causing 0% confidence on obviously positive messages. Expand lexicon proactively with everyday language, not just strong emotion words.
+- **Silent exception swallowing hides critical failures.** `except: pass` in the LLM sentiment fallback meant we had no idea the model calls were failing. Always log at least a warning on fallback paths.
+- **Backfill endpoints must write to the correct tables.** `backfill-sessions` wrote to `semantic_memories` only, while the dashboard reads from `sentiment_events`. Both tables need writes for the feature to work end-to-end.

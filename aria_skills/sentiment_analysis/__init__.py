@@ -119,9 +119,22 @@ class SentimentLexicon:
 
     POSITIVE_WORDS = frozenset({
         "good", "great", "excellent", "awesome", "amazing", "love", "happy",
-        "thanks", "perfect", "wonderful", "fantastic", "yes", "correct",
+        "thanks", "thank", "perfect", "wonderful", "fantastic", "yes", "correct",
         "right", "helpful", "clear", "understood", "understands", "nice",
         "brilliant", "superb", "beautiful", "glad", "pleased", "thrilled",
+        "better", "best", "clean", "cleaner", "improved", "enjoy", "enjoyed",
+        "like", "liked", "smooth", "prefer", "comfortable", "easy", "easier",
+        "fine", "well", "solid", "neat", "cool", "impressive", "reliable",
+        "fast", "quick", "efficient", "elegant", "smart", "working", "works",
+        "sweet", "okay", "ok", "satisfied", "safe", "stable", "ready",
+        # S-47: everyday warm/casual words for real conversations
+        "fun", "dear", "hope", "hoping", "welcome", "promise", "free",
+        "hello", "hi", "hey", "please", "congrats", "bravo", "cheers",
+        "gentle", "kind", "generous", "grateful", "proud", "warm",
+        "exciting", "interesting", "useful", "valuable", "lovely",
+        "progress", "success", "successful", "done", "complete", "completed",
+        "agreed", "absolutely", "exactly", "indeed", "definitely",
+        "appreciate", "appreciated", "recommended", "approved",
     })
 
     NEGATIVE_WORDS = frozenset({
@@ -129,6 +142,9 @@ class SentimentLexicon:
         "wrong", "error", "fail", "failed", "stupid", "useless", "no", "not",
         "problem", "issue", "broken", "slow", "disappointed", "annoying",
         "boring", "ugly", "horrible", "worst", "bugs", "crash", "stuck",
+        "worse", "painful", "messy", "unclear", "hard", "difficult", "missing",
+        "lost", "confusing", "annoyed", "tired", "worried", "afraid", "scary",
+        "impossible", "unreliable", "unstable", "laggy", "complicated", "sucks",
     })
 
     EXCITED_WORDS = frozenset({
@@ -165,15 +181,168 @@ class SentimentLexicon:
 
 
 # ═══════════════════════════════════════════════════════════════════
+# Embedding-Based Classifier (pgvector cosine similarity)
+# ═══════════════════════════════════════════════════════════════════
+
+class EmbeddingSentimentClassifier:
+    """Semantic sentiment classification via pgvector cosine similarity.
+
+    How it works:
+      1. Generate 768-dim embedding of the input text (nomic-embed-text).
+      2. Query ``semantic_memories`` for the top-K nearest reference sentences
+         where ``category = 'sentiment_reference'``.
+      3. Compute distance-weighted votes across the neighbours to produce
+         valence / arousal / dominance / primary_emotion.
+
+    Reference sentences are seeded via the
+    ``POST /analysis/sentiment/seed-references`` endpoint and accumulate
+    organically through the feedback loop (high-confidence events → new
+    references).
+
+    This replaces the naïve lexicon look-up with a semantically-aware
+    classifier that captures sarcasm, mixed sentiment, and domain-specific
+    language — just like the skill knowledge-graph search works.
+    """
+
+    def __init__(
+        self,
+        api_base_url: str | None = None,
+        api_key: str | None = None,
+        top_k: int = 7,
+        min_similarity: float = 0.40,
+    ):
+        self._litellm_url = api_base_url or os.environ.get("LITELLM_URL", "http://litellm:4000")
+        self._litellm_key = api_key or os.environ.get("LITELLM_MASTER_KEY", "")
+        self._top_k = top_k
+        self._min_similarity = min_similarity
+        # Internal API URL for DB queries (runs inside same container network)
+        self._api_url = os.environ.get("ARIA_API_URL", "http://aria-api:8000")
+
+    # ── embedding generation ────────────────────────────────────────
+    async def _embed(self, text: str) -> List[float]:
+        """Generate 768-dim embedding via LiteLLM proxy."""
+        import httpx
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(
+                f"{self._litellm_url}/v1/embeddings",
+                json={"model": "nomic-embed-text", "input": text[:2000]},
+                headers={"Authorization": f"Bearer {self._litellm_key}"},
+            )
+            resp.raise_for_status()
+            return resp.json()["data"][0]["embedding"]
+
+    # ── reference lookup via API ────────────────────────────────────
+    async def _find_nearest_references(
+        self, query_embedding: List[float],
+    ) -> List[Dict[str, Any]]:
+        """Search semantic_memories for nearest sentiment references.
+
+        Uses the ``/memories/search`` endpoint which wraps pgvector
+        ``cosine_distance`` ordering.
+        """
+        import httpx
+        # The memories/search endpoint accepts a text query and does
+        # embedding generation + cosine search server-side.
+        # We need to call the DB directly via the internal API when we
+        # already have an embedding.  Fall back to text search if needed.
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(
+                f"{self._api_url}/api/memories/search-by-vector",
+                json={
+                    "embedding": query_embedding,
+                    "category": "sentiment_reference",
+                    "limit": self._top_k,
+                },
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                return data.get("memories", [])
+        return []
+
+    # ── classification ──────────────────────────────────────────────
+    async def classify(self, text: str, context: Optional[List[str]] = None) -> Optional[Sentiment]:
+        """Classify sentiment by comparing input embedding to reference corpus.
+
+        Returns ``None`` when there are no reference sentences or when
+        the nearest neighbours are too distant (below ``min_similarity``).
+        The caller should fall back to LLM / lexicon when ``None`` is
+        returned.
+        """
+        try:
+            embedding = await self._embed(text)
+        except Exception:
+            return None
+
+        refs = await self._find_nearest_references(embedding)
+        if not refs:
+            return None
+
+        # Filter by minimum similarity
+        valid = [r for r in refs if r.get("similarity", 0) >= self._min_similarity]
+        if not valid:
+            return None
+
+        # Distance-weighted vote
+        total_weight = 0.0
+        w_valence = 0.0
+        w_arousal = 0.0
+        w_dominance = 0.0
+        emotion_votes: Dict[str, float] = {}
+
+        for ref in valid:
+            sim = ref["similarity"]
+            meta = ref.get("metadata", {}) or {}
+            weight = sim ** 2  # quadratic weighting to favour close matches
+            total_weight += weight
+
+            w_valence += meta.get("valence", 0.0) * weight
+            w_arousal += meta.get("arousal", 0.5) * weight
+            w_dominance += meta.get("dominance", 0.5) * weight
+
+            emotion = meta.get("primary_emotion", "neutral")
+            emotion_votes[emotion] = emotion_votes.get(emotion, 0.0) + weight
+
+        if total_weight == 0:
+            return None
+
+        avg_valence = w_valence / total_weight
+        avg_arousal = w_arousal / total_weight
+        avg_dominance = w_dominance / total_weight
+        best_emotion = max(emotion_votes, key=emotion_votes.get)
+        avg_sim = sum(r["similarity"] for r in valid) / len(valid)
+
+        return Sentiment(
+            valence=round(avg_valence, 4),
+            arousal=round(avg_arousal, 4),
+            dominance=round(avg_dominance, 4),
+            confidence=round(min(1.0, avg_sim * 1.1), 4),  # slight boost
+            primary_emotion=best_emotion,
+            labels=[f"embedding_top{len(valid)}", f"avg_sim={avg_sim:.3f}"],
+        )
+
+
+# ═══════════════════════════════════════════════════════════════════
 # LLM Classifier (via LiteLLM proxy)
 # ═══════════════════════════════════════════════════════════════════
 
 class LLMSentimentClassifier:
     """LLM-based sentiment classification for higher accuracy."""
 
-    def __init__(self):
+    def __init__(self, model: str = None):
         self._litellm_url = os.environ.get("LITELLM_URL", "http://litellm:4000")
         self._litellm_key = os.environ.get("LITELLM_MASTER_KEY", "")
+        # Resolve model from models.yaml (Constraint #3) — fallback to free model
+        if model:
+            self._model = model
+        else:
+            try:
+                from aria_models import load_config
+                cfg = load_config()
+                profiles = cfg.get("profiles", {})
+                sentiment_profile = profiles.get("sentiment", profiles.get("routing", {}))
+                self._model = sentiment_profile.get("model", "gpt-oss-small-free")
+            except Exception:
+                self._model = "gpt-oss-small-free"
 
     async def classify(self, text: str, context: Optional[List[str]] = None) -> Sentiment:
         import httpx
@@ -199,7 +368,7 @@ class LLMSentimentClassifier:
             resp = await client.post(
                 f"{self._litellm_url}/v1/chat/completions",
                 json={
-                    "model": "kimi",
+                    "model": self._model,
                     "messages": [{"role": "user", "content": prompt}],
                     "max_tokens": 200,
                     "temperature": 0.2,
@@ -231,59 +400,160 @@ class LLMSentimentClassifier:
 
 class SentimentAnalyzer:
     """
-    Main engine with fast lexicon baseline + optional LLM when ambiguous.
+    Multi-strategy sentiment engine.
+
+    Priority order:
+      1. **Embedding** (pgvector cosine similarity against labelled reference
+         corpus) — most accurate, semantic-level understanding.
+      2. **LLM** — used when embeddings return no confident match or when
+         the lexicon is ambiguous.
+      3. **Lexicon** — fastest fallback, always computed as a baseline.
+
+    Blend weights (when multiple strategies fire):
+      - embedding_weight  0.50
+      - llm_weight        0.30
+      - lexicon_weight    0.20
     """
 
     def __init__(
         self,
         llm_classifier: Optional[LLMSentimentClassifier] = None,
-        lexicon_weight: float = 0.3,
-        llm_weight: float = 0.7,
+        embedding_classifier: Optional[EmbeddingSentimentClassifier] = None,
+        lexicon_weight: float = 0.20,
+        llm_weight: float = 0.30,
+        embedding_weight: float = 0.50,
         use_llm_threshold: float = 0.6,
     ):
         self.llm_classifier = llm_classifier
+        self.embedding_classifier = embedding_classifier
         self.lexicon_weight = lexicon_weight
         self.llm_weight = llm_weight
+        self.embedding_weight = embedding_weight
         self.use_llm_threshold = use_llm_threshold
         self.history: deque = deque(maxlen=50)
 
     async def analyze(self, text: str, context: Optional[List[str]] = None) -> Sentiment:
-        # Step 1: fast lexicon
+        import logging
+        log = logging.getLogger("aria.sentiment")
+
+        # ── Step 1: fast lexicon (always computed as baseline) ───────
         l_val, l_aro, l_dom = SentimentLexicon.score(text)
 
         lexicon_matches = sum(
             1 for w in re.findall(r"\b\w+\b", text.lower())
             if w in SentimentLexicon.POSITIVE_WORDS or w in SentimentLexicon.NEGATIVE_WORDS
         )
-        lexicon_confidence = min(1.0, lexicon_matches / 5)
+        lexicon_confidence = min(1.0, max(0.3, lexicon_matches / 3) if lexicon_matches > 0 else 0.15)
 
-        # Step 2: use LLM if ambiguous
-        should_use_llm = (
+        # ── Step 2: embedding classifier (highest priority) ────────
+        emb_result: Optional[Sentiment] = None
+        if self.embedding_classifier:
+            try:
+                emb_result = await self.embedding_classifier.classify(text, context)
+            except Exception as e:
+                log.warning("Embedding classify failed: %s", e)
+
+        # ── Step 3: LLM (if embedding didn't produce a confident result) ──
+        llm_result: Optional[Sentiment] = None
+        needs_llm = (
             self.llm_classifier
+            and (emb_result is None or emb_result.confidence < 0.55)
             and (lexicon_confidence < self.use_llm_threshold or abs(l_val) < 0.3)
         )
-
-        if should_use_llm:
+        if needs_llm:
             try:
-                llm_s = await self.llm_classifier.classify(text, context)
-                blended = Sentiment(
-                    valence=l_val * self.lexicon_weight + llm_s.valence * self.llm_weight,
-                    arousal=l_aro * self.lexicon_weight + llm_s.arousal * self.llm_weight,
-                    dominance=l_dom * self.lexicon_weight + llm_s.dominance * self.llm_weight,
-                    confidence=max(lexicon_confidence, llm_s.confidence),
-                    primary_emotion=llm_s.primary_emotion,
-                    labels=llm_s.labels,
-                )
-                self.history.append(blended)
-                return blended
-            except Exception:
-                pass   # fall through to lexicon-only
+                llm_result = await self.llm_classifier.classify(text, context)
+            except Exception as e:
+                log.warning("LLM classify failed: %s", e)
 
-        result = Sentiment(
-            valence=l_val, arousal=l_aro, dominance=l_dom, confidence=lexicon_confidence
+        # ── Step 4: build final blended result ─────────────────────
+        sources_used: List[str] = ["lexicon"]
+        strategies: List[Tuple[Sentiment, float]] = []
+
+        # Always include lexicon
+        lex_emotion = self._derive_lexicon_emotion(l_val, l_dom, text)
+        lex_sentiment = Sentiment(
+            valence=l_val, arousal=l_aro, dominance=l_dom,
+            confidence=lexicon_confidence, primary_emotion=lex_emotion,
         )
-        self.history.append(result)
-        return result
+
+        if emb_result is not None and llm_result is not None:
+            # All three available — full blend
+            strategies = [
+                (emb_result, self.embedding_weight),
+                (llm_result, self.llm_weight),
+                (lex_sentiment, self.lexicon_weight),
+            ]
+            sources_used = ["embedding", "llm", "lexicon"]
+        elif emb_result is not None:
+            # Embedding + lexicon (no LLM)
+            emb_w = self.embedding_weight + self.llm_weight * 0.6
+            lex_w = self.lexicon_weight + self.llm_weight * 0.4
+            strategies = [(emb_result, emb_w), (lex_sentiment, lex_w)]
+            sources_used = ["embedding", "lexicon"]
+        elif llm_result is not None:
+            # LLM + lexicon (no embedding — legacy path)
+            strategies = [
+                (llm_result, 0.7),
+                (lex_sentiment, 0.3),
+            ]
+            sources_used = ["llm", "lexicon"]
+        else:
+            # Lexicon only
+            strategies = [(lex_sentiment, 1.0)]
+
+        blended = self._blend(strategies, sources_used)
+        self.history.append(blended)
+        return blended
+
+    # ── helpers ─────────────────────────────────────────────────────
+    @staticmethod
+    def _derive_lexicon_emotion(valence: float, dominance: float, text: str) -> str:
+        """Derive primary_emotion from lexicon scores + word signals."""
+        text_lower = text.lower()
+        has_frustration = any(w in text_lower for w in ("frustrated", "frustrating", "annoying", "annoyed", "stuck"))
+        has_confusion = any(w in text_lower for w in ("confused", "confusing", "unclear", "lost"))
+
+        if valence <= -0.25 and has_frustration:
+            return "frustrated"
+        if valence <= -0.25 and has_confusion:
+            return "confused"
+        if valence >= 0.25:
+            return "happy"
+        if valence <= -0.25:
+            return "sad"
+        if dominance > 0.4:
+            return "assertive"
+        return "neutral"
+
+    @staticmethod
+    def _blend(
+        strategies: List[Tuple[Sentiment, float]],
+        sources: List[str],
+    ) -> Sentiment:
+        """Weighted blend of multiple Sentiment results."""
+        total_w = sum(w for _, w in strategies)
+        if total_w == 0:
+            return strategies[0][0]
+
+        val = sum(s.valence * w for s, w in strategies) / total_w
+        aro = sum(s.arousal * w for s, w in strategies) / total_w
+        dom = sum(s.dominance * w for s, w in strategies) / total_w
+        conf = max(s.confidence for s, _ in strategies)
+
+        # Pick emotion from the highest-weighted strategy
+        best_s = max(strategies, key=lambda x: x[1])[0]
+        emotion = best_s.primary_emotion
+        labels = list(best_s.labels) + [f"blend={'+'.join(sources)}"]
+
+        return Sentiment(
+            valence=round(val, 4),
+            arousal=round(aro, 4),
+            dominance=round(dom, 4),
+            confidence=round(conf, 4),
+            primary_emotion=emotion,
+            labels=labels,
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -455,6 +725,7 @@ class SentimentAnalysisSkill(BaseSkill):
         super().__init__(config or SkillConfig(name="sentiment_analysis"))
         self._api = None
         self._llm_classifier: Optional[LLMSentimentClassifier] = None
+        self._embedding_classifier: Optional[EmbeddingSentimentClassifier] = None
         self._analyzer: Optional[SentimentAnalyzer] = None
         self._conv_analyzer: Optional[ConversationAnalyzer] = None
         self._tuner = ResponseTuner()
@@ -475,16 +746,23 @@ class SentimentAnalysisSkill(BaseSkill):
         if use_llm:
             self._llm_classifier = LLMSentimentClassifier()
 
+        # Embedding classifier — uses pgvector cosine similarity
+        use_embedding = self.config.config.get("use_embedding", True)
+        if use_embedding:
+            self._embedding_classifier = EmbeddingSentimentClassifier()
+
         self._analyzer = SentimentAnalyzer(
             llm_classifier=self._llm_classifier,
-            lexicon_weight=float(self.config.config.get("lexicon_weight", 0.3)),
-            llm_weight=float(self.config.config.get("llm_weight", 0.7)),
+            embedding_classifier=self._embedding_classifier,
+            lexicon_weight=float(self.config.config.get("lexicon_weight", 0.20)),
+            llm_weight=float(self.config.config.get("llm_weight", 0.30)),
+            embedding_weight=float(self.config.config.get("embedding_weight", 0.50)),
         )
         self._conv_analyzer = ConversationAnalyzer(self._analyzer)
 
         self._status = SkillStatus.AVAILABLE
-        self.logger.info("Sentiment analysis initialized (llm=%s, api=%s)",
-                         use_llm, self._api is not None)
+        self.logger.info("Sentiment analysis initialized (embedding=%s, llm=%s, api=%s)",
+                         use_embedding, use_llm, self._api is not None)
         return True
 
     async def health_check(self) -> SkillStatus:

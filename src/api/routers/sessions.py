@@ -665,6 +665,14 @@ async def create_agent_session(request: Request, db: AsyncSession = Depends(get_
     if status in {"completed", "ended", "error"} and ended_at is None:
         ended_at = datetime.now(timezone.utc)
 
+    metadata_payload = data.get("metadata", {})
+    if not isinstance(metadata_payload, dict):
+        metadata_payload = {}
+
+    external_session_id = str(data.get("external_session_id") or "").strip()
+    if external_session_id:
+        metadata_payload["external_session_id"] = external_session_id
+
     payload = {
         "id": uuid.uuid4(),
         "agent_id": data.get("agent_id", "main"),
@@ -673,7 +681,7 @@ async def create_agent_session(request: Request, db: AsyncSession = Depends(get_
         "tokens_used": int(data.get("tokens_used") or 0),
         "cost_usd": float(data.get("cost_usd") or 0),
         "status": status,
-        "metadata_json": data.get("metadata", {}),
+        "metadata_json": metadata_payload,
     }
     if started_at is not None:
         payload["started_at"] = started_at

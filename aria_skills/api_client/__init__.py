@@ -1232,6 +1232,37 @@ class AriaAPIClient(BaseSkill):
         except Exception as e:
             return SkillResult.fail(f"Failed to store semantic memory: {e}")
 
+    # ========================================
+    # Sentiment Events (S-47)
+    # ========================================
+    async def store_sentiment_event(
+        self, message: str, session_id: str = None,
+        external_session_id: str = None, agent_id: str = None,
+        source_channel: str = None, store_semantic: bool = True,
+        metadata: Optional[Dict] = None,
+    ) -> SkillResult:
+        """Analyze and persist sentiment for a user message via /analysis/sentiment/reply."""
+        try:
+            data: Dict[str, Any] = {
+                "message": message,
+                "store_semantic": store_semantic,
+            }
+            if session_id:
+                data["session_id"] = session_id
+            if external_session_id:
+                data["external_session_id"] = external_session_id
+            if agent_id:
+                data["agent_id"] = agent_id
+            if source_channel:
+                data["source_channel"] = source_channel
+            if metadata:
+                data["metadata"] = metadata
+            resp = await self._client.post("/analysis/sentiment/reply", json=data)
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to store sentiment event: {e}")
+
     async def search_memories_semantic(
         self, query: str, limit: int = 5,
         category: str = None, min_importance: float = 0.0,
