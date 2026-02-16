@@ -92,6 +92,13 @@ def _epoch_ms_to_iso(ms: Any) -> Optional[str]:
         return None
 
 
+def _is_cron_or_subagent_session(session_key: str) -> bool:
+    """Check if a session key belongs to a cron job or subagent (safe to delete)."""
+    if not session_key:
+        return False
+    return any(marker in session_key for marker in [":cron:", ":subagent:", ":run:"])
+
+
 def _flatten_sessions(index: Dict[str, Any], agent: str = "main") -> List[Dict[str, Any]]:
     """Convert sessions.json index into a flat deduplicated list."""
     seen: Dict[str, Dict[str, Any]] = {}
@@ -227,7 +234,27 @@ class SessionManagerSkill(BaseSkill):
             return SkillResult.fail("session_id is required")
         agent = agent or kwargs.get("agent", "")
 
+        # Session protection: prevent deleting current active session
+        current_sid = os.environ.get("OPENCLAW_SESSION_ID", "")
+        if current_sid and session_id == current_sid:
+            return SkillResult.fail(
+                f"Cannot delete current session {session_id}: "
+                "this would destroy the active conversation context."
+            )
+
         agents = [agent] if agent else _list_all_agents()
+
+        # Protect main agent sessions (non-cron, non-subagent)
+        for ag in agents:
+            idx = _load_sessions_index(ag)
+            for key, val in (idx or {}).items():
+                if isinstance(val, dict) and val.get("sessionId") == session_id:
+                    if ag == "main" and not _is_cron_or_subagent_session(key):
+                        return SkillResult.fail(
+                            f"Cannot delete main agent session {session_id} (key={key}). "
+                            "Only cron/subagent sessions may be deleted."
+                        )
+
         removed_keys: List[str] = []
         archived = False
 
@@ -344,6 +371,15 @@ class SessionManagerSkill(BaseSkill):
                 except (ValueError, TypeError):
                     pass
             to_delete.append(sess)
+
+        # Filter out protected sessions before deletion
+        current_sid = os.environ.get("OPENCLAW_SESSION_ID", "")
+        if current_sid:
+            to_delete = [s for s in to_delete if s.get("id", s.get("sessionId", "")) != current_sid]
+        to_delete = [
+            s for s in to_delete
+            if not (s.get("agentId") == "main" and not _is_cron_or_subagent_session(s.get("key", "")))
+        ]
 
         deleted_ids: List[str] = []
         errors: List[Dict[str, str]] = []

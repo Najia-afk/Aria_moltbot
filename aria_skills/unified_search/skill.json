@@ -1,0 +1,33 @@
+{
+  "name": "unified_search",
+  "canonical_name": "aria-unified-search",
+  "version": "1.0.0",
+  "description": "Search across skill graph + semantic memories with RRF merge",
+  "author": "Claude (Senior SWE)",
+  "layer": 2,
+  "dependencies": ["api_client"],
+  "focus_affinity": ["data", "memory"],
+  "tools": [
+    {
+      "name": "search",
+      "description": "Unified search across skills and memories with Reciprocal Rank Fusion",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search text"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max results (default: 10)",
+            "default": 10
+          }
+        },
+        "required": ["query"]
+      }
+    }
+  ],
+  "rate_limit": {"max_per_minute": 30},
+  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py unified_search {{tool}} '{{args_json}}'"
+}

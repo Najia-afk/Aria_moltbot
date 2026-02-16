@@ -1,0 +1,28 @@
+{
+  "name": "sentiment_analysis",
+  "canonical_name": "aria-sentiment-analysis",
+  "version": "1.0.0",
+  "description": "Lightweight rule-based sentiment analysis — detects frustration, satisfaction, confusion",
+  "author": "Claude (Senior SWE)",
+  "layer": 2,
+  "dependencies": [],
+  "focus_affinity": ["communication", "data"],
+  "tools": [
+    {
+      "name": "analyze_sentiment",
+      "description": "Detect sentiment (frustration/satisfaction/confusion) in text",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "Text to analyze for sentiment"
+          }
+        },
+        "required": ["text"]
+      }
+    }
+  ],
+  "rate_limit": {"max_per_minute": 60},
+  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py sentiment_analysis {{tool}} '{{args_json}}'"
+}

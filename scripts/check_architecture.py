@@ -73,7 +73,12 @@ def check_5layer():
             rel = py_file.relative_to(root).as_posix()
             is_allowed = any(rel.startswith(a) for a in ALLOW_LIST)
 
-            for i, line in enumerate(py_file.read_text(encoding="utf-8").splitlines(), 1):
+            try:
+                lines = py_file.read_text(encoding="utf-8").splitlines()
+            except (OSError, UnicodeDecodeError):
+                continue  # Skip unreadable files
+
+            for i, line in enumerate(lines, 1):
                 for pattern in FORBIDDEN:
                     if pattern.search(line):
                         entry = f"  🔴 [5-LAYER] {rel}:{i}: {line.strip()}"

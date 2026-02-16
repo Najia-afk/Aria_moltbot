@@ -1,0 +1,42 @@
+{
+  "name": "memory_compression",
+  "canonical_name": "aria-memory-compression",
+  "version": "1.0.0",
+  "description": "Compress session history into episodic semantic memories",
+  "author": "Claude (Senior SWE)",
+  "layer": 2,
+  "dependencies": ["api_client"],
+  "focus_affinity": ["data", "memory"],
+  "tools": [
+    {
+      "name": "compress_session",
+      "description": "LLM-summarize recent activity into semantic memory",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "hours_back": {
+            "type": "integer",
+            "description": "Hours of activity to compress (default: 6)",
+            "default": 6
+          }
+        }
+      }
+    },
+    {
+      "name": "get_context_budget",
+      "description": "Retrieve working memory within a token budget",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "max_tokens": {
+            "type": "integer",
+            "description": "Max tokens for context (default: 2000)",
+            "default": 2000
+          }
+        }
+      }
+    }
+  ],
+  "rate_limit": {"max_per_minute": 10},
+  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py memory_compression {{tool}} '{{args_json}}'"
+}
