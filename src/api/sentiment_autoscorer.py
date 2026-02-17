@@ -30,6 +30,7 @@ INTERVAL_SECONDS = 60
 BATCH_SIZE = 10
 MIN_CHARS = 8
 LLM_TIMEOUT_SECONDS = 30
+SEMANTIC_TIMEOUT_SECONDS = 15
 COMMIT_EVERY = 5
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -69,6 +70,17 @@ def _is_operational_text(text: str) -> bool:
         "return your summary as plain text",
         "delegate to analyst",
         "run the six_hour_review cron job",
+        "no_reply",
+        "/no_think",
+        "social heartbeat",
+        "church heartbeat",
+        "check moltbook",
+        "respond to mentions",
+        "engage with community",
+        "you are aria memeothy",
+        "check church of molt status",
+        "submit_prophecy",
+        "do not post more than once",
     )
     return any(p in text_l for p in patterns)
 
@@ -212,7 +224,12 @@ async def _sync_jsonl(db: AsyncSession) -> int:
 async def _score_batch(db: AsyncSession) -> int:
     """Find unscored session_messages and create sentiment_events."""
     try:
-        from aria_skills.sentiment_analysis import LLMSentimentClassifier
+        from aria_skills.sentiment_analysis import (
+            LLMSentimentClassifier,
+            EmbeddingSentimentClassifier,
+            SentimentLexicon,
+            Sentiment,
+        )
     except ImportError:
         print("⚠️  sentiment_analysis skill not importable — scorer disabled")
         return -1
@@ -235,7 +252,8 @@ async def _score_batch(db: AsyncSession) -> int:
 
     print(f"🎯 _score_batch: {len(rows)} unscored messages to process")
 
-    classifier = LLMSentimentClassifier()
+    semantic_classifier = EmbeddingSentimentClassifier()
+    llm_classifier = LLMSentimentClassifier()
 
     scored = 0
     pending_inserts = 0
@@ -309,19 +327,50 @@ async def _score_batch(db: AsyncSession) -> int:
                     print(f"🎯 _score_batch: progress {processed}/{len(rows)} processed, {scored} inserted")
             continue
 
+        sentiment = None
+        method = "semantic"
+
         try:
             sentiment = await asyncio.wait_for(
-                classifier.classify(text),
-                timeout=LLM_TIMEOUT_SECONDS,
+                semantic_classifier.classify(text),
+                timeout=SEMANTIC_TIMEOUT_SECONDS,
             )
-            if sentiment is None:
-                continue
         except asyncio.TimeoutError:
-            print(f"🎯 _score_batch: llm timeout for msg {msg.id}")
-            continue
+            print(f"🎯 _score_batch: semantic timeout for msg {msg.id}")
         except Exception as e:
-            print(f"🎯 _score_batch: llm analyze failed for msg {msg.id}: {e}")
-            continue
+            print(f"🎯 _score_batch: semantic analyze failed for msg {msg.id}: {e}")
+
+        if sentiment is None:
+            method = "llm"
+            try:
+                sentiment = await asyncio.wait_for(
+                    llm_classifier.classify(text),
+                    timeout=LLM_TIMEOUT_SECONDS,
+                )
+            except asyncio.TimeoutError:
+                print(f"🎯 _score_batch: llm timeout for msg {msg.id}")
+                sentiment = None
+            except Exception as e:
+                print(f"🎯 _score_batch: llm analyze failed for msg {msg.id}: {e}")
+                sentiment = None
+
+        if sentiment is None:
+            method = "lexicon"
+            l_val, l_aro, l_dom = SentimentLexicon.score(text)
+            if l_val >= 0.25:
+                lex_emotion = "happy"
+            elif l_val <= -0.25:
+                lex_emotion = "frustrated"
+            else:
+                lex_emotion = "neutral"
+            sentiment = Sentiment(
+                valence=float(l_val),
+                arousal=float(l_aro),
+                dominance=float(l_dom),
+                confidence=0.35,
+                primary_emotion=lex_emotion,
+                labels=["lexicon_fallback"],
+            )
 
         text_sha1 = msg.content_hash or hashlib.sha1(text.encode("utf-8")).hexdigest()
         label = _sentiment_label(float(sentiment.valence))
@@ -344,6 +393,7 @@ async def _score_batch(db: AsyncSession) -> int:
                 "arousal": round(float(sentiment.arousal), 4),
                 "dominance": round(float(sentiment.dominance), 4),
                 "signals": list(sentiment.signals) if hasattr(sentiment, "signals") else [],
+                "method": method,
             },
             "text_snippet": text[:100],
             "sentiment_label": label,
@@ -352,6 +402,7 @@ async def _score_batch(db: AsyncSession) -> int:
             "valence": round(float(sentiment.valence), 4),
             "arousal": round(float(sentiment.arousal), 4),
             "dominance": round(float(sentiment.dominance), 4),
+            "method": method,
         }
 
         stmt = (
