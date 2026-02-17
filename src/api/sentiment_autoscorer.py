@@ -56,6 +56,23 @@ def _normalize(text: str) -> str:
     return text
 
 
+def _is_operational_text(text: str) -> bool:
+    text_l = text.lower().strip()
+    if not text_l:
+        return False
+    patterns = (
+        "[cron:",
+        "instructions from heartbeat.md",
+        "## your tasks:",
+        "## tool usage:",
+        "return your analysis as structured text",
+        "return your summary as plain text",
+        "delegate to analyst",
+        "run the six_hour_review cron job",
+    )
+    return any(p in text_l for p in patterns)
+
+
 def _extract_line_message(payload: dict) -> tuple[str, str, str | None]:
     """Extract (role, content, timestamp) — mirrors analysis.py logic."""
     role = ""
@@ -229,6 +246,67 @@ async def _score_batch(db: AsyncSession) -> int:
             print(f"🎯 _score_batch: heartbeat processed={processed}/{len(rows)} inserted={scored}")
         text = (msg.content or "").strip()
         if _is_noise(text):
+            continue
+
+        if _is_operational_text(text):
+            text_sha1 = msg.content_hash or hashlib.sha1(text.encode("utf-8")).hexdigest()
+            label = "neutral"
+            origin = {
+                "source": "autoscorer",
+                "session_id": str(msg.session_id) if msg.session_id else None,
+                "external_session_id": msg.external_session_id,
+                "agent_id": msg.agent_id,
+                "source_channel": msg.source_channel,
+                "text_sha1": text_sha1,
+            }
+            meta = {
+                "origin": origin,
+                "sentiment": {
+                    "sentiment": label,
+                    "dominant_emotion": "neutral",
+                    "confidence": 0.65,
+                    "valence": 0.0,
+                    "arousal": 0.35,
+                    "dominance": 0.5,
+                    "signals": ["operational_text"],
+                },
+                "text_snippet": text[:100],
+                "sentiment_label": label,
+                "primary_emotion": "neutral",
+                "confidence": 0.65,
+                "valence": 0.0,
+                "arousal": 0.35,
+                "dominance": 0.5,
+            }
+
+            stmt = (
+                pg_insert(SentimentEvent)
+                .values(
+                    message_id=msg.id,
+                    session_id=msg.session_id,
+                    external_session_id=msg.external_session_id,
+                    speaker=msg.role or "user",
+                    agent_id=msg.agent_id,
+                    sentiment_label=label,
+                    primary_emotion="neutral",
+                    valence=0.0,
+                    arousal=0.35,
+                    dominance=0.5,
+                    confidence=0.65,
+                    importance=0.3,
+                    metadata_json=meta,
+                )
+                .on_conflict_do_nothing(index_elements=[SentimentEvent.message_id])
+                .returning(SentimentEvent.id)
+            )
+            inserted_id = (await db.execute(stmt)).scalar_one_or_none()
+            if inserted_id is not None:
+                scored += 1
+                pending_inserts += 1
+                if scored % COMMIT_EVERY == 0:
+                    await db.commit()
+                    pending_inserts = 0
+                    print(f"🎯 _score_batch: progress {processed}/{len(rows)} processed, {scored} inserted")
             continue
 
         try:
