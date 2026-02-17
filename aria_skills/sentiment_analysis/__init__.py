@@ -187,8 +187,9 @@ class SentimentLexicon:
 class EmbeddingSentimentClassifier:
     """Semantic sentiment classification via pgvector cosine similarity.
 
-    How it works:
-      1. Generate 768-dim embedding of the input text (nomic-embed-text).
+        How it works:
+            1. Generate embedding of the input text using the configured
+                 embedding model from models.yaml.
       2. Query ``semantic_memories`` for the top-K nearest reference sentences
          where ``category = 'sentiment_reference'``.
       3. Compute distance-weighted votes across the neighbours to produce
@@ -208,24 +209,46 @@ class EmbeddingSentimentClassifier:
         self,
         api_base_url: str | None = None,
         api_key: str | None = None,
+        model: str | None = None,
         top_k: int = 7,
         min_similarity: float = 0.40,
     ):
         self._litellm_url = api_base_url or os.environ.get("LITELLM_URL", "http://litellm:4000")
         self._litellm_key = api_key or os.environ.get("LITELLM_MASTER_KEY", "")
+        self._embedding_model = model or self._resolve_embedding_model()
         self._top_k = top_k
         self._min_similarity = min_similarity
         # Internal API URL for DB queries (runs inside same container network)
         self._api_url = os.environ.get("ARIA_API_URL", "http://aria-api:8000")
 
+    @staticmethod
+    def _resolve_embedding_model() -> str:
+        from aria_models import load_catalog
+
+        cfg = load_catalog() or {}
+        profiles = cfg.get("profiles", {}) or {}
+        profile_model = (profiles.get("embedding") or {}).get("model")
+        if profile_model:
+            return str(profile_model)
+
+        models = cfg.get("models", {}) or {}
+        for name, meta in models.items():
+            use_for = meta.get("use_for", []) if isinstance(meta, dict) else []
+            if isinstance(use_for, list) and "embedding" in use_for:
+                return str(name)
+
+        raise ValueError(
+            "No embedding model configured. Set profiles.embedding.model or mark a model with use_for: [embedding] in aria_models/models.yaml"
+        )
+
     # ── embedding generation ────────────────────────────────────────
     async def _embed(self, text: str) -> List[float]:
-        """Generate 768-dim embedding via LiteLLM proxy."""
+        """Generate embedding via LiteLLM proxy using configured model."""
         import httpx
         async with httpx.AsyncClient(timeout=10) as client:
             resp = await client.post(
                 f"{self._litellm_url}/v1/embeddings",
-                json={"model": "nomic-embed-text", "input": text[:2000]},
+                json={"model": self._embedding_model, "input": text[:2000]},
                 headers={"Authorization": f"Bearer {self._litellm_key}"},
             )
             resp.raise_for_status()
@@ -331,18 +354,15 @@ class LLMSentimentClassifier:
     def __init__(self, model: str = None):
         self._litellm_url = os.environ.get("LITELLM_URL", "http://litellm:4000")
         self._litellm_key = os.environ.get("LITELLM_MASTER_KEY", "")
-        # Resolve model from models.yaml (Constraint #3) — fallback to free model
+        # Resolve model from models.yaml profiles.sentiment — NO hardcoded model names
         if model:
             self._model = model
         else:
-            try:
-                from aria_models import load_config
-                cfg = load_config()
-                profiles = cfg.get("profiles", {})
-                sentiment_profile = profiles.get("sentiment", profiles.get("routing", {}))
-                self._model = sentiment_profile.get("model", "gpt-oss-small-free")
-            except Exception:
-                self._model = "gpt-oss-small-free"
+            from aria_models import load_catalog
+            cfg = load_catalog()
+            profiles = cfg.get("profiles", {})
+            sentiment_profile = profiles.get("sentiment", profiles.get("routing", {}))
+            self._model = sentiment_profile["model"]
 
     async def classify(self, text: str, context: Optional[List[str]] = None) -> Sentiment:
         import httpx

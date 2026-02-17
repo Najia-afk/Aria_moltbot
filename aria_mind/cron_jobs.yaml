@@ -160,12 +160,6 @@ jobs:
 
   # memory_sync merged into work_cycle (S2-01)
 
-  # ── Sentiment Backfill (S-47: score unscored session messages) ──
-
-  - name: sentiment_backfill
-    cron: "0 30 */6 * * *"
-    text: "Backfill sentiment from all sources. Step 1: POST /api/analysis/sentiment/backfill-sessions with body {\"dry_run\":false,\"max_sessions\":500,\"max_messages\":500} to ingest OpenClaw JSONL conversations into session_messages + sentiment_events. Step 2: POST /api/analysis/sentiment/backfill-messages with body {\"dry_run\":false,\"limit\":200,\"store_semantic\":true} to score any session_messages that lack sentiment_events. Log result to activity_log via api_client."
-    agent: main
-    session: isolated
-    delivery: none
-    best_effort_deliver: true
+  # ── Sentiment Backfill — REMOVED ──
+  # Replaced by background auto-scorer in aria-api (sentiment_autoscorer.py).
+  # Zero LLM tokens, runs every 60s, handles JSONL sync + scoring automatically.

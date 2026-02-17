@@ -10,6 +10,7 @@ Modular API with:
 
 import logging
 import os
+import asyncio
 import time as _time
 import traceback
 import uuid as _uuid
@@ -68,7 +69,21 @@ async def lifespan(app: FastAPI):
     else:
         print("ℹ️  Skill invocation backfill skipped (SKILL_BACKFILL_ON_STARTUP=false)")
 
+    # S-AUTO: Background sentiment auto-scorer (zero LLM tokens)
+    from sentiment_autoscorer import run_autoscorer_loop
+    scorer_task = asyncio.create_task(run_autoscorer_loop())
+    print("🎯 Sentiment auto-scorer background task launched")
+
     yield
+
+    # Graceful shutdown of auto-scorer
+    scorer_task.cancel()
+    try:
+        await scorer_task
+    except asyncio.CancelledError:
+        pass
+    print("🛑 Sentiment auto-scorer stopped")
+
     await async_engine.dispose()
     print("🔌 Database engine disposed")
 

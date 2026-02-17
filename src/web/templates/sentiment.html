@@ -103,9 +103,9 @@
     </select>
     <select id="filter-speaker" onchange="renderFiltered()">
         <option value="">All Speakers</option>
-        <option value="user">👤 User (Shiva)</option>
-        <option value="assistant">🤖 Aria</option>
-        <option value="system">⚙️ System</option>
+    </select>
+    <select id="filter-agent" onchange="renderFiltered()">
+        <option value="">All Agents</option>
     </select>
     <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-secondary);cursor:pointer">
         <input type="checkbox" id="hide-neutral" checked onchange="renderFiltered()" style="accent-color:var(--accent-blue)">
@@ -147,6 +147,22 @@ async function loadSentiment() {
         renderStats(_allItems);
         renderCharts(_allItems);
         renderList(_allItems);
+
+        // Populate speaker filter dynamically from data
+        const speakerIcons = {user:'👤', assistant:'🤖', system:'⚙️'};
+        const speakerLabels = {user:'User', assistant:'Aria', system:'System'};
+        const speakers = [...new Set(_allItems.map(i => i.speaker || 'user'))].sort();
+        const speakerSel = document.getElementById('filter-speaker');
+        const curSpeaker = speakerSel.value;
+        speakerSel.innerHTML = '<option value="">All Speakers</option>' +
+            speakers.map(s => `<option value="${s}"${s === curSpeaker ? ' selected' : ''}>${speakerIcons[s]||'❓'} ${speakerLabels[s]||s}</option>`).join('');
+
+        // Populate agent filter dynamically from data
+        const agents = [...new Set(_allItems.map(i => i.agent_id).filter(Boolean))].sort();
+        const agentSel = document.getElementById('filter-agent');
+        const curAgent = agentSel.value;
+        agentSel.innerHTML = '<option value="">All Agents</option>' +
+            agents.map(a => `<option value="${escapeHtml(a)}"${a === curAgent ? ' selected' : ''}>${escapeHtml(a)}</option>`).join('');
     } catch (err) {
         document.getElementById('sentiment-list').innerHTML =
             `<div class="empty-state">Failed to load sentiment data: ${escapeHtml(err.message)}</div>`;
@@ -335,6 +351,10 @@ function renderList(items) {
     if (speakerFilter) {
         filtered = filtered.filter(i => (i.speaker || 'user') === speakerFilter);
     }
+    const agentFilter = document.getElementById('filter-agent').value;
+    if (agentFilter) {
+        filtered = filtered.filter(i => (i.agent_id || '') === agentFilter);
+    }
 
     document.getElementById('result-count').textContent = `${filtered.length} event${filtered.length !== 1 ? 's' : ''}`;
 
@@ -371,7 +391,7 @@ function renderList(items) {
         let speakerLabel, speakerIcon, speakerClass;
         if (speaker === 'assistant') {
             speakerIcon = '🤖';
-            speakerLabel = agentId ? `Aria (${agentId})` : 'Aria';
+            speakerLabel = agentId ? `Aria · ${agentId}` : 'Aria';
             speakerClass = 'assistant';
         } else if (speaker === 'system') {
             speakerIcon = '⚙️';
@@ -379,7 +399,7 @@ function renderList(items) {
             speakerClass = 'system';
         } else {
             speakerIcon = '👤';
-            speakerLabel = 'Shiva';
+            speakerLabel = agentId && agentId !== 'main' ? `User · ${agentId}` : 'User';
             speakerClass = 'user';
         }
 
@@ -425,7 +445,8 @@ function renderFiltered() {
     renderList(_allItems);
 }
 
-// Initial load
+// Initial load + auto-refresh every 30s
 loadSentiment();
+setInterval(loadSentiment, 30_000);
 </script>
 {% endblock %}

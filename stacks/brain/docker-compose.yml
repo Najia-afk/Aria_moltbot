@@ -458,6 +458,8 @@ services:
       - ../../src/api:/app:ro
       # Mount models catalog (single source of truth for all model pricing)
       - ../../aria_models/models.yaml:/models/models.yaml:ro
+      # Mount aria_models as importable Python package
+      - ../../aria_models:/aria_models:ro
       # Mount OpenClaw data for reading cron jobs
       - openclaw_data:/openclaw:ro
       # Mount aria_mind for soul/identity file access (read-only)
