@@ -16,6 +16,8 @@ COPY aria_skills/ ./aria_skills/
 COPY aria_agents/ ./aria_agents/
 COPY aria_models/ ./aria_models/
 COPY aria_engine/ ./aria_engine/
+COPY scripts/ ./scripts/
+COPY src/ ./src/
 COPY tests/ ./tests/
 
 # Install Python dependencies
