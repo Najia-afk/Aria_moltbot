@@ -21,7 +21,6 @@ Adaptive response tuner selects tone profile based on current sentiment.
 
 All storage via api_client → FastAPI → PostgreSQL (semantic memory).
 """
-from __future__ import annotations
 
 import json
 import os
@@ -31,7 +30,7 @@ from collections import deque
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
 from aria_skills.registry import SkillRegistry
@@ -56,7 +55,7 @@ class Sentiment:
     dominance: float      # 0 (submissive) to 1 (dominant)
     confidence: float = 0.8
     primary_emotion: str = "neutral"
-    labels: List[str] = field(default_factory=list)
+    labels: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -87,13 +86,13 @@ class ConversationSentiment:
     """Aggregate sentiment across a conversation."""
     overall: Sentiment
     trajectory: Trajectory
-    turning_points: List[Dict[str, Any]] = field(default_factory=list)
-    peak_positive: Optional[Sentiment] = None
-    peak_negative: Optional[Sentiment] = None
+    turning_points: list[dict[str, Any]] = field(default_factory=list)
+    peak_positive: Sentiment | None = None
+    peak_negative: Sentiment | None = None
     volatility: float = 0.0
-    resolution: Optional[str] = None   # "positive", "negative", "neutral"
+    resolution: str | None = None   # "positive", "negative", "neutral"
     messages_analyzed: int = 0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         data = {
@@ -157,7 +156,7 @@ class SentimentLexicon:
     })
 
     @classmethod
-    def score(cls, text: str) -> Tuple[float, float, float]:
+    def score(cls, text: str) -> tuple[float, float, float]:
         """Return (valence, arousal, dominance) from lexicon matches."""
         text_lower = text.lower()
         words = re.findall(r"\b\w+\b", text_lower)
@@ -242,7 +241,7 @@ class EmbeddingSentimentClassifier:
         )
 
     # ── embedding generation ────────────────────────────────────────
-    async def _embed(self, text: str) -> List[float]:
+    async def _embed(self, text: str) -> list[float]:
         """Generate embedding via LiteLLM proxy using configured model."""
         import httpx
         async with httpx.AsyncClient(timeout=10) as client:
@@ -256,8 +255,8 @@ class EmbeddingSentimentClassifier:
 
     # ── reference lookup via API ────────────────────────────────────
     async def _find_nearest_references(
-        self, query_embedding: List[float],
-    ) -> List[Dict[str, Any]]:
+        self, query_embedding: list[float],
+    ) -> list[dict[str, Any]]:
         """Search semantic_memories for nearest sentiment references.
 
         Uses the ``/memories/search`` endpoint which wraps pgvector
@@ -283,7 +282,7 @@ class EmbeddingSentimentClassifier:
         return []
 
     # ── classification ──────────────────────────────────────────────
-    async def classify(self, text: str, context: Optional[List[str]] = None) -> Optional[Sentiment]:
+    async def classify(self, text: str, context: list[str] | None = None) -> Sentiment | None:
         """Classify sentiment by comparing input embedding to reference corpus.
 
         Returns ``None`` when there are no reference sentences or when
@@ -310,7 +309,7 @@ class EmbeddingSentimentClassifier:
         w_valence = 0.0
         w_arousal = 0.0
         w_dominance = 0.0
-        emotion_votes: Dict[str, float] = {}
+        emotion_votes: dict[str, float] = {}
 
         for ref in valid:
             sim = ref["similarity"]
@@ -364,7 +363,7 @@ class LLMSentimentClassifier:
             sentiment_profile = profiles.get("sentiment", profiles.get("routing", {}))
             self._model = sentiment_profile["model"]
 
-    async def classify(self, text: str, context: Optional[List[str]] = None) -> Sentiment:
+    async def classify(self, text: str, context: list[str] | None = None) -> Sentiment:
         import httpx
 
         context_str = ""
@@ -437,8 +436,8 @@ class SentimentAnalyzer:
 
     def __init__(
         self,
-        llm_classifier: Optional[LLMSentimentClassifier] = None,
-        embedding_classifier: Optional[EmbeddingSentimentClassifier] = None,
+        llm_classifier: LLMSentimentClassifier | None = None,
+        embedding_classifier: EmbeddingSentimentClassifier | None = None,
         lexicon_weight: float = 0.20,
         llm_weight: float = 0.30,
         embedding_weight: float = 0.50,
@@ -452,7 +451,7 @@ class SentimentAnalyzer:
         self.use_llm_threshold = use_llm_threshold
         self.history: deque = deque(maxlen=50)
 
-    async def analyze(self, text: str, context: Optional[List[str]] = None) -> Sentiment:
+    async def analyze(self, text: str, context: list[str] | None = None) -> Sentiment:
         import logging
         log = logging.getLogger("aria.sentiment")
 
@@ -466,7 +465,7 @@ class SentimentAnalyzer:
         lexicon_confidence = min(1.0, max(0.3, lexicon_matches / 3) if lexicon_matches > 0 else 0.15)
 
         # ── Step 2: embedding classifier (highest priority) ────────
-        emb_result: Optional[Sentiment] = None
+        emb_result: Sentiment | None = None
         if self.embedding_classifier:
             try:
                 emb_result = await self.embedding_classifier.classify(text, context)
@@ -474,7 +473,7 @@ class SentimentAnalyzer:
                 log.warning("Embedding classify failed: %s", e)
 
         # ── Step 3: LLM (if embedding didn't produce a confident result) ──
-        llm_result: Optional[Sentiment] = None
+        llm_result: Sentiment | None = None
         needs_llm = (
             self.llm_classifier
             and (emb_result is None or emb_result.confidence < 0.55)
@@ -487,8 +486,8 @@ class SentimentAnalyzer:
                 log.warning("LLM classify failed: %s", e)
 
         # ── Step 4: build final blended result ─────────────────────
-        sources_used: List[str] = ["lexicon"]
-        strategies: List[Tuple[Sentiment, float]] = []
+        sources_used: list[str] = ["lexicon"]
+        strategies: list[tuple[Sentiment, float]] = []
 
         # Always include lexicon
         lex_emotion = self._derive_lexicon_emotion(l_val, l_dom, text)
@@ -548,8 +547,8 @@ class SentimentAnalyzer:
 
     @staticmethod
     def _blend(
-        strategies: List[Tuple[Sentiment, float]],
-        sources: List[str],
+        strategies: list[tuple[Sentiment, float]],
+        sources: list[str],
     ) -> Sentiment:
         """Weighted blend of multiple Sentiment results."""
         total_w = sum(w for _, w in strategies)
@@ -587,7 +586,7 @@ class ConversationAnalyzer:
         self.analyzer = analyzer
 
     async def analyze_conversation(
-        self, messages: List[Dict[str, Any]], window_size: int = 10,
+        self, messages: list[dict[str, Any]], window_size: int = 10,
     ) -> ConversationSentiment:
         if not messages:
             return ConversationSentiment(
@@ -595,7 +594,7 @@ class ConversationAnalyzer:
                 trajectory=Trajectory.INSUFFICIENT_DATA,
             )
 
-        sentiments: List[Sentiment] = []
+        sentiments: list[Sentiment] = []
         for msg in messages:
             content = msg.get("content", "")
             ctx = [m.get("content", "") for m in messages[-3:] if m is not msg]
@@ -635,7 +634,7 @@ class ConversationAnalyzer:
         )
 
     @staticmethod
-    def _compute_trajectory(sentiments: List[Sentiment]) -> Trajectory:
+    def _compute_trajectory(sentiments: list[Sentiment]) -> Trajectory:
         if len(sentiments) < 4:
             return Trajectory.INSUFFICIENT_DATA
         mid = len(sentiments) // 2
@@ -649,8 +648,8 @@ class ConversationAnalyzer:
         return Trajectory.STABLE
 
     @staticmethod
-    def _find_turning_points(sentiments: List[Sentiment], threshold: float = 0.5) -> List[Dict[str, Any]]:
-        points: List[Dict[str, Any]] = []
+    def _find_turning_points(sentiments: list[Sentiment], threshold: float = 0.5) -> list[dict[str, Any]]:
+        points: list[dict[str, Any]] = []
         for i in range(1, len(sentiments) - 1):
             prev_v = sentiments[i - 1].valence
             curr_v = sentiments[i].valence
@@ -696,9 +695,9 @@ class ResponseTuner:
     }
 
     def select_tone(
-        self, sentiment: Sentiment, conversation: Optional[ConversationSentiment] = None,
-    ) -> Dict[str, Any]:
-        scores: Dict[str, float] = {}
+        self, sentiment: Sentiment, conversation: ConversationSentiment | None = None,
+    ) -> dict[str, Any]:
+        scores: dict[str, float] = {}
         for name, profile in self.TONE_PROFILES.items():
             conds = profile["conditions"]
             if not conds:
@@ -741,13 +740,13 @@ class SentimentAnalysisSkill(BaseSkill):
       get_sentiment_history — Recent analysis history
     """
 
-    def __init__(self, config: Optional[SkillConfig] = None):
+    def __init__(self, config: SkillConfig | None = None):
         super().__init__(config or SkillConfig(name="sentiment_analysis"))
         self._api = None
-        self._llm_classifier: Optional[LLMSentimentClassifier] = None
-        self._embedding_classifier: Optional[EmbeddingSentimentClassifier] = None
-        self._analyzer: Optional[SentimentAnalyzer] = None
-        self._conv_analyzer: Optional[ConversationAnalyzer] = None
+        self._llm_classifier: LLMSentimentClassifier | None = None
+        self._embedding_classifier: EmbeddingSentimentClassifier | None = None
+        self._analyzer: SentimentAnalyzer | None = None
+        self._conv_analyzer: ConversationAnalyzer | None = None
         self._tuner = ResponseTuner()
         self._analysis_count = 0
 
@@ -791,7 +790,7 @@ class SentimentAnalysisSkill(BaseSkill):
         return self._status
 
     @logged_method()
-    async def analyze_message(self, text: str = "", context: Optional[List[str]] = None,
+    async def analyze_message(self, text: str = "", context: list[str] | None = None,
                                store: bool = True, **kwargs) -> SkillResult:
         """Analyze sentiment of a single message."""
         text = text or kwargs.get("text", "")
@@ -838,7 +837,7 @@ class SentimentAnalysisSkill(BaseSkill):
         return SkillResult.ok(result_data)
 
     @logged_method()
-    async def analyze_conversation(self, messages: Optional[List[Dict[str, Any]]] = None,
+    async def analyze_conversation(self, messages: list[dict[str, Any]] | None = None,
                                     store: bool = True, **kwargs) -> SkillResult:
         """Analyze sentiment trajectory of a full conversation."""
         messages = messages or kwargs.get("messages", [])
@@ -900,7 +899,7 @@ class SentimentAnalysisSkill(BaseSkill):
         history = [s.to_dict() for s in list(self._analyzer.history)[-limit:]]
 
         # Also fetch from semantic storage if available
-        stored: List[Dict[str, Any]] = []
+        stored: list[dict[str, Any]] = []
         if self._api:
             try:
                 result = await self._api.list_semantic_memories(
@@ -913,7 +912,7 @@ class SentimentAnalysisSkill(BaseSkill):
                 pass
 
         # ── DB fallback: pull from activities + thoughts when no stored sentiment ──
-        fallback: List[Dict[str, Any]] = []
+        fallback: list[dict[str, Any]] = []
         if not stored and not history and self._api:
             try:
                 r = await self._api.get_activities(limit=limit * 3)

@@ -1,6 +1,5 @@
 """Database skill compatibility layer — routes supported operations via api_client."""
 
-from __future__ import annotations
 
 from aria_skills.api_client import get_api_client
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus

@@ -6,7 +6,7 @@ Manages scheduled jobs and recurring tasks.
 Persists via REST API (TICKET-12: eliminate in-memory stubs).
 """
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable
 
 from aria_skills.api_client import get_api_client
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
@@ -23,7 +23,7 @@ class ScheduleSkill(BaseSkill):
     
     def __init__(self, config: SkillConfig):
         super().__init__(config)
-        self._jobs: Dict[str, Dict] = {}  # fallback cache
+        self._jobs: dict[str, Dict] = {}  # fallback cache
         self._job_counter = 0
         self._api = None
     
@@ -52,7 +52,7 @@ class ScheduleSkill(BaseSkill):
         name: str,
         schedule: str,  # cron-like or "every X minutes/hours"
         action: str,
-        params: Optional[Dict] = None,
+        params: Dict | None = None,
         enabled: bool = True,
     ) -> SkillResult:
         """
@@ -109,7 +109,7 @@ class ScheduleSkill(BaseSkill):
     async def list_jobs(self, enabled_only: bool = False) -> SkillResult:
         """List all scheduled jobs."""
         try:
-            params: Dict[str, Any] = {}
+            params: dict[str, Any] = {}
             if enabled_only:
                 params["enabled"] = True
             resp = await self._api._client.get("/schedule", params=params)
@@ -225,7 +225,7 @@ class ScheduleSkill(BaseSkill):
             job["last_success"] = success
             return SkillResult.ok(job)
     
-    def _calculate_next_run(self, schedule: str) -> Optional[str]:
+    def _calculate_next_run(self, schedule: str) -> str | None:
         """Calculate next run time from schedule expression."""
         now = datetime.now(timezone.utc)
 

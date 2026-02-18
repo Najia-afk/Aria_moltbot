@@ -10,7 +10,7 @@ import asyncio
 import logging
 import re
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 from aria_agents.base import AgentConfig, AgentMessage, AgentRole, BaseAgent
 from aria_agents.context import AgentContext, AgentResult
@@ -175,12 +175,12 @@ class AgentCoordinator:
     - Explore/Work/Validate structured task execution
     """
     
-    def __init__(self, skill_registry: Optional["SkillRegistry"] = None):
+    def __init__(self, skill_registry: "SkillRegistry" | None = None):
         self._skill_registry = skill_registry
-        self._agents: Dict[str, BaseAgent] = {}
-        self._configs: Dict[str, AgentConfig] = {}
-        self._hierarchy: Dict[str, List[str]] = {}
-        self._main_agent_id: Optional[str] = None
+        self._agents: dict[str, BaseAgent] = {}
+        self._configs: dict[str, AgentConfig] = {}
+        self._hierarchy: dict[str, list[str]] = {}
+        self._main_agent_id: str | None = None
         self._tracker: PerformanceTracker = get_performance_tracker()
         self._enable_skill_routing_hints = True
         self.logger = logging.getLogger("aria.coordinator")
@@ -190,7 +190,7 @@ class AgentCoordinator:
         task: str,
         limit: int = 2,
         include_info: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Best-effort skill routing for a free-form task."""
         if not _HAS_SKILL_ROUTER:
             return {
@@ -287,21 +287,21 @@ class AgentCoordinator:
                         parent.add_sub_agent(child)
                         self.logger.debug(f"Linked {child_id} -> {parent_id}")
     
-    def get_agent(self, agent_id: str) -> Optional[BaseAgent]:
+    def get_agent(self, agent_id: str) -> BaseAgent | None:
         """Get an agent by ID."""
         return self._agents.get(agent_id)
     
-    def get_main_agent(self) -> Optional[BaseAgent]:
+    def get_main_agent(self) -> BaseAgent | None:
         """Get the main (root) agent."""
         if self._main_agent_id:
             return self._agents.get(self._main_agent_id)
         return None
     
-    def list_agents(self) -> List[str]:
+    def list_agents(self) -> list[str]:
         """List all agent IDs."""
         return list(self._agents.keys())
     
-    async def process(self, message: str, agent_id: Optional[str] = None, **kwargs) -> AgentMessage:
+    async def process(self, message: str, agent_id: str | None = None, **kwargs) -> AgentMessage:
         """
         Process a message through an agent with performance tracking.
         
@@ -399,7 +399,7 @@ class AgentCoordinator:
             )
     
     def _build_synthesis_prompt(
-        self, original_message: str, perspectives: Dict[str, AgentMessage]
+        self, original_message: str, perspectives: dict[str, AgentMessage]
     ) -> str:
         """Build a synthesis prompt from roundtable perspectives."""
         parts = [f"Original request: {original_message}\n\nPerspectives gathered:\n"]
@@ -411,7 +411,7 @@ class AgentCoordinator:
         )
         return "\n".join(parts)
     
-    async def broadcast(self, message: str, **kwargs) -> Dict[str, AgentMessage]:
+    async def broadcast(self, message: str, **kwargs) -> dict[str, AgentMessage]:
         """
         Send a message to all agents in parallel.
         
@@ -459,9 +459,9 @@ class AgentCoordinator:
     async def roundtable(
         self, 
         question: str, 
-        agent_ids: Optional[List[str]] = None,
+        agent_ids: list[str] | None = None,
         exclude_main: bool = True
-    ) -> Dict[str, AgentMessage]:
+    ) -> dict[str, AgentMessage]:
         """
         Gather perspectives from multiple agents in parallel.
         
@@ -529,7 +529,7 @@ class AgentCoordinator:
         self.logger.info(f"Roundtable complete: {len(results)} perspectives gathered")
         return {aid: resp for aid, resp in results if resp}
     
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get coordinator status with performance leaderboard."""
         return {
             "agents": len(self._agents),

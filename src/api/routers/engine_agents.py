@@ -6,7 +6,7 @@ Endpoints:
     GET  /api/engine/agents/{id}     — get single agent detail
 """
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -23,20 +23,20 @@ class AgentSummary(BaseModel):
     display_name: str = ""
     model: str = ""
     status: str = "idle"
-    focus_type: Optional[str] = None
-    current_session_id: Optional[str] = None
-    current_task: Optional[str] = None
+    focus_type: str | None = None
+    current_session_id: str | None = None
+    current_task: str | None = None
     pheromone_score: float = 0.5
     consecutive_failures: int = 0
-    last_active_at: Optional[str] = None
+    last_active_at: str | None = None
     context_length: int = 0
 
 
 class AgentPoolStatus(BaseModel):
     total_agents: int
     max_concurrent: int
-    status_counts: Dict[str, int]
-    agents: List[AgentSummary]
+    status_counts: dict[str, int]
+    agents: list[AgentSummary]
 
 
 def get_pool() -> AgentPool:

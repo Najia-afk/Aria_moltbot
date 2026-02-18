@@ -1,6 +1,5 @@
 """Skill registry composition for run_skill runtime."""
 
-from __future__ import annotations
 
 import os
 

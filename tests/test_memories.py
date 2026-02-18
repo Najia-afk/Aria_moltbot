@@ -5,7 +5,6 @@ S5-05 · Memory endpoint tests (including S5-01 semantic memory).
 Tests semantic store, search, and session summarization.
 Auto-skips when aria-api is unreachable.
 """
-from __future__ import annotations
 
 import os
 import uuid

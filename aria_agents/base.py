@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from aria_skills import SkillRegistry
@@ -49,13 +49,13 @@ class AgentConfig:
     name: str
     role: AgentRole
     model: str
-    parent: Optional[str] = None
-    capabilities: List[str] = field(default_factory=list)
-    skills: List[str] = field(default_factory=list)
-    system_prompt: Optional[str] = None
+    parent: str | None = None
+    capabilities: list[str] = field(default_factory=list)
+    skills: list[str] = field(default_factory=list)
+    system_prompt: str | None = None
     temperature: float = 0.7
     max_tokens: int = 2048
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 # Mandatory browser policy for all agents
@@ -75,11 +75,11 @@ class AgentMessage:
     """A message in the agent system."""
     role: str  # "user", "assistant", "system", "tool"
     content: str
-    agent_id: Optional[str] = None
+    agent_id: str | None = None
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "role": self.role,
             "content": self.content,
@@ -108,14 +108,14 @@ class BaseAgent(ABC):
     def __init__(
         self, 
         config: AgentConfig, 
-        skill_registry: Optional["SkillRegistry"] = None,
-        coordinator: Optional["AgentCoordinator"] = None
+        skill_registry: "SkillRegistry" | None = None,
+        coordinator: "AgentCoordinator" | None = None
     ):
         self.config = config
         self._skill_registry = skill_registry
         self._coordinator = coordinator  # For peer consultation
-        self._context: List[AgentMessage] = []
-        self._sub_agents: Dict[str, "BaseAgent"] = {}
+        self._context: list[AgentMessage] = []
+        self._sub_agents: dict[str, "BaseAgent"] = {}
         self._total_messages_processed = 0
         self.logger = logging.getLogger(f"aria.agent.{config.id}")
     
@@ -139,7 +139,7 @@ class BaseAgent(ABC):
         """Add a sub-agent."""
         self._sub_agents[agent.id] = agent
     
-    def get_sub_agent(self, agent_id: str) -> Optional["BaseAgent"]:
+    def get_sub_agent(self, agent_id: str) -> "BaseAgent" | None:
         """Get a sub-agent by ID."""
         return self._sub_agents.get(agent_id)
     
@@ -165,13 +165,13 @@ class BaseAgent(ABC):
                 f"(total processed: {self._total_messages_processed})"
             )
     
-    def get_context(self, limit: Optional[int] = None) -> List[AgentMessage]:
+    def get_context(self, limit: int | None = None) -> list[AgentMessage]:
         """Get recent context messages."""
         if limit:
             return self._context[-limit:]
         return self._context.copy()
     
-    def get_context_summary(self) -> Dict[str, Any]:
+    def get_context_summary(self) -> dict[str, Any]:
         """Get a summary of the current context state."""
         role_counts = {}
         for msg in self._context:

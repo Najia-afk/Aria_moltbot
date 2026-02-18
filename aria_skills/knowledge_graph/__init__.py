@@ -6,7 +6,7 @@ Manages entities and relationships in Aria's knowledge base.
 Persists via REST API (TICKET-12: eliminate in-memory stubs).
 """
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from aria_skills.api_client import get_api_client
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
@@ -23,8 +23,8 @@ class KnowledgeGraphSkill(BaseSkill):
     
     def __init__(self, config: SkillConfig):
         super().__init__(config)
-        self._entities: Dict[str, Dict] = {}  # fallback cache
-        self._relations: List[Dict] = []  # fallback cache
+        self._entities: dict[str, Dict] = {}  # fallback cache
+        self._relations: list[Dict] = []  # fallback cache
         self._api = None
     
     @property
@@ -50,7 +50,7 @@ class KnowledgeGraphSkill(BaseSkill):
         self,
         name: str,
         entity_type: str,
-        properties: Optional[Dict] = None,
+        properties: Dict | None = None,
     ) -> SkillResult:
         """Add an entity to the knowledge graph."""
         entity_id = f"{entity_type}:{name}".lower().replace(" ", "_")
@@ -78,7 +78,7 @@ class KnowledgeGraphSkill(BaseSkill):
         from_entity: str,
         relation: str,
         to_entity: str,
-        properties: Optional[Dict] = None,
+        properties: Dict | None = None,
     ) -> SkillResult:
         """Add a relationship between entities."""
         rel = {
@@ -115,12 +115,12 @@ class KnowledgeGraphSkill(BaseSkill):
     
     async def query(
         self,
-        entity_type: Optional[str] = None,
-        relation: Optional[str] = None,
+        entity_type: str | None = None,
+        relation: str | None = None,
     ) -> SkillResult:
         """Query the knowledge graph."""
         try:
-            params: Dict[str, Any] = {}
+            params: dict[str, Any] = {}
             if entity_type:
                 params["type"] = entity_type
             if relation:

@@ -9,7 +9,7 @@ Persists via REST API (TICKET-12: eliminate in-memory stubs).
 import hashlib
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 
 from aria_skills.api_client import get_api_client
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
@@ -33,7 +33,7 @@ class ResearchProject:
     """A research project or investigation."""
     id: str
     topic: str
-    thesis: Optional[str] = None
+    thesis: str | None = None
     sources: list[Source] = field(default_factory=list)
     findings: list[str] = field(default_factory=list)
     questions: list[str] = field(default_factory=list)
@@ -89,7 +89,7 @@ class ResearchSkill(BaseSkill):
     async def start_project(
         self,
         topic: str,
-        initial_questions: Optional[list[str]] = None
+        initial_questions: list[str] | None = None
     ) -> SkillResult:
         """
         Start a new research project.
@@ -189,7 +189,7 @@ class ResearchSkill(BaseSkill):
         self,
         project_id: str,
         finding: str,
-        source_ids: Optional[list[str]] = None
+        source_ids: list[str] | None = None
     ) -> SkillResult:
         """
         Add a finding to a research project.
@@ -360,7 +360,7 @@ class ResearchSkill(BaseSkill):
     async def complete_project(
         self,
         project_id: str,
-        summary: Optional[str] = None
+        summary: str | None = None
     ) -> SkillResult:
         """
         Mark a project as completed.
@@ -399,7 +399,7 @@ class ResearchSkill(BaseSkill):
         except Exception as e:
             return SkillResult.fail(f"Project completion failed: {str(e)}")
     
-    async def list_projects(self, status: Optional[str] = None) -> SkillResult:
+    async def list_projects(self, status: str | None = None) -> SkillResult:
         """
         List research projects.
         

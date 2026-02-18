@@ -23,7 +23,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy import select, update, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -43,9 +43,9 @@ class ChatResponse:
     message_id: str
     session_id: str
     content: str
-    thinking: Optional[str] = None
-    tool_calls: Optional[List[Dict[str, Any]]] = None
-    tool_results: Optional[List[Dict[str, Any]]] = None
+    thinking: str | None = None
+    tool_calls: list[dict[str, Any]] | None = None
+    tool_results: list[dict[str, Any]] | None = None
     model: str = ""
     input_tokens: int = 0
     output_tokens: int = 0
@@ -54,7 +54,7 @@ class ChatResponse:
     latency_ms: int = 0
     finish_reason: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "message_id": self.message_id,
             "session_id": self.session_id,
@@ -110,14 +110,14 @@ class ChatEngine:
     async def create_session(
         self,
         agent_id: str = "main",
-        model: Optional[str] = None,
+        model: str | None = None,
         session_type: str = "interactive",
-        system_prompt: Optional[str] = None,
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        system_prompt: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
         context_window: int = 50,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Create a new chat session.
 
@@ -168,7 +168,7 @@ class ChatEngine:
 
             return self._session_to_dict(session)
 
-    async def resume_session(self, session_id: str | uuid.UUID) -> Dict[str, Any]:
+    async def resume_session(self, session_id: str | uuid.UUID) -> dict[str, Any]:
         """
         Resume an existing session by ID.
 
@@ -203,7 +203,7 @@ class ChatEngine:
             session_dict["messages"] = [self._message_to_dict(m) for m in messages]
             return session_dict
 
-    async def end_session(self, session_id: str | uuid.UUID) -> Dict[str, Any]:
+    async def end_session(self, session_id: str | uuid.UUID) -> dict[str, Any]:
         """
         End (close) a session. Marks status='ended' and sets ended_at.
 
@@ -239,7 +239,7 @@ class ChatEngine:
         *,
         enable_thinking: bool = False,
         enable_tools: bool = True,
-        context_messages: Optional[List[Dict[str, str]]] = None,
+        context_messages: list[dict[str, str]] | None = None,
     ) -> ChatResponse:
         """
         Send a user message and get an assistant response.
@@ -302,8 +302,8 @@ class ChatEngine:
 
             # ── 4. LLM completion with tool-call loop ─────────────────────
             tools_for_llm = self.tools.get_tools_for_llm() if enable_tools else None
-            accumulated_tool_calls: List[Dict[str, Any]] = []
-            accumulated_tool_results: List[Dict[str, Any]] = []
+            accumulated_tool_calls: list[dict[str, Any]] = []
+            accumulated_tool_results: list[dict[str, Any]] = []
             total_input_tokens = 0
             total_output_tokens = 0
             total_cost = 0.0
@@ -444,7 +444,7 @@ class ChatEngine:
         db: AsyncSession,
         session,
         current_content: str,
-    ) -> List[Dict[str, str]]:
+    ) -> list[dict[str, str]]:
         """
         Build conversation context from DB messages.
 
@@ -455,7 +455,7 @@ class ChatEngine:
         """
         from db.models import EngineChatMessage
 
-        messages: List[Dict[str, str]] = []
+        messages: list[dict[str, str]] = []
 
         # System prompt
         if session.system_prompt:
@@ -472,7 +472,7 @@ class ChatEngine:
         db_messages = list(reversed(result.scalars().all()))
 
         for msg in db_messages:
-            entry: Dict[str, Any] = {"role": msg.role, "content": msg.content}
+            entry: dict[str, Any] = {"role": msg.role, "content": msg.content}
             if msg.tool_calls:
                 entry["tool_calls"] = msg.tool_calls
             if msg.role == "tool" and msg.tool_results:
@@ -499,7 +499,7 @@ class ChatEngine:
         return title
 
     @staticmethod
-    def _session_to_dict(session) -> Dict[str, Any]:
+    def _session_to_dict(session) -> dict[str, Any]:
         """Convert ORM session to plain dict."""
         return {
             "id": str(session.id),
@@ -521,7 +521,7 @@ class ChatEngine:
         }
 
     @staticmethod
-    def _message_to_dict(msg) -> Dict[str, Any]:
+    def _message_to_dict(msg) -> dict[str, Any]:
         """Convert ORM message to plain dict."""
         return {
             "id": str(msg.id),

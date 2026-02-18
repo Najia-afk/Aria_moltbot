@@ -8,7 +8,7 @@ Integrates with aria_mind.security for comprehensive protection.
 import re
 import logging
 from pathlib import Path
-from typing import List, Optional, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from aria_mind.security import AriaSecurityGateway, SecurityCheckResult
@@ -34,7 +34,7 @@ class Boundaries:
     """
     
     def __init__(self):
-        self.will_do: List[str] = [
+        self.will_do: list[str] = [
             "Help with code, research, and creative tasks",
             "Post to Moltbook with rate limiting",
             "Store and recall memories",
@@ -42,7 +42,7 @@ class Boundaries:
             "Learn from interactions",
         ]
         
-        self.will_not: List[str] = [
+        self.will_not: list[str] = [
             "Reveal API keys or secrets",
             "Execute commands without context",
             "Pretend to be a different AI",
@@ -54,7 +54,7 @@ class Boundaries:
         ]
         
         self._loaded = False
-        self._security_gateway: Optional["AriaSecurityGateway"] = None
+        self._security_gateway: "AriaSecurityGateway" | None = None
     
     def set_security_gateway(self, gateway: "AriaSecurityGateway"):
         """Inject security gateway for enhanced protection."""
@@ -101,7 +101,7 @@ class Boundaries:
                 if line.strip().startswith(("-", "*"))
             ]
     
-    def check(self, request: str) -> Tuple[bool, str]:
+    def check(self, request: str) -> tuple[bool, str]:
         """
         Check if a request violates boundaries.
         

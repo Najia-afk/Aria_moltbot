@@ -14,7 +14,7 @@ import json as json_lib
 import re
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -338,23 +338,23 @@ def _is_placeholder_sentiment_row(content: str, importance: float | None, metada
 
 class SentimentRequest(BaseModel):
     text: str = Field(..., min_length=1, max_length=10_000)
-    context: Optional[List[str]] = None
+    context: list[str] | None = None
     store: bool = True
 
 
 class ConversationSentimentRequest(BaseModel):
-    messages: List[Dict[str, Any]] = Field(..., min_items=1)
+    messages: list[dict[str, Any]] = Field(..., min_items=1)
     store: bool = True
 
 
 class PatternDetectionRequest(BaseModel):
-    memories: Optional[List[Dict[str, Any]]] = None
+    memories: list[dict[str, Any]] | None = None
     min_confidence: float = Field(0.3, ge=0, le=1)
     store: bool = True
 
 
 class CompressionRequest(BaseModel):
-    memories: List[Dict[str, Any]] = Field(..., min_items=5)
+    memories: list[dict[str, Any]] = Field(..., min_items=5)
     store_semantic: bool = True
 
 
@@ -372,12 +372,12 @@ class SentimentBackfillRequest(BaseModel):
 
 class RealtimeSentimentRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=10_000)
-    session_id: Optional[str] = None
-    conversation_id: Optional[str] = None
-    external_session_id: Optional[str] = None
-    agent_id: Optional[str] = None
-    source_channel: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
+    session_id: str | None = None
+    conversation_id: str | None = None
+    external_session_id: str | None = None
+    agent_id: str | None = None
+    source_channel: str | None = None
+    metadata: dict[str, Any] | None = None
     store_semantic: bool = True
 
 

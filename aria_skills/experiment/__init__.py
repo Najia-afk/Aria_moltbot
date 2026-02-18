@@ -1,6 +1,5 @@
 """Experiment skill — lightweight in-memory ML experiment tracking."""
 
-from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone

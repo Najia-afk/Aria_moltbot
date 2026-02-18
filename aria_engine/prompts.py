@@ -18,7 +18,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from aria_engine.config import EngineConfig
 
@@ -38,7 +38,7 @@ class PromptSection:
 class AssembledPrompt:
     """Result of prompt assembly with metadata."""
     prompt: str
-    sections: List[str]
+    sections: list[str]
     total_chars: int
     cached: bool = False
     assembled_at: float = 0.0
@@ -69,18 +69,18 @@ class PromptAssembler:
 
     def __init__(self, config: EngineConfig):
         self.config = config
-        self._soul_cache: Dict[str, str] = {}
+        self._soul_cache: dict[str, str] = {}
         self._soul_cache_time: float = 0.0
-        self._prompt_cache: Dict[str, AssembledPrompt] = {}
-        self._prompt_cache_times: Dict[str, float] = {}
+        self._prompt_cache: dict[str, AssembledPrompt] = {}
+        self._prompt_cache_times: dict[str, float] = {}
 
     def assemble(
         self,
         agent_id: str = "main",
-        tools: Optional[List[Dict[str, Any]]] = None,
-        goals: Optional[List[str]] = None,
-        agent_prompt: Optional[str] = None,
-        override: Optional[str] = None,
+        tools: list[dict[str, Any]] | None = None,
+        goals: list[str] | None = None,
+        agent_prompt: str | None = None,
+        override: str | None = None,
         include_datetime: bool = True,
         include_tools: bool = True,
         include_goals: bool = True,
@@ -119,7 +119,7 @@ class PromptAssembler:
             return cached
 
         # Build sections
-        sections: List[PromptSection] = []
+        sections: list[PromptSection] = []
 
         # ── Section 1: Soul Identity (highest priority) ───────────────────
         identity = self._load_soul_file("IDENTITY.md")
@@ -234,7 +234,7 @@ class PromptAssembler:
         self,
         agent_id: str,
         db_session_factory,
-        tools: Optional[List[Dict[str, Any]]] = None,
+        tools: list[dict[str, Any]] | None = None,
     ) -> AssembledPrompt:
         """
         Assemble prompt with agent-specific data from the database.
@@ -244,7 +244,7 @@ class PromptAssembler:
         from sqlalchemy import select
 
         agent_prompt = None
-        goals: List[str] = []
+        goals: list[str] = []
 
         async with db_session_factory() as db:
             # Load agent state for system_prompt
@@ -281,7 +281,7 @@ class PromptAssembler:
             agent_prompt=agent_prompt,
         )
 
-    def _load_soul_file(self, filename: str) -> Optional[str]:
+    def _load_soul_file(self, filename: str) -> str | None:
         """
         Load a soul file from aria_mind/soul/ directory.
 
@@ -317,7 +317,7 @@ class PromptAssembler:
             logger.warning("Failed to read soul file %s: %s", filename, e)
             return None
 
-    def _get_cached(self, key: str) -> Optional[AssembledPrompt]:
+    def _get_cached(self, key: str) -> AssembledPrompt | None:
         """Get cached prompt if not expired."""
         if key not in self._prompt_cache:
             return None
@@ -348,7 +348,7 @@ class PromptAssembler:
         self._prompt_cache_times.clear()
         logger.info("Prompt cache cleared")
 
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """Return cache statistics."""
         return {
             "soul_files_cached": len(self._soul_cache),

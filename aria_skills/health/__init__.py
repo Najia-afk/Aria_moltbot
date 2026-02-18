@@ -9,7 +9,7 @@ import asyncio
 import os
 import sys
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
 from aria_skills.registry import SkillRegistry
@@ -62,8 +62,8 @@ class HealthMonitorSkill(BaseSkill):
     
     def __init__(self, config: SkillConfig):
         super().__init__(config)
-        self._last_check: Optional[datetime] = None
-        self._check_results: Dict[str, Any] = {}
+        self._last_check: datetime | None = None
+        self._check_results: dict[str, Any] = {}
     
     @property
     def name(self) -> str:
@@ -115,7 +115,7 @@ class HealthMonitorSkill(BaseSkill):
             "checks": checks,
         })
     
-    async def _check_python(self) -> Dict[str, Any]:
+    async def _check_python(self) -> dict[str, Any]:
         """Check Python runtime."""
         return {
             "status": "healthy",
@@ -124,7 +124,7 @@ class HealthMonitorSkill(BaseSkill):
             "platform": sys.platform,
         }
     
-    async def _check_memory(self) -> Dict[str, Any]:
+    async def _check_memory(self) -> dict[str, Any]:
         """Check memory usage."""
         try:
             import psutil
@@ -145,7 +145,7 @@ class HealthMonitorSkill(BaseSkill):
         except ImportError:
             return {"status": "unknown", "message": "psutil not installed"}
     
-    async def _check_disk(self) -> Dict[str, Any]:
+    async def _check_disk(self) -> dict[str, Any]:
         """Check disk space."""
         try:
             import psutil
@@ -166,7 +166,7 @@ class HealthMonitorSkill(BaseSkill):
         except ImportError:
             return {"status": "unknown", "message": "psutil not installed"}
     
-    async def _check_network(self) -> Dict[str, Any]:
+    async def _check_network(self) -> dict[str, Any]:
         """Check network connectivity."""
         try:
             import aiohttp
@@ -180,7 +180,7 @@ class HealthMonitorSkill(BaseSkill):
         except Exception as e:
             return {"status": "warning", "message": str(e)}
     
-    async def _check_environment(self) -> Dict[str, Any]:
+    async def _check_environment(self) -> dict[str, Any]:
         """Check environment variables."""
         required_vars = ["HOME", "PATH"]
         missing = [v for v in required_vars if not os.environ.get(v)]

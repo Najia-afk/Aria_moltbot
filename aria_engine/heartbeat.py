@@ -12,7 +12,7 @@ import asyncio
 import logging
 import time
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -75,21 +75,21 @@ class AgentHeartbeatManager:
         self,
         config: EngineConfig,
         db_engine: AsyncEngine,
-        scheduler: Optional[Any] = None,
-        agent_pool: Optional[Any] = None,
+        scheduler: Any | None = None,
+        agent_pool: Any | None = None,
     ):
         self.config = config
         self._db_engine = db_engine
         self._scheduler = scheduler
         self._agent_pool = agent_pool
-        self._heartbeat_configs: Dict[str, AgentHeartbeatConfig] = {}
-        self._beat_counts: Dict[str, int] = {}
-        self._consecutive_failures: Dict[str, int] = {}
+        self._heartbeat_configs: dict[str, AgentHeartbeatConfig] = {}
+        self._beat_counts: dict[str, int] = {}
+        self._consecutive_failures: dict[str, int] = {}
 
     def configure_agent(
         self,
         agent_id: str,
-        interval_seconds: Optional[int] = None,
+        interval_seconds: int | None = None,
         enabled: bool = True,
     ) -> None:
         """
@@ -183,7 +183,7 @@ class AgentHeartbeatManager:
         logger.info("Registered %d agent heartbeats", registered)
         return registered
 
-    async def heartbeat_handler(self, agent_id: str) -> Dict[str, Any]:
+    async def heartbeat_handler(self, agent_id: str) -> dict[str, Any]:
         """
         Execute a single heartbeat for an agent.
 
@@ -206,7 +206,7 @@ class AgentHeartbeatManager:
         self._beat_counts[agent_id] = self._beat_counts.get(agent_id, 0) + 1
         beat_number = self._beat_counts[agent_id]
 
-        health_status: Dict[str, Any] = {
+        health_status: dict[str, Any] = {
             "agent_id": agent_id,
             "beat_number": beat_number,
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -330,7 +330,7 @@ class AgentHeartbeatManager:
         except Exception:
             return True  # Don't fail heartbeat just because gateway isn't initialized
 
-    async def _check_subsystems(self, agent_id: str) -> Dict[str, bool]:
+    async def _check_subsystems(self, agent_id: str) -> dict[str, bool]:
         """
         Check subsystem health using existing heartbeat.py logic.
 
@@ -340,7 +340,7 @@ class AgentHeartbeatManager:
         if agent_id != "main":
             return {"agent_exists": True}
 
-        checks: Dict[str, bool] = {}
+        checks: dict[str, bool] = {}
 
         try:
             # Check DB connectivity
@@ -352,14 +352,14 @@ class AgentHeartbeatManager:
 
         return checks
 
-    async def check_all_health(self) -> Dict[str, Dict[str, Any]]:
+    async def check_all_health(self) -> dict[str, dict[str, Any]]:
         """
         Check health of all agents, including missed-beat detection.
 
         Returns:
             Dict mapping agent_id to health status.
         """
-        results: Dict[str, Dict[str, Any]] = {}
+        results: dict[str, dict[str, Any]] = {}
 
         async with self._db_engine.begin() as conn:
             result = await conn.execute(
@@ -408,7 +408,7 @@ class AgentHeartbeatManager:
 
         return results
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get heartbeat manager status summary."""
         return {
             "configured_agents": len(self._heartbeat_configs),

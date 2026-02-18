@@ -13,7 +13,7 @@ Endpoints:
 """
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
@@ -32,7 +32,7 @@ router = APIRouter(prefix="/api/engine/cron", tags=["engine-cron"])
 class CronJobCreate(BaseModel):
     """Request body for creating a cron job."""
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         None,
         description="Job ID (auto-generated if omitted)",
         max_length=100,
@@ -95,21 +95,21 @@ class CronJobCreate(BaseModel):
 class CronJobUpdate(BaseModel):
     """Request body for updating a cron job (all fields optional)."""
 
-    name: Optional[str] = Field(None, max_length=200)
-    schedule: Optional[str] = Field(None, max_length=100)
-    agent_id: Optional[str] = Field(None, max_length=100)
-    enabled: Optional[bool] = None
-    payload_type: Optional[str] = Field(None, pattern="^(prompt|skill|pipeline)$")
-    payload: Optional[str] = None
-    session_mode: Optional[str] = Field(
+    name: str | None = Field(None, max_length=200)
+    schedule: str | None = Field(None, max_length=100)
+    agent_id: str | None = Field(None, max_length=100)
+    enabled: bool | None = None
+    payload_type: str | None = Field(None, pattern="^(prompt|skill|pipeline)$")
+    payload: str | None = None
+    session_mode: str | None = Field(
         None, pattern="^(isolated|shared|persistent)$"
     )
-    max_duration_seconds: Optional[int] = Field(None, ge=10, le=3600)
-    retry_count: Optional[int] = Field(None, ge=0, le=5)
+    max_duration_seconds: int | None = Field(None, ge=10, le=3600)
+    retry_count: int | None = Field(None, ge=0, le=5)
 
     @field_validator("schedule")
     @classmethod
-    def validate_schedule(cls, v: Optional[str]) -> Optional[str]:
+    def validate_schedule(cls, v: str | None) -> str | None:
         if v is not None:
             try:
                 parse_schedule(v)
@@ -128,16 +128,16 @@ class CronJobResponse(BaseModel):
     enabled: bool
     payload_type: str
     session_mode: str
-    last_run_at: Optional[datetime] = None
-    last_status: Optional[str] = None
-    last_duration_ms: Optional[int] = None
-    last_error: Optional[str] = None
-    next_run_at: Optional[datetime] = None
+    last_run_at: datetime | None = None
+    last_status: str | None = None
+    last_duration_ms: int | None = None
+    last_error: str | None = None
+    next_run_at: datetime | None = None
     run_count: int = 0
     success_count: int = 0
     fail_count: int = 0
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 
@@ -146,20 +146,20 @@ class CronJobListResponse(BaseModel):
     """Response for listing cron jobs."""
 
     total: int
-    jobs: List[CronJobResponse]
+    jobs: list[CronJobResponse]
     scheduler_running: bool
 
 
 class CronHistoryEntry(BaseModel):
     """Single execution history entry."""
 
-    id: Optional[Any] = None
+    id: Any | None = None
     action: str
-    skill: Optional[str] = None
-    details: Optional[Dict[str, Any]] = None
-    success: Optional[bool] = None
-    created_at: Optional[datetime] = None
-    duration_ms: Optional[int] = None
+    skill: str | None = None
+    details: dict[str, Any] | None = None
+    success: bool | None = None
+    created_at: datetime | None = None
+    duration_ms: int | None = None
 
 
 class CronHistoryResponse(BaseModel):
@@ -167,7 +167,7 @@ class CronHistoryResponse(BaseModel):
 
     job_id: str
     total: int
-    entries: List[CronHistoryEntry]
+    entries: list[CronHistoryEntry]
 
 
 class SchedulerStatusResponse(BaseModel):
@@ -175,7 +175,7 @@ class SchedulerStatusResponse(BaseModel):
 
     running: bool
     active_executions: int
-    active_job_ids: List[str]
+    active_job_ids: list[str]
     max_concurrent: int
 
 

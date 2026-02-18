@@ -8,7 +8,7 @@ All data access through aria-api (httpx HTTP client).
 """
 import logging
 from datetime import datetime, timezone, timedelta
-from typing import Any, Optional
+from typing import Any
 
 from aria_skills.api_client import get_api_client
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
@@ -70,8 +70,8 @@ class AgentManagerSkill(BaseSkill):
 
     async def list_agents(
         self,
-        status: Optional[str] = None,
-        agent_id: Optional[str] = None,
+        status: str | None = None,
+        agent_id: str | None = None,
         limit: int = 50,
     ) -> SkillResult:
         """List agent sessions, optionally filtered by status or agent_id."""
@@ -97,7 +97,7 @@ class AgentManagerSkill(BaseSkill):
     async def spawn_agent(
         self,
         agent_type: str,
-        context: Optional[dict] = None,
+        context: dict | None = None,
     ) -> SkillResult:
         """Spawn an agent session with optional context protocol.
 
@@ -151,7 +151,7 @@ class AgentManagerSkill(BaseSkill):
             self._log_usage("terminate_agent", False, error=str(e))
             return SkillResult.fail(f"Failed to terminate agent: {e}")
 
-    async def get_agent_stats(self, session_id: Optional[str] = None) -> SkillResult:
+    async def get_agent_stats(self, session_id: str | None = None) -> SkillResult:
         """Get session statistics, optionally for a specific session.
 
         Args:

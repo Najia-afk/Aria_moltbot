@@ -3,7 +3,7 @@ Aria Advanced Memory Skill
 Combines: compression, pattern recognition, sentiment, embeddings.
 """
 
-from typing import Dict, Any, List
+from typing import Any
 from dataclasses import asdict
 import asyncio
 
@@ -56,10 +56,10 @@ class AdvancedMemorySkill(BaseSkill):
 
     def __init__(self, config: SkillConfig):
         super().__init__(config)
-        self.compressor: Optional[MemoryCompressor] = None
-        self.pattern_recognizer: Optional[PatternRecognizer] = None
-        self.sentiment_analyzer: Optional[SentimentAnalyzer] = None
-        self.embedding_memory: Optional[EmbeddingMemory] = None
+        self.compressor: MemoryCompressor | None = None
+        self.pattern_recognizer: PatternRecognizer | None = None
+        self.sentiment_analyzer: SentimentAnalyzer | None = None
+        self.embedding_memory: EmbeddingMemory | None = None
         self._initialized = False
 
     @property
@@ -94,7 +94,7 @@ class AdvancedMemorySkill(BaseSkill):
     @logged_method()
     async def compress_memories(
         self,
-        memories: List[Dict[str, Any]] = None,
+        memories: list[dict[str, Any]] = None,
         **kwargs
     ) -> SkillResult:
         """
@@ -145,7 +145,7 @@ class AdvancedMemorySkill(BaseSkill):
     @logged_method()
     async def detect_patterns(
         self,
-        memories: List[Dict[str, Any]] = None,
+        memories: list[dict[str, Any]] = None,
         window_days: int = 30,
         min_confidence: float = 0.3,
         **kwargs
@@ -195,7 +195,7 @@ class AdvancedMemorySkill(BaseSkill):
     async def analyze_sentiment(
         self,
         text: str = None,
-        messages: List[Dict[str, Any]] = None,
+        messages: list[dict[str, Any]] = None,
         use_llm: bool = False,
         **kwargs
     ) -> SkillResult:
@@ -239,7 +239,7 @@ class AdvancedMemorySkill(BaseSkill):
         top_k: int = 10,
         min_similarity: float = 0.5,
         category: str = None,
-        tags: List[str] = None,
+        tags: list[str] = None,
         **kwargs
     ) -> SkillResult:
         """
@@ -301,7 +301,7 @@ class AdvancedMemorySkill(BaseSkill):
         content: str,
         category: str = "general",
         importance: float = 0.5,
-        tags: List[str] = None,
+        tags: list[str] = None,
         **kwargs
     ) -> SkillResult:
         """
@@ -346,9 +346,9 @@ class AdvancedMemorySkill(BaseSkill):
 # ===========================
 
 async def get_memory_insights_workflow(
-    recent_memories: List[Dict[str, Any]],
+    recent_memories: list[dict[str, Any]],
     pattern_days: int = 30
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Complete insights workflow: compression + patterns + sentiment.
 

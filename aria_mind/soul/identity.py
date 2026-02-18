@@ -6,7 +6,6 @@ Loads identity from IDENTITY.md and provides personality attributes.
 """
 import re
 from pathlib import Path
-from typing import Optional
 
 
 class Identity:
@@ -21,7 +20,7 @@ class Identity:
         self.creature: str = "Silicon Familiar"
         self.vibe: str = "sharp, efficient, secure"
         self.emoji: str = "⚡️"
-        self.avatar: Optional[str] = None
+        self.avatar: str | None = None
         self.handles: dict = {}
         self._loaded = False
     

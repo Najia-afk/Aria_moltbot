@@ -10,7 +10,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
 from aria_skills.registry import SkillRegistry
@@ -23,10 +23,10 @@ class Vulnerability:
     severity: str  # critical, high, medium, low, info
     title: str
     description: str
-    file: Optional[str] = None
-    line: Optional[int] = None
+    file: str | None = None
+    line: int | None = None
     recommendation: str = ""
-    cwe: Optional[str] = None  # CWE ID if applicable
+    cwe: str | None = None  # CWE ID if applicable
 
 
 @dataclass
@@ -37,7 +37,7 @@ class ScanResult:
     target: str
     vulnerabilities: list[Vulnerability] = field(default_factory=list)
     started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    completed_at: Optional[datetime] = None
+    completed_at: datetime | None = None
 
 
 @SkillRegistry.register
@@ -102,7 +102,7 @@ class SecurityScanSkill(BaseSkill):
         self,
         code: str,
         language: str = "python",
-        file_name: Optional[str] = None
+        file_name: str | None = None
     ) -> SkillResult:
         """
         Scan code for security issues.

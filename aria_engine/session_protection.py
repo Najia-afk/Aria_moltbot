@@ -15,7 +15,7 @@ import re
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional, Set
+from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -138,15 +138,15 @@ class SessionProtection:
         self._max_per_session = max_per_session
 
         # In-memory rate limiters (per session + per agent)
-        self._session_windows: Dict[str, SlidingWindow] = defaultdict(
+        self._session_windows: dict[str, SlidingWindow] = defaultdict(
             SlidingWindow
         )
-        self._agent_windows: Dict[str, SlidingWindow] = defaultdict(
+        self._agent_windows: dict[str, SlidingWindow] = defaultdict(
             SlidingWindow
         )
 
         # Advisory lock set (track which sessions are locked)
-        self._locks: Dict[str, asyncio.Lock] = {}
+        self._locks: dict[str, asyncio.Lock] = {}
 
     async def validate_and_check(
         self,
@@ -358,11 +358,11 @@ class SessionProtection:
 
     def get_rate_limit_status(
         self,
-        session_id: Optional[str] = None,
-        agent_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        session_id: str | None = None,
+        agent_id: str | None = None,
+    ) -> dict[str, Any]:
         """Get current rate limit status for monitoring."""
-        status: Dict[str, Any] = {}
+        status: dict[str, Any] = {}
 
         if session_id and session_id in self._session_windows:
             w = self._session_windows[session_id]

@@ -17,7 +17,7 @@ import json
 import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
 
@@ -35,7 +35,7 @@ if _env_workspace:
         _AGENTS_DIR = _candidate
 
 
-def _load_sessions_index(agent: str = "main") -> Dict[str, Any]:
+def _load_sessions_index(agent: str = "main") -> dict[str, Any]:
     """Read sessions.json for a given agent."""
     path = os.path.join(_AGENTS_DIR, agent, "sessions", "sessions.json")
     if not os.path.exists(path):
@@ -47,7 +47,7 @@ def _load_sessions_index(agent: str = "main") -> Dict[str, Any]:
         return {}
 
 
-def _save_sessions_index(data: Dict[str, Any], agent: str = "main") -> None:
+def _save_sessions_index(data: dict[str, Any], agent: str = "main") -> None:
     """Write sessions.json atomically for a given agent."""
     path = os.path.join(_AGENTS_DIR, agent, "sessions", "sessions.json")
     tmp = path + ".tmp"
@@ -67,7 +67,7 @@ def _archive_transcript(session_id: str, agent: str = "main") -> bool:
     return True
 
 
-def _list_all_agents() -> List[str]:
+def _list_all_agents() -> list[str]:
     """Discover agent directories that have sessions."""
     if not os.path.isdir(_AGENTS_DIR):
         return ["main"]
@@ -79,7 +79,7 @@ def _list_all_agents() -> List[str]:
     return agents or ["main"]
 
 
-def _epoch_ms_to_iso(ms: Any) -> Optional[str]:
+def _epoch_ms_to_iso(ms: Any) -> str | None:
     """Convert epoch-ms timestamp to ISO string."""
     if ms is None:
         return None
@@ -99,9 +99,9 @@ def _is_cron_or_subagent_session(session_key: str) -> bool:
     return any(marker in session_key for marker in [":cron:", ":subagent:", ":run:"])
 
 
-def _flatten_sessions(index: Dict[str, Any], agent: str = "main") -> List[Dict[str, Any]]:
+def _flatten_sessions(index: dict[str, Any], agent: str = "main") -> list[dict[str, Any]]:
     """Convert sessions.json index into a flat deduplicated list."""
-    seen: Dict[str, Dict[str, Any]] = {}
+    seen: dict[str, dict[str, Any]] = {}
     for key, value in index.items():
         if not isinstance(value, dict):
             continue
@@ -205,7 +205,7 @@ class SessionManagerSkill(BaseSkill):
         agent = agent or kwargs.get("agent", "")
         try:
             agents = [agent] if agent else _list_all_agents()
-            sessions: List[Dict[str, Any]] = []
+            sessions: list[dict[str, Any]] = []
             for ag in agents:
                 index = _load_sessions_index(ag)
                 sessions.extend(_flatten_sessions(index, ag))
@@ -255,7 +255,7 @@ class SessionManagerSkill(BaseSkill):
                             "Only cron/subagent sessions may be deleted."
                         )
 
-        removed_keys: List[str] = []
+        removed_keys: list[str] = []
         archived = False
 
         for ag in agents:
@@ -354,8 +354,8 @@ class SessionManagerSkill(BaseSkill):
         now = datetime.now(timezone.utc)
         cutoff = now - timedelta(minutes=int(max_age_minutes))
 
-        to_delete: List[Dict[str, Any]] = []
-        kept: List[Dict[str, Any]] = []
+        to_delete: list[dict[str, Any]] = []
+        kept: list[dict[str, Any]] = []
         for sess in sessions:
             ts_str = sess.get("updatedAt") or ""
             if ts_str:
@@ -381,8 +381,8 @@ class SessionManagerSkill(BaseSkill):
             if not (s.get("agentId") == "main" and not _is_cron_or_subagent_session(s.get("key", "")))
         ]
 
-        deleted_ids: List[str] = []
-        errors: List[Dict[str, str]] = []
+        deleted_ids: list[str] = []
+        errors: list[dict[str, str]] = []
         if not dry_run:
             for sess in to_delete:
                 sid = sess.get("id") or sess.get("sessionId", "")
@@ -412,7 +412,7 @@ class SessionManagerSkill(BaseSkill):
 
         sessions = list_result.data.get("sessions", [])
         now = datetime.now(timezone.utc)
-        agent_counts: Dict[str, int] = {}
+        agent_counts: dict[str, int] = {}
         stale_count = 0
 
         for sess in sessions:
@@ -470,9 +470,9 @@ class SessionManagerSkill(BaseSkill):
             dry_run = dry_run.lower() in ("true", "1", "yes")
 
         agents = _list_all_agents()
-        stale_keys_removed: List[Dict[str, str]] = []
-        orphans_archived: List[Dict[str, str]] = []
-        deleted_purged: List[Dict[str, str]] = []
+        stale_keys_removed: list[dict[str, str]] = []
+        orphans_archived: list[dict[str, str]] = []
+        deleted_purged: list[dict[str, str]] = []
         now = datetime.now(timezone.utc)
         seven_days_ago = now - timedelta(days=7)
 

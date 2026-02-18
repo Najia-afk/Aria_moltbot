@@ -13,7 +13,7 @@ adds agent_id filters to every query.
 """
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 from uuid import uuid4
 
 from sqlalchemy import text
@@ -43,7 +43,7 @@ class AgentSessionScope:
         self,
         agent_id: str,
         db_engine: AsyncEngine,
-        config: Optional[EngineConfig] = None,
+        config: EngineConfig | None = None,
     ):
         self.agent_id = agent_id
         self._db_engine = db_engine
@@ -51,15 +51,15 @@ class AgentSessionScope:
 
     async def create_session(
         self,
-        title: Optional[str] = None,
+        title: str | None = None,
         session_type: str = "interactive",
-        model: Optional[str] = None,
-        system_prompt: Optional[str] = None,
+        model: str | None = None,
+        system_prompt: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 4096,
         context_window: int = 50,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Create a new session scoped to this agent.
 
@@ -122,7 +122,7 @@ class AgentSessionScope:
             "status": "active",
         }
 
-    async def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+    async def get_session(self, session_id: str) -> dict[str, Any] | None:
         """
         Get a session by ID — only if it belongs to this agent.
 
@@ -147,11 +147,11 @@ class AgentSessionScope:
 
     async def list_sessions(
         self,
-        status: Optional[str] = None,
-        session_type: Optional[str] = None,
+        status: str | None = None,
+        session_type: str | None = None,
         limit: int = 50,
         offset: int = 0,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         List sessions for this agent only.
 
@@ -165,7 +165,7 @@ class AgentSessionScope:
             List of session dicts, always filtered by agent_id.
         """
         conditions = ["agent_id = :agent_id"]
-        params: Dict[str, Any] = {
+        params: dict[str, Any] = {
             "agent_id": self.agent_id,
             "limit": limit,
             "offset": offset,
@@ -247,15 +247,15 @@ class AgentSessionScope:
         session_id: str,
         role: str,
         content: str,
-        thinking: Optional[str] = None,
-        tool_calls: Optional[Any] = None,
-        tool_results: Optional[Any] = None,
-        model: Optional[str] = None,
-        tokens_input: Optional[int] = None,
-        tokens_output: Optional[int] = None,
-        cost: Optional[float] = None,
-        latency_ms: Optional[int] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        thinking: str | None = None,
+        tool_calls: Any | None = None,
+        tool_results: Any | None = None,
+        model: str | None = None,
+        tokens_input: int | None = None,
+        tokens_output: int | None = None,
+        cost: float | None = None,
+        latency_ms: int | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> str:
         """
         Add a message to a session.
@@ -348,7 +348,7 @@ class AgentSessionScope:
         session_id: str,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Get messages for a session belonging to this agent.
 
@@ -404,11 +404,11 @@ class SessionIsolationFactory:
     def __init__(
         self,
         db_engine: AsyncEngine,
-        config: Optional[EngineConfig] = None,
+        config: EngineConfig | None = None,
     ):
         self._db_engine = db_engine
         self._config = config
-        self._scopes: Dict[str, AgentSessionScope] = {}
+        self._scopes: dict[str, AgentSessionScope] = {}
 
     def for_agent(self, agent_id: str) -> AgentSessionScope:
         """
@@ -424,6 +424,6 @@ class SessionIsolationFactory:
             )
         return self._scopes[agent_id]
 
-    def list_scopes(self) -> List[str]:
+    def list_scopes(self) -> list[str]:
         """List all agent IDs with active scopes."""
         return list(self._scopes.keys())

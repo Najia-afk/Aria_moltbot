@@ -7,7 +7,6 @@ This file documents the patch to apply to:
 """
 
 import os
-from typing import Optional
 from datetime import datetime, timezone, timedelta
 
 
@@ -15,7 +14,7 @@ from datetime import datetime, timezone, timedelta
 # Helper Functions (to add)
 # ===========================
 
-def _get_current_session_id() -> Optional[str]:
+def _get_current_session_id() -> str | None:
     """
     Get the current session ID from the environment.
 
@@ -223,7 +222,7 @@ def get_patched_delete_session():
             )
 
         agents = [agent] if agent else _list_all_agents()
-        removed_keys: List[str] = []
+        removed_keys: list[str] = []
         archived = False
 
         for ag in agents:
@@ -339,8 +338,8 @@ def get_patched_prune_sessions():
                     not _is_cron_or_subagent_session(s.get("key", "")))
         ]
 
-        deleted_ids: List[str] = []
-        errors: List[Dict[str, str]] = []
+        deleted_ids: list[str] = []
+        errors: list[dict[str, str]] = []
 
         if not dry_run:
             for sess in to_delete:
@@ -377,7 +376,7 @@ Add these functions to the TOP of /app/skills/aria_skills/session_manager/__init
 (before the class definition):
 
 ```python
-def _get_current_session_id() -> Optional[str]:
+def _get_current_session_id() -> str | None:
     return os.environ.get("ARIA_SESSION_ID")
 
 def _is_cron_or_subagent_session(session_key: str) -> bool:

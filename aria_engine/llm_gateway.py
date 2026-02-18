@@ -15,7 +15,7 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any, AsyncIterator
 
 import litellm
 from litellm import acompletion, token_counter
@@ -31,8 +31,8 @@ logger = logging.getLogger("aria.engine.llm")
 class LLMResponse:
     """Response from LLM gateway."""
     content: str
-    thinking: Optional[str] = None
-    tool_calls: Optional[List[Dict[str, Any]]] = None
+    thinking: str | None = None
+    tool_calls: list[dict[str, Any]] | None = None
     model: str = ""
     input_tokens: int = 0
     output_tokens: int = 0
@@ -46,8 +46,8 @@ class StreamChunk:
     """Single chunk from streaming response."""
     content: str = ""
     thinking: str = ""
-    tool_call_delta: Optional[Dict[str, Any]] = None
-    finish_reason: Optional[str] = None
+    tool_call_delta: dict[str, Any] | None = None
+    finish_reason: str | None = None
     is_thinking: bool = False
 
 
@@ -66,19 +66,19 @@ class LLMGateway:
 
     def __init__(self, config: EngineConfig):
         self.config = config
-        self._models_config: Optional[Dict[str, Any]] = None
+        self._models_config: dict[str, Any] | None = None
         self._circuit_failures = 0
         self._circuit_threshold = 5
         self._circuit_reset_after = 30.0
-        self._circuit_opened_at: Optional[float] = None
-        self._latency_samples: List[float] = []
+        self._circuit_opened_at: float | None = None
+        self._latency_samples: list[float] = []
 
         # Configure litellm
         litellm.api_base = config.litellm_base_url
         litellm.api_key = config.litellm_master_key
         litellm.drop_params = True  # Don't fail on unsupported params
 
-    def _load_models(self) -> Dict[str, Any]:
+    def _load_models(self) -> dict[str, Any]:
         """Lazy-load models.yaml configuration."""
         if self._models_config is None:
             self._models_config = load_catalog()
@@ -95,7 +95,7 @@ class LLMGateway:
         litellm_model = litellm_block.get("model", model)
         return litellm_model
 
-    def _get_fallback_chain(self) -> List[str]:
+    def _get_fallback_chain(self) -> list[str]:
         """Get fallback model chain from models.yaml."""
         routing = get_routing_config()
         fallbacks = routing.get("fallbacks", [])
@@ -117,11 +117,11 @@ class LLMGateway:
 
     async def complete(
         self,
-        messages: List[Dict[str, str]],
-        model: Optional[str] = None,
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
-        tools: Optional[List[Dict[str, Any]]] = None,
+        messages: list[dict[str, str]],
+        model: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        tools: list[dict[str, Any]] | None = None,
         enable_thinking: bool = False,
     ) -> LLMResponse:
         """
@@ -143,7 +143,7 @@ class LLMGateway:
 
         resolved_model = self._resolve_model(model or self.config.default_model)
 
-        kwargs: Dict[str, Any] = {
+        kwargs: dict[str, Any] = {
             "model": resolved_model,
             "messages": messages,
             "temperature": temperature or self.config.default_temperature,
@@ -216,11 +216,11 @@ class LLMGateway:
 
     async def stream(
         self,
-        messages: List[Dict[str, str]],
-        model: Optional[str] = None,
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
-        tools: Optional[List[Dict[str, Any]]] = None,
+        messages: list[dict[str, str]],
+        model: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        tools: list[dict[str, Any]] | None = None,
         enable_thinking: bool = False,
     ) -> AsyncIterator[StreamChunk]:
         """
@@ -233,7 +233,7 @@ class LLMGateway:
 
         resolved_model = self._resolve_model(model or self.config.default_model)
 
-        kwargs: Dict[str, Any] = {
+        kwargs: dict[str, Any] = {
             "model": resolved_model,
             "messages": messages,
             "temperature": temperature or self.config.default_temperature,
@@ -274,7 +274,7 @@ class LLMGateway:
                 self._circuit_opened_at = time.monotonic()
             raise LLMError(f"LLM streaming failed: {e}") from e
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Return gateway statistics."""
         return {
             "circuit_failures": self._circuit_failures,

@@ -15,7 +15,7 @@ WebSocket:
 All endpoints use the native aria_engine modules.
 """
 import logging
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket
@@ -42,23 +42,23 @@ ws_router = APIRouter(tags=["Engine Chat WebSocket"])
 class CreateSessionRequest(BaseModel):
     """Request body for creating a new chat session."""
     agent_id: str = Field(default="main", description="Agent owning this session")
-    model: Optional[str] = Field(default=None, description="LLM model (defaults to config)")
+    model: str | None = Field(default=None, description="LLM model (defaults to config)")
     session_type: str = Field(default="interactive", description="Session type")
-    system_prompt: Optional[str] = Field(default=None, description="Override system prompt")
-    temperature: Optional[float] = Field(default=None, ge=0.0, le=2.0)
-    max_tokens: Optional[int] = Field(default=None, ge=1, le=128000)
+    system_prompt: str | None = Field(default=None, description="Override system prompt")
+    temperature: float | None = Field(default=None, ge=0.0, le=2.0)
+    max_tokens: int | None = Field(default=None, ge=1, le=128000)
     context_window: int = Field(default=50, ge=1, le=500)
-    metadata: Optional[dict] = Field(default=None, description="Arbitrary metadata")
+    metadata: dict | None = Field(default=None, description="Arbitrary metadata")
 
 
 class CreateSessionResponse(BaseModel):
     """Response for session creation."""
     id: str
     agent_id: str
-    model: Optional[str]
+    model: str | None
     status: str
     session_type: str
-    created_at: Optional[str]
+    created_at: str | None
 
 
 class SendMessageRequest(BaseModel):
@@ -73,9 +73,9 @@ class SendMessageResponse(BaseModel):
     message_id: str
     session_id: str
     content: str
-    thinking: Optional[str] = None
-    tool_calls: Optional[list] = None
-    tool_results: Optional[list] = None
+    thinking: str | None = None
+    tool_calls: list | None = None
+    tool_results: list | None = None
     model: str = ""
     input_tokens: int = 0
     output_tokens: int = 0
@@ -89,26 +89,26 @@ class SessionSummary(BaseModel):
     """Summary of a session for list endpoints."""
     id: str
     agent_id: str
-    title: Optional[str] = None
-    model: Optional[str] = None
+    title: str | None = None
+    model: str | None = None
     status: str
     session_type: str
     message_count: int = 0
     total_tokens: int = 0
     total_cost: float = 0.0
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
-    ended_at: Optional[str] = None
+    created_at: str | None = None
+    updated_at: str | None = None
+    ended_at: str | None = None
 
 
 class SessionDetail(SessionSummary):
     """Full session with messages."""
-    system_prompt: Optional[str] = None
-    temperature: Optional[float] = None
-    max_tokens: Optional[int] = None
+    system_prompt: str | None = None
+    temperature: float | None = None
+    max_tokens: int | None = None
     context_window: int = 50
     messages: list = Field(default_factory=list)
-    metadata: Optional[dict] = None
+    metadata: dict | None = None
 
 
 class PaginatedSessions(BaseModel):
@@ -125,11 +125,11 @@ class PaginatedSessions(BaseModel):
 # These will be initialized at app startup and injected via FastAPI depends.
 # In production, these are set in src/api/main.py during lifespan.
 
-_engine_config: Optional[EngineConfig] = None
-_chat_engine: Optional[ChatEngine] = None
-_stream_manager: Optional[StreamManager] = None
-_context_manager: Optional[ContextManager] = None
-_prompt_assembler: Optional[PromptAssembler] = None
+_engine_config: EngineConfig | None = None
+_chat_engine: ChatEngine | None = None
+_stream_manager: StreamManager | None = None
+_context_manager: ContextManager | None = None
+_prompt_assembler: PromptAssembler | None = None
 
 
 def configure_engine(
@@ -208,8 +208,8 @@ async def create_session(
 async def list_sessions(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
-    agent_id: Optional[str] = Query(default=None),
-    status: Optional[str] = Query(default=None),
+    agent_id: str | None = Query(default=None),
+    status: str | None = Query(default=None),
     engine: ChatEngine = Depends(_get_engine),
 ):
     """

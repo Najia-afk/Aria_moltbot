@@ -16,7 +16,6 @@ import json
 import asyncio
 import time
 from pathlib import Path
-from typing import Optional, Tuple
 
 # Add skill modules to path — handle both local and container layouts
 # Container: aria_skills/ is mounted at /app/skills/aria_skills/
@@ -434,7 +433,7 @@ async def run_skill(skill_name: str, function_name: str, args: dict, timeout: fl
         return {'error': str(e), 'traceback': traceback.format_exc()}
 
 
-def _parse_args_payload(raw: Optional[str]) -> Tuple[dict, Optional[str]]:
+def _parse_args_payload(raw: str | None) -> tuple[dict, str | None]:
     """Defensive JSON parsing for CLI payloads."""
     if raw is None:
         return {}, None

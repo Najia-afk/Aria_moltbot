@@ -5,7 +5,6 @@ Validates models.yaml profiles, qwen-cpu-fallback entry,
 routing fallbacks, and benchmark script syntax.
 """
 
-from __future__ import annotations
 
 import ast
 import json

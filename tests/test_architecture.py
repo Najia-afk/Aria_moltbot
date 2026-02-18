@@ -16,7 +16,6 @@ Key rules:
   - soul/ directory must never be modified
   - models.yaml is the SSOT for model definitions
 """
-from __future__ import annotations
 
 import ast
 import os

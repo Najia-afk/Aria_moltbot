@@ -10,7 +10,6 @@ Gracefully skips if SQLAlchemy or the models can't be imported (e.g. missing
 psycopg / asyncpg at import time).
 """
 
-from __future__ import annotations
 
 import importlib
 import inspect

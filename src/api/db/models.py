@@ -4,7 +4,6 @@ SQLAlchemy 2.0 ORM models for Aria Brain (aria_warehouse).
 Canonical source of truth for all database tables.
 Driver: psycopg 3 via SQLAlchemy async.
 """
-from __future__ import annotations
 
 import uuid as uuid_mod
 from datetime import datetime, timezone

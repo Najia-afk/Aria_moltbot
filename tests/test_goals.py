@@ -5,7 +5,6 @@ S5-05 · Goal endpoint tests.
 Uses a live API (marked @pytest.mark.integration).
 Auto-skips when aria-api is unreachable.
 """
-from __future__ import annotations
 
 import os
 import uuid

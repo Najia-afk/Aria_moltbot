@@ -8,7 +8,7 @@ Provides:
 """
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
@@ -28,7 +28,7 @@ class AgentMetric(BaseModel):
 
     agent_id: str
     display_name: str
-    focus_type: Optional[str] = None
+    focus_type: str | None = None
     status: str = "idle"
     pheromone_score: float = 0.500
     messages_processed: int = 0
@@ -38,21 +38,21 @@ class AgentMetric(BaseModel):
     error_rate: float = 0.0
     consecutive_failures: int = 0
     uptime_seconds: int = 0
-    last_active_at: Optional[str] = None
+    last_active_at: str | None = None
 
 
 class AgentMetricDetail(AgentMetric):
     """Extended metrics for single agent view."""
 
     recent_sessions: int = 0
-    last_error: Optional[str] = None
-    score_trend: List[float] = []
+    last_error: str | None = None
+    score_trend: list[float] = []
 
 
 class AgentMetricsResponse(BaseModel):
     """Response with all agent metrics."""
 
-    agents: List[AgentMetric]
+    agents: list[AgentMetric]
     total_messages: int = 0
     total_errors: int = 0
     avg_pheromone: float = 0.0

@@ -7,7 +7,6 @@ Architecture: DB ↔ SQLAlchemy ↔ FastAPI ↔ api_client ↔ Skills ↔ ARIA
 """
 from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
-from typing import Optional
 from enum import Enum
 
 

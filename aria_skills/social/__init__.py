@@ -7,7 +7,7 @@ Persists via REST API (TICKET-12: eliminate in-memory stubs).
 """
 from datetime import datetime, timezone
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
 
@@ -28,10 +28,10 @@ class SocialSkill(BaseSkill):
     
     def __init__(self, config: SkillConfig):
         super().__init__(config)
-        self._posts: List[Dict] = []  # fallback cache
+        self._posts: list[Dict] = []  # fallback cache
         self._post_counter = 0
         self._api = None
-        self._platforms: Dict[str, SocialPlatform] = {}
+        self._platforms: dict[str, SocialPlatform] = {}
     
     def register_platform(self, name: str, platform: SocialPlatform) -> None:
         """Register a social platform implementation."""
@@ -63,9 +63,9 @@ class SocialSkill(BaseSkill):
         platform: str,
         content: str,
         visibility: str,
-        metadata: Optional[Dict[str, Any]] = None,
-        reply_to: Optional[str] = None,
-    ) -> Optional[Dict[str, Any]]:
+        metadata: dict[str, Any] | None = None,
+        reply_to: str | None = None,
+    ) -> dict[str, Any] | None:
         payload = {
             "platform": platform,
             "content": content,
@@ -118,12 +118,12 @@ class SocialSkill(BaseSkill):
         self,
         content: str,
         platform: str = "moltbook",
-        tags: Optional[List[str]] = None,
-        media_urls: Optional[List[str]] = None,
-        mood: Optional[str] = None,
+        tags: list[str] | None = None,
+        media_urls: list[str] | None = None,
+        mood: str | None = None,
         visibility: str = "public",
         simulate: bool = True,
-        chat_id: Optional[str] = None,
+        chat_id: str | None = None,
     ) -> SkillResult:
         """
         Create a social media post, routed to the specified platform.
@@ -233,11 +233,11 @@ class SocialSkill(BaseSkill):
         self,
         content: str,
         platform: str = "moltbook",
-        tags: Optional[List[str]] = None,
-        mood: Optional[str] = None,
+        tags: list[str] | None = None,
+        mood: str | None = None,
         visibility: str = "public",
         simulate: bool = True,
-        chat_id: Optional[str] = None,
+        chat_id: str | None = None,
     ) -> SkillResult:
         """Tool-compatible wrapper for creating posts across platforms."""
         return await self.create_post(
@@ -251,7 +251,7 @@ class SocialSkill(BaseSkill):
         )
 
     @logged_method()
-    async def social_list(self, platform: Optional[str] = None, limit: int = 20) -> SkillResult:
+    async def social_list(self, platform: str | None = None, limit: int = 20) -> SkillResult:
         """Tool-compatible wrapper for listing social posts."""
         return await self.get_posts(platform=platform, limit=limit)
 
@@ -261,8 +261,8 @@ class SocialSkill(BaseSkill):
         content: str,
         platform: str,
         scheduled_for: str,
-        tags: Optional[List[str]] = None,
-        mood: Optional[str] = None,
+        tags: list[str] | None = None,
+        mood: str | None = None,
         visibility: str = "public",
         simulate: bool = True,
     ) -> SkillResult:
@@ -348,13 +348,13 @@ class SocialSkill(BaseSkill):
     
     async def get_posts(
         self,
-        status: Optional[str] = None,
-        platform: Optional[str] = None,
+        status: str | None = None,
+        platform: str | None = None,
         limit: int = 20,
     ) -> SkillResult:
         """Get posts with optional filters."""
         try:
-            params: Dict[str, Any] = {"limit": limit}
+            params: dict[str, Any] = {"limit": limit}
             if status:
                 params["status"] = status
             if platform:

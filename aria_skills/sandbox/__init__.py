@@ -9,7 +9,6 @@ All sandbox operations are logged via api_client.
 import os
 import logging
 from datetime import datetime, timezone
-from typing import Optional
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
 from aria_skills.registry import SkillRegistry
@@ -40,7 +39,7 @@ class SandboxSkill(BaseSkill):
 
     def __init__(self, config: SkillConfig):
         super().__init__(config)
-        self._client: Optional[httpx.AsyncClient] = None
+        self._client: httpx.AsyncClient | None = None
         self._sandbox_url: str = ""
 
     @property

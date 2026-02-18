@@ -16,7 +16,7 @@ import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from aria_engine.config import EngineConfig
 from aria_engine.exceptions import SessionError
@@ -81,7 +81,7 @@ async def export_session_jsonl(
         messages = msg_result.scalars().all()
 
     # Build JSONL lines
-    lines: List[str] = []
+    lines: list[str] = []
 
     # Header comment (metadata about the session)
     header = {
@@ -101,7 +101,7 @@ async def export_session_jsonl(
     lines.append(json.dumps(header, ensure_ascii=False))
 
     for msg in messages:
-        line: Dict[str, Any] = {
+        line: dict[str, Any] = {
             "role": msg.role,
             "content": msg.content,
             "thinking": msg.thinking,
@@ -185,7 +185,7 @@ async def export_session_markdown(
         messages = msg_result.scalars().all()
 
     # Build Markdown
-    parts: List[str] = []
+    parts: list[str] = []
 
     # Header
     title = session.title or "Untitled Session"
@@ -321,7 +321,7 @@ async def export_session(
         raise ValueError(f"Unsupported export format: {format}. Use 'jsonl' or 'markdown'.")
 
 
-def parse_jsonl_line(line: str) -> Optional[Dict[str, Any]]:
+def parse_jsonl_line(line: str) -> dict[str, Any] | None:
     """
     Parse a single JSONL line back into a message dict.
 
@@ -341,7 +341,7 @@ def parse_jsonl_line(line: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def read_jsonl_file(path: str | Path) -> List[Dict[str, Any]]:
+def read_jsonl_file(path: str | Path) -> list[dict[str, Any]]:
     """
     Read a JSONL file and return list of message dicts.
 
@@ -351,7 +351,7 @@ def read_jsonl_file(path: str | Path) -> List[Dict[str, Any]]:
     if not path.exists():
         raise FileNotFoundError(f"JSONL file not found: {path}")
 
-    messages: List[Dict[str, Any]] = []
+    messages: list[dict[str, Any]] = []
     with path.open("r", encoding="utf-8") as f:
         for line in f:
             msg = parse_jsonl_line(line)

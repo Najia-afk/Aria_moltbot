@@ -8,7 +8,7 @@ Supported formats:
 """
 import re
 from dataclasses import dataclass
-from typing import Optional, Dict, Any, List
+from typing import Any
 
 
 @dataclass
@@ -20,7 +20,7 @@ class ThinkingBlock:
     duration_ms: int = 0
 
 
-def extract_thinking_from_response(response: Any) -> Optional[str]:
+def extract_thinking_from_response(response: Any) -> str | None:
     """Extract thinking content from a litellm response object."""
     if not response or not response.choices:
         return None
@@ -52,9 +52,9 @@ def strip_thinking_from_content(content: str) -> str:
     return re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
 
 
-def build_thinking_params(model: str, enable: bool = True) -> Dict[str, Any]:
+def build_thinking_params(model: str, enable: bool = True) -> dict[str, Any]:
     """Build model-specific parameters for enabling thinking mode."""
-    params: Dict[str, Any] = {}
+    params: dict[str, Any] = {}
 
     if not enable:
         return params

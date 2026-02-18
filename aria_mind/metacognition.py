@@ -21,7 +21,7 @@ import logging
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger("aria.metacognition")
 
@@ -34,7 +34,7 @@ class GrowthMilestone:
         self.description = description
         self.achieved_at = achieved_at
     
-    def to_dict(self) -> Dict[str, str]:
+    def to_dict(self) -> dict[str, str]:
         return {
             "name": self.name,
             "description": self.description,
@@ -76,12 +76,12 @@ class MetacognitiveEngine:
     
     def __init__(self):
         # Core tracking
-        self._task_outcomes: Dict[str, List[bool]] = defaultdict(list)  # category → [success, success, fail, ...]
+        self._task_outcomes: dict[str, list[bool]] = defaultdict(list)  # category → [success, success, fail, ...]
         self._failure_patterns: Counter = Counter()  # error_type → count
-        self._strategy_adjustments: List[Dict[str, Any]] = []
+        self._strategy_adjustments: list[dict[str, Any]] = []
         
         # Growth tracking
-        self._milestones: Dict[str, GrowthMilestone] = {}
+        self._milestones: dict[str, GrowthMilestone] = {}
         self._total_tasks = 0
         self._total_successes = 0
         self._current_streak = 0
@@ -90,19 +90,19 @@ class MetacognitiveEngine:
         self._consolidation_count = 0
         
         # Learning velocity — track success rate over time windows
-        self._window_results: List[Dict[str, Any]] = []  # [{timestamp, success, category}, ...]
+        self._window_results: list[dict[str, Any]] = []  # [{timestamp, success, category}, ...]
         
         # Adaptive strategies
-        self._category_strategies: Dict[str, str] = {}  # category → suggested approach
+        self._category_strategies: dict[str, str] = {}  # category → suggested approach
     
     def record_task(
         self,
         category: str,
         success: bool,
         duration_ms: int = 0,
-        error_type: Optional[str] = None,
+        error_type: str | None = None,
         confidence_at_start: float = 0.5,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Record a task outcome and return insights.
         
@@ -174,7 +174,7 @@ class MetacognitiveEngine:
         self._consolidation_count += 1
         self._check_milestones()
     
-    def _check_milestones(self) -> List[GrowthMilestone]:
+    def _check_milestones(self) -> list[GrowthMilestone]:
         """Check if any new milestones have been achieved."""
         now = datetime.now(timezone.utc).isoformat()
         new = []
@@ -203,7 +203,7 @@ class MetacognitiveEngine:
         
         return new
     
-    def _detect_failure_patterns(self, category: str) -> Optional[str]:
+    def _detect_failure_patterns(self, category: str) -> str | None:
         """Detect recurring failure patterns and suggest strategies."""
         outcomes = self._task_outcomes.get(category, [])
         if len(outcomes) < 5:
@@ -241,7 +241,7 @@ class MetacognitiveEngine:
         
         return None
     
-    def get_learning_velocity(self) -> Dict[str, Any]:
+    def get_learning_velocity(self) -> dict[str, Any]:
         """
         Calculate how fast Aria is improving.
         
@@ -286,7 +286,7 @@ class MetacognitiveEngine:
             "total_tasks": len(self._window_results),
         }
     
-    def get_strengths(self) -> List[Dict[str, Any]]:
+    def get_strengths(self) -> list[dict[str, Any]]:
         """Identify Aria's strongest categories based on performance data."""
         strengths = []
         for category, outcomes in self._task_outcomes.items():
@@ -307,7 +307,7 @@ class MetacognitiveEngine:
         
         return sorted(strengths, key=lambda x: x["success_rate"], reverse=True)
     
-    def get_growth_report(self) -> Dict[str, Any]:
+    def get_growth_report(self) -> dict[str, Any]:
         """
         Generate a comprehensive growth report for Aria.
         
@@ -380,7 +380,7 @@ class MetacognitiveEngine:
         
         return " ".join(parts)
     
-    def save(self, base_path: Optional[Path] = None) -> bool:
+    def save(self, base_path: Path | None = None) -> bool:
         """Persist metacognitive state to disk."""
         try:
             if base_path is None:
@@ -418,7 +418,7 @@ class MetacognitiveEngine:
             logger.warning(f"Failed to save metacognitive state: {e}")
             return False
     
-    def load(self, base_path: Optional[Path] = None) -> bool:
+    def load(self, base_path: Path | None = None) -> bool:
         """Load metacognitive state from disk."""
         try:
             if base_path is None:
@@ -468,7 +468,7 @@ class MetacognitiveEngine:
 
 
 # Module-level singleton
-_engine: Optional[MetacognitiveEngine] = None
+_engine: MetacognitiveEngine | None = None
 
 
 def get_metacognitive_engine() -> MetacognitiveEngine:

@@ -16,7 +16,7 @@ import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger("aria.scoring")
 
@@ -96,8 +96,8 @@ class PerformanceTracker:
     _MAX_RECORDS_PER_AGENT = 200
     
     def __init__(self):
-        self._records: Dict[str, List[Dict[str, Any]]] = {}
-        self._scores: Dict[str, float] = {}
+        self._records: dict[str, list[dict[str, Any]]] = {}
+        self._scores: dict[str, float] = {}
         self._total_invocations = 0
         self._loaded = False
     
@@ -166,15 +166,15 @@ class PerformanceTracker:
         """Get current pheromone score for an agent."""
         return self._scores.get(agent_id, COLD_START_SCORE)
     
-    def get_all_scores(self) -> Dict[str, float]:
+    def get_all_scores(self) -> dict[str, float]:
         """Get all agent scores."""
         return dict(self._scores)
     
-    def get_best_agent(self, candidates: List[str]) -> str:
+    def get_best_agent(self, candidates: list[str]) -> str:
         """Select the best agent from candidates."""
         return select_best_agent(candidates, self._scores)
     
-    def get_agent_stats(self, agent_id: str) -> Dict[str, Any]:
+    def get_agent_stats(self, agent_id: str) -> dict[str, Any]:
         """Get detailed performance statistics for an agent."""
         records = self._records.get(agent_id, [])
         if not records:
@@ -199,7 +199,7 @@ class PerformanceTracker:
             "status": "proven" if len(records) > 10 else "learning",
         }
     
-    def get_leaderboard(self) -> List[Dict[str, Any]]:
+    def get_leaderboard(self) -> list[dict[str, Any]]:
         """Get all agents ranked by score."""
         all_agents = set(list(self._records.keys()) + list(self._scores.keys()))
         stats = [self.get_agent_stats(aid) for aid in all_agents]
@@ -273,7 +273,7 @@ class PerformanceTracker:
 
 
 # Module-level singleton
-_tracker: Optional[PerformanceTracker] = None
+_tracker: PerformanceTracker | None = None
 
 
 def get_performance_tracker() -> PerformanceTracker:

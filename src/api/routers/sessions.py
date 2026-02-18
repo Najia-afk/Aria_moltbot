@@ -5,7 +5,7 @@ Reads from agent_sessions (PostgreSQL-native). No external sync.
 
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import delete, func, select, text, update
@@ -24,10 +24,10 @@ router = APIRouter(tags=["Sessions"])
 async def get_agent_sessions(
     page: int = 1,
     limit: int = 25,
-    status: Optional[str] = None,
-    agent_id: Optional[str] = None,
-    session_type: Optional[str] = None,
-    search: Optional[str] = None,
+    status: str | None = None,
+    agent_id: str | None = None,
+    session_type: str | None = None,
+    search: str | None = None,
     include_runtime_events: bool = False,
     include_cron_events: bool = False,
     db: AsyncSession = Depends(get_db),
@@ -66,8 +66,8 @@ async def get_sessions_hourly(
     hours: int = 24,
     include_runtime_events: bool = False,
     include_cron_events: bool = False,
-    status: Optional[str] = None,
-    agent_id: Optional[str] = None,
+    status: str | None = None,
+    agent_id: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
     """Hourly session counts grouped by agent for time-series charts."""
@@ -215,8 +215,8 @@ async def delete_agent_session(session_id: str, db: AsyncSession = Depends(get_d
 async def get_session_stats(
     include_runtime_events: bool = False,
     include_cron_events: bool = False,
-    status: Optional[str] = None,
-    agent_id: Optional[str] = None,
+    status: str | None = None,
+    agent_id: str | None = None,
     db: AsyncSession = Depends(get_db),
     litellm_db: AsyncSession = Depends(get_litellm_db),
 ):

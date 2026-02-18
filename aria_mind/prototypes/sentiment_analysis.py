@@ -15,7 +15,7 @@ Derived metrics:
 
 from collections import deque
 from datetime import datetime, timezone, timedelta
-from typing import List, Dict, Any, Optional, Tuple
+from typing import Any
 from dataclasses import dataclass, field, asdict
 from enum import Enum
 import json
@@ -41,7 +41,7 @@ class Sentiment:
     dominance: float  # 0 (submissive) to 1 (dominant)
     confidence: float = 0.8
     primary_emotion: str = "neutral"
-    labels: List[str] = field(default_factory=list)
+    labels: list[str] = field(default_factory=list)
 
     def to_dict(self):
         return asdict(self)
@@ -72,13 +72,13 @@ class ConversationSentiment:
     """Aggregate sentiment across a conversation."""
     overall: Sentiment
     trajectory: Trajectory
-    turning_points: List[Dict[str, Any]] = field(default_factory=list)
-    peak_positive: Optional[Sentiment] = None
-    peak_negative: Optional[Sentiment] = None
+    turning_points: list[dict[str, Any]] = field(default_factory=list)
+    peak_positive: Sentiment | None = None
+    peak_negative: Sentiment | None = None
     volatility: float = 0.0  # Standard deviation of valence
-    resolution: Optional[str] = None  # "positive", "negative", "neutral"
+    resolution: str | None = None  # "positive", "negative", "neutral"
     messages_analyzed: int = 0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self):
         data = asdict(self)
@@ -133,7 +133,7 @@ class SentimentLexicon:
     }
 
     @classmethod
-    def score(cls, text: str) -> Tuple[float, float, float]:
+    def score(cls, text: str) -> tuple[float, float, float]:
         """
         Quick lexicon-based sentiment scoring.
 
@@ -176,7 +176,7 @@ class LLMSentimentClassifier:
     async def classify(
         self,
         text: str,
-        context: List[str] = None
+        context: list[str] = None
     ) -> Sentiment:
         """
         Classify sentiment using LLM.
@@ -210,7 +210,7 @@ class LLMSentimentClassifier:
                 confidence=0.6
             )
 
-    def _build_prompt(self, text: str, context: List[str] = None) -> str:
+    def _build_prompt(self, text: str, context: list[str] = None) -> str:
         """Build prompt for LLM sentiment analysis."""
         context_str = ""
         if context:
@@ -248,7 +248,7 @@ class SentimentAnalyzer:
 
     def __init__(
         self,
-        llm_classifier: Optional[LLMSentimentClassifier] = None,
+        llm_classifier: LLMSentimentClassifier | None = None,
         lexicon_weight: float = 0.3,
         llm_weight: float = 0.7,
         use_llm_threshold: float = 0.6  # Use LLM if lexicon confidence < threshold
@@ -262,7 +262,7 @@ class SentimentAnalyzer:
     async def analyze(
         self,
         text: str,
-        context: List[str] = None
+        context: list[str] = None
     ) -> Sentiment:
         """
         Analyze sentiment of a single message.
@@ -320,7 +320,7 @@ class SentimentAnalyzer:
 
     def _blend(
         self,
-        lexicon_scores: Tuple[float, float, float, float],
+        lexicon_scores: tuple[float, float, float, float],
         llm_sentiment: Sentiment,
         w_lex: float,
         w_llm: float
@@ -353,11 +353,11 @@ class ConversationAnalyzer:
 
     def __init__(self, sentiment_analyzer: SentimentAnalyzer):
         self.analyzer = sentiment_analyzer
-        self.sentiment_history: List[Sentiment] = []
+        self.sentiment_history: list[Sentiment] = []
 
     async def analyze_conversation(
         self,
-        messages: List[Dict[str, Any]],
+        messages: list[dict[str, Any]],
         window_size: int = 10
     ) -> ConversationSentiment:
         """
@@ -440,7 +440,7 @@ class ConversationAnalyzer:
 
     def _compute_trajectory(
         self,
-        sentiments: List[Sentiment],
+        sentiments: list[Sentiment],
         window: int = 10
     ) -> Trajectory:
         """Determine if conversation sentiment is improving, declining, or stable."""
@@ -466,9 +466,9 @@ class ConversationAnalyzer:
 
     def _find_turning_points(
         self,
-        sentiments: List[Sentiment],
+        sentiments: list[Sentiment],
         threshold: float = 0.5
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Find points where sentiment changed significantly."""
         turning_points = []
 
@@ -529,8 +529,8 @@ class ResponseTuner:
     def select_tone(
         self,
         sentiment: Sentiment,
-        conversation_sentiment: Optional[ConversationSentiment] = None
-    ) -> Dict[str, Any]:
+        conversation_sentiment: ConversationSentiment | None = None
+    ) -> dict[str, Any]:
         """
         Select response tone based on sentiment.
 
@@ -572,9 +572,9 @@ class ResponseTuner:
 # ===========================
 
 async def analyze_sentiment_workflow(
-    messages: List[Dict[str, Any]],
-    config: Dict[str, Any] = None
-) -> Dict[str, Any]:
+    messages: list[dict[str, Any]],
+    config: dict[str, Any] = None
+) -> dict[str, Any]:
     """
     Complete sentiment analysis workflow.
 

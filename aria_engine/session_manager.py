@@ -10,7 +10,7 @@ Replaces aria_skills/session_manager with direct DB access:
 """
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 from uuid import uuid4
 
 from sqlalchemy import text
@@ -70,10 +70,10 @@ class NativeSessionManager:
     async def create_session(
         self,
         agent_id: str = "main",
-        title: Optional[str] = None,
+        title: str | None = None,
         session_type: str = "chat",
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Create a new chat session.
 
@@ -134,7 +134,7 @@ class NativeSessionManager:
     async def get_session(
         self,
         session_id: str,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Get session details by ID.
 
@@ -169,14 +169,14 @@ class NativeSessionManager:
 
     async def list_sessions(
         self,
-        agent_id: Optional[str] = None,
-        session_type: Optional[str] = None,
-        search: Optional[str] = None,
+        agent_id: str | None = None,
+        session_type: str | None = None,
+        search: str | None = None,
         limit: int = DEFAULT_PAGE_SIZE,
         offset: int = 0,
         sort: str = "updated_at",
         order: str = "desc",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         List sessions with filtering, search, and pagination.
 
@@ -203,7 +203,7 @@ class NativeSessionManager:
 
         # Build WHERE clauses
         conditions = []
-        params: Dict[str, Any] = {"limit": limit, "offset": offset}
+        params: dict[str, Any] = {"limit": limit, "offset": offset}
 
         if agent_id:
             conditions.append("s.agent_id = :agent_id")
@@ -274,12 +274,12 @@ class NativeSessionManager:
     async def update_session(
         self,
         session_id: str,
-        title: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Optional[Dict[str, Any]]:
+        title: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
         """Update session title and/or metadata."""
         sets = ["updated_at = NOW()"]
-        params: Dict[str, Any] = {"sid": session_id}
+        params: dict[str, Any] = {"sid": session_id}
 
         if title is not None:
             sets.append("title = :title")
@@ -377,9 +377,9 @@ class NativeSessionManager:
         session_id: str,
         role: str,
         content: str,
-        agent_id: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        agent_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Add a message to a session.
 
@@ -458,8 +458,8 @@ class NativeSessionManager:
         session_id: str,
         limit: int = 100,
         offset: int = 0,
-        since: Optional[datetime] = None,
-    ) -> List[Dict[str, Any]]:
+        since: datetime | None = None,
+    ) -> list[dict[str, Any]]:
         """
         Get messages for a session, ordered chronologically.
 
@@ -472,7 +472,7 @@ class NativeSessionManager:
         Returns:
             List of message dicts.
         """
-        params: Dict[str, Any] = {
+        params: dict[str, Any] = {
             "sid": session_id,
             "limit": min(limit, 500),
             "offset": offset,
@@ -533,7 +533,7 @@ class NativeSessionManager:
         self,
         days: int = 30,
         dry_run: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Delete sessions older than N days with no recent messages.
 
@@ -604,7 +604,7 @@ class NativeSessionManager:
             "dry_run": False,
         }
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """Get session statistics."""
         async with self._db.begin() as conn:
             result = await conn.execute(
@@ -640,7 +640,7 @@ class NativeSessionManager:
 
     # ── Internal Helpers ──────────────────────────────────────
 
-    def _row_to_session(self, row) -> Dict[str, Any]:
+    def _row_to_session(self, row) -> dict[str, Any]:
         """Convert a DB row to a session dict."""
         return {
             "session_id": row["session_id"],

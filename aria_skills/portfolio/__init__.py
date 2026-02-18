@@ -5,7 +5,7 @@ Portfolio management skill.
 Tracks and manages cryptocurrency portfolios.
 """
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
 from aria_skills.registry import SkillRegistry
@@ -21,8 +21,8 @@ class PortfolioSkill(BaseSkill):
     
     def __init__(self, config: SkillConfig):
         super().__init__(config)
-        self._positions: Dict[str, Dict] = {}
-        self._transactions: List[Dict] = []
+        self._positions: dict[str, Dict] = {}
+        self._transactions: list[Dict] = []
     
     @property
     def name(self) -> str:
@@ -46,7 +46,7 @@ class PortfolioSkill(BaseSkill):
         symbol: str,
         quantity: float,
         entry_price: float,
-        notes: Optional[str] = None,
+        notes: str | None = None,
     ) -> SkillResult:
         """
         Add or update a position.
@@ -97,8 +97,8 @@ class PortfolioSkill(BaseSkill):
     async def remove_position(
         self,
         symbol: str,
-        quantity: Optional[float] = None,
-        exit_price: Optional[float] = None,
+        quantity: float | None = None,
+        exit_price: float | None = None,
     ) -> SkillResult:
         """
         Remove or reduce a position.
@@ -166,7 +166,7 @@ class PortfolioSkill(BaseSkill):
         
         return SkillResult.ok(self._positions[symbol])
     
-    async def get_portfolio(self, current_prices: Optional[Dict[str, float]] = None) -> SkillResult:
+    async def get_portfolio(self, current_prices: dict[str, float] | None = None) -> SkillResult:
         """
         Get full portfolio with optional current valuations.
         
@@ -223,7 +223,7 @@ class PortfolioSkill(BaseSkill):
         
         return SkillResult.ok(result)
     
-    async def get_transactions(self, limit: int = 20, symbol: Optional[str] = None) -> SkillResult:
+    async def get_transactions(self, limit: int = 20, symbol: str | None = None) -> SkillResult:
         """
         Get transaction history.
         

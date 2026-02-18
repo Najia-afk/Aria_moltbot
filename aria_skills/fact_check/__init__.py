@@ -1,6 +1,5 @@
 """Fact-check skill — lightweight claim extraction and verdict scaffolding."""
 
-from __future__ import annotations
 
 import re
 import uuid

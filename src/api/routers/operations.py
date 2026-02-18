@@ -8,7 +8,6 @@ import json as json_lib
 import os
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select, update, text
@@ -125,7 +124,7 @@ async def increment_rate_limit(request: Request, db: AsyncSession = Depends(get_
 @router.get("/api-key-rotations")
 async def get_api_key_rotations(
     limit: int = 50,
-    service: Optional[str] = None,
+    service: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
     stmt = select(ApiKeyRotation).order_by(ApiKeyRotation.rotated_at.desc()).limit(limit)
@@ -235,7 +234,7 @@ async def create_performance_log(request: Request, db: AsyncSession = Depends(ge
 
 @router.get("/tasks")
 async def get_pending_tasks(
-    status: Optional[str] = None, db: AsyncSession = Depends(get_db)
+    status: str | None = None, db: AsyncSession = Depends(get_db)
 ):
     stmt = select(PendingComplexTask).order_by(PendingComplexTask.created_at.desc())
     if status:

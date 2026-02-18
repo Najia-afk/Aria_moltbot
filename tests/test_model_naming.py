@@ -8,7 +8,6 @@ Validates:
 - focus.py loads model hints from models.yaml (or uses fallback)
 """
 
-from __future__ import annotations
 
 import json
 import sys

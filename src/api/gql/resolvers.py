@@ -3,7 +3,6 @@ GraphQL resolvers — read/write operations for key Aria data types.
 """
 
 import uuid
-from typing import Optional
 
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import aliased
@@ -48,7 +47,7 @@ async def _get_session():
 
 # ── Query resolvers ──────────────────────────────────────────────────────────
 
-async def resolve_activities(limit: int = 25, offset: int = 0, action: Optional[str] = None) -> list[ActivityType]:
+async def resolve_activities(limit: int = 25, offset: int = 0, action: str | None = None) -> list[ActivityType]:
     async with AsyncSessionLocal() as db:
         stmt = select(ActivityLog).order_by(ActivityLog.created_at.desc()).offset(offset).limit(limit)
         if action:
@@ -65,7 +64,7 @@ async def resolve_activities(limit: int = 25, offset: int = 0, action: Optional[
         ]
 
 
-async def resolve_thoughts(limit: int = 20, offset: int = 0, category: Optional[str] = None) -> list[ThoughtType]:
+async def resolve_thoughts(limit: int = 20, offset: int = 0, category: str | None = None) -> list[ThoughtType]:
     async with AsyncSessionLocal() as db:
         stmt = select(Thought).order_by(Thought.created_at.desc()).offset(offset).limit(limit)
         if category:
@@ -81,7 +80,7 @@ async def resolve_thoughts(limit: int = 20, offset: int = 0, category: Optional[
         ]
 
 
-async def resolve_memories(limit: int = 20, offset: int = 0, category: Optional[str] = None) -> list[MemoryType]:
+async def resolve_memories(limit: int = 20, offset: int = 0, category: str | None = None) -> list[MemoryType]:
     async with AsyncSessionLocal() as db:
         stmt = select(Memory).order_by(Memory.updated_at.desc()).offset(offset).limit(limit)
         if category:
@@ -97,7 +96,7 @@ async def resolve_memories(limit: int = 20, offset: int = 0, category: Optional[
         ]
 
 
-async def resolve_memory(key: str) -> Optional[MemoryType]:
+async def resolve_memory(key: str) -> MemoryType | None:
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(Memory).where(Memory.key == key))
         m = result.scalar_one_or_none()
@@ -110,7 +109,7 @@ async def resolve_memory(key: str) -> Optional[MemoryType]:
         )
 
 
-async def resolve_goals(limit: int = 25, offset: int = 0, status: Optional[str] = None) -> list[GoalType]:
+async def resolve_goals(limit: int = 25, offset: int = 0, status: str | None = None) -> list[GoalType]:
     async with AsyncSessionLocal() as db:
         stmt = select(Goal).order_by(Goal.priority.asc(), Goal.created_at.desc()).offset(offset).limit(limit)
         if status:
@@ -134,7 +133,7 @@ async def resolve_goals(limit: int = 25, offset: int = 0, status: Optional[str] 
 
 
 async def resolve_knowledge_entities(
-    limit: int = 25, offset: int = 0, entity_type: Optional[str] = None,
+    limit: int = 25, offset: int = 0, entity_type: str | None = None,
 ) -> list[KnowledgeEntityType]:
     async with AsyncSessionLocal() as db:
         stmt = select(KnowledgeEntity).order_by(KnowledgeEntity.created_at.desc()).offset(offset).limit(limit)
@@ -182,7 +181,7 @@ async def resolve_knowledge_relations(limit: int = 25, offset: int = 0) -> list[
         ]
 
 
-async def resolve_sessions(limit: int = 25, offset: int = 0, status: Optional[str] = None) -> list[SessionType]:
+async def resolve_sessions(limit: int = 25, offset: int = 0, status: str | None = None) -> list[SessionType]:
     async with AsyncSessionLocal() as db:
         stmt = select(AgentSession).order_by(AgentSession.started_at.desc()).offset(offset).limit(limit)
         if status:
@@ -282,7 +281,7 @@ async def resolve_update_goal(goal_id: str, input: GoalUpdateInput) -> GoalType:
 
 async def resolve_graph_traverse(
     start: str,
-    relation_type: Optional[str] = None,
+    relation_type: str | None = None,
     max_depth: int = 3,
     direction: str = "outgoing",
 ) -> GraphTraversalResult:

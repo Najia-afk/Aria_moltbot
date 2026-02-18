@@ -1,6 +1,5 @@
 """Community skill — engagement tracking and growth orchestration."""
 
-from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone

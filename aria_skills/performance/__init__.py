@@ -6,7 +6,7 @@ Tracks and logs Aria's performance metrics.
 Persists via REST API (TICKET-12: eliminate in-memory stubs).
 """
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from aria_skills.api_client import get_api_client
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
@@ -23,7 +23,7 @@ class PerformanceSkill(BaseSkill):
     
     def __init__(self, config: SkillConfig):
         super().__init__(config)
-        self._logs: List[Dict] = []  # fallback cache
+        self._logs: list[Dict] = []  # fallback cache
         self._api = None
     
     @property
@@ -48,9 +48,9 @@ class PerformanceSkill(BaseSkill):
     async def log_review(
         self,
         period: str,
-        successes: List[str],
-        failures: List[str],
-        improvements: List[str],
+        successes: list[str],
+        failures: list[str],
+        improvements: list[str],
     ) -> SkillResult:
         """
         Log a performance review.

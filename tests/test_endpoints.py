@@ -16,7 +16,7 @@ Route mapping:
 import os
 import pytest
 import requests
-from typing import Dict, Any
+from typing import Any
 
 pytestmark = pytest.mark.integration
 

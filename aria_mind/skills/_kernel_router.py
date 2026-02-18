@@ -4,7 +4,6 @@ Primary route source: aria-api knowledge graph endpoints.
 Fallback route source: local skill manifest overlap scoring.
 """
 
-from __future__ import annotations
 
 import os
 import re

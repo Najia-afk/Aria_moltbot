@@ -10,7 +10,7 @@ import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
 from aria_skills.registry import SkillRegistry
@@ -30,7 +30,7 @@ class DataSchema:
     """Schema for data validation."""
     fields: dict[str, str]  # field_name: type
     required: list[str]
-    constraints: Optional[dict] = None
+    constraints: dict | None = None
 
 
 @SkillRegistry.register
@@ -366,7 +366,7 @@ class DataPipelineSkill(BaseSkill):
             return isinstance(value, expected_type)
         return True
     
-    def _check_constraint(self, value: Any, constraint: dict) -> Optional[str]:
+    def _check_constraint(self, value: Any, constraint: dict) -> str | None:
         """Check value against constraint, return violation message or None."""
         if "min" in constraint and value < constraint["min"]:
             return f"Value {value} below minimum {constraint['min']}"

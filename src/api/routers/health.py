@@ -3,7 +3,6 @@ Health, status, and stats endpoints.
 """
 
 from datetime import datetime, timezone
-from typing import Optional
 
 import asyncio
 import httpx
@@ -33,7 +32,7 @@ class StatsResponse(BaseModel):
     activities_count: int
     thoughts_count: int
     memories_count: int
-    last_activity: Optional[str]
+    last_activity: str | None
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────────

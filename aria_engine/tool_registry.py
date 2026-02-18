@@ -19,7 +19,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable
 
 from aria_engine.exceptions import ToolError
 
@@ -31,10 +31,10 @@ class ToolDefinition:
     """A tool that can be called by the LLM."""
     name: str
     description: str
-    parameters: Dict[str, Any]
+    parameters: dict[str, Any]
     skill_name: str
     function_name: str
-    _handler: Optional[Callable] = field(default=None, repr=False)
+    _handler: Callable | None = field(default=None, repr=False)
 
 
 @dataclass
@@ -63,8 +63,8 @@ class ToolRegistry:
     """
 
     def __init__(self, timeout_seconds: int = 300):
-        self._tools: Dict[str, ToolDefinition] = {}
-        self._skill_instances: Dict[str, Any] = {}
+        self._tools: dict[str, ToolDefinition] = {}
+        self._skill_instances: dict[str, Any] = {}
         self._timeout = timeout_seconds
 
     def discover_from_skills(self, skill_registry) -> int:
@@ -120,7 +120,7 @@ class ToolRegistry:
         self,
         name: str,
         description: str,
-        parameters: Dict[str, Any],
+        parameters: dict[str, Any],
         handler: Callable,
         skill_name: str = "custom",
     ):
@@ -134,7 +134,7 @@ class ToolRegistry:
             _handler=handler,
         )
 
-    def get_tools_for_llm(self, filter_skills: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+    def get_tools_for_llm(self, filter_skills: list[str] | None = None) -> list[dict[str, Any]]:
         """
         Get tool definitions in OpenAI function calling format.
 
@@ -160,7 +160,7 @@ class ToolRegistry:
         self,
         tool_call_id: str,
         function_name: str,
-        arguments: str | Dict[str, Any],
+        arguments: str | dict[str, Any],
     ) -> ToolResult:
         """
         Execute a tool call from the LLM.
@@ -255,7 +255,7 @@ class ToolRegistry:
                 duration_ms=elapsed_ms,
             )
 
-    def list_tools(self) -> List[Dict[str, str]]:
+    def list_tools(self) -> list[dict[str, str]]:
         """List all registered tools (for debugging)."""
         return [
             {

@@ -13,7 +13,7 @@ Config:
 """
 import asyncio
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
 
@@ -109,12 +109,12 @@ class InputGuardSkill(BaseSkill):
         self,
         threat_level: str,
         threat_type: str,
-        threat_patterns: List[str],
+        threat_patterns: list[str],
         input_preview: str,
         source: str,
-        user_id: Optional[str],
+        user_id: str | None,
         blocked: bool,
-        details: Optional[Dict] = None,
+        details: Dict | None = None,
     ) -> None:
         """Log security event to database via API."""
         if not self._enable_logging:
@@ -145,7 +145,7 @@ class InputGuardSkill(BaseSkill):
         self,
         text: str,
         source: str = "user",
-        user_id: Optional[str] = None,
+        user_id: str | None = None,
     ) -> SkillResult:
         """
         Analyze input text for security threats.
@@ -294,11 +294,11 @@ class InputGuardSkill(BaseSkill):
         self,
         operation: str,
         table: str,
-        data: Optional[Dict[str, Any]] = None,
-        columns: Optional[List[str]] = None,
-        where: Optional[Dict[str, Any]] = None,
-        order_by: Optional[str] = None,
-        limit: Optional[int] = None,
+        data: dict[str, Any] | None = None,
+        columns: list[str] | None = None,
+        where: dict[str, Any] | None = None,
+        order_by: str | None = None,
+        limit: int | None = None,
     ) -> SkillResult:
         """
         Build a safe parameterized SQL query.
@@ -367,8 +367,8 @@ class InputGuardSkill(BaseSkill):
     
     async def validate_api_params(
         self,
-        params: Dict[str, Any],
-        schema: Dict[str, str],
+        params: dict[str, Any],
+        schema: dict[str, str],
     ) -> SkillResult:
         """
         Validate API parameters against a schema.

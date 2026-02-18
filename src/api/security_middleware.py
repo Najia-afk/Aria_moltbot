@@ -21,7 +21,7 @@ import re
 import time
 from collections import defaultdict
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable
 
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
@@ -89,10 +89,10 @@ class RateLimiter:
         self.rpm = requests_per_minute
         self.rph = requests_per_hour
         self.burst = burst_limit
-        self._requests: Dict[str, List[float]] = defaultdict(list)
-        self._blocked: Dict[str, float] = {}
+        self._requests: dict[str, list[float]] = defaultdict(list)
+        self._blocked: dict[str, float] = {}
     
-    def is_allowed(self, identifier: str) -> Tuple[bool, Optional[str]]:
+    def is_allowed(self, identifier: str) -> tuple[bool, str | None]:
         """Check if request is allowed."""
         now = time.time()
         
@@ -150,17 +150,17 @@ class SecurityMiddleware(BaseHTTPMiddleware):
     def __init__(
         self,
         app: ASGIApp,
-        rate_limiter: Optional[RateLimiter] = None,
+        rate_limiter: RateLimiter | None = None,
         max_body_size: int = 1_000_000,  # 1MB default
         scan_body: bool = True,
-        blocked_ips: Optional[Set[str]] = None,
+        blocked_ips: set[str] | None = None,
     ):
         super().__init__(app)
         self.rate_limiter = rate_limiter or RateLimiter()
         self.max_body_size = max_body_size
         self.scan_body = scan_body
         self.blocked_ips = blocked_ips or set()
-        self._threat_counts: Dict[str, int] = defaultdict(int)
+        self._threat_counts: dict[str, int] = defaultdict(int)
     
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """Process request through security checks."""
@@ -255,7 +255,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         
         return "unknown"
     
-    async def _scan_body(self, request: Request) -> Optional[Tuple[str, str]]:
+    async def _scan_body(self, request: Request) -> tuple[str, str] | None:
         """Scan request body for security threats."""
         try:
             # Read body (need to cache it for the actual handler)
@@ -290,7 +290,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             logger.error(f"Body scan error: {e}")
             return None
     
-    def _scan_dict(self, data: Any, depth: int = 0) -> Optional[Tuple[str, str]]:
+    def _scan_dict(self, data: Any, depth: int = 0) -> tuple[str, str] | None:
         """Recursively scan dict/list for threats."""
         if depth > 10:  # Prevent deep recursion
             return None
@@ -338,7 +338,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         
         return response
     
-    def get_threat_stats(self) -> Dict[str, int]:
+    def get_threat_stats(self) -> dict[str, int]:
         """Get threat detection statistics."""
         return dict(self._threat_counts)
 
@@ -352,7 +352,7 @@ def add_security_middleware(
     rate_limit_rpm: int = 60,
     rate_limit_rph: int = 500,
     max_body_size: int = 1_000_000,
-    blocked_ips: Optional[Set[str]] = None,
+    blocked_ips: set[str] | None = None,
 ) -> SecurityMiddleware:
     """
     Add security middleware to FastAPI app.
@@ -391,7 +391,7 @@ def add_security_middleware(
     return middleware
 
 
-def sanitize_log_data(data: Dict[str, Any]) -> Dict[str, Any]:
+def sanitize_log_data(data: dict[str, Any]) -> dict[str, Any]:
     """
     Sanitize data for safe logging.
     
@@ -414,7 +414,7 @@ def sanitize_log_data(data: Dict[str, Any]) -> Dict[str, Any]:
     return result
 
 
-def validate_content_type(request: Request, allowed: List[str]) -> bool:
+def validate_content_type(request: Request, allowed: list[str]) -> bool:
     """
     Validate request content type.
     

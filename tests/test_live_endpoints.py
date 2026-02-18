@@ -11,7 +11,6 @@ Integration tests for every REST endpoint in aria-api (FastAPI, port 8000).
 Covers 63 endpoints across 17 routers.
 """
 
-from __future__ import annotations
 
 import os
 import uuid

@@ -9,7 +9,7 @@ Tiers:
 """
 
 from datetime import datetime, timezone
-from typing import List, Dict, Any, Optional
+from typing import Any
 from dataclasses import dataclass, field, asdict
 import json
 
@@ -26,7 +26,7 @@ class Memory:
     category: str
     timestamp: datetime
     importance_score: float = 0.5
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -36,11 +36,11 @@ class CompressedMemory:
     summary: str
     original_count: int
     compressed_count: int
-    key_entities: List[str]
+    key_entities: list[str]
     timestamp: datetime
-    key_facts: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    original_ids: List[str] = field(default_factory=list)
+    key_facts: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
+    original_ids: list[str] = field(default_factory=list)
 
     def to_dict(self):
         data = asdict(self)
@@ -55,8 +55,8 @@ class CompressionResult:
     memories_processed: int
     compressed_count: int
     compression_ratio: float
-    tiers_updated: Dict[str, int]
-    errors: List[str] = field(default_factory=list)
+    tiers_updated: dict[str, int]
+    errors: list[str] = field(default_factory=list)
 
 
 # ===========================
@@ -90,7 +90,7 @@ class ImportanceScorer:
             "system": 0.3,
         }
 
-    def score(self, memory: Memory, now: Optional[datetime] = None) -> float:
+    def score(self, memory: Memory, now: datetime | None = None) -> float:
         """Calculate importance score (0.0-1.0)."""
         if now is None:
             now = datetime.now(timezone.utc)
@@ -144,7 +144,7 @@ class MemoryCompressor:
         self,
         raw_limit: int = 20,
         recent_limit: int = 100,
-        compression_ratios: Dict[str, float] = None,
+        compression_ratios: dict[str, float] = None,
         llm_summarizer = None  # Optional LLM for better summaries
     ):
         self.raw_limit = raw_limit
@@ -158,10 +158,10 @@ class MemoryCompressor:
 
     async def compress_tier(
         self,
-        memories: List[Memory],
+        memories: list[Memory],
         target_tier: str,
         target_count: int
-    ) -> List[CompressedMemory]:
+    ) -> list[CompressedMemory]:
         """
         Compress memories into target tier with specified target count.
 
@@ -213,9 +213,9 @@ class MemoryCompressor:
 
     async def _summarize_batch(
         self,
-        memories: List[Memory],
+        memories: list[Memory],
         tier: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Generate summary for a batch of memories.
 
@@ -244,7 +244,7 @@ class MemoryCompressor:
             # Fallback to rule-based
             return self._rule_based_summary(contents, categories)
 
-    def _build_summary_prompt(self, contents: List[str], tier: str) -> str:
+    def _build_summary_prompt(self, contents: list[str], tier: str) -> str:
         """Build prompt for LLM summarization."""
         if tier == "recent":
             instruction = (
@@ -263,9 +263,9 @@ class MemoryCompressor:
 
     def _rule_based_summary(
         self,
-        contents: List[str],
-        categories: List[str]
-    ) -> Dict[str, Any]:
+        contents: list[str],
+        categories: list[str]
+    ) -> dict[str, Any]:
         """Simple rule-based summarization when LLM unavailable."""
         # Extract first sentences, unique topics
         first_sentences = []
@@ -309,11 +309,11 @@ class CompressionManager:
             "recent": {"limit": 100, "memories": []},
             "archive": {"limit": None, "memories": []}  # No limit, but ratio-based
         }
-        self.compressed_store: List[CompressedMemory] = []
+        self.compressed_store: list[CompressedMemory] = []
 
     async def process_all(
         self,
-        memories: List[Memory]
+        memories: list[Memory]
     ) -> CompressionResult:
         """
         Process all memories through the compression pipeline.
@@ -378,8 +378,8 @@ class CompressionManager:
 
     def get_active_memories(
         self,
-        raw_memories: List[Memory]
-    ) -> List[Dict[str, Any]]:
+        raw_memories: list[Memory]
+    ) -> list[dict[str, Any]]:
         """
         Assemble active context from raw + compressed memories.
 
@@ -417,7 +417,7 @@ class CompressionManager:
 
         return [{"content": "\n\n".join(context_parts), "tokens_est": self._estimate_tokens(context_parts)}]
 
-    def _estimate_tokens(self, parts: List[str]) -> int:
+    def _estimate_tokens(self, parts: list[str]) -> int:
         """Rough token estimation (4 chars per token)."""
         total_chars = sum(len(p) for p in parts)
         return total_chars // 4
@@ -428,9 +428,9 @@ class CompressionManager:
 # ===========================
 
 async def compress_memories_workflow(
-    raw_memories: List[Memory],
-    config: Dict[str, Any] = None
-) -> Dict[str, Any]:
+    raw_memories: list[Memory],
+    config: dict[str, Any] = None
+) -> dict[str, Any]:
     """
     Complete compression workflow.
 

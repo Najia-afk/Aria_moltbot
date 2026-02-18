@@ -12,7 +12,7 @@ Pattern Types:
 
 from collections import Counter, defaultdict
 from datetime import datetime, timezone, timedelta
-from typing import List, Dict, Any, Optional, Tuple
+from typing import Any
 from dataclasses import dataclass, field, asdict
 from enum import Enum
 import json
@@ -38,11 +38,11 @@ class Pattern:
     type: PatternType
     subject: str
     confidence: float  # 0.0-1.0
-    evidence: List[Any] = field(default_factory=list)
+    evidence: list[Any] = field(default_factory=list)
     first_seen: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     last_seen: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     frequency_per_day: float = 0.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self):
         data = asdict(self)
@@ -58,19 +58,19 @@ class TopicMention:
     topic: str
     timestamp: datetime
     memory_id: str
-    sentiment: Optional[float] = None  # -1 to +1
+    sentiment: float | None = None  # -1 to +1
     category: str = "general"
 
 
 @dataclass
 class PatternDetectionResult:
     """Result of pattern detection run."""
-    patterns_found: List[Pattern]
+    patterns_found: list[Pattern]
     total_memories_analyzed: int
     analysis_window_days: int
     new_patterns: int
     persistent_patterns: int
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 # ===========================
@@ -102,7 +102,7 @@ class TopicExtractor:
         self.entity_pattern = re.compile(r'\b[A-Z][a-zA-Z]+(?:[ -][A-Z][a-zA-Z]+)*\b')
         self.tech_pattern = re.compile(r'\b(?:API|LLM|AI|ML|DB|SQL|HTTP|HTTPS|JSON|XML|Docker|Kubernetes)\b', re.IGNORECASE)
 
-    def extract(self, memories: List[Memory]) -> List[TopicMention]:
+    def extract(self, memories: list[Memory]) -> list[TopicMention]:
         """Extract topics from a list of memories."""
         mentions = []
 
@@ -140,7 +140,7 @@ class TopicExtractor:
 
         return mentions
 
-    def _map_category_to_topic(self, category: str) -> Optional[str]:
+    def _map_category_to_topic(self, category: str) -> str | None:
         """Map memory category to a high-level topic."""
         mapping = {
             "user_command": "interaction",
@@ -156,7 +156,7 @@ class TopicExtractor:
         }
         return mapping.get(category)
 
-    def _extract_entities(self, text: str) -> List[str]:
+    def _extract_entities(self, text: str) -> list[str]:
         """Extract named entities from text."""
         entities = []
 
@@ -185,9 +185,9 @@ class FrequencyTracker:
 
     def __init__(self, window_days: int = 30):
         self.window_days = window_days
-        self.topic_history: Dict[str, List[TopicMention]] = defaultdict(list)
+        self.topic_history: dict[str, list[TopicMention]] = defaultdict(list)
 
-    def add_mentions(self, mentions: List[TopicMention]):
+    def add_mentions(self, mentions: list[TopicMention]):
         """Add new topic mentions to history."""
         for mention in mentions:
             self.topic_history[mention.topic].append(mention)
@@ -195,7 +195,7 @@ class FrequencyTracker:
     def get_frequency(
         self,
         topic: str,
-        window_days: Optional[int] = None
+        window_days: int | None = None
     ) -> float:
         """
         Calculate frequency of a topic over time window.
@@ -214,10 +214,10 @@ class FrequencyTracker:
 
     def find_recurring(
         self,
-        topics: List[str],
+        topics: list[str],
         min_frequency: float = 0.3,
         min_mentions: int = 5
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Find topics that recur frequently.
 
@@ -250,7 +250,7 @@ class FrequencyTracker:
         self,
         min_growth_rate: float = 2.0,
         min_recent_mentions: int = 3
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Find topics that are emerging (growth rate > threshold).
 
@@ -319,11 +319,11 @@ class PatternRecognizer:
         self.llm_analyzer = llm_analyzer
         self.topic_extractor = TopicExtractor()
         self.frequency_tracker = FrequencyTracker(window_days)
-        self.pattern_history: List[Pattern] = []
+        self.pattern_history: list[Pattern] = []
 
     async def analyze(
         self,
-        memories: List[Memory],
+        memories: list[Memory],
         min_confidence: float = 0.3
     ) -> PatternDetectionResult:
         """
@@ -430,7 +430,7 @@ class PatternRecognizer:
             persistent_patterns=persistent_count
         )
 
-    def _detect_temporal_patterns(self, memories: List[Memory]) -> List[Pattern]:
+    def _detect_temporal_patterns(self, memories: list[Memory]) -> list[Pattern]:
         """Detect time-based patterns (active hours, day of week)."""
         patterns = []
 
@@ -470,7 +470,7 @@ class PatternRecognizer:
 
         return patterns
 
-    def _detect_sentiment_drift(self, memories: List[Memory]) -> List[Pattern]:
+    def _detect_sentiment_drift(self, memories: list[Memory]) -> list[Pattern]:
         """Detect significant changes in sentiment over time."""
         patterns = []
 
@@ -512,7 +512,7 @@ class PatternRecognizer:
 
         return patterns
 
-    def _detect_knowledge_gaps(self, memories: List[Memory]) -> List[Pattern]:
+    def _detect_knowledge_gaps(self, memories: list[Memory]) -> list[Pattern]:
         """Detect repeated questions = knowledge gap."""
         patterns = []
 
@@ -546,7 +546,7 @@ class PatternRecognizer:
 
         return patterns
 
-    async def _llm_detect_patterns(self, memories: List[Memory]) -> List[Pattern]:
+    async def _llm_detect_patterns(self, memories: list[Memory]) -> list[Pattern]:
         """Use LLM to detect semantic patterns not caught by statistics."""
         if not self.llm_analyzer:
             return []
@@ -589,7 +589,7 @@ class PatternRecognizer:
             print(f"LLM pattern detection failed: {e}")
             return []
 
-    def _deduplicate_patterns(self, patterns: List[Pattern]) -> List[Pattern]:
+    def _deduplicate_patterns(self, patterns: list[Pattern]) -> list[Pattern]:
         """Remove duplicate patterns (same type+subject)."""
         seen = set()
         unique = []
@@ -610,9 +610,9 @@ class PatternRecognizer:
 # ===========================
 
 async def detect_patterns_workflow(
-    memories: List[Memory],
-    config: Dict[str, Any] = None
-) -> Dict[str, Any]:
+    memories: list[Memory],
+    config: dict[str, Any] = None
+) -> dict[str, Any]:
     """
     Complete pattern detection workflow.
 

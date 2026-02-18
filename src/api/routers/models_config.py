@@ -10,7 +10,7 @@ To add a new model (Gemini, Claude, etc.) → edit models.yaml only.
 
 import json
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from fastapi import APIRouter
 
@@ -25,10 +25,10 @@ _CATALOG_PATHS = [
     Path(__file__).resolve().parent.parent.parent.parent / "aria_models" / "models.yaml",  # local dev
 ]
 
-_catalog_cache: Dict[str, Any] | None = None
+_catalog_cache: dict[str, Any] | None = None
 
 
-def _load_catalog() -> Dict[str, Any]:
+def _load_catalog() -> dict[str, Any]:
     global _catalog_cache
     if _catalog_cache is not None:
         return _catalog_cache
@@ -101,7 +101,7 @@ async def api_models_pricing():
     """
     catalog = _load_catalog()
     models_raw = catalog.get("models", {})
-    pricing: Dict[str, Any] = {}
+    pricing: dict[str, Any] = {}
 
     for model_id, entry in models_raw.items():
         cost = entry.get("cost", {"input": 0, "output": 0})

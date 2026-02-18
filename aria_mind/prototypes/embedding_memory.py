@@ -10,7 +10,7 @@ Features:
 - Cosine similarity with FAISS/local vector store
 """
 
-from typing import List, Dict, Any, Optional, Tuple
+from typing import Any
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 import json
@@ -28,8 +28,8 @@ class MemoryEntry:
     """Memory entry with embedding vector."""
     id: str
     content: str
-    embedding: List[float]
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    embedding: list[float]
+    metadata: dict[str, Any] = field(default_factory=dict)
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     category: str = "general"
     importance: float = 0.5
@@ -40,7 +40,7 @@ class MemoryEntry:
         return data
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "MemoryEntry":
+    def from_dict(cls, data: dict[str, Any]) -> "MemoryEntry":
         """Reconstruct from dict (including ISO timestamp)."""
         if "timestamp" in data and isinstance(data["timestamp"], str):
             data["timestamp"] = datetime.fromisoformat(data["timestamp"].replace("Z", "+00:00"))
@@ -53,7 +53,7 @@ class SearchResult:
     entry: MemoryEntry
     similarity: float
     rank: int
-    matched_terms: List[str] = field(default_factory=list)
+    matched_terms: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -81,7 +81,7 @@ class EmbeddingProvider:
     def __init__(
         self,
         model: str = "local",
-        model_path: Optional[str] = None,
+        model_path: str | None = None,
         dimension: int = 384
     ):
         """
@@ -112,7 +112,7 @@ class EmbeddingProvider:
         else:
             self._model = None
 
-    async def embed(self, text: str) -> List[float]:
+    async def embed(self, text: str) -> list[float]:
         """Generate embedding for a single text."""
         if self._model:
             # Local model
@@ -122,7 +122,7 @@ class EmbeddingProvider:
             # Mock embedding (hash-based, deterministic)
             return self._mock_embedding(text)
 
-    async def embed_batch(self, texts: List[str]) -> List[List[float]]:
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings for multiple texts."""
         if self._model:
             embeddings = self._model.encode(texts)
@@ -130,7 +130,7 @@ class EmbeddingProvider:
         else:
             return [self._mock_embedding(t) for t in texts]
 
-    def _mock_embedding(self, text: str) -> List[float]:
+    def _mock_embedding(self, text: str) -> list[float]:
         """Deterministic pseudo-embedding for prototype/testing."""
         import hashlib
         # Create deterministic float array from hash
@@ -166,14 +166,14 @@ class VectorStore:
         self,
         dimension: int = 384,
         use_faiss: bool = True,
-        index_path: Optional[str] = None
+        index_path: str | None = None
     ):
         self.dimension = dimension
         self.use_faiss = use_faiss
         self.index_path = index_path
 
-        self.vectors: Optional[np.ndarray] = None
-        self.ids: List[str] = []
+        self.vectors: np.ndarray | None = None
+        self.ids: list[str] = []
         self.faiss_index = None
 
     async def initialize(self):
@@ -193,8 +193,8 @@ class VectorStore:
     async def add(
         self,
         entry_id: str,
-        embedding: List[float],
-        metadata: Dict[str, Any] = None
+        embedding: list[float],
+        metadata: dict[str, Any] = None
     ) -> bool:
         """Add a vector to the store."""
         vec = np.array(embedding, dtype=np.float32).reshape(1, -1)
@@ -212,10 +212,10 @@ class VectorStore:
 
     async def search(
         self,
-        query_embedding: List[float],
+        query_embedding: list[float],
         top_k: int = 10,
         min_similarity: float = 0.0
-    ) -> List[SearchResult]:
+    ) -> list[SearchResult]:
         """Search for nearest neighbors."""
         query_vec = np.array(query_embedding, dtype=np.float32).reshape(1, -1)
 
@@ -318,10 +318,10 @@ class MetadataIndex:
     """
 
     def __init__(self):
-        self._entries: Dict[str, Dict[str, Any]] = {}
-        self._category_index: Dict[str, List[str]] = defaultdict(list)
-        self._tag_index: Dict[str, List[str]] = defaultdict(list)
-        self._time_index: Dict[str, List[str]] = defaultdict(list)  # YYYY-MM -> [ids]
+        self._entries: dict[str, dict[str, Any]] = {}
+        self._category_index: dict[str, list[str]] = defaultdict(list)
+        self._tag_index: dict[str, list[str]] = defaultdict(list)
+        self._time_index: dict[str, list[str]] = defaultdict(list)  # YYYY-MM -> [ids]
 
     def store(self, entry: MemoryEntry):
         """Index a memory entry's metadata."""
@@ -339,11 +339,11 @@ class MetadataIndex:
         month_key = entry.timestamp.strftime("%Y-%m")
         self._time_index[month_key].append(entry.id)
 
-    def get_by_category(self, category: str) -> List[str]:
+    def get_by_category(self, category: str) -> list[str]:
         """Get entry IDs in a category."""
         return self._category_index.get(category, [])
 
-    def get_by_tag(self, tag: str) -> List[str]:
+    def get_by_tag(self, tag: str) -> list[str]:
         """Get entry IDs with a tag."""
         return self._tag_index.get(tag, [])
 
@@ -351,7 +351,7 @@ class MetadataIndex:
         self,
         start: datetime,
         end: datetime
-    ) -> List[str]:
+    ) -> list[str]:
         """Get entry IDs within time range."""
         ids = []
         for month_key, month_ids in self._time_index.items():
@@ -363,7 +363,7 @@ class MetadataIndex:
 
         return list(set(ids))
 
-    def get_entry(self, entry_id: str) -> Optional[Dict[str, Any]]:
+    def get_entry(self, entry_id: str) -> dict[str, Any] | None:
         """Get full entry metadata by ID."""
         return self._entries.get(entry_id)
 
@@ -400,8 +400,8 @@ class EmbeddingMemory:
     async def remember(
         self,
         content: str,
-        metadata: Dict[str, Any] = None,
-        entry_id: Optional[str] = None
+        metadata: dict[str, Any] = None,
+        entry_id: str | None = None
     ) -> MemoryEntry:
         """
         Store a memory with its embedding.
@@ -444,8 +444,8 @@ class EmbeddingMemory:
         self,
         query: str,
         strategy: RetrievalStrategy = None,
-        filters: Dict[str, Any] = None
-    ) -> List[SearchResult]:
+        filters: dict[str, Any] = None
+    ) -> list[SearchResult]:
         """
         Retrieve memories using semantic similarity.
 
@@ -480,9 +480,9 @@ class EmbeddingMemory:
 
     def _apply_filters(
         self,
-        results: List[SearchResult],
-        filters: Dict[str, Any]
-    ) -> List[SearchResult]:
+        results: list[SearchResult],
+        filters: dict[str, Any]
+    ) -> list[SearchResult]:
         """Apply metadata filters to results."""
         filtered = []
 
@@ -516,10 +516,10 @@ class EmbeddingMemory:
 
     async def _rerank(
         self,
-        results: List[SearchResult],
+        results: list[SearchResult],
         query: str,
         strategy: RetrievalStrategy
-    ) -> List[SearchResult]:
+    ) -> list[SearchResult]:
         """
         Rerank results using multiple signals.
 
@@ -598,9 +598,9 @@ class HybridRetriever:
     async def retrieve(
         self,
         query: str,
-        keywords: List[str] = None,
+        keywords: list[str] = None,
         strategy: RetrievalStrategy = None
-    ) -> List[SearchResult]:
+    ) -> list[SearchResult]:
         """
         Hybrid retrieval using multiple strategies.
 
@@ -651,8 +651,8 @@ class HybridRetriever:
 
     def _add_rrf_scores(
         self,
-        results: List[SearchResult],
-        accumulator: Dict[str, Dict],
+        results: list[SearchResult],
+        accumulator: dict[str, Dict],
         weight: float = 1.0
     ):
         """Add RRF (Reciprocal Rank Fusion) scores."""
@@ -674,9 +674,9 @@ class HybridRetriever:
 
     async def _keyword_search(
         self,
-        keywords: List[str],
+        keywords: list[str],
         top_k: int
-    ) -> List[SearchResult]:
+    ) -> list[SearchResult]:
         """Simple keyword-based search."""
         # In real implementation, would use text index (e.g., SQLite FTS)
         # For prototype: scan all entries (inefficient but works for small DB)
@@ -715,7 +715,7 @@ class HybridRetriever:
 # ===========================
 
 async def create_embedding_memory(
-    config: Dict[str, Any] = None
+    config: dict[str, Any] = None
 ) -> EmbeddingMemory:
     """
     Factory function to create and initialize embedding memory.
@@ -758,9 +758,9 @@ async def create_embedding_memory(
 
 async def semantic_search_workflow(
     query: str,
-    memories: List[Dict[str, Any]],
-    config: Dict[str, Any] = None
-) -> Dict[str, Any]:
+    memories: list[dict[str, Any]],
+    config: dict[str, Any] = None
+) -> dict[str, Any]:
     """
     Complete semantic search workflow including bulk load.
 

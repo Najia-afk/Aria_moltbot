@@ -12,7 +12,7 @@ Features:
 import logging
 import re
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -36,7 +36,7 @@ WEIGHTS = {
 }
 
 # Specialty keywords per focus type
-SPECIALTY_PATTERNS: Dict[str, re.Pattern] = {
+SPECIALTY_PATTERNS: dict[str, re.Pattern] = {
     "social": re.compile(
         r"(social|post|tweet|moltbook|community|engage|share|content)",
         re.IGNORECASE,
@@ -62,7 +62,7 @@ SPECIALTY_PATTERNS: Dict[str, re.Pattern] = {
 
 def compute_specialty_match(
     message: str,
-    focus_type: Optional[str],
+    focus_type: str | None,
 ) -> float:
     """
     Compute how well a message matches an agent's specialty.
@@ -114,7 +114,7 @@ def compute_load_score(
     return max(1.0 - failure_penalty, 0.2)
 
 
-def compute_pheromone_score(records: List[Dict[str, Any]]) -> float:
+def compute_pheromone_score(records: list[dict[str, Any]]) -> float:
     """
     Compute pheromone score from performance records.
 
@@ -182,13 +182,13 @@ class EngineRouter:
     def __init__(self, db_engine: AsyncEngine):
         self._db_engine = db_engine
         # In-memory record cache per agent (synced to DB periodically)
-        self._records: Dict[str, List[Dict[str, Any]]] = {}
+        self._records: dict[str, list[dict[str, Any]]] = {}
         self._total_invocations = 0
 
     async def route_message(
         self,
         message: str,
-        available_agents: List[str],
+        available_agents: list[str],
     ) -> str:
         """
         Route a message to the best available agent.
@@ -218,7 +218,7 @@ class EngineRouter:
         # Load agent state from DB
         agent_states = await self._load_agent_states(available_agents)
 
-        scores: Dict[str, float] = {}
+        scores: dict[str, float] = {}
 
         for agent_id in available_agents:
             state = agent_states.get(agent_id, {})
@@ -340,8 +340,8 @@ class EngineRouter:
 
     async def _load_agent_states(
         self,
-        agent_ids: List[str],
-    ) -> Dict[str, Dict[str, Any]]:
+        agent_ids: list[str],
+    ) -> dict[str, dict[str, Any]]:
         """Load agent states from DB for routing decisions."""
         if not agent_ids:
             return {}
@@ -381,7 +381,7 @@ class EngineRouter:
                 {"agent_id": agent_id, "score": round(score, 3)},
             )
 
-    async def get_routing_table(self) -> List[Dict[str, Any]]:
+    async def get_routing_table(self) -> list[dict[str, Any]]:
         """Get current routing table with all agent scores and stats."""
         async with self._db_engine.begin() as conn:
             result = await conn.execute(

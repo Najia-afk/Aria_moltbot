@@ -2,7 +2,6 @@
 import json
 import os
 from pathlib import Path
-from typing import Optional
 
 
 def generate_catalog(skills_dir: str = "aria_skills") -> dict:

@@ -6,7 +6,7 @@ Manages small, time-boxed goals for Aria's hourly cycles.
 Persists via REST API (TICKET-12: eliminate in-memory stubs).
 """
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from aria_skills.api_client import get_api_client
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
@@ -23,7 +23,7 @@ class HourlyGoalsSkill(BaseSkill):
     
     def __init__(self, config: SkillConfig):
         super().__init__(config)
-        self._hourly_goals: Dict[int, List[Dict]] = {}  # fallback cache
+        self._hourly_goals: dict[int, list[Dict]] = {}  # fallback cache
         self._api = None
     
     @property

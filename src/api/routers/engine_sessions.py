@@ -11,7 +11,7 @@ Provides:
 """
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -37,15 +37,15 @@ class SessionResponse(BaseModel):
     session_type: str = "chat"
     message_count: int = 0
     created_at: str
-    updated_at: Optional[str] = None
-    last_message_at: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
+    updated_at: str | None = None
+    last_message_at: str | None = None
+    metadata: dict[str, Any] | None = None
 
 
 class SessionListResponse(BaseModel):
     """Paginated session list."""
 
-    sessions: List[SessionResponse]
+    sessions: list[SessionResponse]
     total: int
     limit: int
     offset: int
@@ -59,15 +59,15 @@ class MessageResponse(BaseModel):
     session_id: str
     role: str
     content: str
-    agent_id: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
+    agent_id: str | None = None
+    metadata: dict[str, Any] | None = None
     created_at: str
 
 
 class SessionDetailResponse(SessionResponse):
     """Full session detail with recent messages."""
 
-    recent_messages: List[MessageResponse] = []
+    recent_messages: list[MessageResponse] = []
 
 
 class SessionStatsResponse(BaseModel):
@@ -76,8 +76,8 @@ class SessionStatsResponse(BaseModel):
     total_sessions: int
     total_messages: int
     active_agents: int
-    oldest_session: Optional[str] = None
-    newest_activity: Optional[str] = None
+    oldest_session: str | None = None
+    newest_activity: str | None = None
 
 
 # ── Helpers ───────────────────────────────────────────────────
@@ -98,24 +98,24 @@ async def _get_manager() -> NativeSessionManager:
 
 @router.get("", response_model=SessionListResponse)
 async def list_sessions(
-    agent_id: Optional[str] = Query(
+    agent_id: str | None = Query(
         default=None,
         description="Filter by agent ID",
     ),
-    session_type: Optional[str] = Query(
+    session_type: str | None = Query(
         default=None,
         description="Filter by type (chat, roundtable, cron)",
     ),
-    search: Optional[str] = Query(
+    search: str | None = Query(
         default=None,
         max_length=200,
         description="Search in titles and message content",
     ),
-    date_from: Optional[str] = Query(
+    date_from: str | None = Query(
         default=None,
         description="Start date (ISO format, e.g., 2025-01-01)",
     ),
-    date_to: Optional[str] = Query(
+    date_to: str | None = Query(
         default=None,
         description="End date (ISO format, e.g., 2025-12-31)",
     ),
@@ -227,13 +227,13 @@ async def get_session(session_id: str):
 
 @router.get(
     "/{session_id}/messages",
-    response_model=List[MessageResponse],
+    response_model=list[MessageResponse],
 )
 async def get_session_messages(
     session_id: str,
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
-    since: Optional[str] = Query(
+    since: str | None = Query(
         default=None,
         description="Only messages after this ISO datetime",
     ),

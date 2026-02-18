@@ -11,7 +11,7 @@ import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
 from aria_skills.registry import SkillRegistry
@@ -22,10 +22,10 @@ class PipelineStatus:
     """Status of a CI/CD pipeline."""
     name: str
     status: str  # running, success, failed, pending
-    started_at: Optional[datetime] = None
-    finished_at: Optional[datetime] = None
-    duration_seconds: Optional[int] = None
-    url: Optional[str] = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    duration_seconds: int | None = None
+    url: str | None = None
 
 
 @SkillRegistry.register
@@ -58,7 +58,7 @@ class CICDSkill(BaseSkill):
         self,
         workflow_type: str,
         language: str = "python",
-        options: Optional[dict] = None
+        options: dict | None = None
     ) -> SkillResult:
         """
         Generate a GitHub Actions workflow file.
@@ -154,8 +154,8 @@ class CICDSkill(BaseSkill):
     async def generate_dockerfile(
         self,
         language: str = "python",
-        base_image: Optional[str] = None,
-        options: Optional[dict] = None
+        base_image: str | None = None,
+        options: dict | None = None
     ) -> SkillResult:
         """
         Generate a secure Dockerfile.
@@ -421,7 +421,7 @@ jobs:
         sarif_file: 'trivy-results.sarif'
 '''
     
-    def _generate_python_dockerfile(self, base_image: Optional[str], options: dict) -> str:
+    def _generate_python_dockerfile(self, base_image: str | None, options: dict) -> str:
         """Generate a secure Python Dockerfile."""
         base = base_image or "python:3.11-slim"
         port = options.get("port", 8000)
@@ -469,7 +469,7 @@ EXPOSE {port}
 CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "{port}"]
 '''
     
-    def _generate_node_dockerfile(self, base_image: Optional[str], options: dict) -> str:
+    def _generate_node_dockerfile(self, base_image: str | None, options: dict) -> str:
         """Generate a secure Node.js Dockerfile."""
         base = base_image or "node:20-slim"
         port = options.get("port", 3000)

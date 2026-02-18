@@ -4,7 +4,7 @@ This module provides an abstract interface for LLM gateway communication.
 Currently implemented by LegacyGateway; NativeGateway planned for v1.3.
 """
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any
 import logging
 import time
 
@@ -16,8 +16,8 @@ class GatewayInterface(ABC):
 
     @abstractmethod
     async def send_message(
-        self, message: str, tools: Optional[List[str]] = None
-    ) -> Dict[str, Any]:
+        self, message: str, tools: list[str] | None = None
+    ) -> dict[str, Any]:
         """Send a message through the gateway and return the response."""
         ...
 
@@ -27,7 +27,7 @@ class GatewayInterface(ABC):
         ...
 
     @abstractmethod
-    async def list_tools(self) -> List[Dict[str, Any]]:
+    async def list_tools(self) -> list[dict[str, Any]]:
         """List available tools registered with the gateway."""
         ...
 
@@ -41,11 +41,11 @@ class LegacyGateway(GatewayInterface):
 
     def __init__(self, base_url: str = "http://aria-api:8000"):
         self.base_url = base_url
-        self._latency_samples: List[float] = []
+        self._latency_samples: list[float] = []
 
     async def send_message(
-        self, message: str, tools: Optional[List[str]] = None
-    ) -> Dict[str, Any]:
+        self, message: str, tools: list[str] | None = None
+    ) -> dict[str, Any]:
         start = time.monotonic()
         try:
             # TODO: wire to actual Aria REST or WebSocket API
@@ -72,11 +72,11 @@ class LegacyGateway(GatewayInterface):
                 return p.read_text(encoding="utf-8")
         return "(default Aria prompt — not customized)"
 
-    async def list_tools(self) -> List[Dict[str, Any]]:
+    async def list_tools(self) -> list[dict[str, Any]]:
         # TODO: query Aria /tools endpoint
         raise NotImplementedError("LegacyGateway.list_tools() — v1.3")
 
-    def get_latency_stats(self) -> Dict[str, float]:
+    def get_latency_stats(self) -> dict[str, float]:
         """Return latency statistics for phase-out analysis."""
         if not self._latency_samples:
             return {"avg_ms": 0, "p95_ms": 0, "p99_ms": 0, "count": 0}

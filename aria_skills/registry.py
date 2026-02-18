@@ -5,7 +5,6 @@ Skill registry for managing available skills.
 import logging
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, Type
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillStatus
 
@@ -24,17 +23,17 @@ class SkillRegistry:
     """
     
     # Map of skill names to their implementation classes
-    _skill_classes: Dict[str, Type[BaseSkill]] = {}
+    _skill_classes: dict[str, type[BaseSkill]] = {}
     
     def __init__(self):
-        self._skills: Dict[str, BaseSkill] = {}
-        self._configs: Dict[str, SkillConfig] = {}
-        self._aliases: Dict[str, str] = {}
+        self._skills: dict[str, BaseSkill] = {}
+        self._configs: dict[str, SkillConfig] = {}
+        self._aliases: dict[str, str] = {}
         # Backward-compatible alias for tests
         self._registered_classes = self._skill_classes
     
     @classmethod
-    def register(cls, skill_class: Type[BaseSkill]):
+    def register(cls, skill_class: type[BaseSkill]):
         """
         Register a skill class.
         
@@ -93,7 +92,7 @@ class SkillRegistry:
         
         return loaded
     
-    def _parse_tools_md(self, content: str) -> List[SkillConfig]:
+    def _parse_tools_md(self, content: str) -> list[SkillConfig]:
         """
         Parse TOOLS.md to extract skill configurations.
         
@@ -175,7 +174,7 @@ class SkillRegistry:
         
         return result
     
-    def get(self, name: str) -> Optional[BaseSkill]:
+    def get(self, name: str) -> BaseSkill | None:
         """Get a skill by name (supports both python name and canonical name)."""
         skill = self._skills.get(name)
         if skill is None:
@@ -185,19 +184,19 @@ class SkillRegistry:
                 skill = self._skills.get(python_name)
         return skill
     
-    def list_available(self) -> List[str]:
+    def list_available(self) -> list[str]:
         """List all available (loaded) skill names."""
         return list(self._skills.keys())
 
-    def list(self) -> List[str]:
+    def list(self) -> list[str]:
         """Backward-compatible list of loaded skills."""
         return self.list_available()
     
-    def list_configured(self) -> List[str]:
+    def list_configured(self) -> list[str]:
         """List all configured skill names."""
         return list(self._configs.keys())
     
-    async def check_all_health(self) -> Dict[str, SkillStatus]:
+    async def check_all_health(self) -> dict[str, SkillStatus]:
         """Run health checks on all loaded skills."""
         results = {}
         for name, skill in self._skills.items():
@@ -208,7 +207,7 @@ class SkillRegistry:
                 results[name] = SkillStatus.ERROR
         return results
     
-    def get_all_metrics(self) -> Dict[str, dict]:
+    def get_all_metrics(self) -> dict[str, dict]:
         """Get metrics for all loaded skills."""
         return {
             name: skill.get_metrics()

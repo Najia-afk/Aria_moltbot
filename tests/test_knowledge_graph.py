@@ -5,7 +5,6 @@ S5-05 · Knowledge graph endpoint tests.
 Tests entity CRUD, relation management, and traversal.
 Auto-skips when aria-api is unreachable.
 """
-from __future__ import annotations
 
 import os
 import uuid

@@ -9,7 +9,7 @@ Architecture: Skill (Layer 3) → api_client (Layer 2) → API (Layer 1)
 Depends on S5-01 (pgvector semantic memory).
 """
 import json
-from typing import Any, Optional
+from typing import Any
 
 from aria_skills.api_client import get_api_client
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
@@ -80,7 +80,7 @@ class ConversationSummarySkill(BaseSkill):
     async def summarize_session(
         self,
         hours_back: int = 24,
-        session_id: Optional[str] = None,
+        session_id: str | None = None,
     ) -> SkillResult:
         """
         Summarize a recent work session.

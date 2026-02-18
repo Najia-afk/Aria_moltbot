@@ -30,7 +30,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from starlette.websockets import WebSocket, WebSocketDisconnect, WebSocketState
 
@@ -47,8 +47,8 @@ class StreamAccumulator:
     """Accumulates a full response from stream chunks for DB persistence."""
     content: str = ""
     thinking: str = ""
-    tool_calls: List[Dict[str, Any]] = field(default_factory=list)
-    tool_results: List[Dict[str, Any]] = field(default_factory=list)
+    tool_calls: list[dict[str, Any]] = field(default_factory=list)
+    tool_results: list[dict[str, Any]] = field(default_factory=list)
     input_tokens: int = 0
     output_tokens: int = 0
     cost_usd: float = 0.0
@@ -87,7 +87,7 @@ class StreamManager:
         self.gateway = gateway
         self.tools = tool_registry
         self._db_factory = db_session_factory
-        self._active_connections: Dict[str, WebSocket] = {}
+        self._active_connections: dict[str, WebSocket] = {}
 
     async def handle_connection(
         self,
@@ -451,12 +451,12 @@ class StreamManager:
         db,
         session,
         current_content: str,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Build conversation context from DB messages (same as ChatEngine)."""
         from db.models import EngineChatMessage
         from sqlalchemy import select
 
-        messages: List[Dict[str, Any]] = []
+        messages: list[dict[str, Any]] = []
 
         if session.system_prompt:
             messages.append({"role": "system", "content": session.system_prompt})
@@ -471,7 +471,7 @@ class StreamManager:
         db_messages = list(reversed(result.scalars().all()))
 
         for msg in db_messages:
-            entry: Dict[str, Any] = {"role": msg.role, "content": msg.content}
+            entry: dict[str, Any] = {"role": msg.role, "content": msg.content}
             if msg.tool_calls:
                 entry["tool_calls"] = msg.tool_calls
             if msg.role == "tool" and msg.tool_results:
@@ -501,7 +501,7 @@ class StreamManager:
         return websocket.client_state == WebSocketState.CONNECTED
 
     @staticmethod
-    async def _send_json(websocket: WebSocket, data: Dict[str, Any]) -> None:
+    async def _send_json(websocket: WebSocket, data: dict[str, Any]) -> None:
         """Send JSON data over WebSocket, silently catching disconnection."""
         try:
             if websocket.client_state == WebSocketState.CONNECTED:

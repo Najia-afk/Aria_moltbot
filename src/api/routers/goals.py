@@ -4,7 +4,6 @@ Goals + hourly goals endpoints.
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func, select, update, delete
@@ -61,7 +60,7 @@ def _is_noisy_goal_payload(goal_id: str | None, title: str | None, description: 
 async def list_goals(
     page: int = 1,
     limit: int = 25,
-    status: Optional[str] = None,
+    status: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
     base = select(Goal).order_by(Goal.priority.asc(), Goal.created_at.desc())
@@ -399,7 +398,7 @@ async def goal_history(
 
 @router.get("/hourly-goals")
 async def get_hourly_goals(
-    status: Optional[str] = None, db: AsyncSession = Depends(get_db)
+    status: str | None = None, db: AsyncSession = Depends(get_db)
 ):
     stmt = select(HourlyGoal).order_by(HourlyGoal.hour_slot, HourlyGoal.created_at.desc())
     if status:

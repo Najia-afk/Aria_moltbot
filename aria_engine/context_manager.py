@@ -11,7 +11,7 @@ The goal: maximize context quality within the token budget.
 """
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from aria_engine.config import EngineConfig
 
@@ -20,7 +20,7 @@ logger = logging.getLogger("aria.engine.context")
 
 # ── Importance scores by role ─────────────────────────────────────────────────
 # Higher = more important to keep in context
-IMPORTANCE_SCORES: Dict[str, int] = {
+IMPORTANCE_SCORES: dict[str, int] = {
     "system": 100,
     "tool": 80,
     "user": 60,
@@ -38,14 +38,14 @@ FALLBACK_TOKENS_PER_MESSAGE = 150
 class ScoredMessage:
     """A message with its importance score and token count."""
     index: int
-    message: Dict[str, Any]
+    message: dict[str, Any]
     role: str
     tokens: int
     importance: int
     is_pinned: bool = False  # pinned = must include (system, first msg, recent)
 
     @property
-    def priority(self) -> Tuple[bool, int, int]:
+    def priority(self) -> tuple[bool, int, int]:
         """Sort key: pinned first, then by importance, then by recency (index)."""
         return (self.is_pinned, self.importance, self.index)
 
@@ -79,11 +79,11 @@ class ContextManager:
 
     def build_context(
         self,
-        all_messages: List[Dict[str, Any]],
+        all_messages: list[dict[str, Any]],
         max_tokens: int = 8192,
         model: str = "gpt-4",
         reserve_tokens: int = 1024,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Build an optimal message list within the token budget.
 
@@ -105,7 +105,7 @@ class ContextManager:
             return [m for m in all_messages if m.get("role") == "system"][:1]
 
         # ── Score and tokenize all messages ───────────────────────────────
-        scored: List[ScoredMessage] = []
+        scored: list[ScoredMessage] = []
         for i, msg in enumerate(all_messages):
             role = msg.get("role", "user")
             tokens = self._count_tokens(msg, model)
@@ -133,7 +133,7 @@ class ContextManager:
                 "Pinned messages (%d tokens) exceed budget (%d). Truncating.",
                 pinned_tokens, budget,
             )
-            result: List[ScoredMessage] = []
+            result: list[ScoredMessage] = []
             used = 0
             for s in pinned:
                 if used + s.tokens <= budget:
@@ -148,7 +148,7 @@ class ContextManager:
         remaining_budget = budget - pinned_tokens
         unpinned.sort(key=lambda s: (s.importance, s.index), reverse=True)
 
-        selected_unpinned: List[ScoredMessage] = []
+        selected_unpinned: list[ScoredMessage] = []
         used_unpinned = 0
         for s in unpinned:
             if used_unpinned + s.tokens <= remaining_budget:
@@ -172,12 +172,12 @@ class ContextManager:
         self,
         db,
         session_id,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         max_tokens: int = 8192,
         model: str = "gpt-4",
         reserve_tokens: int = 1024,
         max_messages: int = 200,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Build context by loading messages from the database.
 
@@ -204,7 +204,7 @@ class ContextManager:
         )
         rows = result.scalars().all()
 
-        all_messages: List[Dict[str, Any]] = []
+        all_messages: list[dict[str, Any]] = []
 
         # Prepend system prompt if provided
         if system_prompt:
@@ -212,7 +212,7 @@ class ContextManager:
 
         # Convert DB rows to message dicts
         for row in rows:
-            msg: Dict[str, Any] = {"role": row.role, "content": row.content}
+            msg: dict[str, Any] = {"role": row.role, "content": row.content}
             if row.tool_calls:
                 msg["tool_calls"] = row.tool_calls
             if row.role == "tool" and row.tool_results:
@@ -226,7 +226,7 @@ class ContextManager:
             reserve_tokens=reserve_tokens,
         )
 
-    def _count_tokens(self, message: Dict[str, Any], model: str) -> int:
+    def _count_tokens(self, message: dict[str, Any], model: str) -> int:
         """
         Count tokens in a message using litellm's token counter.
 
@@ -245,7 +245,7 @@ class ContextManager:
             return FALLBACK_TOKENS_PER_MESSAGE
 
     def _compute_importance(
-        self, message: Dict[str, Any], index: int, total: int
+        self, message: dict[str, Any], index: int, total: int
     ) -> int:
         """
         Compute importance score for a message.
@@ -274,7 +274,7 @@ class ContextManager:
 
         return score
 
-    def _is_pinned(self, message: Dict[str, Any], index: int, total: int) -> bool:
+    def _is_pinned(self, message: dict[str, Any], index: int, total: int) -> bool:
         """
         Determine if a message must always be included.
 
@@ -300,7 +300,7 @@ class ContextManager:
         return False
 
     def estimate_tokens(
-        self, messages: List[Dict[str, Any]], model: str = "gpt-4"
+        self, messages: list[dict[str, Any]], model: str = "gpt-4"
     ) -> int:
         """
         Estimate total tokens for a list of messages.
@@ -310,16 +310,16 @@ class ContextManager:
         return sum(self._count_tokens(m, model) for m in messages)
 
     def get_window_stats(
-        self, all_messages: List[Dict[str, Any]], model: str = "gpt-4"
-    ) -> Dict[str, Any]:
+        self, all_messages: list[dict[str, Any]], model: str = "gpt-4"
+    ) -> dict[str, Any]:
         """
         Get statistics about the context window.
 
         Returns:
             Dict with total_messages, total_tokens, role_breakdown, etc.
         """
-        role_counts: Dict[str, int] = {}
-        role_tokens: Dict[str, int] = {}
+        role_counts: dict[str, int] = {}
+        role_tokens: dict[str, int] = {}
         total_tokens = 0
 
         for msg in all_messages:

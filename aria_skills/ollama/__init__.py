@@ -5,7 +5,6 @@ Ollama local LLM interface skill.
 Split from aria_skills/llm/ per Skill Standard v2 naming convention.
 """
 import os
-from typing import Dict, List, Optional
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
 from aria_skills.registry import SkillRegistry
@@ -38,7 +37,7 @@ class OllamaSkill(BaseSkill):
     
     def __init__(self, config: SkillConfig):
         super().__init__(config)
-        self._client: Optional["httpx.AsyncClient"] = None
+        self._client: "httpx.AsyncClient" | None = None
         self._model: str = ""
         self._host: str = ""
     
@@ -112,7 +111,7 @@ class OllamaSkill(BaseSkill):
     async def generate(
         self,
         prompt: str,
-        system: Optional[str] = None,
+        system: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 2048,
     ) -> SkillResult:
@@ -164,7 +163,7 @@ class OllamaSkill(BaseSkill):
     
     async def chat(
         self,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         temperature: float = 0.7,
         max_tokens: int = 2048,
     ) -> SkillResult:

@@ -8,7 +8,7 @@ import asyncio
 import subprocess
 import sys
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
 from aria_skills.registry import SkillRegistry
@@ -26,7 +26,7 @@ class PytestSkill(BaseSkill):
     
     def __init__(self, config: SkillConfig):
         super().__init__(config)
-        self._last_result: Optional[Dict] = None
+        self._last_result: Dict | None = None
     
     @property
     def name(self) -> str:
@@ -57,9 +57,9 @@ class PytestSkill(BaseSkill):
     
     async def run_tests(
         self,
-        path: Optional[str] = None,
-        markers: Optional[str] = None,
-        keywords: Optional[str] = None,
+        path: str | None = None,
+        markers: str | None = None,
+        keywords: str | None = None,
         verbose: bool = True,
     ) -> SkillResult:
         """

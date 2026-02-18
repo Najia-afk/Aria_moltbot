@@ -5,7 +5,6 @@ Social posts endpoints (Moltbook + other platforms).
 import json as json_lib
 import os
 import uuid
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import delete, func, or_, select
@@ -124,7 +123,7 @@ async def _fetch_paginated_items(client, endpoint_templates: list[str], max_item
 async def get_social_posts(
     page: int = 1,
     limit: int = 25,
-    platform: Optional[str] = None,
+    platform: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
     base = select(SocialPost).order_by(SocialPost.posted_at.desc())

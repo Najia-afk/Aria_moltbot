@@ -15,7 +15,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -43,24 +43,24 @@ class EngineAgent:
     temperature: float = 0.7
     max_tokens: int = 4096
     system_prompt: str = ""
-    focus_type: Optional[str] = None
+    focus_type: str | None = None
     status: str = "idle"  # idle, busy, error, disabled
-    current_session_id: Optional[str] = None
-    current_task: Optional[str] = None
+    current_session_id: str | None = None
+    current_task: str | None = None
     pheromone_score: float = 0.500
     consecutive_failures: int = 0
-    last_active_at: Optional[datetime] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    last_active_at: datetime | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     # Runtime state (not persisted)
     _task_queue: asyncio.Queue = field(
         default_factory=lambda: asyncio.Queue(maxsize=100)
     )
-    _worker_task: Optional[asyncio.Task] = field(default=None, repr=False)
-    _llm_gateway: Optional[Any] = field(default=None, repr=False)
-    _context: List[Dict[str, str]] = field(default_factory=list, repr=False)
+    _worker_task: asyncio.Task | None = field(default=None, repr=False)
+    _llm_gateway: Any | None = field(default=None, repr=False)
+    _context: list[dict[str, str]] = field(default_factory=list, repr=False)
 
-    async def process(self, message: str, **kwargs: Any) -> Dict[str, Any]:
+    async def process(self, message: str, **kwargs: Any) -> dict[str, Any]:
         """
         Process a message using the LLM gateway.
 
@@ -132,7 +132,7 @@ class EngineAgent:
         """Clear the agent's conversation context."""
         self._context.clear()
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Get a summary of the agent's current state."""
         return {
             "agent_id": self.agent_id,
@@ -167,14 +167,14 @@ class AgentPool:
         self,
         config: EngineConfig,
         db_engine: AsyncEngine,
-        llm_gateway: Optional[Any] = None,
+        llm_gateway: Any | None = None,
     ):
         self.config = config
         self._db_engine = db_engine
         self._llm_gateway = llm_gateway
-        self._agents: Dict[str, EngineAgent] = {}
+        self._agents: dict[str, EngineAgent] = {}
         self._concurrency_semaphore = asyncio.Semaphore(MAX_CONCURRENT_AGENTS)
-        self._skill_registry: Optional[Any] = None
+        self._skill_registry: Any | None = None
 
     def set_llm_gateway(self, gateway: Any) -> None:
         """Set the LLM gateway for all agents."""
@@ -242,7 +242,7 @@ class AgentPool:
         model: str = "",
         display_name: str = "",
         system_prompt: str = "",
-        focus_type: Optional[str] = None,
+        focus_type: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 4096,
     ) -> EngineAgent:
@@ -320,11 +320,11 @@ class AgentPool:
         logger.info("Spawned agent: %s (model=%s)", agent_id, agent.model)
         return agent
 
-    def get_agent(self, agent_id: str) -> Optional[EngineAgent]:
+    def get_agent(self, agent_id: str) -> EngineAgent | None:
         """Get an agent by ID. Returns None if not found."""
         return self._agents.get(agent_id)
 
-    def get_skill(self, skill_name: str) -> Optional[Any]:
+    def get_skill(self, skill_name: str) -> Any | None:
         """Get a skill by name from the registry."""
         if self._skill_registry is None:
             return None
@@ -364,7 +364,7 @@ class AgentPool:
         logger.info("Terminated agent: %s", agent_id)
         return True
 
-    def list_agents(self) -> List[Dict[str, Any]]:
+    def list_agents(self) -> list[dict[str, Any]]:
         """Get summaries of all agents in the pool."""
         return [agent.get_summary() for agent in self._agents.values()]
 
@@ -373,7 +373,7 @@ class AgentPool:
         agent_id: str,
         message: str,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Process a message with a specific agent, respecting concurrency limits.
 
@@ -407,8 +407,8 @@ class AgentPool:
 
     async def run_parallel(
         self,
-        tasks: List[Dict[str, Any]],
-    ) -> List[Dict[str, Any]]:
+        tasks: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
         """
         Run multiple agent tasks in parallel using TaskGroup.
 
@@ -418,13 +418,13 @@ class AgentPool:
         Returns:
             List of result dicts (one per task).
         """
-        results: List[Dict[str, Any]] = [{}] * len(tasks)
+        results: list[dict[str, Any]] = [{}] * len(tasks)
 
         async with asyncio.TaskGroup() as tg:
             for i, task in enumerate(tasks):
 
                 async def _run(
-                    idx: int = i, t: Dict[str, Any] = task
+                    idx: int = i, t: dict[str, Any] = task
                 ) -> None:
                     try:
                         result = await self.process_with_agent(
@@ -451,7 +451,7 @@ class AgentPool:
     async def _persist_agent_state(
         self,
         agent_id: str,
-        status: Optional[str] = None,
+        status: str | None = None,
     ) -> None:
         """Persist agent runtime state to the database."""
         agent = self._agents.get(agent_id)
@@ -480,9 +480,9 @@ class AgentPool:
                 },
             )
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get pool status summary."""
-        statuses: Dict[str, int] = {}
+        statuses: dict[str, int] = {}
         for agent in self._agents.values():
             statuses[agent.status] = statuses.get(agent.status, 0) + 1
 

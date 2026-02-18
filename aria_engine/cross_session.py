@@ -11,7 +11,7 @@ Features:
 """
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import litellm
 from sqlalchemy import text
@@ -38,7 +38,7 @@ KEYWORD_MAX_RESULTS = 20
 async def generate_embedding(
     text_content: str,
     model: str = EMBEDDING_MODEL,
-) -> List[float]:
+) -> list[float]:
     """
     Generate embedding vector for text using litellm.
 
@@ -95,7 +95,7 @@ class CrossSessionContext:
 
     def __init__(self, db_engine: AsyncEngine):
         self._db = db_engine
-        self._embedding_available: Optional[bool] = None
+        self._embedding_available: bool | None = None
 
     async def load_context(
         self,
@@ -104,8 +104,8 @@ class CrossSessionContext:
         max_tokens: int = DEFAULT_MAX_TOKENS,
         max_results: int = DEFAULT_MAX_RESULTS,
         threshold: float = DEFAULT_SIMILARITY_THRESHOLD,
-        exclude_session_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        exclude_session_id: str | None = None,
+    ) -> dict[str, Any]:
         """
         Load relevant cross-session context for a query.
 
@@ -171,14 +171,14 @@ class CrossSessionContext:
     async def _vector_search(
         self,
         agent_id: str,
-        embedding: List[float],
+        embedding: list[float],
         max_results: int,
         threshold: float,
-        exclude_session_id: Optional[str],
-    ) -> List[Dict[str, Any]]:
+        exclude_session_id: str | None,
+    ) -> list[dict[str, Any]]:
         """Search using pgvector cosine similarity."""
         exclude_clause = ""
-        params: Dict[str, Any] = {
+        params: dict[str, Any] = {
             "agent_id": agent_id,
             "embedding": str(embedding),
             "threshold": threshold,
@@ -236,8 +236,8 @@ class CrossSessionContext:
         agent_id: str,
         query: str,
         max_results: int,
-        exclude_session_id: Optional[str],
-    ) -> List[Dict[str, Any]]:
+        exclude_session_id: str | None,
+    ) -> list[dict[str, Any]]:
         """Fallback keyword search using ILIKE."""
         # Extract meaningful keywords
         keywords = [
@@ -263,7 +263,7 @@ class CrossSessionContext:
 
         # Build OR conditions for each keyword
         conditions = []
-        params: Dict[str, Any] = {
+        params: dict[str, Any] = {
             "agent_id": agent_id,
             "limit": max_results,
         }
@@ -363,7 +363,7 @@ class CrossSessionContext:
     async def backfill_embeddings(
         self,
         batch_size: int = 50,
-        agent_id: Optional[str] = None,
+        agent_id: str | None = None,
     ) -> int:
         """
         Backfill embeddings for messages that don't have one.
@@ -380,7 +380,7 @@ class CrossSessionContext:
             Number of messages successfully embedded.
         """
         agent_filter = ""
-        params: Dict[str, Any] = {"limit": batch_size}
+        params: dict[str, Any] = {"limit": batch_size}
         if agent_id:
             agent_filter = "AND agent_id = :agent_id"
             params["agent_id"] = agent_id
@@ -449,9 +449,9 @@ class CrossSessionContext:
 
     def _trim_to_token_budget(
         self,
-        messages: List[Dict[str, Any]],
+        messages: list[dict[str, Any]],
         max_tokens: int,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Trim messages to fit within a token budget."""
         result = []
         used_tokens = 0
@@ -474,7 +474,7 @@ class CrossSessionContext:
 
     def _estimate_tokens(
         self,
-        messages: List[Dict[str, Any]],
+        messages: list[dict[str, Any]],
     ) -> int:
         """Estimate total tokens across messages."""
         return sum(

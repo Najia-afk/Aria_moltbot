@@ -14,7 +14,7 @@ import asyncio
 import logging
 import os
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from aria_mind import AriaMind
@@ -35,17 +35,17 @@ class Heartbeat:
     def __init__(self, mind: "AriaMind"):
         self._mind = mind
         self._running = False
-        self._task: Optional[asyncio.Task] = None
-        self._last_beat: Optional[datetime] = None
+        self._task: asyncio.Task | None = None
+        self._last_beat: datetime | None = None
         self._beat_count = 0
         self._interval = int(os.environ.get("HEARTBEAT_INTERVAL_SECONDS", "3600"))
-        self._health_status: Dict[str, Any] = {}
+        self._health_status: dict[str, Any] = {}
         self.logger = logging.getLogger("aria.heartbeat")
         
         # Self-healing state
         self._consecutive_failures = 0
         self._max_consecutive_failures = 5
-        self._subsystem_health: Dict[str, bool] = {
+        self._subsystem_health: dict[str, bool] = {
             "soul": False,
             "memory": False,
             "cognition": False,
@@ -273,7 +273,7 @@ class Heartbeat:
         except Exception as e:
             self.logger.debug(f"Consolidation skipped: {e}")
     
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get current health status with detailed telemetry."""
         return {
             "running": self._running,

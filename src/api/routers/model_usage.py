@@ -8,7 +8,6 @@ OOMs/times out with 15K+ rows.
 
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy import and_, func, or_, select, text
@@ -25,7 +24,7 @@ router = APIRouter(tags=["Model Usage"])
 _TEST_MODEL_NAMES = {"test-model", "test_model"}
 
 
-def _is_test_usage_entry(model: Optional[str], provider: Optional[str]) -> bool:
+def _is_test_usage_entry(model: str | None, provider: str | None) -> bool:
     provider_l = (provider or "").strip().lower()
     model_l = (model or "").strip().lower()
     return provider_l == "pytest" or model_l in _TEST_MODEL_NAMES
@@ -42,7 +41,7 @@ def _db_non_test_usage_filter():
 async def _fetch_litellm_spend_logs(
     db: AsyncSession,
     limit: int = 200,
-    since: Optional[datetime] = None,
+    since: datetime | None = None,
 ) -> list[dict]:
     """Fetch spend logs directly from the LiteLLM PostgreSQL database."""
     try:
@@ -101,7 +100,7 @@ async def _fetch_litellm_spend_logs(
 
 async def _litellm_aggregate_stats(
     db: AsyncSession,
-    since: Optional[datetime] = None,
+    since: datetime | None = None,
 ) -> dict:
     """Aggregate LiteLLM stats directly from the DB."""
     try:
@@ -139,7 +138,7 @@ async def _litellm_aggregate_stats(
 
 async def _litellm_by_model_stats(
     db: AsyncSession,
-    since: Optional[datetime] = None,
+    since: datetime | None = None,
 ) -> list[dict]:
     """Per-model aggregation from LiteLLM DB."""
     try:
@@ -224,16 +223,16 @@ def _litellm_fallback_from_logs(logs: list[dict]) -> tuple[dict, list[dict]]:
 async def get_model_usage(
     page: int = 1,
     limit: int = 50,
-    hours: Optional[int] = None,
-    model: Optional[str] = None,
-    provider: Optional[str] = None,
-    source: Optional[str] = None,
+    hours: int | None = None,
+    model: str | None = None,
+    provider: str | None = None,
+    source: str | None = None,
     db: AsyncSession = Depends(get_db),
     litellm_db: AsyncSession = Depends(get_litellm_db),
 ):
     """Merged model usage from skill executions (DB) + LLM calls (LiteLLM)."""
     results: list[dict] = []
-    cutoff: Optional[datetime] = None
+    cutoff: datetime | None = None
     if hours is not None and int(hours) > 0:
         cutoff = datetime.now(timezone.utc) - timedelta(hours=int(hours))
 

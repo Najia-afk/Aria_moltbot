@@ -11,7 +11,6 @@ Integration tests for every page in aria-web (Flask, port 5000).
 Covers 21 web routes (22 pages — "/" and "/dashboard" share the page).
 """
 
-from __future__ import annotations
 
 import os
 

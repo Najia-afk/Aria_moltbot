@@ -14,7 +14,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 from uuid import uuid4
 
 from sqlalchemy import text
@@ -54,9 +54,9 @@ class RoundtableResult:
 
     session_id: str
     topic: str
-    participants: List[str]
+    participants: list[str]
     rounds: int
-    turns: List[RoundtableTurn]
+    turns: list[RoundtableTurn]
     synthesis: str
     synthesizer_id: str
     total_duration_ms: int
@@ -68,7 +68,7 @@ class RoundtableResult:
     def turn_count(self) -> int:
         return len(self.turns)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "session_id": self.session_id,
             "topic": self.topic,
@@ -128,7 +128,7 @@ class Roundtable:
     async def discuss(
         self,
         topic: str,
-        agent_ids: List[str],
+        agent_ids: list[str],
         rounds: int = DEFAULT_ROUNDS,
         synthesizer_id: str = "main",
         agent_timeout: int = DEFAULT_AGENT_TIMEOUT,
@@ -172,7 +172,7 @@ class Roundtable:
             rounds,
         )
 
-        turns: List[RoundtableTurn] = []
+        turns: list[RoundtableTurn] = []
 
         for round_num in range(1, rounds + 1):
             # Check total timeout
@@ -262,12 +262,12 @@ class Roundtable:
         self,
         session_id: str,
         topic: str,
-        agent_ids: List[str],
+        agent_ids: list[str],
         round_number: int,
-        prior_turns: List[RoundtableTurn],
+        prior_turns: list[RoundtableTurn],
         agent_timeout: int,
         round_timeout: float,
-    ) -> List[RoundtableTurn]:
+    ) -> list[RoundtableTurn]:
         """Run one round of discussion, collecting all agent responses."""
         context = self._build_context(prior_turns)
 
@@ -288,7 +288,7 @@ class Roundtable:
             )
 
         # Run all agents in parallel with round-level timeout
-        turns: List[RoundtableTurn] = []
+        turns: list[RoundtableTurn] = []
         try:
             results = await asyncio.wait_for(
                 asyncio.gather(*tasks, return_exceptions=True),
@@ -367,7 +367,7 @@ class Roundtable:
         self,
         session_id: str,
         topic: str,
-        turns: List[RoundtableTurn],
+        turns: list[RoundtableTurn],
         synthesizer_id: str,
         timeout: float,
     ) -> tuple:
@@ -412,7 +412,7 @@ class Roundtable:
 
     def _build_context(
         self,
-        turns: List[RoundtableTurn],
+        turns: list[RoundtableTurn],
         max_per_agent: int = 300,
     ) -> str:
         """Build context string from prior turns."""
@@ -456,7 +456,7 @@ class Roundtable:
             f"{'Identify gaps and finalize.' if round_number >= 3 else ''}"
         )
 
-    def _fallback_synthesis(self, turns: List[RoundtableTurn]) -> str:
+    def _fallback_synthesis(self, turns: list[RoundtableTurn]) -> str:
         """Fallback synthesis when the synthesizer agent fails."""
         if not turns:
             return "(No discussion content to synthesize)"
@@ -478,7 +478,7 @@ class Roundtable:
         self,
         session_id: str,
         topic: str,
-        agent_ids: List[str],
+        agent_ids: list[str],
     ) -> None:
         """Create a roundtable session in the DB."""
         import json
@@ -531,7 +531,7 @@ class Roundtable:
         self,
         limit: int = 20,
         offset: int = 0,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """List recent roundtable sessions."""
         async with self._db_engine.begin() as conn:
             result = await conn.execute(

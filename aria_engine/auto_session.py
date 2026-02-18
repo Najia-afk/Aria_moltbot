@@ -11,7 +11,7 @@ Features:
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional
+from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -112,9 +112,9 @@ class AutoSessionManager:
         agent_id: str,
         role: str,
         content: str,
-        session_id: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        session_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Ensure a session exists and add a message to it.
 
@@ -191,7 +191,7 @@ class AutoSessionManager:
 
     async def _needs_rotation(
         self,
-        session: Dict[str, Any],
+        session: dict[str, Any],
     ) -> bool:
         """
         Check if a session should be rotated to a new one.
@@ -253,8 +253,8 @@ class AutoSessionManager:
 
     async def close_idle_sessions(
         self,
-        idle_minutes: Optional[int] = None,
-    ) -> Dict[str, Any]:
+        idle_minutes: int | None = None,
+    ) -> dict[str, Any]:
         """
         Close sessions that have been idle beyond the timeout.
 
@@ -324,8 +324,8 @@ class AutoSessionManager:
     async def get_or_create_session(
         self,
         agent_id: str,
-        session_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        session_id: str | None = None,
+    ) -> dict[str, Any]:
         """
         Get an existing active session or create a new one.
 

@@ -14,7 +14,7 @@ import asyncio
 import logging
 import time
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 from uuid import uuid4
 
 from apscheduler import AsyncScheduler
@@ -122,15 +122,15 @@ class EngineScheduler:
         self,
         config: EngineConfig,
         db_engine: AsyncEngine,
-        agent_pool: Optional[Any] = None,
+        agent_pool: Any | None = None,
     ):
         self.config = config
         self._db_engine = db_engine
         self._agent_pool = agent_pool
-        self._scheduler: Optional[AsyncScheduler] = None
+        self._scheduler: AsyncScheduler | None = None
         self._running = False
         self._job_semaphore = asyncio.Semaphore(MAX_CONCURRENT_JOBS)
-        self._active_executions: Dict[str, asyncio.Task] = {}
+        self._active_executions: dict[str, asyncio.Task] = {}
 
     async def start(self) -> None:
         """
@@ -239,7 +239,7 @@ class EngineScheduler:
         async with self._job_semaphore:
             attempt = 0
             max_attempts = retry_count + 1
-            last_error: Optional[str] = None
+            last_error: str | None = None
             elapsed_ms = 0
 
             while attempt < max_attempts:
@@ -376,16 +376,16 @@ class EngineScheduler:
     async def _update_job_state(
         self,
         job_id: str,
-        status: Optional[str] = None,
-        last_run_at: Optional[datetime] = None,
-        last_duration_ms: Optional[int] = None,
-        last_error: Optional[str] = None,
+        status: str | None = None,
+        last_run_at: datetime | None = None,
+        last_duration_ms: int | None = None,
+        last_error: str | None = None,
         increment_success: bool = False,
         increment_fail: bool = False,
     ) -> None:
         """Update job execution state in the database."""
         set_clauses = ["updated_at = NOW()"]
-        params: Dict[str, Any] = {"job_id": job_id}
+        params: dict[str, Any] = {"job_id": job_id}
 
         if status is not None:
             set_clauses.append("last_status = :status")
@@ -417,7 +417,7 @@ class EngineScheduler:
 
     # ── Public management API ────────────────────────────────────────
 
-    async def add_job(self, job_data: Dict[str, Any]) -> str:
+    async def add_job(self, job_data: dict[str, Any]) -> str:
         """
         Add a new cron job to the database and register it with APScheduler.
 
@@ -475,7 +475,7 @@ class EngineScheduler:
         logger.info("Added job: %s (%s)", job_data["name"], job_id)
         return job_id
 
-    async def update_job(self, job_id: str, updates: Dict[str, Any]) -> bool:
+    async def update_job(self, job_id: str, updates: dict[str, Any]) -> bool:
         """
         Update an existing cron job in the DB and re-register with APScheduler.
 
@@ -593,7 +593,7 @@ class EngineScheduler:
         logger.info("Manually triggered job: %s", job_id)
         return True
 
-    async def get_job(self, job_id: str) -> Optional[Dict[str, Any]]:
+    async def get_job(self, job_id: str) -> dict[str, Any] | None:
         """Get a single job by ID."""
         async with self._db_engine.begin() as conn:
             result = await conn.execute(
@@ -603,7 +603,7 @@ class EngineScheduler:
             row = result.mappings().first()
             return dict(row) if row else None
 
-    async def list_jobs(self) -> List[Dict[str, Any]]:
+    async def list_jobs(self) -> list[dict[str, Any]]:
         """List all cron jobs with current state."""
         async with self._db_engine.begin() as conn:
             result = await conn.execute(
@@ -621,7 +621,7 @@ class EngineScheduler:
 
     async def get_job_history(
         self, job_id: str, limit: int = 50
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Get execution history for a job from activity_log.
 
@@ -648,7 +648,7 @@ class EngineScheduler:
         """Whether the scheduler is currently running."""
         return self._running
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get scheduler status summary."""
         return {
             "running": self._running,

@@ -5,7 +5,6 @@ S5-05 · Lessons learned endpoint tests (S5-02).
 Tests lesson recording, checking, listing, and seeding.
 Auto-skips when aria-api is unreachable.
 """
-from __future__ import annotations
 
 import os
 import uuid

@@ -18,7 +18,6 @@ Model hints are loaded from aria_models/models.yaml (criteria.focus_defaults).
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
 from pathlib import Path
 import logging
 
@@ -30,7 +29,7 @@ try:
     _HAS_CATALOG = True
 except ImportError:
     _HAS_CATALOG = False
-    def get_focus_default(focus_type: str) -> Optional[str]:
+    def get_focus_default(focus_type: str) -> str | None:
         return None
     def load_catalog():
         return {}
@@ -48,7 +47,7 @@ class FocusType(Enum):
 
 
 # CATASTROPHIC FALLBACK ONLY — models.yaml is truth
-_FALLBACK_MODEL_HINTS: Dict[str, str] = {
+_FALLBACK_MODEL_HINTS: dict[str, str] = {
     "orchestrator": "kimi",
     "devsecops": "qwen3-coder-free",
     "data": "chimera-free",
@@ -75,7 +74,7 @@ def _get_model_hint(focus_type: str) -> str:
     return _FALLBACK_MODEL_HINTS.get(focus_type, "kimi")
 
 
-def get_focus_default_with_profile(focus_type: str) -> Tuple[str, float, int]:
+def get_focus_default_with_profile(focus_type: str) -> tuple[str, float, int]:
     """Return (model, temperature, max_tokens) for a focus type.
 
     Looks up the profiles section in models.yaml first (keyed by focus_type).
@@ -117,7 +116,7 @@ class Focus:
     name: str
     emoji: str
     vibe: str
-    skills: List[str]
+    skills: list[str]
     model_hint: str  # Loaded from models.yaml at init, see _get_model_hint()
     context: str
     delegation_hint: str = ""  # How this focus delegates work
@@ -126,7 +125,7 @@ class Focus:
         """Get current model hint from models.yaml (refreshes on each call)."""
         return _get_model_hint(self.type.value)
 
-    def get_model_profile(self) -> Tuple[str, float, int]:
+    def get_model_profile(self) -> tuple[str, float, int]:
         """Return (model, temperature, max_tokens) from profiles section."""
         return get_focus_default_with_profile(self.type.value)
     
@@ -147,7 +146,7 @@ Approach: {self.vibe}
 # PERSONA DEFINITIONS
 # ─────────────────────────────────────────────────────────────────────────────
 
-FOCUSES: Dict[FocusType, Focus] = {
+FOCUSES: dict[FocusType, Focus] = {
     
     FocusType.ORCHESTRATOR: Focus(
         type=FocusType.ORCHESTRATOR,
@@ -329,7 +328,7 @@ class FocusManager:
     
     def __init__(self):
         self._active: Focus = FOCUSES[FocusType.ORCHESTRATOR]
-        self._history: List[FocusType] = []
+        self._history: list[FocusType] = []
     
     @property
     def active(self) -> Focus:
@@ -337,7 +336,7 @@ class FocusManager:
         return self._active
     
     @property
-    def all_focuses(self) -> Dict[FocusType, Focus]:
+    def all_focuses(self) -> dict[FocusType, Focus]:
         """Get all available focuses."""
         return FOCUSES
     
@@ -368,7 +367,7 @@ class FocusManager:
         """Reset to default ORCHESTRATOR focus."""
         return self.set_focus(FocusType.ORCHESTRATOR)
     
-    def get_focus_for_task(self, task_keywords: List[str]) -> FocusType:
+    def get_focus_for_task(self, task_keywords: list[str]) -> FocusType:
         """
         Suggest best focus for a task based on keywords.
         
@@ -436,7 +435,7 @@ class FocusManager:
             "catalog_available": _HAS_CATALOG,
         }
     
-    def get_all_model_hints(self) -> Dict[str, str]:
+    def get_all_model_hints(self) -> dict[str, str]:
         """Get all focus -> model mappings (live from models.yaml)."""
         return {ft.value: _get_model_hint(ft.value) for ft in FocusType}
 

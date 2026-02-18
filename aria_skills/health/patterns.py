@@ -11,7 +11,7 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger("aria.health.patterns")
 
@@ -47,7 +47,7 @@ class FailurePatternStore:
         self,
         component: str,
         error_type: str,
-        context: Optional[dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> None:
         """Record a failure occurrence."""
         record = FailureRecord(
