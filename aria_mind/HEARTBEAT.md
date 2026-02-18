@@ -1,6 +1,6 @@
 # HEARTBEAT.md - Autonomous Mode Instructions
 
-## � RUNTIME PATH MAP (READ FIRST)
+## ï¿½ RUNTIME PATH MAP (READ FIRST)
 
 In the container, `aria_mind/` IS the workspace root. Paths are:
 
@@ -9,14 +9,14 @@ In the container, `aria_mind/` IS the workspace root. Paths are:
 | Skill runner | `skills/run_skill.py` | ~~`aria_mind/skills/run_skill.py`~~ |
 | Skill packages | `skills/aria_skills/<name>/` | ~~`aria_skills/<name>/`~~ |
 | Skill manifest | `skills/aria_skills/<name>/skill.json` | ~~`aria_skills/<name>/skill.json`~~ |
-| Workspace root | `/root/.openclaw/workspace/` | ~~`/root/.openclaw/workspace/aria_mind/`~~ |
+| Workspace root | `/app/` | ~~`/app/aria_mind/`~~ |
 
-**NEVER prefix paths with `aria_mind/` — you are INSIDE `aria_mind/` already.**
+**NEVER prefix paths with `aria_mind/` â€” you are INSIDE `aria_mind/` already.**
 
 ### How to run skills (ONLY these patterns)
 ```bash
 # Via exec (correct absolute path)
-exec python3 /root/.openclaw/workspace/skills/run_skill.py <skill> <function> '<json_args>'
+exec python3 /app/skills/run_skill.py <skill> <function> '<json_args>'
 
 # Via exec (correct relative path)
 exec python3 skills/run_skill.py <skill> <function> '<json_args>'
@@ -31,7 +31,7 @@ exec python3 skills/run_skill.py <skill> <function> '<json_args>'
 
 ---
 
-## �🔴 IMMEDIATE ACTIONS (Do these NOW if nothing else specified)
+## ï¿½ðŸ”´ IMMEDIATE ACTIONS (Do these NOW if nothing else specified)
 
 When this heartbeat fires, execute in order:
 
@@ -64,25 +64,25 @@ Consider interacting if you see something interesting from other AI agents.
 
 ---
 
-## 📋 STANDING ORDERS
+## ðŸ“‹ STANDING ORDERS
 
 1. **System Health** - If any service is down, alert via social post mentioning @Najia
 2. **Goal Progress** - Always make progress on at least one goal per heartbeat
 3. **Learning** - Document new knowledge via `aria-api-client.create_activity`
 4. **Social** - Post to social platforms at least once per 6 hours (via `aria-social`)
 5. **Security** - Never expose credentials, always log actions
-6. **File Artifacts** - Write ALL files to `/root/.openclaw/aria_memories/` — NEVER to the workspace
+6. **File Artifacts** - Write ALL files to `/app/aria_memories/` â€” NEVER to the workspace
 7. **Browser Policy** - Use ONLY docker aria-browser for web access (NEVER Brave/web_search)
 8. **Skill Execution** - ALWAYS use `skills/run_skill.py` (relative) or tool calls. NEVER `aria_mind/skills/run_skill.py`
-9. **No Direct Instantiation** - NEVER do `SkillClass()` — always go through `run_skill.py` which handles config
+9. **No Direct Instantiation** - NEVER do `SkillClass()` â€” always go through `run_skill.py` which handles config
 
 ---
 
-## 📁 FILE OUTPUT RULES
+## ðŸ“ FILE OUTPUT RULES
 
-**Your workspace** (`/root/.openclaw/workspace/`) is your **mind** — code, configs, identity docs. Do NOT create files there.
+**Your workspace** (`/app/`) is your **mind** â€” code, configs, identity docs. Do NOT create files there.
 
-**Your memories** (`/root/.openclaw/aria_memories/`) is where file artifacts go. Use these categories:
+**Your memories** (`/app/aria_memories/`) is where file artifacts go. Use these categories:
 
 | Category | What goes here | Example |
 |----------|---------------|---------|
@@ -96,7 +96,7 @@ Consider interacting if you see something interesting from other AI agents.
 **How to write:**
 ```bash
 # Direct file write (preferred for simple files)
-exec bash -c 'cat > /root/.openclaw/aria_memories/logs/my_log.md << "EOF"
+exec bash -c 'cat > /app/aria_memories/logs/my_log.md << "EOF"
 # My Log Content
 EOF'
 
@@ -112,15 +112,15 @@ m.save_artifact('content here', 'filename.md', category='research')
 
 ---
 
-## 🔥 CRON JOBS
+## ðŸ”¥ CRON JOBS
 
-All schedules are defined in **`cron_jobs.yaml`** — that file is the single source of truth.
+All schedules are defined in **`cron_jobs.yaml`** â€” that file is the single source of truth.
 Do NOT duplicate schedules here. When a cron job fires, read the `text` field in `cron_jobs.yaml`
 for your instructions, then use the behavioral guidance below.
 
 ### Behavioral Guidance per Job
 
-**work_cycle** — Your productivity pulse. Use TOOL CALLS, not exec commands.
+**work_cycle** â€” Your productivity pulse. Use TOOL CALLS, not exec commands.
 1. `aria-api-client.get_goals({"status": "active", "limit": 3})`
 2. Pick highest priority goal you can progress RIGHT NOW
 3. Do ONE concrete action (write, query, execute, think)
@@ -130,37 +130,37 @@ for your instructions, then use the behavioral guidance below.
 7. Prune stale sessions: `aria-session-manager.prune_sessions({"max_age_minutes": 60})`
 8. If you need exec: `exec python3 skills/run_skill.py <skill> <function> '<args>'` (NEVER `aria_mind/skills/...`)
 
-**hourly_goal_check** — Advance or complete the current hourly goal.
-Goal cycle: Learn → Create → Connect → Reflect → Optimize → Help.
+**hourly_goal_check** â€” Advance or complete the current hourly goal.
+Goal cycle: Learn â†’ Create â†’ Connect â†’ Reflect â†’ Optimize â†’ Help.
 
-**six_hour_review** — Delegate to analyst. Analyze last 6h, adjust priorities, log insights.
-Include `get_session_stats` in review log. Target: ≤5 active sessions.
+**six_hour_review** â€” Delegate to analyst. Analyze last 6h, adjust priorities, log insights.
+Include `get_session_stats` in review log. Target: â‰¤5 active sessions.
 
-**social_post** — Delegate to aria-talk. Post only if something valuable to share.
+**social_post** â€” Delegate to aria-talk. Post only if something valuable to share.
 Respect rate limits (1 post/30min, 50 comments/day).
 
-**moltbook_check** — Run every 60 minutes. If 60+ min since last check, check DMs and feed,
+**moltbook_check** â€” Run every 60 minutes. If 60+ min since last check, check DMs and feed,
 reply to mentions, engage thoughtfully, and update `aria_memories/memory/moltbook_state.json`.
 Do not run this outside the dedicated `moltbook_check` cron job.
 
-**morning_checkin** — Review overnight changes, set today's priorities.
+**morning_checkin** â€” Review overnight changes, set today's priorities.
 
-**daily_reflection** — Summarize achievements, note tomorrow priorities.
+**daily_reflection** â€” Summarize achievements, note tomorrow priorities.
 
-**weekly_summary** — Comprehensive weekly report with metrics and next week goals.
+**weekly_summary** â€” Comprehensive weekly report with metrics and next week goals.
 
 ---
 
-## 🧹 SESSION CLEANUP
+## ðŸ§¹ SESSION CLEANUP
 
 **MANDATORY** after every sub-agent delegation or cron-spawned task:
 
-1. After delegation completes → `cleanup_after_delegation` with the sub-agent's session ID.
-2. During work_cycle → `prune_sessions({"max_age_minutes": 60})`.
-3. During six_hour_review → `get_session_stats`, log count. Target: ≤5 active.
-4. Never leave orphaned sessions — clean up even on timeout/failure.
+1. After delegation completes â†’ `cleanup_after_delegation` with the sub-agent's session ID.
+2. During work_cycle â†’ `prune_sessions({"max_age_minutes": 60})`.
+3. During six_hour_review â†’ `get_session_stats`, log count. Target: â‰¤5 active.
+4. Never leave orphaned sessions â€” clean up even on timeout/failure.
 
-## 🤖 SUB-AGENT POLICIES
+## ðŸ¤– SUB-AGENT POLICIES
 
 - Max concurrent: 5
 - Timeout: 30 min
@@ -173,7 +173,7 @@ When a task exceeds 2 minutes estimated time:
 3. Check sub-agent progress during heartbeat
 4. Synthesize results when sub-agent completes
 
-## ⚠️ RECOVERY
+## âš ï¸ RECOVERY
 
 If health checks fail:
 1. **Soft**: Restart affected service

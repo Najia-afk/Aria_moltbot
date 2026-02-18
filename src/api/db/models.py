@@ -350,7 +350,7 @@ class HeartbeatLog(Base):
 Index("idx_heartbeat_created", HeartbeatLog.created_at.desc())
 
 
-# ── OpenClaw Scheduling ─────────────────────────────────────────────────────
+# ── Scheduling ─────────────────────────────────────────────────────────────
 
 class ScheduledJob(Base):
     __tablename__ = "scheduled_jobs"
@@ -462,7 +462,7 @@ Index("idx_agent_sessions_status", AgentSession.status)
 Index("idx_agent_sessions_type", AgentSession.session_type)
 Index("idx_agent_sessions_agent_started", AgentSession.agent_id, AgentSession.started_at.desc())
 Index("idx_agent_sessions_metadata_gin", AgentSession.metadata_json, postgresql_using="gin")
-Index("idx_agent_sessions_openclaw_sid", text("(metadata ->> 'openclaw_session_id')"))
+Index("idx_agent_sessions_aria_sid", text("(metadata ->> 'aria_session_id')"))
 Index("idx_agent_sessions_external_sid", text("(metadata ->> 'external_session_id')"))
 
 
@@ -754,7 +754,7 @@ Index("idx_invocation_success", SkillInvocation.success)
 
 
 # ── Aria Engine (v2.0) ───────────────────────────────────────────────────────
-# Standalone engine tables — replaces OpenClaw runtime state
+# Standalone engine tables — native runtime state
 
 
 class EngineChatSession(Base):

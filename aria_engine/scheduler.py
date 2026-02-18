@@ -1,7 +1,7 @@
 """
 Native Scheduler — APScheduler 4.x with PostgreSQL persistence.
 
-Replaces OpenClaw's Node.js cron system with a Python-native scheduler.
+Python-native scheduler replacing legacy Node.js cron.
 Features:
 - APScheduler 4.x async scheduler with SQLAlchemy data store
 - Job definitions stored in aria_engine.cron_jobs table

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Migrate historical OpenClaw sessions from public.agent_sessions
+Migrate historical sessions from public.agent_sessions
 to aria_engine.chat_sessions.
 
 Usage:
@@ -213,7 +213,7 @@ async def run_migration(
 ) -> None:
     """Run the full migration."""
     print("=" * 60)
-    print("OpenClaw → Engine Session Migration")
+    print("Legacy → Engine Session Migration")
     print("=" * 60)
     print(f"  Database:   {DATABASE_URL.split('@')[1] if '@' in DATABASE_URL else DATABASE_URL}")
     print(f"  Dry run:    {dry_run}")
@@ -290,7 +290,7 @@ async def run_migration(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Migrate OpenClaw sessions to engine tables"
+        description="Migrate legacy sessions to engine tables"
     )
     parser.add_argument(
         "--dry-run",

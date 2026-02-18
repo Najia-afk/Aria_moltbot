@@ -1,33 +1,33 @@
-# Implementation Tickets — Memory Systems Project
+# Implementation Tickets â€” Memory Systems Project
 **For:** Najia  
 **Created:** 2026-02-16  
 **Status:** Ready for Implementation  
 
 ---
 
-## 📋 Quick Reference
+## ðŸ“‹ Quick Reference
 
 | Ticket | Priority | Effort | Status |
 |--------|----------|--------|--------|
-| [BUG-001](#bug-001-session-protection-fix) Session Protection | 🔴 CRITICAL | 15 min | Ready |
-| [FEAT-001](#feat-001-memory-compression) Memory Compression | 🟠 HIGH | 1h | Ready |
-| [FEAT-002](#feat-002-sentiment-analysis) Sentiment Analysis | 🟡 MEDIUM | 45m | Ready |
-| [FEAT-003](#feat-003-pattern-recognition) Pattern Recognition | 🟡 MEDIUM | 1h | Ready |
-| [FEAT-004](#feat-004-embedding-memory) Embedding Memory | 🟢 LOW | 2h | Ready |
+| [BUG-001](#bug-001-session-protection-fix) Session Protection | ðŸ”´ CRITICAL | 15 min | Ready |
+| [FEAT-001](#feat-001-memory-compression) Memory Compression | ðŸŸ  HIGH | 1h | Ready |
+| [FEAT-002](#feat-002-sentiment-analysis) Sentiment Analysis | ðŸŸ¡ MEDIUM | 45m | Ready |
+| [FEAT-003](#feat-003-pattern-recognition) Pattern Recognition | ðŸŸ¡ MEDIUM | 1h | Ready |
+| [FEAT-004](#feat-004-embedding-memory) Embedding Memory | ðŸŸ¢ LOW | 2h | Ready |
 
 ---
 
 ## BUG-001: Session Protection Fix
 
-### 🔴 CRITICAL — 15 minutes
+### ðŸ”´ CRITICAL â€” 15 minutes
 
 ### Description
 The `session_manager` skill can delete ANY session, including the main agent session. This destroys active conversation context and breaks continuity.
 
 ### Reproduction Steps
 1. Run: `exec python3 skills/run_skill.py session_manager delete_session '{"session_id": "CURRENT_SESSION"}'`
-2. Session is deleted → active conversation lost
-3. User must start new session → context gone
+2. Session is deleted â†’ active conversation lost
+3. User must start new session â†’ context gone
 
 ### Expected Behavior
 - Cannot delete the session you're currently in
@@ -40,7 +40,7 @@ The `session_manager` skill can delete ANY session, including the main agent ses
 1. **Add helper functions at TOP of file:**
 ```python
 def _get_current_session_id() -> Optional[str]:
-    return os.environ.get("OPENCLAW_SESSION_ID")
+    return os.environ.get("Aria Engine_SESSION_ID")
 
 def _is_cron_or_subagent_session(session_key: str) -> bool:
     if not session_key:
@@ -48,9 +48,9 @@ def _is_cron_or_subagent_session(session_key: str) -> bool:
     return any(marker in session_key for marker in [":cron:", ":subagent:", ":run:"])
 ```
 
-2. **Patch `delete_session()` method** — add at beginning:
+2. **Patch `delete_session()` method** â€” add at beginning:
 ```python
-# 🛡️ PROTECTION: Prevent deleting current session
+# ðŸ›¡ï¸ PROTECTION: Prevent deleting current session
 current_session_id = _get_current_session_id()
 if session_id == current_session_id:
     return SkillResult.fail(
@@ -58,7 +58,7 @@ if session_id == current_session_id:
         "This would destroy the active conversation context."
     )
 
-# 🛡️ PROTECTION: Prevent deleting main agent session
+# ðŸ›¡ï¸ PROTECTION: Prevent deleting main agent session
 for ag in agents:
     index = _load_sessions_index(ag)
     for key, value in index.items():
@@ -69,14 +69,14 @@ for ag in agents:
                 )
 ```
 
-3. **Patch `prune_sessions()` method** — add before deletion loop:
+3. **Patch `prune_sessions()` method** â€” add before deletion loop:
 ```python
-# 🛡️ FILTER: Remove current session from deletion candidates
+# ðŸ›¡ï¸ FILTER: Remove current session from deletion candidates
 current_session_id = _get_current_session_id()
 if current_session_id:
     to_delete = [s for s in to_delete if s.get("sessionId") != current_session_id]
 
-# 🛡️ FILTER: Remove main agent sessions
+# ðŸ›¡ï¸ FILTER: Remove main agent sessions
 to_delete = [
     s for s in to_delete
     if not (s.get("agentId") == "main" and
@@ -94,7 +94,7 @@ to_delete = [
 ### Unit Tests
 ```python
 async def test_cannot_delete_current_session():
-    os.environ["OPENCLAW_SESSION_ID"] = "test-session-123"
+    os.environ["Aria Engine_SESSION_ID"] = "test-session-123"
     result = await skill.delete_session(session_id="test-session-123")
     assert not result.success
     assert "Cannot delete current session" in result.error
@@ -106,7 +106,7 @@ async def test_cannot_delete_main_agent_session():
     assert "main agent" in result.error.lower()
 ```
 
-### 🌟 Wish List (Optional Improvements)
+### ðŸŒŸ Wish List (Optional Improvements)
 - [ ] Add `--force` flag for admin override
 - [ ] Log all deletion attempts to audit trail
 - [ ] Add confirmation prompt for main sessions (interactive mode)
@@ -116,7 +116,7 @@ async def test_cannot_delete_main_agent_session():
 
 ## FEAT-001: Memory Compression
 
-### 🟠 HIGH — 1 hour
+### ðŸŸ  HIGH â€” 1 hour
 
 ### Description
 Hierarchical memory compression to reduce token usage by 70%+ while preserving context. Implements three-tier system: raw (verbatim), recent (30% compression), archive (10% compression).
@@ -162,7 +162,7 @@ async def get_context(self, limit: int = 20):
 | Compression time | <100ms for 100 messages |
 | Context tokens | <2000 for full conversation |
 
-### 🌟 Wish List (Optional Improvements)
+### ðŸŒŸ Wish List (Optional Improvements)
 - [ ] **Incremental compression:** Only compress new messages since last run
 - [ ] **Topic-aware:** Group by topic before compressing (better coherence)
 - [ ] **LLM-powered:** Use LLM for high-quality summaries (fallback to rule-based)
@@ -174,7 +174,7 @@ async def get_context(self, limit: int = 20):
 
 ## FEAT-002: Sentiment Analysis
 
-### 🟡 MEDIUM — 45 minutes
+### ðŸŸ¡ MEDIUM â€” 45 minutes
 
 ### Description
 Multi-dimensional sentiment tracking (valence, arousal, dominance) to adapt response tone and detect user satisfaction/frustration/confusion.
@@ -234,8 +234,8 @@ result = await skill.analyze_sentiment(text="Perfect! Thanks so much!")
 assert result.data["sentiment"]["satisfaction"] > 0.7
 ```
 
-### 🌟 Wish List (Optional Improvements)
-- [ ] **Emoji sentiment:** Parse emoji as sentiment signals (😊 = +valence)
+### ðŸŒŸ Wish List (Optional Improvements)
+- [ ] **Emoji sentiment:** Parse emoji as sentiment signals (ðŸ˜Š = +valence)
 - [ ] **Sarcasm detection:** Use pattern matching for "great, just what I needed" (negative)
 - [ ] **User-specific baseline:** Learn each user's normal sentiment range
 - [ ] **Sentiment alerts:** Notify if frustration spikes suddenly
@@ -246,7 +246,7 @@ assert result.data["sentiment"]["satisfaction"] > 0.7
 
 ## FEAT-003: Pattern Recognition
 
-### 🟡 MEDIUM — 1 hour
+### ðŸŸ¡ MEDIUM â€” 1 hour
 
 ### Description
 Detect recurring topics, temporal patterns, emerging interests, and knowledge gaps from memory streams.
@@ -306,8 +306,8 @@ if pattern.type == "topic_recurrence" and pattern.subject == "quantum_mechanics"
 | Knowledge gap | Same question 2+ times | "How do I X?" asked repeatedly |
 | Sentiment drift | Valence change >0.3 | Conversation getting frustrated |
 
-### 🌟 Wish List (Optional Improvements)
-- [ ] **Topic clustering:** Group similar topics ("quantum" + "physics" → same cluster)
+### ðŸŒŸ Wish List (Optional Improvements)
+- [ ] **Topic clustering:** Group similar topics ("quantum" + "physics" â†’ same cluster)
 - [ ] **Seasonal patterns:** Detect weekly/monthly cycles
 - [ ] **Anomaly detection:** Flag unusual behavior (silence after high activity)
 - [ ] **Predictive:** Predict next likely topic based on sequence patterns
@@ -319,7 +319,7 @@ if pattern.type == "topic_recurrence" and pattern.subject == "quantum_mechanics"
 
 ## FEAT-004: Embedding Memory
 
-### 🟢 LOW — 2 hours
+### ðŸŸ¢ LOW â€” 2 hours
 
 ### Description
 Vector-based semantic memory for meaning-based retrieval (not just keywords). Enables "find similar to X" queries.
@@ -389,19 +389,19 @@ async def search_memories(self, query: str):
 | Index size | ~1.5KB per 384-dim vector |
 | Recall@10 | >0.8 for relevant memories |
 
-### 🌟 Wish List (Optional Improvements)
+### ðŸŒŸ Wish List (Optional Improvements)
 - [ ] **Multi-modal:** Support image embeddings (CLIP model)
 - [ ] **Hierarchical index:** HNSW for millions of entries
 - [ ] **Quantization:** INT8 embeddings (4x smaller, minimal accuracy loss)
 - [ ] **Embedding cache:** Cache common phrase embeddings
-- [ ] **Query expansion:** Expand "AI" → "artificial intelligence, machine learning, LLM"
+- [ ] **Query expansion:** Expand "AI" â†’ "artificial intelligence, machine learning, LLM"
 - [ ] **Cross-lingual:** Use multilingual model for any language
 - [ ] **Similarity visualization:** 2D/3D projection of memory space
 - [ ] **Memory neighborhoods:** "Find memories similar to X but not Y"
 
 ---
 
-## 🧪 Testing Strategy
+## ðŸ§ª Testing Strategy
 
 ### Unit Tests (per skill)
 ```python
@@ -431,7 +431,7 @@ class TestEmbeddingMemory:
 ```python
 # test_memory_integration.py
 async def test_full_memory_pipeline():
-    """Test compression → sentiment → pattern → embedding flow."""
+    """Test compression â†’ sentiment â†’ pattern â†’ embedding flow."""
     # 1. Add 100 messages
     # 2. Compress
     # 3. Analyze sentiment
@@ -452,7 +452,7 @@ async def test_embedding_search_performance():
 
 ---
 
-## 📈 Success Metrics
+## ðŸ“ˆ Success Metrics
 
 After implementing all features:
 
@@ -462,11 +462,11 @@ After implementing all features:
 | Memory search recall | 60% | 85%+ | Manual test queries |
 | Response relevance | 70% | 90%+ | User feedback |
 | Pattern detection | 0 | 5+ patterns/hour | Pattern log |
-| Sentiment adaptation | None | Auto-detect | Frustration → empathetic |
+| Sentiment adaptation | None | Auto-detect | Frustration â†’ empathetic |
 
 ---
 
-## 🚀 Deployment Checklist
+## ðŸš€ Deployment Checklist
 
 ### Pre-deployment
 - [ ] All unit tests pass
@@ -480,7 +480,7 @@ After implementing all features:
 - [ ] Deploy FEAT-002 (sentiment)
 - [ ] Deploy FEAT-003 (patterns)
 - [ ] Deploy FEAT-004 (embeddings)
-- [ ] Restart OpenClaw gateway
+- [ ] Restart Aria Engine gateway
 - [ ] Verify `/status` shows all skills
 
 ### Post-deployment
@@ -491,7 +491,7 @@ After implementing all features:
 
 ---
 
-## 📝 Notes
+## ðŸ“ Notes
 
 ### Design Principles
 1. **Graceful degradation:** All features work without LLM (rule-based fallback)
@@ -507,4 +507,4 @@ After implementing all features:
 
 ---
 
-**Ready to implement?** Start with BUG-001 (critical), then FEAT-001 (highest impact). All prototypes tested and documented. ⚡️
+**Ready to implement?** Start with BUG-001 (critical), then FEAT-001 (highest impact). All prototypes tested and documented. âš¡ï¸

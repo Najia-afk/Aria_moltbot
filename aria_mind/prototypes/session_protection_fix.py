@@ -3,7 +3,7 @@ Session Protection Fix prototype
 Prevents deletion of main agent session to preserve context.
 
 This file documents the patch to apply to:
-/root/.openclaw/workspace/skills/aria_skills/session_manager/__init__.py
+/app/skills/aria_skills/session_manager/__init__.py
 """
 
 import os
@@ -17,11 +17,11 @@ from datetime import datetime, timezone, timedelta
 
 def _get_current_session_id() -> Optional[str]:
     """
-    Get the current session ID from OpenClaw's environment.
+    Get the current session ID from the environment.
 
-    OpenClaw sets session ID in environment when running a session.
+    Aria sets session ID in environment when running a session.
     """
-    return os.environ.get("OPENCLAW_SESSION_ID")
+    return os.environ.get("ARIA_SESSION_ID")
 
 
 def _get_agent_name() -> str:
@@ -30,8 +30,8 @@ def _get_agent_name() -> str:
 
     Returns: e.g., "main", "analyst", "creator"
     """
-    # Option 1: From OPENCLAW_AGENT_ID env var
-    agent = os.environ.get("OPENCLAW_AGENT_ID", "")
+    # Option 1: From ARIA_AGENT_ID env var
+    agent = os.environ.get("ARIA_AGENT_ID", "")
 
     # Option 2: From config (if skill has access)
     # self._config.agent_id if available
@@ -76,9 +76,9 @@ async def delete_session_fixed(
 
     agent = agent or kwargs.get("agent", "")
 
-    # ═══════════════════════════════════════════════════════════════
-    # 🛡️ PROTECTION CHECKS (NEW CODE)
-    # ═══════════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    # ðŸ›¡ï¸ PROTECTION CHECKS (NEW CODE)
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     # 1. Check if this is the current session
     current_session_id = _get_current_session_id()
@@ -111,10 +111,10 @@ async def delete_session_fixed(
                         "Only cron and sub-agent sessions can be deleted automatically."
                     )
 
-    # ═══════════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     # Existing delete logic continues below...
     # (keep all the existing deletion code unchanged)
-    # ═══════════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     # ... rest of the original delete_session function ...
 
@@ -158,9 +158,9 @@ async def prune_sessions_fixed(
             except (ValueError, TypeError):
                 to_delete.append(sess)
 
-    # ═══════════════════════════════════════════════════════════════
-    # 🛡️ FILTER: Remove current session from deletion candidates (NEW)
-    # ═══════════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    # ðŸ›¡ï¸ FILTER: Remove current session from deletion candidates (NEW)
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     current_session_id = _get_current_session_id()
     if current_session_id:
         original_count = len(to_delete)
@@ -169,7 +169,7 @@ async def prune_sessions_fixed(
             if s.get("sessionId") != current_session_id
         ]
         if len(to_delete) < original_count:
-            print(f"ℹ️  Protected current session {current_session_id} from pruning")
+            print(f"â„¹ï¸  Protected current session {current_session_id} from pruning")
 
     # Also filter out main agent sessions
     to_delete_filtered = []
@@ -180,7 +180,7 @@ async def prune_sessions_fixed(
         to_delete_filtered.append(sess)
 
     to_delete = to_delete_filtered
-    # ═══════════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     # Continue with existing deletion logic...
     # (rest of prune_sessions unchanged)
@@ -199,7 +199,7 @@ def get_patched_delete_session():
     return '''
     async def delete_session(self, session_id: str = "", agent: str = "", **kwargs) -> SkillResult:
         """
-        Delete a session: remove from clawdbot filesystem, mark ended in PG.
+        Delete a session: remove from aria-api filesystem, mark ended in PG.
 
         PROTECTION: Cannot delete current session or main agent session.
 
@@ -213,7 +213,7 @@ def get_patched_delete_session():
             return SkillResult.fail("session_id is required")
         agent = agent or kwargs.get("agent", "")
 
-        # 🛡️ PROTECTION: Prevent deleting current session
+        # ðŸ›¡ï¸ PROTECTION: Prevent deleting current session
         current_session_id = _get_current_session_id()
         if session_id == current_session_id:
             return SkillResult.fail(
@@ -238,7 +238,7 @@ def get_patched_delete_session():
             if not keys_to_remove:
                 continue
 
-            # 🛡️ PROTECTION: Check if this is a main agent session
+            # ðŸ›¡ï¸ PROTECTION: Check if this is a main agent session
             for k in keys_to_remove:
                 # Main agent session = agent=="main" AND not a cron/subagent key
                 if ag == "main" and not _is_cron_or_subagent_session(k):
@@ -327,12 +327,12 @@ def get_patched_prune_sessions():
                 except (ValueError, TypeError):
                     to_delete.append(sess)
 
-        # 🛡️ PROTECTION: Filter out current session
+        # ðŸ›¡ï¸ PROTECTION: Filter out current session
         current_session_id = _get_current_session_id()
         if current_session_id:
             to_delete = [s for s in to_delete if s.get("sessionId") != current_session_id]
 
-        # 🛡️ PROTECTION: Filter out main agent sessions
+        # ðŸ›¡ï¸ PROTECTION: Filter out main agent sessions
         to_delete = [
             s for s in to_delete
             if not (s.get("agentId") == "main" and
@@ -373,12 +373,12 @@ PATCH_INSTRUCTIONS = """
 ## How to Apply the Session Protection Fix
 
 ### Step 1: Add Helper Functions
-Add these functions to the TOP of /root/.openclaw/workspace/skills/aria_skills/session_manager/__init__.py
+Add these functions to the TOP of /app/skills/aria_skills/session_manager/__init__.py
 (before the class definition):
 
 ```python
 def _get_current_session_id() -> Optional[str]:
-    return os.environ.get("OPENCLAW_SESSION_ID")
+    return os.environ.get("ARIA_SESSION_ID")
 
 def _is_cron_or_subagent_session(session_key: str) -> bool:
     if not session_key:
@@ -399,9 +399,9 @@ Replace the `prune_sessions` method with the code from `get_patched_prune_sessio
 3. Verify cron/subagent sessions still get deleted normally
 
 ### Step 5: Deploy
-After testing, restart OpenClaw gateway:
+After testing, restart Aria gateway:
 ```bash
-openclaw gateway restart
+Aria gateway restart
 ```
 """
 

@@ -34,7 +34,7 @@ class TestFlaskRoutes:
         os.environ.setdefault('SECRET_KEY', 'test-secret-key')
         os.environ.setdefault('SERVICE_HOST', 'localhost')
         os.environ.setdefault('API_BASE_URL', '/api')
-        os.environ.setdefault('CLAWDBOT_PUBLIC_URL', 'http://localhost:18789')
+        os.environ.setdefault('ARIA_PUBLIC_URL', 'http://localhost:8000')
         
         app = create_app()
         app.config['TESTING'] = True

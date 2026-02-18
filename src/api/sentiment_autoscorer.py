@@ -20,7 +20,7 @@ from sqlalchemy import select, func
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config import OPENCLAW_AGENTS_ROOT
+from config import ARIA_AGENTS_ROOT
 from db.session import AsyncSessionLocal
 from db.models import SessionMessage, SentimentEvent
 
@@ -126,7 +126,7 @@ def _extract_line_message(payload: dict) -> tuple[str, str, str | None]:
 
 async def _sync_jsonl(db: AsyncSession) -> int:
     """Scan ALL agent JSONL files and insert new messages into session_messages."""
-    if not OPENCLAW_AGENTS_ROOT or not os.path.exists(OPENCLAW_AGENTS_ROOT):
+    if not ARIA_AGENTS_ROOT or not os.path.exists(ARIA_AGENTS_ROOT):
         return 0
 
     # Fetch all existing content hashes to avoid duplicates (fast set lookup)
@@ -136,7 +136,7 @@ async def _sync_jsonl(db: AsyncSession) -> int:
         if h:
             existing_hashes.add(h)
 
-    pattern = os.path.join(OPENCLAW_AGENTS_ROOT, "*", "sessions", "*.jsonl")
+    pattern = os.path.join(ARIA_AGENTS_ROOT, "*", "sessions", "*.jsonl")
     inserted = 0
 
     for path in glob.glob(pattern):
@@ -193,7 +193,7 @@ async def _sync_jsonl(db: AsyncSession) -> int:
                         content=text,
                         content_hash=text_sha1,
                         source_channel="autoscorer_sync",
-                        metadata_json={"origin": "openclaw_jsonl", "timestamp": ts_str},
+                        metadata_json={"origin": "legacy_jsonl", "timestamp": ts_str},
                     )
                     # Preserve original timestamp if available
                     if ts_str:

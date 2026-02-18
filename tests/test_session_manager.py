@@ -328,7 +328,7 @@ class TestCleanupOrphans:
         (sess_dir / "sessions.json").write_text(json.dumps(index))
         # live1 has a transcript
         (sess_dir / "live1.jsonl").write_text('{"msg":"hi"}\n')
-        # stale1 has NO transcript (clawdbot already deleted it)
+        # stale1 has NO transcript (gateway already deleted it)
         # orphan transcript not in index
         (sess_dir / "orphan1.jsonl").write_text('{"msg":"orphan"}\n')
         # old .deleted file (set mtime to 10 days ago)

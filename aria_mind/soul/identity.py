@@ -13,7 +13,7 @@ class Identity:
     """
     Aria's identity - name, creature type, vibe, visual representation.
     
-    Loaded from IDENTITY.md in OpenClaw format.
+    Loaded from IDENTITY.md.
     """
     
     def __init__(self):

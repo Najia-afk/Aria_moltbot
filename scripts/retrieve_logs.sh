@@ -46,15 +46,15 @@ echo "=== Aria Log Retrieval — $(date) ==="
 echo "Target: ${SSH_HOST} | Hours: ${HOURS}h | Output: ${OUTPUT_DIR}"
 echo ""
 
-# ---- 1. OpenClaw (clawdbot) logs ----
-echo "[1/4] Retrieving OpenClaw logs (${HOURS}h)..."
-OPENCLAW_FILE="${OUTPUT_DIR}/openclaw_${TIMESTAMP}.log"
-if ${SSH_CMD} "docker logs clawdbot --since ${HOURS}h 2>&1" > "${OPENCLAW_FILE}" 2>&1; then
-  LINE_COUNT=$(wc -l < "${OPENCLAW_FILE}")
-  echo "  ✅ Saved ${LINE_COUNT} lines → ${OPENCLAW_FILE}"
+# ---- 1. Aria Brain (aria-api) logs ----
+echo "[1/4] Retrieving Aria Brain logs (${HOURS}h)..."
+ARIA_FILE="${OUTPUT_DIR}/aria_brain_${TIMESTAMP}.log"
+if ${SSH_CMD} "docker logs aria-api --since ${HOURS}h 2>&1" > "${ARIA_FILE}" 2>&1; then
+  LINE_COUNT=$(wc -l < "${ARIA_FILE}")
+  echo "  ✅ Saved ${LINE_COUNT} lines → ${ARIA_FILE}"
 else
-  echo "  ❌ Failed to retrieve OpenClaw logs (exit $?)"
-  echo "RETRIEVAL_FAILED" > "${OPENCLAW_FILE}"
+  echo "  ❌ Failed to retrieve Aria Brain logs (exit $?)"
+  echo "RETRIEVAL_FAILED" > "${ARIA_FILE}"
 fi
 
 # ---- 2. LiteLLM logs ----

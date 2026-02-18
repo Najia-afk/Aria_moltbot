@@ -56,7 +56,7 @@ SQLAlchemy 2.0 async models and session management:
 
 A Flask application with Jinja2 templates, Chart.js visualizations, tabbed layouts, and auto-refresh.
 
-The Flask app includes a reverse proxy for seamless `/api/*` and `/clawdbot/*` forwarding.
+The Flask app includes a reverse proxy for seamless `/api/*` forwarding.
 
 ### Source
 

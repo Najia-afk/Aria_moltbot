@@ -1,7 +1,7 @@
 {
   "name": "aria-session-manager",
   "version": "2.0.0",
-  "description": "Two-layer session management: delete from clawdbot filesystem (live) + mark ended in aria-api PG (history). Reads sessions.json directly, archives .jsonl transcripts.",
+  "description": "Two-layer session management: delete from filesystem (live) + mark ended in aria-api PG (history). Reads sessions.json directly, archives .jsonl transcripts.",
   "author": "Aria Team",
   "layer": 2,
   "dependencies": [],
@@ -29,7 +29,7 @@
         "properties": {
           "session_id": {
             "type": "string",
-            "description": "The OpenClaw session UUID to delete"
+            "description": "The session UUID to delete"
           },
           "agent": {
             "type": "string",
@@ -83,7 +83,7 @@
     },
     {
       "name": "cleanup_orphans",
-      "description": "Clean up filesystem inconsistencies left by clawdbot's own session management: stale keys in index, orphan .jsonl transcripts not in index, and old .deleted files (>7 days). Run this periodically or after noticing session bloat.",
+      "description": "Clean up filesystem inconsistencies left by the gateway's own session management: stale keys in index, orphan .jsonl transcripts not in index, and old .deleted files (>7 days). Run this periodically or after noticing session bloat.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -96,5 +96,5 @@
       }
     }
   ],
-  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py session_manager {{tool}} '{{args_json}}'"
+  "run": "python3 /app/skills/run_skill.py session_manager {{tool}} '{{args_json}}'"
 }

@@ -1,7 +1,7 @@
 """
 Aria Engine — Standalone Python runtime for Aria Blue.
 
-Replaces OpenClaw with native:
+Native runtime providing:
 - LLM gateway (direct litellm SDK)
 - Chat engine (session lifecycle + streaming)
 - Scheduler (APScheduler + PostgreSQL)

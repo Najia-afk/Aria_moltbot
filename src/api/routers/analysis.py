@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config import OPENCLAW_AGENTS_ROOT
+from config import ARIA_AGENTS_ROOT
 from db.models import (
     ActivityLog,
     AgentSession,
@@ -77,7 +77,7 @@ def _sentiment_label_from_valence(valence: float) -> str:
     return "neutral"
 
 
-# Attribution prefix injected by OpenClaw gateway:
+# Attribution prefix injected by gateway:
 # [Telegram Test Toust (@TestToust) id:1643801012 2026-02-16 16:10 UTC] ...
 # [Mon 2026-02-16 21:21 UTC] You said ...
 # System: [2026-02-16 20:05:34 UTC] Cron: ...
@@ -95,7 +95,7 @@ _ATTRIBUTION_PREFIX_RE = re.compile(
 
 
 def _strip_attribution(text: str) -> str:
-    """Remove OpenClaw gateway attribution prefix(es) from user text."""
+    """Remove gateway attribution prefix(es) from user text."""
     t = text.strip()
     for _ in range(5):  # up to 5 nested prefixes
         m = _ATTRIBUTION_PREFIX_RE.match(t)
@@ -164,7 +164,7 @@ def _looks_like_transcript(text: str) -> bool:
 
 
 def _extract_line_message(payload: dict[str, Any]) -> tuple[str, str, str | None]:
-    """Extract (role, content, timestamp) from various OpenClaw JSONL shapes."""
+    """Extract (role, content, timestamp) from various JSONL shapes."""
     role = ""
     content = ""
     timestamp: str | None = None
@@ -190,7 +190,7 @@ def _extract_line_message(payload: dict[str, Any]) -> tuple[str, str, str | None
             if isinstance(raw_content, str):
                 content = raw_content
             elif isinstance(raw_content, list):
-                # OpenClaw stores content as [{"type":"text","text":"..."},...]
+                # Content may be stored as [{"type":"text","text":"..."},...]
                 parts = []
                 for item in raw_content:
                     if isinstance(item, dict):
@@ -207,16 +207,16 @@ def _extract_line_message(payload: dict[str, Any]) -> tuple[str, str, str | None
     return role, content, timestamp
 
 
-def _extract_user_messages_from_openclaw_jsonl(
+def _extract_user_messages_from_jsonl(
     session_ids: set[str],
     max_messages: int,
     min_chars: int,
 ) -> list[dict[str, Any]]:
     extracted: list[dict[str, Any]] = []
-    if not OPENCLAW_AGENTS_ROOT or not os.path.exists(OPENCLAW_AGENTS_ROOT):
+    if not ARIA_AGENTS_ROOT or not os.path.exists(ARIA_AGENTS_ROOT):
         return extracted
 
-    pattern = os.path.join(OPENCLAW_AGENTS_ROOT, "*", "sessions", "*.jsonl")
+    pattern = os.path.join(ARIA_AGENTS_ROOT, "*", "sessions", "*.jsonl")
     for path in glob.glob(pattern):
         if len(extracted) >= max_messages:
             break
@@ -263,7 +263,7 @@ def _extract_user_messages_from_openclaw_jsonl(
                             "role": role,
                             "text": text,
                             "timestamp": timestamp,
-                            "origin": "openclaw_jsonl",
+                            "origin": "legacy_jsonl",
                         }
                     )
         except Exception:
@@ -449,7 +449,7 @@ async def backfill_sentiment_from_sessions(
     req: SentimentBackfillRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    """Retro-populate sentiment memories from real user messages in OpenClaw session JSONL."""
+    """Retro-populate sentiment memories from real user messages in session JSONL."""
     try:
         from aria_skills.sentiment_analysis import (
             SentimentAnalyzer, LLMSentimentClassifier, EmbeddingSentimentClassifier,
@@ -457,8 +457,8 @@ async def backfill_sentiment_from_sessions(
 
         session_stmt = (
             select(AgentSession)
-            .where(AgentSession.session_type.like("openclaw%"))
-            .where(AgentSession.session_type != "openclaw_heartbeat")
+            .where(AgentSession.session_type.like("legacy%"))
+            .where(AgentSession.session_type != "legacy_heartbeat")
             .order_by(AgentSession.started_at.desc())
             .limit(req.max_sessions)
         )
@@ -467,11 +467,11 @@ async def backfill_sentiment_from_sessions(
         session_ids: set[str] = set()
         for sess in sessions:
             meta = sess.metadata_json or {}
-            sid = str(meta.get("openclaw_session_id") or "").strip()
+            sid = str(meta.get("aria_session_id") or meta.get("session_id") or "").strip()
             if sid:
                 session_ids.add(sid)
 
-        messages = _extract_user_messages_from_openclaw_jsonl(
+        messages = _extract_user_messages_from_jsonl(
             session_ids=session_ids,
             max_messages=req.max_messages,
             min_chars=req.min_chars,
@@ -485,7 +485,7 @@ async def backfill_sentiment_from_sessions(
                 "messages_found": 0,
                 "stored": 0,
                 "skipped": 0,
-                "note": "No user messages found in OpenClaw JSONL (check OPENCLAW_AGENTS_ROOT mount and session files).",
+                "note": "No user messages found in session JSONL (check ARIA_AGENTS_ROOT mount and session files).",
             }
 
         classifier = LLMSentimentClassifier()
@@ -543,13 +543,13 @@ async def backfill_sentiment_from_sessions(
                 stored += 1
                 continue
 
-            # Resolve internal session_id from external openclaw session id
+            # Resolve internal session_id from external session id
             parsed_session_id: uuid.UUID | None = None
             if session_id:
                 session_match = (await db.execute(
                     select(AgentSession.id)
                     .where(
-                        (AgentSession.metadata_json["openclaw_session_id"].astext == session_id)
+                        (AgentSession.metadata_json["aria_session_id"].astext == session_id)
                         | (AgentSession.metadata_json["external_session_id"].astext == session_id)
                     )
                     .order_by(AgentSession.started_at.desc())
@@ -577,8 +577,8 @@ async def backfill_sentiment_from_sessions(
                     role=msg_role,
                     content=text,
                     content_hash=text_sha1,
-                    source_channel="openclaw_backfill",
-                    metadata_json={"origin": "openclaw_jsonl", "timestamp": msg.get("timestamp")},
+                    source_channel="legacy_backfill",
+                    metadata_json={"origin": "legacy_jsonl", "timestamp": msg.get("timestamp")},
                 )
                 if original_ts:
                     existing_msg.created_at = original_ts
@@ -704,7 +704,7 @@ async def analyze_realtime_user_reply_sentiment(
                 select(AgentSession.id)
                 .where(
                     (AgentSession.metadata_json["external_session_id"].astext == conversation_id)
-                    | (AgentSession.metadata_json["openclaw_session_id"].astext == conversation_id)
+                    | (AgentSession.metadata_json["aria_session_id"].astext == conversation_id)
                 )
                 .order_by(AgentSession.started_at.desc())
                 .limit(1)

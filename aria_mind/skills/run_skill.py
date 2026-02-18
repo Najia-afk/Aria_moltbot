@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Aria Skill Runner - Execute Python skills from OpenClaw exec tool.
+Aria Skill Runner - Execute Python skills from exec tool.
 
 Usage:
     python3 aria_mind/skills/run_skill.py <skill_name> <function_name> [args_json]
@@ -19,10 +19,10 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 # Add skill modules to path — handle both local and container layouts
-# Container: aria_skills/ is mounted at /root/.openclaw/workspace/skills/aria_skills/
+# Container: aria_skills/ is mounted at /app/skills/aria_skills/
 # Local: aria_skills/ is a sibling of aria_mind/ at project root
-sys.path.insert(0, '/root/.openclaw/workspace/skills')
-sys.path.insert(0, '/root/.openclaw/workspace')
+sys.path.insert(0, '/app/skills')
+sys.path.insert(0, '/app')
 _project_root = str(Path(__file__).resolve().parents[2])
 sys.path.insert(0, _project_root)
 # Also add the parent of skills/ in case aria_skills is nested
@@ -585,7 +585,7 @@ if __name__ == '__main__':
     skill_name = remaining[0]
     function_name = remaining[1]
     
-    # Defensive JSON parsing - handle malformed tool call args from OpenClaw
+    # Defensive JSON parsing - handle malformed tool call args from exec
     args = {}
     if len(remaining) > 2:
         args, warning = _parse_args_payload(remaining[2])

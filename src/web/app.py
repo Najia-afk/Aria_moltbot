@@ -16,7 +16,7 @@ def create_app():
 
     service_host = os.environ['SERVICE_HOST']
     api_base_url = os.environ['API_BASE_URL']
-    # REMOVED: clawdbot_public_url, clawdbot_token — OpenClaw removed (Operation Independence)
+    # REMOVED: legacy bot proxy config (Operation Independence)
 
     # Internal API service URL (Docker network or localhost fallback)
     _api_internal_url = os.environ.get('API_INTERNAL_URL', 'http://aria-api:8000')
@@ -26,7 +26,7 @@ def create_app():
         return {
             'service_host': service_host,
             'api_base_url': api_base_url,
-            # REMOVED: clawdbot_public_url, clawdbot_token
+            # REMOVED: legacy bot proxy config
         }
     
     @app.after_request
@@ -67,14 +67,14 @@ def create_app():
         headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded_headers}
         return Response(resp.content, status=resp.status_code, headers=headers)
 
-    # REMOVED: /clawdbot/ proxy route — OpenClaw removed (Operation Independence)
-    # Previously: forwarded to http://clawdbot:18789 with Bearer token injection
+    # REMOVED: legacy bot proxy route (Operation Independence)
+    # Previously: forwarded to legacy bot service with Bearer token injection
     # Replaced by: native /chat/ route (S6-01) connecting to engine WebSocket
 
     # Legacy redirect: anyone bookmarking /clawdbot/ gets redirected to /chat/
     @app.route('/clawdbot/')
     @app.route('/clawdbot/<path:path>')
-    def clawdbot_redirect(path=''):
+    def legacy_bot_redirect(path=''):
         from flask import redirect
         return redirect('/chat/', code=301)
 
@@ -257,7 +257,7 @@ def create_app():
         return render_template('engine_health.html')
 
     # ============================================
-    # Engine Routes (New — replaces OpenClaw UI)
+    # Engine Routes (native chat UI)
     # ============================================
     @app.route('/chat/')
     @app.route('/chat/<session_id>')

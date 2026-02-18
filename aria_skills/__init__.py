@@ -15,7 +15,7 @@ Each skill:
 NEW STRUCTURE (v2.0):
 Each skill is now a subdirectory containing:
 - __init__.py  - Python implementation
-- skill.json   - OpenClaw manifest
+- skill.json   - Aria manifest
 - SKILL.md     - Documentation (optional)
 
 Usage:

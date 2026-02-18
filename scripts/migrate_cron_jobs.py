@@ -9,7 +9,7 @@ Handles:
 - Commented-out jobs → skipped
 - Duplicate detection → upsert on id (job name used as id)
 - Agent mapping → agent_id column
-- Session mode mapping → OpenClaw 'isolated' → 'isolated'
+- Session mode mapping → legacy 'isolated' → 'isolated'
 
 Usage:
     python scripts/migrate_cron_jobs.py
@@ -69,7 +69,7 @@ def map_schedule(job: Dict[str, Any]) -> str:
 
 
 def map_session_mode(job: Dict[str, Any]) -> str:
-    """Map OpenClaw session mode to engine session mode."""
+    """Map legacy session mode to engine session mode."""
     session = job.get("session", "isolated")
     mode_map = {
         "isolated": "isolated",

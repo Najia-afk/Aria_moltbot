@@ -521,7 +521,7 @@ COMMENT ON TABLE hourly_goals IS 'Hourly goal tracking for Aria scheduling';
 COMMENT ON TABLE performance_log IS 'Periodic performance reviews';
 COMMENT ON TABLE pending_complex_tasks IS 'Queue for complex multi-step tasks';
 COMMENT ON TABLE schedule_tick IS 'Scheduler state singleton';
-COMMENT ON TABLE scheduled_jobs IS 'Cron-style scheduled jobs synced from OpenClaw';
+COMMENT ON TABLE scheduled_jobs IS 'Cron-style scheduled jobs synced from scheduler';
 COMMENT ON TABLE skill_status IS 'Runtime status of registered skills';
 COMMENT ON TABLE agent_performance IS 'Pheromone scoring for agent task routing';
 COMMENT ON TABLE working_memory IS 'Short-term working memory with TTL and importance';

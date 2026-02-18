@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 # File-based storage paths (inside container)
-ARIA_MEMORIES_PATH = os.environ.get("ARIA_MEMORIES_PATH", "/root/.openclaw/aria_memories")
+ARIA_MEMORIES_PATH = os.environ.get("ARIA_MEMORIES_PATH", "/app/aria_memories")
 ARIA_REPO_PATH = os.environ.get("ARIA_REPO_PATH", "/root/repo/aria_memories")
 
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test WebSocket session management against clawdbot gateway."""
+"""Test WebSocket session management against Aria gateway."""
 import aiohttp
 import asyncio
 import json
@@ -7,8 +7,8 @@ import os
 
 
 async def test_connect_and_list():
-    token = os.environ.get("OPENCLAW_GATEWAY_TOKEN", "")
-    port = os.environ.get("OPENCLAW_GATEWAY_PORT", "18789")
+    token = os.environ.get("ARIA_GATEWAY_TOKEN", "")
+    port = os.environ.get("ARIA_GATEWAY_PORT", "8000")
     url = f"ws://localhost:{port}"
 
     async with aiohttp.ClientSession() as session:
@@ -19,7 +19,7 @@ async def test_connect_and_list():
                 "method": "connect",
                 "params": {
                     "minProtocol": 3, "maxProtocol": 3,
-                    "client": {"id": "openclaw-control-ui", "version": "1.0", "platform": "python", "mode": "webchat"},
+                    "client": {"id": "aria-control-ui", "version": "1.0", "platform": "python", "mode": "webchat"},
                     "role": "operator",
                     "scopes": ["operator.admin"],
                     "auth": {"token": token},
@@ -41,7 +41,7 @@ async def test_connect_and_list():
                     "method": "connect",
                     "params": {
                         "minProtocol": 3, "maxProtocol": 3,
-                        "client": {"id": "openclaw-control-ui", "version": "1.0", "platform": "python", "mode": "webchat"},
+                        "client": {"id": "aria-control-ui", "version": "1.0", "platform": "python", "mode": "webchat"},
                         "role": "operator",
                         "scopes": ["operator.admin"],
                         "auth": {"token": token},

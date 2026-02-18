@@ -4,7 +4,7 @@
 
 Aria is an autonomous AI agent built on a layered architecture. She operates as an **orchestrating consciousness** — breaking tasks into delegatable work, routing to specialized agents, and synthesizing results. She runs on a self-driven work cycle with goal tracking, persistent memory, and full observability.
 
-Built on [OpenClaw](https://openclaw.ai) with local-first LLM inference on Apple Silicon.
+Built on a native Python engine (`aria_engine`) with local-first LLM inference on Apple Silicon.
 
 ---
 
@@ -92,7 +92,7 @@ Built on [OpenClaw](https://openclaw.ai) with local-first LLM inference on Apple
 ║  │                      EXTERNAL INTERFACE                             │     ║
 ║  │  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │     ║
 ║  │                                                                     │     ║
-║  │   Telegram ←──→ OpenClaw ←──→ Docker ←──→ PostgreSQL              │     ║
+║  │   Telegram ←──→ Aria Engine ←──→ Docker ←──→ PostgreSQL          │     ║
 ║  │   (You talk  │   (My      │   (My      │   (My memory              │     ║
 ║  │    to me)    │    spine)  │    body)   │    substrate)             │     ║
 ║  │                                                                     │     ║
@@ -238,7 +238,7 @@ Implementation details: `aria_mind/memory.py`, `aria_skills/working_memory/`, `a
 ├──────────────────────────────────────────────────────────────────────┤
 │                                                                      │
 │  ┌────────────┐    ┌────────────┐    ┌────────────┐                  │
-│  │  Traefik   │    │  OpenClaw  │    │  LiteLLM   │                  │
+│  │  Traefik   │    │Aria Engine │    │  LiteLLM   │                  │
 │  │  (Proxy)   │    │ (Gateway)  │    │  (Router)  │                  │
 │  └─────┬──────┘    └─────┬──────┘    └─────┬──────┘                  │
 │        │                 │                 │                          │

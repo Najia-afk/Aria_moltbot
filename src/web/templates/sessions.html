@@ -85,7 +85,7 @@
         <option value="whatsapp">whatsapp</option>
         <option value="heartbeat">heartbeat</option>
     </select>
-    <label class="inline-toggle" title="Show OpenClaw cron sessions in the dashboard">
+    <label class="inline-toggle" title="Show cron sessions in the dashboard">
         <input type="checkbox" id="cron-toggle" checked>
         Show cron sessions
     </label>
@@ -382,7 +382,7 @@ function renderSessionOverview() {
     document.getElementById('stat-active').textContent = s.active_sessions || 0;
     document.getElementById('stat-total').textContent = formatNumber(s.total_sessions);
     document.getElementById('stat-total-sub').textContent =
-        'DB sessions (auto-synced from OpenClaw + runtime events)';
+        'DB sessions (auto-synced + runtime events)';
     document.getElementById('stat-tokens').textContent = formatNumber(s.total_tokens);
     document.getElementById('stat-tokens-sub').textContent =
         `Skills DB: ${formatNumber(skillSrc.tokens || 0)} | LiteLLM DB: ${formatNumber(litSrc.tokens || lit.tokens || 0)}`;
@@ -504,8 +504,8 @@ function renderRecent() {
             <tr>
                 <td><code style="font-size:11px">${s.id.slice(0,8)}...</code></td>
                 <td><span class="agent-badge">🤖 ${s.agent_id}</span></td>
-                <td>${(s.metadata?.openclaw_session?.label || s.metadata?.label || '-')}</td>
-                <td>${(s.source_channel || s.metadata?.openclaw_source_channel || s.metadata?.openclaw_session?.channel || '-')}</td>
+                <td>${(s.metadata?.session?.label || s.metadata?.label || '-')}</td>
+                <td>${(s.source_channel || s.metadata?.source_channel || s.metadata?.session?.channel || '-')}</td>
                 <td><span class="type-badge">${s.session_type}</span></td>
                 <td><span class="status-badge ${s.status}">${s.status}</span></td>
                 <td>${s.tokens_used ? formatNumber(s.tokens_used) : '-'}</td>

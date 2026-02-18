@@ -1,7 +1,7 @@
 {
   "name": "aria-research",
   "version": "1.0.0",
-  "description": "📰 Research and information gathering for Journalist",
+  "description": "ðŸ“° Research and information gathering for Journalist",
   "author": "Aria Blue",
   "layer": 3,
   "dependencies": ["api_client"],
@@ -96,5 +96,5 @@
       }
     }
   ],
-  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py research {{tool}} '{{args_json}}'"
+  "run": "python3 /app/skills/run_skill.py research {{tool}} '{{args_json}}'"
 }

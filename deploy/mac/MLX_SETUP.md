@@ -190,7 +190,7 @@ launchctl unload ~/Library/LaunchAgents/com.aria.mlx-server.plist
 | **14B (4-bit)** | **~8 GB** | M2 Pro / M3 Pro 36 GB+ recommended |
 | **32B (4-bit)** | **~18 GB** | M3 Max 64 GB+ only |
 
-The Aria Docker stack (LiteLLM + Supabase + OpenClaw) typically uses 4-8 GB.
+The Aria Docker stack (LiteLLM + Supabase + Aria Engine) typically uses 4-8 GB.
 Plan total = Docker overhead + model size + 2 GB system headroom.
 
 ---

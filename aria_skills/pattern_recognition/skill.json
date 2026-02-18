@@ -1,7 +1,7 @@
 {
   "name": "aria-pattern-recognition",
   "version": "1.0.0",
-  "description": "Detect behavioral patterns in memory streams — topic recurrence, temporal habits, sentiment drift, emerging interests, knowledge gaps",
+  "description": "Detect behavioral patterns in memory streams â€” topic recurrence, temporal habits, sentiment drift, emerging interests, knowledge gaps",
   "author": "Aria Team",
   "layer": 3,
   "category": "cognitive",
@@ -16,7 +16,7 @@
         "properties": {
           "memories": {
             "type": "array",
-            "description": "List of memory dicts (optional — auto-fetches if empty)"
+            "description": "List of memory dicts (optional â€” auto-fetches if empty)"
           },
           "min_confidence": {
             "type": "number",
@@ -61,7 +61,7 @@
     },
     {
       "name": "get_pattern_stats",
-      "description": "Get statistics from the last pattern detection run — counts by type, new vs persistent.",
+      "description": "Get statistics from the last pattern detection run â€” counts by type, new vs persistent.",
       "input_schema": {
         "type": "object",
         "properties": {}
@@ -69,5 +69,5 @@
     }
   ],
   "rate_limit": {"max_per_minute": 20},
-  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py pattern_recognition {{tool}} '{{args_json}}'"
+  "run": "python3 /app/skills/run_skill.py pattern_recognition {{tool}} '{{args_json}}'"
 }

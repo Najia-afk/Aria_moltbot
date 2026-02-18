@@ -1,26 +1,26 @@
 ```skill
 ---
 name: aria-memory-compression
-description: "🗜️ 3-tier hierarchical memory compression"
-metadata: {"openclaw": {"emoji": "🗜️"}}
+description: "ðŸ—œï¸ 3-tier hierarchical memory compression"
+metadata: {"aria": {"emoji": "ðŸ—œï¸"}}
 ---
 
 # aria-memory-compression
 
 3-tier hierarchical memory compression engine. Scores memory importance,
 compresses via LLM summarization (with rule-based fallback), and manages
-raw → recent → archive tiers. Stores compressed summaries in semantic memory.
+raw â†’ recent â†’ archive tiers. Stores compressed summaries in semantic memory.
 
 ## Architecture
 
 ```
 Raw memories (limit: 20)
-    ↓ ImportanceScorer (recency × significance × category × length)
-    ↓ MemoryCompressor (LLM via LiteLLM + fallback)
+    â†“ ImportanceScorer (recency Ã— significance Ã— category Ã— length)
+    â†“ MemoryCompressor (LLM via LiteLLM + fallback)
 Recent tier (limit: 100, ratio: 0.3)
-    ↓
+    â†“
 Archive tier (all older, ratio: 0.1)
-    ↓
+    â†“
 SemanticMemory (category: compressed_recent / compressed_archive)
 ```
 
@@ -28,16 +28,16 @@ SemanticMemory (category: compressed_recent / compressed_archive)
 
 ```bash
 # Compress a batch of memories through the pipeline
-exec python3 /root/.openclaw/workspace/skills/run_skill.py memory_compression compress_memories '{"memories": [{"content": "...", "category": "task", "timestamp": "2026-02-16T10:00:00Z"}]}'
+exec python3 /app/skills/run_skill.py memory_compression compress_memories '{"memories": [{"content": "...", "category": "task", "timestamp": "2026-02-16T10:00:00Z"}]}'
 
 # Compress recent session (last N hours)
-exec python3 /root/.openclaw/workspace/skills/run_skill.py memory_compression compress_session '{"hours_back": 6}'
+exec python3 /app/skills/run_skill.py memory_compression compress_session '{"hours_back": 6}'
 
 # Get working context within token budget
-exec python3 /root/.openclaw/workspace/skills/run_skill.py memory_compression get_context_budget '{"max_tokens": 2000}'
+exec python3 /app/skills/run_skill.py memory_compression get_context_budget '{"max_tokens": 2000}'
 
 # Check compression statistics
-exec python3 /root/.openclaw/workspace/skills/run_skill.py memory_compression get_compression_stats '{}'
+exec python3 /app/skills/run_skill.py memory_compression get_compression_stats '{}'
 ```
 
 ## Functions
@@ -56,7 +56,7 @@ Retrieve working memory context within a token budget. Includes both raw
 working memory items and compressed summaries from previous runs.
 
 ### get_compression_stats
-Get statistics from the last compression run — memories processed,
+Get statistics from the last compression run â€” memories processed,
 compression ratio, tokens saved, tier breakdown.
 
 ## Dependencies

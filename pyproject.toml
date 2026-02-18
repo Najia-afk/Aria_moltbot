@@ -8,7 +8,7 @@ license = {file = "LICENSE"}
 authors = [
     {name = "Najia-afk"}
 ]
-keywords = ["ai", "agent", "autonomous", "llm", "openclaw", "moltbook", "multi-agent"]
+keywords = ["ai", "agent", "autonomous", "llm", "aria-engine", "moltbook", "multi-agent"]
 
 classifiers = [
     "Development Status :: 4 - Beta",

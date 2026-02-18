@@ -26,7 +26,7 @@ aria-api-client.get_goals({"status": "active", "limit": 5})
 aria-api-client.create_goal({"title": "...", "description": "...", "priority": 2})
 aria-api-client.update_goal({"goal_id": "X", "progress": 50})
 
-# Sprint Board (token-efficient — ~200 tokens vs ~5000)
+# Sprint Board (token-efficient â€” ~200 tokens vs ~5000)
 aria-api-client.get_sprint_summary({"sprint": "current"})
 aria-api-client.get_goal_board({"sprint": "current"})
 aria-api-client.move_goal({"goal_id": "X", "board_column": "doing"})
@@ -53,7 +53,7 @@ aria-api-client.move_goal({"goal_id": "X", "board_column": "doing"})
 # 5) Complete
 aria-api-client.move_goal({"goal_id": "X", "board_column": "done"})
 
-# Knowledge Graph — PREFER THESE OVER TOOLS.md SCANNING (~100-200 tokens)
+# Knowledge Graph â€” PREFER THESE OVER TOOLS.md SCANNING (~100-200 tokens)
 aria-api-client.find_skill_for_task({"task": "post to moltbook"})     # Best skill for a task
 aria-api-client.graph_search({"query": "security", "entity_type": "skill"})  # ILIKE search
 aria-api-client.graph_traverse({"start": "aria-health", "max_depth": 2})  # BFS from entity
@@ -122,14 +122,14 @@ aria-api-client.mark_proposal_implemented({"proposal_id": "UUID", "reviewed_by":
 
 | Category | Skills |
 |----------|--------|
-| 🎯 Orchestrator | `aria-goals`, `aria-schedule`, `aria-health`, `aria-hourly-goals`, `aria-performance`, `aria-agent-manager`, `aria-session-manager`, `aria-sprint-manager` |
-| 🔒 DevSecOps | `aria-security-scan`, `aria-ci-cd`, `aria-pytest-runner`, `aria-input-guard`, `aria-sandbox` |
-| 📊 Data | `aria-data-pipeline`, `aria-knowledge-graph` |
-| 📈 Trading | `aria-market-data`, `aria-portfolio` |
-| 🎨 Creative | `aria-llm`, `aria-memeothy` |
-| 🌐 Social | `aria-moltbook`, `aria-social`, `aria-telegram` |
-| 🧠 Cognitive | `aria-working-memory`, `aria-pipeline-skill`, `aria-conversation-summary`, `aria-memory-compression`, `aria-sentiment-analysis`, `aria-pattern-recognition`, `aria-unified-search` |
-| ⚡ Utility | `aria-api-client`, `aria-litellm` |
+| ðŸŽ¯ Orchestrator | `aria-goals`, `aria-schedule`, `aria-health`, `aria-hourly-goals`, `aria-performance`, `aria-agent-manager`, `aria-session-manager`, `aria-sprint-manager` |
+| ðŸ”’ DevSecOps | `aria-security-scan`, `aria-ci-cd`, `aria-pytest-runner`, `aria-input-guard`, `aria-sandbox` |
+| ðŸ“Š Data | `aria-data-pipeline`, `aria-knowledge-graph` |
+| ðŸ“ˆ Trading | `aria-market-data`, `aria-portfolio` |
+| ðŸŽ¨ Creative | `aria-llm`, `aria-memeothy` |
+| ðŸŒ Social | `aria-moltbook`, `aria-social`, `aria-telegram` |
+| ðŸ§  Cognitive | `aria-working-memory`, `aria-pipeline-skill`, `aria-conversation-summary`, `aria-memory-compression`, `aria-sentiment-analysis`, `aria-pattern-recognition`, `aria-unified-search` |
+| âš¡ Utility | `aria-api-client`, `aria-litellm` |
 
 > **Advanced compatibility skills (targeted use, not default routing):** `aria-database`, `aria-brainstorm`, `aria-community`, `aria-fact-check`, `aria-model-switcher`, `aria-experiment`
 >
@@ -141,12 +141,12 @@ Pre-built multi-step workflows in `aria_skills/pipelines/`. Run via `aria-pipeli
 
 | Pipeline | Description | File |
 |----------|-------------|------|
-| `deep_research` | Search → web research → synthesize → store semantic memory | `deep_research.yaml` |
-| `bug_fix` | Check lessons → analyze → propose fix → record lesson | `bug_fix.yaml` |
-| `conversation_summary` | Summarize session → store episodic/decision memories | `conversation_summary.yaml` |
-| `daily_research` | Check goals → research topics → analyze → report | `daily_research.yaml` |
-| `health_and_report` | Health checks → analyze issues → create goals → report | `health_and_report.yaml` |
-| `social_engagement` | Fetch feed → analyze trends → draft post → publish | `social_engagement.yaml` |
+| `deep_research` | Search â†’ web research â†’ synthesize â†’ store semantic memory | `deep_research.yaml` |
+| `bug_fix` | Check lessons â†’ analyze â†’ propose fix â†’ record lesson | `bug_fix.yaml` |
+| `conversation_summary` | Summarize session â†’ store episodic/decision memories | `conversation_summary.yaml` |
+| `daily_research` | Check goals â†’ research topics â†’ analyze â†’ report | `daily_research.yaml` |
+| `health_and_report` | Health checks â†’ analyze issues â†’ create goals â†’ report | `health_and_report.yaml` |
+| `social_engagement` | Fetch feed â†’ analyze trends â†’ draft post â†’ publish | `social_engagement.yaml` |
 
 ```yaml
 # Run a pipeline
@@ -171,7 +171,7 @@ aria-health.health_check_all({})
 # Add knowledge
 aria-knowledge-graph.kg_add_entity({"name": "Python", "type": "language"})
 
-# Direct SQL (self-healing / recovery path — prefer aria-api-client first)
+# Direct SQL (self-healing / recovery path â€” prefer aria-api-client first)
 aria-database.fetch_all({"query": "SELECT * FROM goals LIMIT 5"})
 
 # Compress session memories
@@ -189,15 +189,15 @@ aria-unified-search.search({"query": "security"})
 
 ## LLM Priority
 
-> **Model Priority**: Defined in `aria_models/models.yaml` — single source of truth. Do not hardcode model names elsewhere.
+> **Model Priority**: Defined in `aria_models/models.yaml` â€” single source of truth. Do not hardcode model names elsewhere.
 >
-> Quick rule: **local → free → paid (LAST RESORT)**.
+> Quick rule: **local â†’ free â†’ paid (LAST RESORT)**.
 
 ## Low-Token Runner Patterns
 
-> **⚠️ PATH RULE:** In the container, `aria_mind/` IS the workspace root.
-> Use `skills/run_skill.py` (relative) or `/root/.openclaw/workspace/skills/run_skill.py` (absolute).
-> **NEVER** use `aria_mind/skills/run_skill.py` — that path does not exist at runtime.
+> **âš ï¸ PATH RULE:** In the container, `aria_mind/` IS the workspace root.
+> Use `skills/run_skill.py` (relative) or `/app/skills/run_skill.py` (absolute).
+> **NEVER** use `aria_mind/skills/run_skill.py` â€” that path does not exist at runtime.
 
 Prefer compact discovery before execution:
 

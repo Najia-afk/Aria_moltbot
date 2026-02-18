@@ -385,7 +385,7 @@ class MetacognitiveEngine:
         try:
             if base_path is None:
                 import os
-                memories = os.environ.get("ARIA_MEMORIES_PATH", "/root/.openclaw/aria_memories")
+                memories = os.environ.get("ARIA_MEMORIES_PATH", "/app/aria_memories")
                 base_path = Path(memories)
                 if not base_path.exists():
                     base_path = Path(__file__).parent.parent / "aria_memories"
@@ -423,7 +423,7 @@ class MetacognitiveEngine:
         try:
             if base_path is None:
                 import os
-                memories = os.environ.get("ARIA_MEMORIES_PATH", "/root/.openclaw/aria_memories")
+                memories = os.environ.get("ARIA_MEMORIES_PATH", "/app/aria_memories")
                 base_path = Path(memories)
                 if not base_path.exists():
                     base_path = Path(__file__).parent.parent / "aria_memories"

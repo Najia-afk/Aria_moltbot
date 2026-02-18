@@ -53,6 +53,10 @@ SKILL_BACKFILL_ON_STARTUP = os.getenv(
     "SKILL_BACKFILL_ON_STARTUP", "true"
 ).lower() in {"1", "true", "yes"}
 
+# ── Filesystem paths ────────────────────────────────────────────────────────
+ARIA_AGENTS_ROOT = os.getenv("ARIA_AGENTS_ROOT", "/app/agents")
+ARIA_JOBS_PATH = os.getenv("ARIA_JOBS_PATH", "/app/jobs.json")
+
 # ── Runtime ──────────────────────────────────────────────────────────────────
 STARTUP_TIME = datetime.now(timezone.utc)
 API_VERSION  = "3.0.0"

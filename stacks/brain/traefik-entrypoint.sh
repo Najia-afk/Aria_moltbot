@@ -5,7 +5,7 @@ set -e
 
 echo "=== Traefik Entrypoint ==="
 
-# Copy template as-is (no token substitution needed after OpenClaw removal)
+# Copy template as-is (no token substitution needed)
 echo "Copying traefik-dynamic.yaml from template..."
 cp /etc/traefik/dynamic.template.yaml /etc/traefik/dynamic.yaml
 

@@ -822,7 +822,7 @@ class AriaAPIClient(BaseSkill):
             return SkillResult.fail(f"Failed to get jobs: {e}")
     
     async def sync_jobs(self) -> SkillResult:
-        """Sync jobs from OpenClaw."""
+        """Sync jobs from scheduler."""
         try:
             resp = await self._client.post("/jobs/sync")
             resp.raise_for_status()

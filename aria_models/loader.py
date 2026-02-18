@@ -149,9 +149,8 @@ def build_litellm_models(catalog: Optional[Dict[str, Any]] = None) -> list[dict[
     for model_id, entry in models.items():
         if entry.get("provider") != "litellm":
             continue
-        # maxTokens MUST be a positive integer — OpenClaw UI sends NaN for
-        # empty fields, and Zod's z.coerce.number().positive() rejects NaN
-        # which blocks config.set entirely (breaking cron display + model save).
+        # maxTokens MUST be a positive integer — UI may send NaN for
+        # empty fields, so we provide an explicit value to prevent issues.
         # Providing an explicit value prevents NaN round-trips.
         ctx = entry.get("contextWindow", 8192)
         max_tok = entry.get("maxTokens") or min(8192, ctx)
@@ -176,7 +175,7 @@ def build_agent_aliases(catalog: Optional[Dict[str, Any]] = None) -> Dict[str, D
 def build_agent_routing(catalog: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Build agent model routing (primary + fallbacks only).
     
-    Note: OpenClaw expects model object to contain ONLY primary and fallbacks.
+    Note: Model object must contain ONLY primary and fallbacks.
     Timeout should be set at agents.defaults.timeoutSeconds level, not in model object.
     """
     catalog = catalog or load_catalog()
@@ -304,7 +303,7 @@ def get_timeout_seconds(catalog: Optional[Dict[str, Any]] = None) -> int:
     """Get timeout from routing config (for agents.defaults.timeoutSeconds)."""
     catalog = catalog or load_catalog()
     routing = catalog.get("routing", {}) if catalog else {}
-    return routing.get("timeout", 600)  # Default 600s per OpenClaw docs
+    return routing.get("timeout", 600)  # Default 600s
 
 
 def validate_catalog(path: Optional[Path] = None) -> list[str]:

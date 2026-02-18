@@ -1,5 +1,5 @@
 -- Aria Engine v2.0 — Migration s48: Add engine tables
--- Replaces OpenClaw runtime state with native PostgreSQL tables
+-- Native PostgreSQL tables for Aria Engine runtime state
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 

@@ -162,7 +162,7 @@ SKILL_REGISTRY = {
         "aria_skills.pytest_runner",
         "PytestSkill",
         lambda: {
-            "workspace": os.environ.get("PYTEST_WORKSPACE", "/root/.openclaw/workspace"),
+            "workspace": os.environ.get("PYTEST_WORKSPACE", "/app"),
             "timeout_sec": int(os.environ.get("PYTEST_TIMEOUT_SEC", "600")),
             "default_args": os.environ.get("PYTEST_DEFAULT_ARGS", "-q"),
         },

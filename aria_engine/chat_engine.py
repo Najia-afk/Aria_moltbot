@@ -1,7 +1,7 @@
 """
 Chat Engine — Native session lifecycle management.
 
-Replaces OpenClaw's session management with PostgreSQL-backed sessions.
+PostgreSQL-backed session lifecycle management.
 Features:
 - Create/resume/end sessions with full state tracking
 - Send messages with LLM completion and tool calling

@@ -130,7 +130,7 @@ def check_secrets():
 
 # Ports that are expected defaults and acceptable when behind os.getenv/os.environ
 HARDCODED_PORT_RE = re.compile(r'(?:port\s*[=:]\s*|:)\s*(\d{4,5})\b')
-KNOWN_DEFAULT_PORTS = {"8000", "5000", "5432", "4000", "9090", "3000", "18789", "8080", "11434", "9999", "8888", "9050", "9051"}
+KNOWN_DEFAULT_PORTS = {"8000", "5000", "5432", "4000", "9090", "3000", "8080", "11434", "9999", "8888", "9050", "9051"}
 PORT_SAFE_CONTEXTS = re.compile(r'os\.getenv|os\.environ|getenv|argparse|add_argument|--api-url|--port|DEFAULT_|EXPOSE|healthcheck|curl|"http|\'http')
 
 

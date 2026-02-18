@@ -1,8 +1,8 @@
 ```skill
 ---
 name: aria-sentiment-analysis
-description: "💭 Multi-dimensional sentiment analysis with adaptive tone"
-metadata: {"openclaw": {"emoji": "💭"}}
+description: "ðŸ’­ Multi-dimensional sentiment analysis with adaptive tone"
+metadata: {"aria": {"emoji": "ðŸ’­"}}
 ---
 
 # aria-sentiment-analysis
@@ -16,22 +16,22 @@ conversation trajectories and recommends adaptive response tones.
 
 ```
 User text
-    ↓
+    â†“
 SentimentLexicon (fast, ~30% weight)
     + LLMSentimentClassifier (kimi model, ~70% weight when ambiguous)
-    ↓
-SentimentAnalyzer → Sentiment(valence, arousal, dominance, primary_emotion)
-    ↓                      ↓
+    â†“
+SentimentAnalyzer â†’ Sentiment(valence, arousal, dominance, primary_emotion)
+    â†“                      â†“
 ConversationAnalyzer    ResponseTuner
 (trajectory, volatility, (empathetic / step-by-step /
  turning points)         celebratory / neutral)
-    ↓
+    â†“
 SemanticMemory (category: sentiment / sentiment_conversation)
 ```
 
 ## Integration
 
-Hooked into `aria_mind/cognition.py` at Step 2.1 — every user message gets
+Hooked into `aria_mind/cognition.py` at Step 2.1 â€” every user message gets
 automatic sentiment analysis. The derived sentiment and tone recommendation
 are injected into the context dict for downstream agent use.
 
@@ -39,16 +39,16 @@ are injected into the context dict for downstream agent use.
 
 ```bash
 # Analyze a single message
-exec python3 /root/.openclaw/workspace/skills/run_skill.py sentiment_analysis analyze_message '{"text": "This is really frustrating, nothing works!"}'
+exec python3 /app/skills/run_skill.py sentiment_analysis analyze_message '{"text": "This is really frustrating, nothing works!"}'
 
 # Analyze full conversation trajectory
-exec python3 /root/.openclaw/workspace/skills/run_skill.py sentiment_analysis analyze_conversation '{"messages": [{"role": "user", "content": "help me"}, {"role": "assistant", "content": "sure!"}]}'
+exec python3 /app/skills/run_skill.py sentiment_analysis analyze_conversation '{"messages": [{"role": "user", "content": "help me"}, {"role": "assistant", "content": "sure!"}]}'
 
 # Get tone recommendation for response tuning
-exec python3 /root/.openclaw/workspace/skills/run_skill.py sentiment_analysis get_tone_recommendation '{"text": "I keep getting errors"}'
+exec python3 /app/skills/run_skill.py sentiment_analysis get_tone_recommendation '{"text": "I keep getting errors"}'
 
 # View sentiment history
-exec python3 /root/.openclaw/workspace/skills/run_skill.py sentiment_analysis get_sentiment_history '{"limit": 20}'
+exec python3 /app/skills/run_skill.py sentiment_analysis get_sentiment_history '{"limit": 20}'
 ```
 
 ## Functions
@@ -64,10 +64,10 @@ conversation is improving, declining, stable, or volatile. Identifies
 turning points and peak sentiment moments.
 
 ### get_tone_recommendation
-Quick tone recommendation without storing — returns one of 4 profiles:
-- **empathetic**: High frustration → acknowledge + gentle guidance
-- **step-by-step**: High confusion → structured walkthrough
-- **celebratory**: High satisfaction → reinforce success
+Quick tone recommendation without storing â€” returns one of 4 profiles:
+- **empathetic**: High frustration â†’ acknowledge + gentle guidance
+- **step-by-step**: High confusion â†’ structured walkthrough
+- **celebratory**: High satisfaction â†’ reinforce success
 - **neutral**: Default balanced tone
 
 ### get_sentiment_history

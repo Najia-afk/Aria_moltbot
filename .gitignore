@@ -10,7 +10,7 @@ __pycache__/
 aria_vault/
 
 # Generated configs - built at runtime from models.yaml
-stacks/brain/openclaw.json
+stacks/brain/aria-engine.json
 
 # macOS junk
 .DS_Store

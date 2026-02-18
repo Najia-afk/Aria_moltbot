@@ -1,7 +1,7 @@
 {
   "name": "aria-sentiment-analysis",
   "version": "2.0.0",
-  "description": "Multi-dimensional sentiment analysis — valence/arousal/dominance, lexicon+LLM blend, conversation trajectory, adaptive tone profiles",
+  "description": "Multi-dimensional sentiment analysis â€” valence/arousal/dominance, lexicon+LLM blend, conversation trajectory, adaptive tone profiles",
   "author": "Aria Team",
   "layer": 3,
   "category": "cognitive",
@@ -10,7 +10,7 @@
   "tools": [
     {
       "name": "analyze_message",
-      "description": "Analyze sentiment of a single message — returns valence, arousal, dominance, frustration, satisfaction, confusion, and tone recommendation.",
+      "description": "Analyze sentiment of a single message â€” returns valence, arousal, dominance, frustration, satisfaction, confusion, and tone recommendation.",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -33,7 +33,7 @@
     },
     {
       "name": "analyze_conversation",
-      "description": "Analyze sentiment trajectory of a full conversation — detects improving/declining/volatile patterns, turning points, resolution.",
+      "description": "Analyze sentiment trajectory of a full conversation â€” detects improving/declining/volatile patterns, turning points, resolution.",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -80,5 +80,5 @@
     }
   ],
   "rate_limit": {"max_per_minute": 60},
-  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py sentiment_analysis {{tool}} '{{args_json}}'"
+  "run": "python3 /app/skills/run_skill.py sentiment_analysis {{tool}} '{{args_json}}'"
 }

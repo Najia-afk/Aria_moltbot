@@ -1,7 +1,7 @@
 ---
 name: aria-goals
 description: Manage user goals, habits, and progress tracking. Create goals with milestones and reminders.
-metadata: {"openclaw": {"emoji": "🎯", "requires": {"env": ["DATABASE_URL"]}}}
+metadata: {"aria": {"emoji": "ðŸŽ¯", "requires": {"env": ["DATABASE_URL"]}}}
 ---
 
 # aria-goals
@@ -11,7 +11,7 @@ Manage user goals, habits, and progress tracking. Create goals with milestones, 
 ## Usage
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py goals <function> '<json_args>'
+exec python3 /app/skills/run_skill.py goals <function> '<json_args>'
 ```
 
 ## Functions
@@ -20,7 +20,7 @@ exec python3 /root/.openclaw/workspace/skills/run_skill.py goals <function> '<js
 List goals with optional filtering.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py goals list '{"status": "active"}'
+exec python3 /app/skills/run_skill.py goals list '{"status": "active"}'
 ```
 
 **Filter options:**
@@ -31,28 +31,28 @@ exec python3 /root/.openclaw/workspace/skills/run_skill.py goals list '{"status"
 Create a new goal.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py goals create '{"title": "Learn Italian", "category": "learning", "description": "Reach B1 level in Italian", "target_date": "2025-12-31", "milestones": ["Complete A1", "Complete A2", "Complete B1"]}'
+exec python3 /app/skills/run_skill.py goals create '{"title": "Learn Italian", "category": "learning", "description": "Reach B1 level in Italian", "target_date": "2025-12-31", "milestones": ["Complete A1", "Complete A2", "Complete B1"]}'
 ```
 
 ### update
 Update goal progress or details.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py goals update '{"goal_id": 1, "progress": 50, "note": "Completed A1 level!"}'
+exec python3 /app/skills/run_skill.py goals update '{"goal_id": 1, "progress": 50, "note": "Completed A1 level!"}'
 ```
 
 ### complete_milestone
 Mark a milestone as completed.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py goals complete_milestone '{"goal_id": 1, "milestone_index": 0}'
+exec python3 /app/skills/run_skill.py goals complete_milestone '{"goal_id": 1, "milestone_index": 0}'
 ```
 
 ### get_reminders
 Get goals with upcoming deadlines or check-in reminders.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py goals get_reminders '{"days_ahead": 7}'
+exec python3 /app/skills/run_skill.py goals get_reminders '{"days_ahead": 7}'
 ```
 
 ## Goal Categories
@@ -75,4 +75,4 @@ Goals are stored in the `goals` table with:
 
 ## Python Module
 
-This skill wraps `/root/.openclaw/workspace/skills/aria_skills/goals.py`
+This skill wraps `/app/skills/aria_skills/goals.py`

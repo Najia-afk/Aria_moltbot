@@ -1,7 +1,7 @@
 ---
 name: aria-performance
 description: Log and query Aria's performance reviews and self-assessments.
-metadata: {"openclaw": {"emoji": "📊", "requires": {"env": ["DATABASE_URL"]}}}
+metadata: {"aria": {"emoji": "ðŸ“Š", "requires": {"env": ["DATABASE_URL"]}}}
 ---
 
 # aria-performance
@@ -11,7 +11,7 @@ Log and query Aria's performance reviews, self-assessments, and improvement trac
 ## Usage
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py performance <function> '<json_args>'
+exec python3 /app/skills/run_skill.py performance <function> '<json_args>'
 ```
 
 ## Functions
@@ -20,21 +20,21 @@ exec python3 /root/.openclaw/workspace/skills/run_skill.py performance <function
 Log a performance review entry.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py performance perf_log '{"period": "daily", "score": 85, "summary": "Completed 5 tasks, helped with code reviews", "strengths": ["fast responses", "code quality"], "improvements": ["context retention"]}'
+exec python3 /app/skills/run_skill.py performance perf_log '{"period": "daily", "score": 85, "summary": "Completed 5 tasks, helped with code reviews", "strengths": ["fast responses", "code quality"], "improvements": ["context retention"]}'
 ```
 
 ### perf_list
 Get performance history.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py performance perf_list '{"period": "daily", "limit": 10}'
+exec python3 /app/skills/run_skill.py performance perf_list '{"period": "daily", "limit": 10}'
 ```
 
 ### perf_stats
 Get performance trends and statistics.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py performance perf_stats '{"days": 30}'
+exec python3 /app/skills/run_skill.py performance perf_stats '{"days": 30}'
 ```
 
 ## API Endpoint

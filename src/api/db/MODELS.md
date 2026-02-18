@@ -14,7 +14,7 @@
 4. [Knowledge Graph](#knowledge-graph)
 5. [Performance / Review](#performance--review)
 6. [Heartbeat](#heartbeat)
-7. [OpenClaw Scheduling](#openclaw-scheduling)
+7. [Scheduling](#scheduling)
 8. [Security](#security)
 9. [Schedule Tick](#schedule-tick)
 10. [Operations: Sessions / Usage](#operations-sessions--usage)
@@ -229,7 +229,7 @@
 
 ---
 
-## OpenClaw Scheduling
+## Scheduling
 
 ### 12. ScheduledJob
 

@@ -115,19 +115,17 @@ class LiteLLMSkill(BaseSkill):
                 "source": "aria_skills.litellm",
             }
             agent_id = (
-                os.environ.get("OPENCLAW_AGENT_ID")
-                or os.environ.get("ARIA_AGENT_ID")
+                os.environ.get("ARIA_AGENT_ID")
                 or os.environ.get("AGENT_ID")
             )
-            openclaw_session_id = (
-                os.environ.get("OPENCLAW_SESSION_ID")
+            aria_session_id = (
+                os.environ.get("ARIA_SESSION_ID")
                 or os.environ.get("SESSION_ID")
-                or os.environ.get("ARIA_SESSION_ID")
             )
             if agent_id:
                 metadata["agent_id"] = agent_id
-            if openclaw_session_id:
-                metadata["openclaw_session_id"] = openclaw_session_id
+            if aria_session_id:
+                metadata["aria_session_id"] = aria_session_id
 
             payload: Dict[str, Any] = {
                 "model": model,
@@ -136,8 +134,8 @@ class LiteLLMSkill(BaseSkill):
                 "max_tokens": max_tokens,
                 "metadata": metadata,
             }
-            if openclaw_session_id:
-                payload["session_id"] = openclaw_session_id
+            if aria_session_id:
+                payload["session_id"] = aria_session_id
 
             resp = await self._client.post("/chat/completions", json=payload)
             resp.raise_for_status()

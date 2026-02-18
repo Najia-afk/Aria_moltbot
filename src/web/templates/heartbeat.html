@@ -481,7 +481,7 @@
 
 {% block extra_js %}
 <script data-page-script>
-// Scheduled Jobs - fetched from API (synced from OpenClaw)
+// Scheduled Jobs - fetched from API
 let scheduledJobs = [];
 let allLogs = [];
 
@@ -536,7 +536,7 @@ const API_BASE = window.ARIA_API_BASE_URL || '/api';
 
 async function loadScheduledJobs() {
     try {
-        // Try live endpoint first (direct from OpenClaw file), fallback to DB
+        // Try live endpoint first (direct from cron_jobs.yaml), fallback to DB
         let response = await fetch(`${API_BASE}/jobs/live`);
         let data = await response.json();
         let jobs = Array.isArray(data?.jobs) ? data.jobs : (Array.isArray(data) ? data : []);
@@ -613,7 +613,7 @@ async function loadScheduledJobs() {
         document.getElementById('jobsGrid').innerHTML = `
             <div class="empty-state">
                 <p>⚠️ Failed to load jobs from API</p>
-                <button class="btn btn-primary" onclick="syncJobs()">Sync from OpenClaw</button>
+                <button class="btn btn-primary" onclick="syncJobs()">Sync Jobs</button>
             </div>
         `;
     }
@@ -621,12 +621,12 @@ async function loadScheduledJobs() {
 
 async function syncJobs() {
     try {
-        showToast('Syncing jobs from OpenClaw...', 'info');
+        showToast('Syncing jobs...', 'info');
         const response = await fetch(`${API_BASE}/jobs/sync`, { method: 'POST' });
         const data = await response.json();
         
         if (response.ok) {
-            showToast(`✅ Synced ${data.synced} jobs from OpenClaw`, 'success');
+            showToast(`✅ Synced ${data.synced} jobs`, 'success');
             await loadScheduledJobs();
         } else {
             showToast(`❌ Sync failed: ${data.detail}`, 'error');
@@ -713,9 +713,9 @@ function renderJobsGrid() {
         container.innerHTML = `
             <div class="empty-state" style="grid-column: 1 / -1; text-align: center; padding: 3rem;">
                 <h3>📋 No Scheduled Jobs Found</h3>
-                <p>Jobs haven't been synced from OpenClaw yet.</p>
+                <p>Jobs haven't been synced yet.</p>
                 <button class="btn btn-primary" onclick="syncJobs()" style="margin-top: 1rem;">
-                    🔄 Sync Jobs from OpenClaw
+                    🔄 Sync Jobs
                 </button>
             </div>
         `;

@@ -12,7 +12,7 @@ REST endpoints:
 WebSocket:
   WS     /ws/chat/{session_id}                  — streaming chat
 
-All endpoints use the native aria_engine modules (no OpenClaw dependency).
+All endpoints use the native aria_engine modules.
 """
 import logging
 from typing import Any, Optional

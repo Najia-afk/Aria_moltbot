@@ -1,7 +1,7 @@
 {
   "name": "aria-fact-check",
   "version": "1.0.0",
-  "description": "🔍 Fact-checking and claim verification for Journalist",
+  "description": "ðŸ” Fact-checking and claim verification for Journalist",
   "author": "Aria Blue",
   "layer": 3,
   "dependencies": ["api_client", "research"],
@@ -68,5 +68,5 @@
       }
     }
   ],
-  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py fact_check {{tool}} '{{args_json}}'"
+  "run": "python3 /app/skills/run_skill.py fact_check {{tool}} '{{args_json}}'"
 }

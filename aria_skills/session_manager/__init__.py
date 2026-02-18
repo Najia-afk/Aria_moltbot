@@ -2,9 +2,9 @@
 """
 Session management skill.
 
-List, prune, and delete OpenClaw agent sessions.
+List, prune, and delete Aria agent sessions.
 Two-layer approach:
-  1. Filesystem (clawdbot shared volume) — the live source of truth.
+  1. Filesystem (aria-api shared volume) — the live source of truth.
      sessions.json index + per-session .jsonl transcripts.
   2. aria-api PostgreSQL — historical record. On delete we mark
      the PG row as "ended" so /sessions on the dashboard keeps history.
@@ -24,11 +24,11 @@ import httpx
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
 from aria_skills.registry import SkillRegistry
 
-# ── Filesystem defaults (inside clawdbot container) ──────────────────
+# ── Filesystem defaults (inside aria-api container) ──────────────────
 
-_AGENTS_DIR = "/root/.openclaw/agents"
+_AGENTS_DIR = "/app/agents"
 # Allow override via env (useful for tests / non-standard mounts)
-_env_workspace = os.environ.get("OPENCLAW_WORKSPACE", "")
+_env_workspace = os.environ.get("ARIA_WORKSPACE", "")
 if _env_workspace:
     _candidate = os.path.join(os.path.dirname(_env_workspace), "agents")
     if os.path.isdir(_candidate):
@@ -57,7 +57,7 @@ def _save_sessions_index(data: Dict[str, Any], agent: str = "main") -> None:
 
 
 def _archive_transcript(session_id: str, agent: str = "main") -> bool:
-    """Rename .jsonl → .jsonl.deleted.<timestamp> (matches clawdbot pattern)."""
+    """Rename .jsonl → .jsonl.deleted.<timestamp> (matches aria-api pattern)."""
     base = os.path.join(_AGENTS_DIR, agent, "sessions", f"{session_id}.jsonl")
     if not os.path.exists(base):
         return False
@@ -153,10 +153,10 @@ def _flatten_sessions(index: Dict[str, Any], agent: str = "main") -> List[Dict[s
 @SkillRegistry.register
 class SessionManagerSkill(BaseSkill):
     """
-    Manage OpenClaw sessions — list, prune stale ones, delete by ID.
+    Manage Aria sessions — list, prune stale ones, delete by ID.
 
     Two-layer delete:
-      1. Remove from clawdbot filesystem (live sessions)
+      1. Remove from aria-api filesystem (live sessions)
       2. Mark as ended in aria-api PG (historical record for /sessions dashboard)
     """
 
@@ -218,14 +218,14 @@ class SessionManagerSkill(BaseSkill):
 
     async def delete_session(self, session_id: str = "", agent: str = "", **kwargs) -> SkillResult:
         """
-        Delete a session: remove from clawdbot filesystem, mark ended in PG.
+        Delete a session: remove from aria-api filesystem, mark ended in PG.
 
         1. Remove all matching keys from sessions.json
         2. Archive the .jsonl transcript (rename to .deleted.<ts>)
         3. PATCH aria-api to set status=ended (keeps history at /sessions)
 
         Args:
-            session_id: The OpenClaw session UUID.
+            session_id: The Aria session UUID.
             agent: Agent name (default: searches all agents).
         """
         if not session_id:
@@ -235,7 +235,7 @@ class SessionManagerSkill(BaseSkill):
         agent = agent or kwargs.get("agent", "")
 
         # Session protection: prevent deleting current active session
-        current_sid = os.environ.get("OPENCLAW_SESSION_ID", "")
+        current_sid = os.environ.get("ARIA_SESSION_ID", "")
         if current_sid and session_id == current_sid:
             return SkillResult.fail(
                 f"Cannot delete current session {session_id}: "
@@ -280,13 +280,13 @@ class SessionManagerSkill(BaseSkill):
                 archived = True
 
         if not removed_keys:
-            # Session may have been scrapped by clawdbot or the user already
+            # Session may have been scrapped by aria-api or the user already
             return SkillResult.ok({
                 "deleted": session_id,
                 "removed_keys": [],
                 "transcript_archived": False,
                 "pg_status_updated": await self._mark_ended_in_pg(session_id),
-                "message": f"Session {session_id} not in sessions.json (already scrapped by clawdbot/user), PG updated",
+                "message": f"Session {session_id} not in sessions.json (already scrapped/user), PG updated",
             })
 
         # Best-effort: mark as ended in PG for dashboard history
@@ -297,7 +297,7 @@ class SessionManagerSkill(BaseSkill):
             "removed_keys": removed_keys,
             "transcript_archived": archived,
             "pg_status_updated": pg_updated,
-            "message": f"Session {session_id} removed from clawdbot"
+            "message": f"Session {session_id} removed from filesystem"
                        f" ({len(removed_keys)} keys, transcript={'archived' if archived else 'n/a'})"
                        f"{', PG marked ended' if pg_updated else ''}",
         })
@@ -313,7 +313,7 @@ class SessionManagerSkill(BaseSkill):
                 return False
             for item in resp.json().get("items", []):
                 meta = item.get("metadata", {})
-                if meta.get("openclaw_session_id") == session_id:
+                if meta.get("aria_session_id") == session_id:
                     r = await self._client.patch(
                         f"/api/sessions/{item['id']}",
                         json={"status": "ended"},
@@ -373,7 +373,7 @@ class SessionManagerSkill(BaseSkill):
             to_delete.append(sess)
 
         # Filter out protected sessions before deletion
-        current_sid = os.environ.get("OPENCLAW_SESSION_ID", "")
+        current_sid = os.environ.get("ARIA_SESSION_ID", "")
         if current_sid:
             to_delete = [s for s in to_delete if s.get("id", s.get("sessionId", "")) != current_sid]
         to_delete = [
@@ -452,11 +452,11 @@ class SessionManagerSkill(BaseSkill):
     @logged_method()
     async def cleanup_orphans(self, dry_run: bool = False, **kwargs) -> SkillResult:
         """
-        Clean up filesystem inconsistencies left by clawdbot's own session management.
+        Clean up filesystem inconsistencies left by aria-api's own session management.
 
         Handles three cases:
         1. **Stale keys**: keys in sessions.json whose transcript was already deleted
-           by clawdbot → removes the key from the index.
+           by aria-api → removes the key from the index.
         2. **Orphan transcripts**: .jsonl files on disk not listed in sessions.json
            → archives them (renames to .deleted pattern).
         3. **Old .deleted files**: archived transcripts older than 7 days
@@ -493,7 +493,7 @@ class SessionManagerSkill(BaseSkill):
                 index_sids.add(sid)
                 jsonl = os.path.join(sess_dir, f"{sid}.jsonl")
                 if not os.path.exists(jsonl):
-                    # Transcript gone (deleted by clawdbot or missing)
+                    # Transcript gone (deleted by aria-api or missing)
                     keys_to_remove.append((k, sid))
 
             for k, sid in keys_to_remove:

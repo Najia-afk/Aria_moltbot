@@ -1,5 +1,6 @@
 """S-46: Add expression index on agent_sessions metadata->>'openclaw_session_id'.
 
+(Legacy migration — index references historical metadata key.
 This index was defined in the SQLAlchemy model but missing from the actual
 database.  session_manager's _mark_ended_in_pg() relies on it for fast lookups.
 

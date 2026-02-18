@@ -153,9 +153,9 @@ class TestReportGeneration:
     @pytest.fixture
     def mock_log_dir(self, tmp_path):
         """Create a temp directory with mock log files."""
-        openclaw = tmp_path / "openclaw_20250209_120000.log"
-        openclaw.write_text(textwrap.dedent("""\
-            2025-02-09T10:00:00 INFO Starting clawdbot
+        aria_log = tmp_path / "aria_brain_20250209_120000.log"
+        aria_log.write_text(textwrap.dedent("""\
+            2025-02-09T10:00:00 INFO Starting aria-api
             2025-02-09T10:00:01 INFO Loaded model gpt-4o-mini
             2025-02-09T10:05:00 ERROR 429 Too Many Requests for model gpt-4o-mini
             2025-02-09T10:05:01 WARNING rate limit exceeded, backing off

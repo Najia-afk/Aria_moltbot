@@ -84,5 +84,5 @@
       }
     }
   ],
-  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py model_switcher {{tool}} '{{args_json}}'"
+  "run": "python3 /app/skills/run_skill.py model_switcher {{tool}} '{{args_json}}'"
 }

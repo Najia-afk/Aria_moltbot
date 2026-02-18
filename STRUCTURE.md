@@ -20,7 +20,7 @@ Aria_moltbot/
 ├── Makefile                      # Development shortcuts
 ├── Dockerfile                    # Agent container build
 │
-├── aria_mind/                    # OpenClaw workspace (mounted to gateway)
+├── aria_mind/                    # Engine workspace (mounted to gateway)
 │   ├── SOUL.md                   # Persona, boundaries, model preferences
 │   ├── IDENTITY.md               # Agent identity configuration
 │   ├── AGENTS.md                 # Sub-agent definitions
@@ -34,7 +34,7 @@ Aria_moltbot/
 │   ├── __init__.py
 │   ├── cli.py                    # Command-line interface
 │   ├── cognition.py              # Cognitive functions
-│   ├── gateway.py                # Gateway abstraction (OpenClaw phase-out, S-31)
+│   ├── gateway.py                # Gateway abstraction (S-31)
 │   ├── heartbeat.py              # Heartbeat implementation
 │   ├── logging_config.py         # Structured logging configuration
 │   ├── memory.py                 # Memory management
@@ -147,9 +147,9 @@ Aria_moltbot/
 │   │   ├── docker-compose.yml    # Full stack orchestration
 │   │   ├── .env                  # Environment configuration (DO NOT COMMIT)
 │   │   ├── .env.example          # Template for .env
-│   │   ├── openclaw-entrypoint.sh    # OpenClaw startup with Python + skills
-│   │   ├── openclaw-config.json      # OpenClaw provider template
-│   │   ├── openclaw-auth-profiles.json # Auth profile configs
+│   │   ├── aria-entrypoint.sh        # Aria Engine startup with Python + skills
+│   │   ├── aria-config.json          # Aria Engine provider template
+│   │   ├── aria-auth-profiles.json   # Auth profile configs
 │   │   ├── litellm-config.yaml       # LLM model routing
 │   │   ├── prometheus.yml            # Prometheus scrape config
 │   │   ├── traefik-dynamic.yaml      # Traefik dynamic routing config
@@ -247,8 +247,8 @@ Aria_moltbot/
 │   └── mac/                      # macOS-specific deployment
 │
 ├── patch/                        # Patches & fixes
-│   ├── openclaw_patch.js
-│   └── openclaw-litellm-fix.patch
+│   ├── # (removed  obsolete)
+│   └── # (removed  obsolete)
 │
 ├── tasks/                        # Task documentation
 │   └── lessons.md
@@ -293,7 +293,7 @@ Aria_moltbot/
 
 ## Key Files
 
-### aria_mind/ (OpenClaw Workspace)
+### aria_mind/ (Engine Workspace)
 
 | File | Purpose | Loaded |
 |------|---------|--------|
@@ -313,8 +313,8 @@ Aria_moltbot/
 | File | Purpose |
 |------|---------|
 | `docker-compose.yml` | Orchestrates all services |
-| `openclaw-entrypoint.sh` | Generates OpenClaw config at startup |
-| `openclaw-config.json` | Template for LiteLLM provider |
+| `aria-entrypoint.sh` | Generates Aria Engine config at startup |
+| `aria-config.json` | Template for LiteLLM provider |
 | `litellm-config.yaml` | Routes model aliases to MLX/OpenRouter |
 | `init-scripts/` | PostgreSQL database initialization |
 | `prometheus.yml` | Prometheus scrape targets |
@@ -340,7 +340,7 @@ Each skill directory follows the same pattern:
 ```
 aria_skills/<skill>/
 ├── __init__.py      # Skill class extending BaseSkill
-├── skill.json       # OpenClaw manifest (name, description, emoji)
+├── skill.json       # Skill manifest (name, description, emoji)
 └── SKILL.md         # Documentation (optional)
 ```
 
@@ -359,19 +359,19 @@ aria_skills/<skill>/
 - `load_from_config(path)` parses `TOOLS.md` for YAML config blocks
 - Lookup via `get(name)`, `list_available()`, `check_all_health()`
 
-### Runtime Mount (OpenClaw Container)
+### Runtime Mount (Aria Engine Container)
 
 ```
-/root/.openclaw/workspace/skills/
+/app/skills/
 ├── run_skill.py                # Legacy compatibility runner
 ├── aria_skills/                # ← mounted from ../../aria_skills
 ├── aria_agents/                # ← mounted from ../../aria_agents
 └── legacy/                     # ← mounted from ../../skills (deprecated)
 
-/root/.openclaw/workspace/aria_mind/skills/
+/app/aria_mind/skills/
 └── run_skill.py                # Primary skill runner (current)
 
-/root/.openclaw/skills/         # OpenClaw manifest symlinks
+/app/skills/                    # Manifest symlinks
 ├── aria-database/skill.json    # → .../aria_skills/database/skill.json
 ├── aria-moltbook/skill.json    # → .../aria_skills/moltbook/skill.json
 └── ... (25 symlinks created by entrypoint)
@@ -380,7 +380,7 @@ aria_skills/<skill>/
 ### Execution Flow
 
 ```
-OpenClaw Agent (exec tool)
+Aria Engine Agent (exec tool)
        │
        ▼
 python3 aria_mind/skills/run_skill.py <skill> <function> '<args_json>'
@@ -392,7 +392,7 @@ SkillRegistry → imports aria_skills.<skill>
 BaseSkill.safe_execute() → retry + metrics + result
        │
        ▼
-JSON output → returned to OpenClaw
+JSON output → returned to Aria Engine
 ```
 
 ---
@@ -405,8 +405,8 @@ JSON output → returned to OpenClaw
 ├──────────────────────────────────────────────────────────────────────┤
 │                                                                      │
 │  ┌────────────┐    ┌────────────┐    ┌────────────┐                  │
-│  │  Traefik   │    │  OpenClaw  │    │  LiteLLM   │                  │
-│  │  :80/:443  │    │  :18789    │    │  :18793    │                  │
+│  │  Traefik   │    │Aria Engine │    │  LiteLLM   │                  │
+│  │  :80/:443  │    │  :8100     │    │  :18793    │                  │
 │  └─────┬──────┘    └─────┬──────┘    └─────┬──────┘                  │
 │        │                 │                 │                          │
 │        ▼                 ▼                 ▼                          │
@@ -469,7 +469,7 @@ docker compose ps         # Verify 13 healthy services
 |---------|-----|-------------|
 | Dashboard | `https://{HOST}/` | Main web UI |
 | API Docs | `https://{HOST}/api/docs` | Swagger documentation |
-| OpenClaw | `http://{HOST}:18789` | Gateway API |
+| Aria Engine | `http://{HOST}:8100` | Engine API |
 | LiteLLM | `http://{HOST}:18793` | Model router |
 | Grafana | `https://{HOST}/grafana` | Monitoring dashboards |
 | PGAdmin | `https://{HOST}/pgadmin` | Database admin |
@@ -481,7 +481,7 @@ docker compose ps         # Verify 13 healthy services
 ## Model Chain
 
 ```
-OpenClaw Request
+Aria Engine Request
   └─► litellm/qwen3-mlx
        │
        ▼

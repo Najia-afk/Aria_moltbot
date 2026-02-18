@@ -38,7 +38,7 @@
 - **GIN indexes require pg_trgm extension.** Must `CREATE EXTENSION IF NOT EXISTS pg_trgm` before creating trigram indexes (S-44).
 - **Brain→API communication via shared DB table.** SkillStatusRecord pattern (S-40) — brain writes, API reads — is the correct cross-container data sharing approach.
 - **AA+ ticket format with Constraints table is essential.** Tickets without explicit constraint evaluation led to architecture violations in v1.1. The full template (Problem, Root Cause, Fix, Constraints, Dependencies, Verification, Prompt) is now the standard.
-- **Gateway abstraction (S-31) enables future LLM provider swaps.** GatewayInterface ABC + OpenClawGateway isolates vendor-specific logic.
+- **Gateway abstraction (S-31) enables future LLM provider swaps.** GatewayInterface ABC + AriaGateway isolates vendor-specific logic.
 
 ## Sprint 1 Execution (2026-02-11)
 - **Token counting formula: prefer `total_tokens || (prompt + completion)`.** Never add all three — `total_tokens` already equals `prompt + completion`. Copy-paste bugs made this 3× inflated in two locations.
@@ -77,7 +77,7 @@
 - **Hardcoded model names accumulate silently.** Kimi was hardcoded at sentiment skill line 202, burning paid API credits on every call. models.yaml profiles must cover every use case — add profiles proactively.
 - **Alembic migrations for every new table.** Relying on `create_all()` is fragile in production with partial schemas. Always create an idempotent migration with `IF NOT EXISTS`.
 - **api_client needs methods for every persistence path.** If a table exists in the DB, there must be a corresponding api_client method. The absence of `store_sentiment_event()` was the direct cause of the broken pipeline.
-- **OpenClaw JSONL `content` is a list, not a string.** OpenClaw stores message content as `[{"type":"text","text":"..."}]`. Any parser that does `isinstance(content, str)` silently drops ALL messages. Always handle both `str` and `list[dict]` formats.
+- **Legacy JSONL `content` is a list, not a string.** The legacy gateway stores message content as `[{"type":"text","text":"..."}]`. Any parser that does `isinstance(content, str)` silently drops ALL messages. Always handle both `str` and `list[dict]` formats.
 - **Lexicon word lists need common conversational words.** "better", "clean", "easy", "works" were missing — causing 0% confidence on obviously positive messages. Expand lexicon proactively with everyday language, not just strong emotion words.
 - **Silent exception swallowing hides critical failures.** `except: pass` in the LLM sentiment fallback meant we had no idea the model calls were failing. Always log at least a warning on fallback paths.
 - **Backfill endpoints must write to the correct tables.** `backfill-sessions` wrote to `semantic_memories` only, while the dashboard reads from `sentiment_events`. Both tables need writes for the feature to work end-to-end.

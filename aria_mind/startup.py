@@ -113,12 +113,12 @@ def validate_env():
         "LITELLM_MASTER_KEY": "LLM proxy auth will fail",
     }
     recommended = [
-        "WEB_SECRET_KEY", "CLAWDBOT_TOKEN", "BRAVE_API_KEY",
+        "WEB_SECRET_KEY", "ARIA_API_TOKEN", "BRAVE_API_KEY",
         "CORS_ALLOWED_ORIGINS", "MAC_HOST",
     ]
     for var, impact in required.items():
         val = os.getenv(var, "")
-        if not val or val in ("admin", "sk-change-me", "aria-dev-secret-key", "default-clawdbot-token"):
+        if not val or val in ("admin", "sk-change-me", "aria-dev-secret-key", "default-aria-api-token"):
             logger.error(f"MISSING/INSECURE REQUIRED: {var} — {impact}")
     for var in recommended:
         if not os.getenv(var):

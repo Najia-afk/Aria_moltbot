@@ -1,7 +1,7 @@
 """
 Session Export — JSONL and Markdown transcript export from PostgreSQL.
 
-Replaces OpenClaw's filesystem-based .jsonl transcripts with on-demand
+On-demand JSONL/Markdown transcript
 export from the aria_engine session tables.
 
 Formats:

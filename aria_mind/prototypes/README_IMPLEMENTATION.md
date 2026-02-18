@@ -1,4 +1,4 @@
-# Memory Systems — Implementation Ready ⚡️
+# Memory Systems â€” Implementation Ready âš¡ï¸
 
 **For:** Najia  
 **Date:** 2026-02-16  
@@ -6,23 +6,23 @@
 
 ---
 
-## 📦 What's Prepared
+## ðŸ“¦ What's Prepared
 
-✅ **Complete documentation** — `MEMORY_SYSTEM_GUIDE.md`  
-✅ **4 working prototypes** — ready to implement:
-   - `memory_compression.py` — Hierarchical compression
-   - `pattern_recognition.py` — Pattern detection engine
-   - `sentiment_analysis.py` — Multi-dimensional sentiment
-   - `embedding_memory.py` — Semantic vector search
-✅ **Session protection fix** — `session_protection_fix.py` (CRITICAL BUG)
+âœ… **Complete documentation** â€” `MEMORY_SYSTEM_GUIDE.md`  
+âœ… **4 working prototypes** â€” ready to implement:
+   - `memory_compression.py` â€” Hierarchical compression
+   - `pattern_recognition.py` â€” Pattern detection engine
+   - `sentiment_analysis.py` â€” Multi-dimensional sentiment
+   - `embedding_memory.py` â€” Semantic vector search
+âœ… **Session protection fix** â€” `session_protection_fix.py` (CRITICAL BUG)
 
 ---
 
-## 🎯 Immediate Action Items
+## ðŸŽ¯ Immediate Action Items
 
-### 1. Fix Session Deletion Bug (CRITICAL — 15 min)
+### 1. Fix Session Deletion Bug (CRITICAL â€” 15 min)
 
-**Problem:** Can delete main agent session → loses context.
+**Problem:** Can delete main agent session â†’ loses context.
 
 **Solution:** Apply patch from `session_protection_fix.py`:
 
@@ -41,13 +41,13 @@ exec python3 skills/run_skill.py session_manager delete_session '{"session_id": 
 
 ---
 
-### 2. Implement Memory Compression (High Impact — 1 hour)
+### 2. Implement Memory Compression (High Impact â€” 1 hour)
 
 **Goal:** Reduce token usage by 70% while preserving context.
 
 **Steps:**
 1. Create new skill: `aria_advanced_memory/memory_compression/`
-2. Copy `prototypes/memory_compression.py` → `skill.py`
+2. Copy `prototypes/memory_compression.py` â†’ `skill.py`
 3. Create `skill.json` (see template below)
 4. Register skill in `registry.py`
 5. Test with `run_skill.py`:
@@ -71,7 +71,7 @@ exec python3 skills/run_skill.py session_manager delete_session '{"session_id": 
 2. Copy `prototypes/sentiment_analysis.py`
 3. Create `skill.json` (see template)
 4. Register skill
-5. Integrate with `cognition.py` — analyze each user message on the fly
+5. Integrate with `cognition.py` â€” analyze each user message on the fly
 
 **Features to enable:**
 - Real-time sentiment per message
@@ -121,7 +121,7 @@ exec python3 skills/run_skill.py session_manager delete_session '{"session_id": 
 
 ---
 
-## 🧩 Skill Template
+## ðŸ§© Skill Template
 
 Create this file for each new skill:
 
@@ -177,13 +177,13 @@ Create this file for each new skill:
       }
     }
   ],
-  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py advanced_memory {{tool}} '{{args_json}}'"
+  "run": "python3 /app/skills/run_skill.py advanced_memory {{tool}} '{{args_json}}'"
 }
 ```
 
 ---
 
-## 📊 Integration Checklist
+## ðŸ“Š Integration Checklist
 
 After implementing all prototypes:
 
@@ -192,11 +192,11 @@ After implementing all prototypes:
 - [ ] Hourly cron job runs pattern recognition
 - [ ] Semantic search integrated with `api_client.graph_search` as fallback
 - [ ] Session protection tested and deployed
-- [ ] All skills registered and visible in `/status` → Skills
+- [ ] All skills registered and visible in `/status` â†’ Skills
 
 ---
 
-## 🐛 Known Issues & Notes
+## ðŸ› Known Issues & Notes
 
 1. **FAISS deletion:** FAISS doesn't support deletion natively. For production, either:
    - Use HNSWLib (supports deletion) OR
@@ -208,23 +208,23 @@ After implementing all prototypes:
 
 4. **Vector index persistence:** Set `ARIA_VECTOR_INDEX_PATH=/data/vector_index` in env.
 
-5. **Session protection environment:** OpenClaw must set `OPENCLAW_SESSION_ID` for protection to work. Check with:
+5. **Session protection environment:** Aria Engine must set `Aria Engine_SESSION_ID` for protection to work. Check with:
    ```bash
-   echo $OPENCLAW_SESSION_ID
+   echo $Aria Engine_SESSION_ID
    ```
 
 ---
 
-## 🚀 Quick Start Summary
+## ðŸš€ Quick Start Summary
 
 When you return:
 
 1. **First:** Fix session protection bug (15 min)
 2. **Next:** Implement memory compression (biggest token saver)
-3. **Then:** Sentiment → Pattern → Embedding (in that order)
+3. **Then:** Sentiment â†’ Pattern â†’ Embedding (in that order)
 4. **Finally:** Integrate all into `working_memory` and `cognition`
 5. **Test:** Run `pytest` and check `/status`
 
-All prototypes are **complete, tested pseudocode** — copy to `skills/aria_skills/advanced_memory/` and register.
+All prototypes are **complete, tested pseudocode** â€” copy to `skills/aria_skills/advanced_memory/` and register.
 
-**Need anything clarified?** I'm here. ⚡️
+**Need anything clarified?** I'm here. âš¡ï¸

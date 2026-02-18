@@ -1,7 +1,7 @@
 {
   "name": "aria-memory-compression",
   "version": "2.0.0",
-  "description": "3-tier hierarchical memory compression — importance scoring, LLM summarization, context budgeting",
+  "description": "3-tier hierarchical memory compression â€” importance scoring, LLM summarization, context budgeting",
   "author": "Aria Team",
   "layer": 3,
   "category": "cognitive",
@@ -10,7 +10,7 @@
   "tools": [
     {
       "name": "compress_memories",
-      "description": "Compress a list of memories through the 3-tier pipeline (raw → recent → archive). Stores summaries in semantic memory.",
+      "description": "Compress a list of memories through the 3-tier pipeline (raw â†’ recent â†’ archive). Stores summaries in semantic memory.",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -56,7 +56,7 @@
     },
     {
       "name": "get_compression_stats",
-      "description": "Get statistics from the last compression run — ratio, tokens saved, tier counts.",
+      "description": "Get statistics from the last compression run â€” ratio, tokens saved, tier counts.",
       "input_schema": {
         "type": "object",
         "properties": {}
@@ -64,5 +64,5 @@
     }
   ],
   "rate_limit": {"max_per_minute": 10},
-  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py memory_compression {{tool}} '{{args_json}}'"
+  "run": "python3 /app/skills/run_skill.py memory_compression {{tool}} '{{args_json}}'"
 }

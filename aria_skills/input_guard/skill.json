@@ -1,7 +1,7 @@
 {
   "name": "aria-input-guard",
   "version": "1.0.0",
-  "description": "🛡️ Runtime security for Aria - analyzes inputs for prompt injection, validates API params, and filters sensitive output",
+  "description": "ðŸ›¡ï¸ Runtime security for Aria - analyzes inputs for prompt injection, validates API params, and filters sensitive output",
   "author": "Aria Team",
   "layer": 0,
   "dependencies": [],
@@ -165,5 +165,5 @@
       }
     }
   ],
-  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py input_guard {{tool}} '{{args_json}}'"
+  "run": "python3 /app/skills/run_skill.py input_guard {{tool}} '{{args_json}}'"
 }

@@ -15,7 +15,7 @@ from sqlalchemy import select, update, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config import OPENCLAW_JOBS_PATH
+from config import ARIA_JOBS_PATH
 from db.models import (
     ApiKeyRotation,
     HeartbeatLog,
@@ -296,7 +296,7 @@ async def manual_tick(db: AsyncSession = Depends(get_db)):
     next_job_at = None
 
     try:
-        with open(OPENCLAW_JOBS_PATH, "r", encoding="utf-8") as f:
+        with open(ARIA_JOBS_PATH, "r", encoding="utf-8") as f:
             data = json.load(f)
         jobs = data.get("jobs", [])
         jobs_total = len(jobs)
@@ -334,7 +334,7 @@ async def manual_tick(db: AsyncSession = Depends(get_db)):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Scheduled Jobs (OpenClaw Sync)
+# Scheduled Jobs (Sync)
 # ──────────────────────────────────────────────────────────────────────────────
 
 @router.get("/jobs")
@@ -346,9 +346,9 @@ async def get_scheduled_jobs(db: AsyncSession = Depends(get_db)):
 
 @router.get("/jobs/live")
 async def get_jobs_live():
-    """Read jobs directly from OpenClaw jobs.json (live, no DB)."""
+    """Read jobs directly from jobs.json (live, no DB)."""
     try:
-        with open(OPENCLAW_JOBS_PATH, "r", encoding="utf-8") as f:
+        with open(ARIA_JOBS_PATH, "r", encoding="utf-8") as f:
             data = json.load(f)
         jobs = []
         for job in data.get("jobs", []):
@@ -379,7 +379,7 @@ async def get_jobs_live():
             })
         return {"jobs": jobs, "count": len(jobs), "source": "live"}
     except FileNotFoundError:
-        return {"jobs": [], "count": 0, "source": "live", "error": f"File not found: {OPENCLAW_JOBS_PATH}"}
+        return {"jobs": [], "count": 0, "source": "live", "error": f"File not found: {ARIA_JOBS_PATH}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -394,9 +394,9 @@ async def get_scheduled_job(job_id: str, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/jobs/sync")
-async def sync_jobs_from_openclaw(db: AsyncSession = Depends(get_db)):
+async def sync_jobs(db: AsyncSession = Depends(get_db)):
     try:
-        with open(OPENCLAW_JOBS_PATH, "r", encoding="utf-8") as f:
+        with open(ARIA_JOBS_PATH, "r", encoding="utf-8") as f:
             data = json.load(f)
         jobs = data.get("jobs", [])
         synced = 0
@@ -446,9 +446,9 @@ async def sync_jobs_from_openclaw(db: AsyncSession = Depends(get_db)):
             await db.execute(stmt)
             synced += 1
         await db.commit()
-        return {"synced": synced, "source": OPENCLAW_JOBS_PATH, "total_in_file": len(jobs)}
+        return {"synced": synced, "source": ARIA_JOBS_PATH, "total_in_file": len(jobs)}
     except FileNotFoundError:
-        raise HTTPException(status_code=404, detail=f"Jobs file not found at {OPENCLAW_JOBS_PATH}")
+        raise HTTPException(status_code=404, detail=f"Jobs file not found at {ARIA_JOBS_PATH}")
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=500, detail=f"Invalid JSON: {e}")
     except Exception as e:

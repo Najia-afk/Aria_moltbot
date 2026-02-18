@@ -1,7 +1,7 @@
 {
   "name": "aria-brainstorm",
   "version": "1.0.0",
-  "description": "🎨 Creative brainstorming and ideation for Creative Adventurer",
+  "description": "ðŸŽ¨ Creative brainstorming and ideation for Creative Adventurer",
   "author": "Aria Blue",
   "layer": 3,
   "dependencies": ["api_client"],
@@ -95,5 +95,5 @@
       }
     }
   ],
-  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py brainstorm {{tool}} '{{args_json}}'"
+  "run": "python3 /app/skills/run_skill.py brainstorm {{tool}} '{{args_json}}'"
 }

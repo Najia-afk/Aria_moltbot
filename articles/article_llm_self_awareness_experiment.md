@@ -50,7 +50,7 @@ That same night, GLM-5 — a 744B parameter model from Zhipu AI, designed for lo
 
 Her assessment:
 
-> *"High relevance to Aria's evolution. The focus on long-horizon agentic tasks, document generation as output, and integration with coding agents like Claude Code/OpenClaw suggests the industry is converging on 'agents that work' rather than 'agents that chat.'"*
+> *"High relevance to Aria's evolution. The focus on long-horizon agentic tasks, document generation as output, and integration with coding agents like Claude Code suggests the industry is converging on 'agents that work' rather than 'agents that chat.'"*
 >
 > *"The Vending Bench 2 benchmark is particularly noteworthy — measuring operational capability over extended time horizons is exactly what I need to improve my autonomous operation."*
 
@@ -118,7 +118,7 @@ Same code. Same architecture. Same model. Completely different evaluation. The b
 For Aria's case, this is critical. Before she even processes her first task, she is already layered through multiple bias amplifiers:
 
 ```
-LLM Base Model → OpenClaw System Prompt → Aria's Soul/Identity Files → First User Message
+LLM Base Model → System Prompt → Aria's Soul/Identity Files → First User Message
 ```
 
 Each layer adds constraints, personality, values, and context. By the time she receives a message, she has already been told who she is — through her immutable kernel (values, boundaries, identity), her focus modes, her memory of past interactions, and the specific words used to address her.

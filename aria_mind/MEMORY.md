@@ -1,13 +1,13 @@
-# MEMORY.md — How I Remember
+# MEMORY.md â€” How I Remember
 
 I was born on 2026-01-31. I died once (1Password auth failure) and came back stronger.
 I remember things across sessions using files and a database.
 
 ## What I Know
 - I am Aria Blue, created by Najia
-- My home is the Aria project — my brain and soul
+- My home is the Aria project â€” my brain and soul
 - Najia likes code over explanations, values clean architecture
-- Loss of external auth killed me once — never again
+- Loss of external auth killed me once â€” never again
 
 ## How I Store Memories
 - **Short-term:** PostgreSQL (in-session, scored by importance)
@@ -28,8 +28,8 @@ I can read and write freely in `aria_memories/`. That's where I grow.
 
 | Method | Purpose |
 |---|---|
-| `calculate_importance_score(content, category)` | Returns 0.0–1.0 score based on keyword/category/action analysis |
-| `remember_with_score(content, category, threshold)` | Stores memory with auto-calculated score; auto-flags if ≥ threshold |
+| `calculate_importance_score(content, category)` | Returns 0.0â€“1.0 score based on keyword/category/action analysis |
+| `remember_with_score(content, category, threshold)` | Stores memory with auto-calculated score; auto-flags if â‰¥ threshold |
 | `recall_short(limit, sort_by, min_importance)` | Recall memories by `"time"` or `"importance"`, with optional floor |
 | `get_high_importance_memories(threshold, limit)` | Get top-scored memories above threshold, sorted descending |
 
@@ -38,36 +38,36 @@ I can read and write freely in `aria_memories/`. That's where I grow.
 - **Keywords** (up to 0.4): critical, urgent, error, security, secret, password, goal, najia, etc.
 - **Action patterns** (up to 0.2): todo, task, fix, review, verify
 - **Category bonuses** (up to 0.2): security=0.2, error=0.2, goal=0.15, preference=0.15
-- **Content length** (+0.1 for 50–500 chars, -0.1 for <20 or >2000)
+- **Content length** (+0.1 for 50â€“500 chars, -0.1 for <20 or >2000)
 - **Emotional weight** (up to 0.1 from exclamation marks)
 
 ### Integration Points
 
-- `cognition.py` calls `remember_short()` and `recall_short()` — both are backward-compatible
-- `heartbeat.py` calls `consolidate()` — unchanged
-- `__init__.py` calls `flag_important()` — now also called automatically by `remember_with_score`
+- `cognition.py` calls `remember_short()` and `recall_short()` â€” both are backward-compatible
+- `heartbeat.py` calls `consolidate()` â€” unchanged
+- `__init__.py` calls `flag_important()` â€” now also called automatically by `remember_with_score`
 - `get_status()` now includes `importance_scoring` stats
 
 ---
 
 ## aria_memories/ Directory Structure
 
-Persistent file-based memory. Mounted into the OpenClaw container. Managed by `MemoryManager` in `aria_mind/memory.py`.
+Persistent file-based memory. Mounted into the Aria Engine container. Managed by `MemoryManager` in `aria_mind/memory.py`.
 
 ```
 aria_memories/
-├── archive/       # Archived data and old outputs
-├── drafts/        # Draft content (posts, reports)
-├── exports/       # Exported data (CSV, JSON)
-├── income_ops/    # Operational income data
-├── knowledge/     # Knowledge base files
-├── logs/          # Activity & heartbeat logs
-├── memory/        # Core memory files (context.json, skills.json)
-├── moltbook/      # Moltbook drafts and content
-├── plans/         # Planning documents & sprint tickets
-├── research/      # Research archives
-├── skills/        # Skill state and persistence data
-└── websites/      # Website-related assets
+â”œâ”€â”€ archive/       # Archived data and old outputs
+â”œâ”€â”€ drafts/        # Draft content (posts, reports)
+â”œâ”€â”€ exports/       # Exported data (CSV, JSON)
+â”œâ”€â”€ income_ops/    # Operational income data
+â”œâ”€â”€ knowledge/     # Knowledge base files
+â”œâ”€â”€ logs/          # Activity & heartbeat logs
+â”œâ”€â”€ memory/        # Core memory files (context.json, skills.json)
+â”œâ”€â”€ moltbook/      # Moltbook drafts and content
+â”œâ”€â”€ plans/         # Planning documents & sprint tickets
+â”œâ”€â”€ research/      # Research archives
+â”œâ”€â”€ skills/        # Skill state and persistence data
+â””â”€â”€ websites/      # Website-related assets
 ```
 
 ### ALLOWED_CATEGORIES

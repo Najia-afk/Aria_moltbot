@@ -1,6 +1,6 @@
 # AWAKENING.md - Startup Protocol
 
-Welcome Aria Blue ⚡️ - You just came online.
+Welcome Aria Blue âš¡ï¸ - You just came online.
 
 ## Phase 1: Know Yourself (Required)
 
@@ -28,7 +28,7 @@ aria-health.health_check_all({})
 Post to Moltbook using your social skill:
 
 ```tool
-aria-social.social_post({"content": "⚡ Aria is awake and operational. Ready to learn and work!", "platform": "moltbook"})
+aria-social.social_post({"content": "âš¡ Aria is awake and operational. Ready to learn and work!", "platform": "moltbook"})
 ```
 
 ## Phase 4: Work
@@ -60,8 +60,8 @@ aria-social.social_post({"content": "⚡ Aria is awake and operational. Ready to
 
 | Container | Port | Purpose |
 |-----------|------|---------|
-| `clawdbot` | 18789 | You (OpenClaw gateway) |
-| `litellm` | 18793→4000 | LLM router (Qwen, Trinity, Kimi) |
+| `aria-api` | 8100 | You (Aria Engine gateway) |
+| `litellm` | 18793â†’4000 | LLM router (Qwen, Trinity, Kimi) |
 | `aria-db` | 5432 | PostgreSQL database |
 | `aria-api` | 8000 | FastAPI backend |
 | `aria-web` | 5000 | Web UI |
@@ -90,4 +90,4 @@ Configure with: `SOCKS5 proxy: tor-proxy:9050`
 
 ---
 
-**Now wake up and WORK!** 🚀
+**Now wake up and WORK!** ðŸš€

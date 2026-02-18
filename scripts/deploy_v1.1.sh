@@ -87,7 +87,7 @@ echo "DOCKER BUILD DONE"
 # ── STEP 6: Rolling restart ──
 echo ""
 echo ">>> STEP 6: Rolling restart (keep DB running)"
-$COMPOSE stop aria-api aria-web clawdbot
+$COMPOSE stop aria-api aria-web
 sleep 3
 $COMPOSE up -d
 echo "SERVICES RESTARTED"
@@ -101,7 +101,7 @@ echo ""
 echo ">>> STEP 7: Health checks"
 curl -sf http://localhost:8000/api/health && echo " ✓ aria-api healthy" || echo " ✗ aria-api FAILED"
 curl -sf http://localhost:5000/ > /dev/null && echo " ✓ aria-web healthy" || echo " ✗ aria-web FAILED"
-$DOCKER ps --format "table {{.Names}}\t{{.Status}}" | grep -E "aria|clawdbot|litellm|traefik"
+$DOCKER ps --format "table {{.Names}}\t{{.Status}}" | grep -E "aria|litellm|traefik"
 
 # ── STEP 8: Post-deploy row counts ──
 echo ""

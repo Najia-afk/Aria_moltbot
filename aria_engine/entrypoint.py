@@ -1,6 +1,6 @@
 """
 Aria Engine — Standalone Runtime Entrypoint
-Replaces openclaw-entrypoint.sh and clawdbot service.
+Native Python runtime entrypoint.
 
 Boot sequence:
   Phase 1: Database connection
@@ -52,7 +52,7 @@ class AriaEngine:
         return self._db_engine
 
     async def start(self):
-        """Boot sequence (replaces startup.py + openclaw-entrypoint.sh)."""
+        """Boot sequence."""
         logger.info("🚀 Aria Engine starting...")
 
         # Phase 1: Database

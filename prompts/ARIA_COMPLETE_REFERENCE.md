@@ -70,7 +70,7 @@ Aria is a **distributed cognitive architecture** with a **Focus-based persona sy
 | **Heartbeat** | `aria_mind/heartbeat.py` | Health monitoring, scheduling |
 | **AgentCoordinator** | `aria_agents/coordinator.py` | Multi-agent orchestration |
 | **Skills** | `aria_skills/<skill>/` | Tool implementations + manifests (24 skills) |
-| **Entrypoint** | `stacks/brain/openclaw-entrypoint.sh` | Dynamic skill runner + symlink generation |
+| **Entrypoint** | `stacks/brain/entrypoint.sh` | Dynamic skill runner + symlink generation |
 
 ---
 
@@ -242,11 +242,11 @@ aria_skills/
 ├── __init__.py           # Package exports
 └── my_skill/             # One directory per skill
     ├── __init__.py       # Python implementation
-    ├── skill.json        # OpenClaw manifest
+    ├── skill.json        # Skill manifest
     └── SKILL.md          # Documentation (optional)
 ```
 
-> **Note**: The entrypoint automatically creates symlinks from `/root/.openclaw/skills/aria-<skill>/` to each `skill.json` at container startup.
+> **Note**: The entrypoint automatically creates symlinks from `/app/skills/aria-<skill>/` to each `skill.json` at container startup.
 
 ### Step 1: Create Python Skill
 
@@ -330,9 +330,9 @@ __all__ = [
 ]
 ```
 
-### Step 3: Add to SKILL_REGISTRY (openclaw-entrypoint.sh)
+### Step 3: Add to SKILL_REGISTRY (entrypoint.sh)
 
-The skill runner at `stacks/brain/openclaw-entrypoint.sh` has a `SKILL_REGISTRY` dict. Add your skill:
+The skill runner at `stacks/brain/entrypoint.sh` has a `SKILL_REGISTRY` dict. Add your skill:
 
 ```python
 SKILL_REGISTRY = {
@@ -345,7 +345,7 @@ SKILL_REGISTRY = {
 }
 ```
 
-### Step 4: Create OpenClaw Manifest
+### Step 4: Create Skill Manifest
 
 ```json
 // aria_skills/my_skill/skill.json
@@ -382,7 +382,7 @@ Create `aria_skills/my_skill/SKILL.md`:
 ---
 name: aria-my-skill
 description: Brief description
-metadata: {"openclaw": {"emoji": "🔧", "requires": {"env": ["MY_SKILL_API_KEY"]}}}
+metadata: {"aria": {"emoji": "🔧", "requires": {"env": ["MY_SKILL_API_KEY"]}}}
 ---
 
 # My Skill 🔧
@@ -409,7 +409,7 @@ Environment variables:
 
 ### Step 6: Add to skills.entries in Entrypoint
 
-In `stacks/brain/openclaw-entrypoint.sh`, add to the `skills.entries` section:
+In `stacks/brain/entrypoint.sh`, add to the `skills.entries` section:
 
 ```json
 "aria-my-skill": { "enabled": true }
@@ -516,7 +516,7 @@ User Input → Boundary Check → Memory Store → Agent Delegation → Skill Ex
 
 | Container | Port | Purpose | Internal URL |
 |-----------|------|---------|--------------|
-| `clawdbot` | 18789 | OpenClaw Brain | - |
+| `aria-engine` | 8100 | Aria Engine | - |
 | `litellm` | 18793→4000 | Model routing | `http://litellm:4000` |
 | `aria-db` | 18780→5432 | PostgreSQL | `postgresql://aria-db:5432` |
 | `mlx-server` | 8080 | Local Qwen3 | `http://host.docker.internal:8080` |
@@ -530,8 +530,8 @@ User Input → Boundary Check → Memory Store → Agent Delegation → Skill Ex
 │                    Docker Network (aria-net)                     │
 │                                                                  │
 │  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐  │
-│  │ clawdbot │───▶│ litellm  │───▶│mlx-server│    │ aria-web │  │
-│  │  :18789  │    │  :4000   │    │  :8080   │    │  :18790  │  │
+│  │ aria-engine │───▶│ litellm  │───▶│mlx-server│    │ aria-web │  │
+│  │  :8100  │    │  :4000   │    │  :8080   │    │  :18790  │  │
 │  └─────┬────┘    └──────────┘    └──────────┘    └──────────┘  │
 │        │                                                         │
 │        │         ┌──────────┐    ┌──────────┐                   │
@@ -541,31 +541,31 @@ User Input → Boundary Check → Memory Store → Agent Delegation → Skill Ex
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### Volume Mounts (clawdbot)
+### Volume Mounts (aria-engine)
 
 ```yaml
 volumes:
-  - ../../aria_mind:/root/.openclaw/workspace
-  - ../../aria_skills:/root/.openclaw/workspace/skills/aria_skills:ro
-  - ../../aria_agents:/root/.openclaw/workspace/skills/aria_agents:ro
-  - ./openclaw-entrypoint.sh:/openclaw-entrypoint.sh:ro
+  - ../../aria_mind:/app
+  - ../../aria_skills:/app/skills/aria_skills:ro
+  - ../../aria_agents:/app/skills/aria_agents:ro
+  - ./entrypoint.sh:/entrypoint.sh:ro
 ```
 
-> **Note**: OpenClaw skill manifests are symlinked at startup from `aria_skills/*/skill.json` to `/root/.openclaw/skills/aria-*/skill.json`.
+> **Note**: Skill manifests are symlinked at startup from `aria_skills/*/skill.json` to `/app/skills/aria-*/skill.json`.
 
 ### Entrypoint Sequence
 
-`stacks/brain/openclaw-entrypoint.sh` runs when clawdbot starts:
+`stacks/brain/entrypoint.sh` runs when aria-engine starts:
 
 1. Install apt dependencies (curl, jq, python3)
-2. Install OpenClaw if not present
-3. **Create skill manifest symlinks** from `aria_skills/*/skill.json` to `/root/.openclaw/skills/aria-*/`
+2. Install dependencies if not present
+3. **Create skill manifest symlinks** from `aria_skills/*/skill.json` to `/app/skills/aria-*/`
 4. pip install Python dependencies
 5. **Generate `run_skill.py`** with SKILL_REGISTRY (24 skills)
 6. Read BOOTSTRAP.md for system prompt
-7. **Generate `openclaw.json`** with all skill entries enabled
+7. **Generate `aria-engine.json`** with all skill entries enabled
 8. Prepare awakening (first boot detection)
-9. Start OpenClaw Gateway on port 18789
+9. Start Aria Engine on port 8100
 
 ---
 
@@ -719,13 +719,13 @@ docker compose down
 docker compose up -d --build
 
 # Verify
-docker compose logs -f clawdbot
+docker compose logs -f aria-engine
 ```
 
 ### Testing a Skill
 
 ```bash
-# From inside clawdbot container or via exec
+# From inside aria-engine container or via exec
 python3 aria_mind/skills/run_skill.py <skill> <function> '<args_json>'
 
 # Examples:
@@ -739,11 +739,11 @@ python3 aria_mind/skills/run_skill.py --auto-task "summarize active goals and ri
 
 - [ ] Create directory `aria_skills/my_skill/`
 - [ ] Create `aria_skills/my_skill/__init__.py` (Python implementation)
-- [ ] Create `aria_skills/my_skill/skill.json` (OpenClaw manifest)
+- [ ] Create `aria_skills/my_skill/skill.json` (Skill manifest)
 - [ ] Create `aria_skills/my_skill/SKILL.md` (documentation, optional)
 - [ ] Add import to `aria_skills/__init__.py`
-- [ ] Add to SKILL_REGISTRY in `openclaw-entrypoint.sh`
-- [ ] Add to skills.entries in `openclaw-entrypoint.sh`
+- [ ] Add to SKILL_REGISTRY in `entrypoint.sh`
+- [ ] Add to skills.entries in `entrypoint.sh`
 - [ ] Add config to `aria_mind/TOOLS.md`
 - [ ] Update Focus skills list in `aria_mind/soul/focus.py` (if focus-specific)
 - [ ] Write tests in `tests/test_my_skill.py`

@@ -1,7 +1,7 @@
 """
 Native LLM Gateway — Direct litellm SDK integration.
 
-Replaces OpenClaw's proxy layer with zero-hop Python calls.
+Zero-hop Python calls to litellm.
 Features:
 - Direct litellm.acompletion() with async streaming
 - Model routing from models.yaml

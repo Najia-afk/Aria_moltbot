@@ -36,17 +36,17 @@ Write-Host ""
 
 $SSHBase = "ssh -i `"$SSHKey`" -o ConnectTimeout=10 -o StrictHostKeyChecking=no $SSHHost"
 
-# ---- 1. OpenClaw (clawdbot) logs ----
-Write-Host "[1/4] Retrieving OpenClaw logs (${Hours}h)..." -ForegroundColor Yellow
-$OpenClawFile = Join-Path $OutputDir "openclaw_${Timestamp}.log"
+# ---- 1. Aria Brain (aria-api) logs ----
+Write-Host "[1/4] Retrieving Aria Brain logs (${Hours}h)..." -ForegroundColor Yellow
+$AriaFile = Join-Path $OutputDir "aria_brain_${Timestamp}.log"
 try {
-    $output = & ssh -i $SSHKey -o ConnectTimeout=10 -o StrictHostKeyChecking=no $SSHHost "docker logs clawdbot --since ${Hours}h 2>&1" 2>&1
-    $output | Out-File -FilePath $OpenClawFile -Encoding utf8
-    $lineCount = (Get-Content $OpenClawFile | Measure-Object -Line).Lines
-    Write-Host "  OK Saved $lineCount lines -> $OpenClawFile" -ForegroundColor Green
+    $output = & ssh -i $SSHKey -o ConnectTimeout=10 -o StrictHostKeyChecking=no $SSHHost "docker logs aria-api --since ${Hours}h 2>&1" 2>&1
+    $output | Out-File -FilePath $AriaFile -Encoding utf8
+    $lineCount = (Get-Content $AriaFile | Measure-Object -Line).Lines
+    Write-Host "  OK Saved $lineCount lines -> $AriaFile" -ForegroundColor Green
 } catch {
-    Write-Host "  FAIL Failed to retrieve OpenClaw logs: $_" -ForegroundColor Red
-    "RETRIEVAL_FAILED" | Out-File -FilePath $OpenClawFile
+    Write-Host "  FAIL Failed to retrieve Aria Brain logs: $_" -ForegroundColor Red
+    "RETRIEVAL_FAILED" | Out-File -FilePath $AriaFile
 }
 
 # ---- 2. LiteLLM logs ----

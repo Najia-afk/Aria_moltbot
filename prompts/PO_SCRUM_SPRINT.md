@@ -32,7 +32,7 @@ Before any action, read ALL of these files to build full context. Do not skip an
 | `plans/SKILL_LAYERING_PAPER.md` | Skill Standard v2 specification |
 | `plans/ANTHROPIC_RESEARCH.md` | Anthropic tool/agent patterns |
 | `plans/GOOGLE_RLM_RESEARCH.md` | Google RLM applicability |
-| `plans/OPENCLAW_PHASE_OUT.md` | OpenClaw migration analysis |
+| `plans/OPENCLAW_PHASE_OUT.md` | Legacy gateway migration analysis |
 | `plans/LOCAL_MODEL_GUIDE.md` | Local model setup (Ollama / MLX) |
 
 ### Sprint Plan
@@ -264,7 +264,7 @@ Each sub-agent should be given exactly one ticket and full context for that tick
 - **Production Mac Mini:** `$MAC_HOST` (env var), SSH user `najia`
 - **Docker Stack:** 12 services via `docker-compose.yaml` + `stacks/brain/`
 - **Python:** 3.10+, venv at `.venv/`
-- **Key Services:** PostgreSQL 16, Traefik v3.1, OpenClaw, LiteLLM, Prometheus, Grafana
+- **Key Services:** PostgreSQL 16, Traefik v3.1, Aria Engine, LiteLLM, Prometheus, Grafana
 
 ---
 

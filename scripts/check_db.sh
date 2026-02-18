@@ -48,29 +48,29 @@ echo "=== Cron Jobs ==="
 docker exec aria-db psql -U "${DB_USER}" -d "${DB_NAME}" -c "SELECT * FROM scheduled_jobs LIMIT 20"
 
 echo ""
-echo "=== OpenClaw Cron Jobs ==="
-docker exec clawdbot openclaw cron list 2>/dev/null || echo "Failed to list cron jobs"
+echo "=== Aria Cron Jobs ==="
+docker exec aria-engine aria-engine cron list 2>/dev/null || echo "Failed to list cron jobs"
 
 echo ""
-echo "=== OpenClaw Agents ==="
-docker exec clawdbot openclaw agent list 2>/dev/null || echo "Failed to list agents"
+echo "=== Aria Agents ==="
+docker exec aria-engine aria-engine agent list 2>/dev/null || echo "Failed to list agents"
 
 echo ""
 echo "=== Files modified by Aria (in aria_mind) ==="
-docker exec clawdbot find /root/.openclaw/workspace -name "*.md" -newer /root/.openclaw/.awakened -type f 2>/dev/null | head -30
+docker exec aria-engine find /app -name "*.md" -newer /app/.awakened -type f 2>/dev/null | head -30
 
 echo ""
 echo "=== Files in aria_memories ==="
-docker exec clawdbot find /root/.openclaw/aria_memories -type f 2>/dev/null | head -30
+docker exec aria-engine find /app/aria_memories -type f 2>/dev/null | head -30
 
 echo ""
 echo "=== Files in mounted repo ==="
-docker exec clawdbot find /root/repo -maxdepth 2 -name "*.md" -newer /root/.openclaw/.awakened -type f 2>/dev/null | head -30
+docker exec aria-engine find /root/repo -maxdepth 2 -name "*.md" -newer /app/.awakened -type f 2>/dev/null | head -30
 
 echo ""
 echo "=== Traefik logs (last 20) ==="
 docker logs traefik --tail 20 2>&1
 
 echo ""
-echo "=== OpenClaw version ==="
-docker exec clawdbot openclaw --version 2>/dev/null || echo "Failed to get version"
+echo "=== Aria version ==="
+docker exec aria-engine aria-engine --version 2>/dev/null || echo "Failed to get version"

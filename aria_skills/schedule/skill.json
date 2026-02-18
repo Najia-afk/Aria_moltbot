@@ -44,7 +44,7 @@
     },
     {
       "name": "schedule_sync",
-      "description": "Sync jobs from OpenClaw configuration.",
+      "description": "Sync jobs from cron configuration.",
       "parameters": {
         "type": "object",
         "properties": {}
@@ -115,5 +115,5 @@
       }
     }
   ],
-  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py schedule {{tool}} '{{args_json}}'"
+  "run": "python3 /app/skills/run_skill.py schedule {{tool}} '{{args_json}}'"
 }

@@ -26,7 +26,7 @@ COLD_START_SCORE = 0.5
 
 # Where to persist scores across restarts
 _SCORES_FILE = "pheromone_scores.json"
-_MEMORIES_PATH = os.environ.get("ARIA_MEMORIES_PATH", "/root/.openclaw/aria_memories")
+_MEMORIES_PATH = os.environ.get("ARIA_MEMORIES_PATH", "/app/aria_memories")
 
 
 def compute_pheromone(records: list[dict]) -> float:

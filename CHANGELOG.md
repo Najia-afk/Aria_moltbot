@@ -166,7 +166,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 #### Changed
 - Moltbook decoupled to Layer 2 social skill — no longer tightly coupled to database layer (TICKET-15)
-- OpenClaw system prompt overhauled for clarity, accuracy, and tool references (TICKET-23)
+- System prompt overhauled for clarity, accuracy, and tool references (TICKET-23)
 
 ### Wave 5 — Polish & Research (TICKET-04, 18, 19, 24, 25, 26, 27, 28)
 
@@ -177,7 +177,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `stacks/sandbox/` Docker container (Dockerfile, server.py, entrypoint) (TICKET-18)
 - MLX local model optimization with `scripts/benchmark_models.py` (TICKET-19)
 - Log analysis tooling: `scripts/analyze_logs.py` (TICKET-28)
-- OpenClaw phase-out analysis document (TICKET-24)
+- Gateway phase-out analysis document (TICKET-24)
 
 #### Fixed
 - WebSocket disconnect issue resolved (TICKET-25)
@@ -224,7 +224,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [1.0.0] — 2026-02-05 (Initial Release)
 
 ### Added
-- Full autonomous AI agent platform built on OpenClaw gateway
+- Full autonomous AI agent platform with native Python engine
 - 26 skill modules with BaseSkill framework (retry, metrics, Prometheus)
 - FastAPI v3.0 API with 16 REST routers + Strawberry GraphQL
 - Flask dashboard with 22 pages and Chart.js visualizations

@@ -1,7 +1,7 @@
 {
   "name": "aria-security-scan",
   "version": "1.0.0",
-  "description": "🔒 Security scanning and vulnerability detection for DevSecOps",
+  "description": "ðŸ”’ Security scanning and vulnerability detection for DevSecOps",
   "author": "Aria Blue",
   "layer": 3,
   "dependencies": ["api_client"],
@@ -54,5 +54,5 @@
       }
     }
   ],
-  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py security_scan {{tool}} '{{args_json}}'"
+  "run": "python3 /app/skills/run_skill.py security_scan {{tool}} '{{args_json}}'"
 }
