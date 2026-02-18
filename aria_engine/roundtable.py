@@ -1,11 +1,12 @@
 """
-Engine Roundtable — multi-agent collaborative discussion.
+Engine Roundtable — multi-agent collaborative discussion using TaskGroup.
 
 Ports roundtable logic from aria_agents/coordinator.py with:
+- Structured concurrency via asyncio.TaskGroup (Python 3.11+)
 - Proper agent pool integration (S4-01)
 - Session isolation per roundtable (S4-02)
 - All turns persisted to chat_messages
-- Per-agent timeout handling
+- Per-agent timeout handling with ExceptionGroup
 - Pheromone score updates after each contribution
 - Configurable rounds, timeout, and synthesis
 """
@@ -275,38 +276,45 @@ class Roundtable:
             topic, round_number, context, len(agent_ids)
         )
 
-        tasks = []
-        for agent_id in agent_ids:
-            tasks.append(
-                self._get_agent_response(
-                    session_id=session_id,
-                    agent_id=agent_id,
-                    prompt=prompt,
-                    round_number=round_number,
-                    timeout=agent_timeout,
-                )
-            )
-
-        # Run all agents in parallel with round-level timeout
+        # Run all agents in parallel using TaskGroup (structured concurrency)
         turns: list[RoundtableTurn] = []
+        futures: dict[str, asyncio.Task[RoundtableTurn]] = {}
+
         try:
-            results = await asyncio.wait_for(
-                asyncio.gather(*tasks, return_exceptions=True),
-                timeout=round_timeout,
-            )
-        except asyncio.TimeoutError:
+            async with asyncio.TaskGroup() as tg:
+                for agent_id in agent_ids:
+                    future = tg.create_task(
+                        asyncio.wait_for(
+                            self._get_agent_response(
+                                session_id=session_id,
+                                agent_id=agent_id,
+                                prompt=prompt,
+                                round_number=round_number,
+                                timeout=agent_timeout,
+                            ),
+                            timeout=round_timeout,
+                        ),
+                        name=f"round-{round_number}-{agent_id}",
+                    )
+                    futures[agent_id] = future
+
+            # Collect results from completed tasks
+            for agent_id, future in futures.items():
+                try:
+                    turns.append(future.result())
+                except Exception as e:
+                    logger.warning("Agent %s response error: %s", agent_id, e)
+
+        except* asyncio.TimeoutError:
             logger.warning(
                 "Round %d timed out after %.0fs",
                 round_number,
                 round_timeout,
             )
-            results = []
 
-        for r in results:
-            if isinstance(r, RoundtableTurn):
-                turns.append(r)
-            elif isinstance(r, Exception):
-                logger.warning("Agent response error: %s", r)
+        except* Exception as eg:
+            for exc in eg.exceptions:
+                logger.warning("Round %d agent error: %s", round_number, exc)
 
         logger.debug(
             "Round %d: %d/%d responses",
