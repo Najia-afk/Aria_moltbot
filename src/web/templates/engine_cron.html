@@ -1,0 +1,382 @@
+{% extends "base.html" %}
+{% block title %}Cron Jobs — Aria Engine{% endblock %}
+
+{% block extra_css %}
+<style>
+    .cron-table th { white-space: nowrap; }
+    .status-badge { font-size: 0.75rem; padding: 2px 8px; border-radius: 4px; }
+    .status-success { background: rgba(46, 204, 113, 0.2); color: #2ecc71; }
+    .status-failed { background: rgba(231, 76, 60, 0.2); color: #e74c3c; }
+    .status-running { background: rgba(52, 152, 219, 0.2); color: #3498db; }
+    .status-pending { background: rgba(149, 165, 166, 0.2); color: #95a5a6; }
+    .toggle-enabled { cursor: pointer; }
+    .schedule-human { font-size: 0.85rem; color: var(--text-muted, #888); }
+    .trigger-btn { padding: 2px 8px; font-size: 0.8rem; }
+    .job-payload { max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #cronTable tbody tr { transition: background-color 0.2s; }
+    #cronTable tbody tr:hover { background-color: var(--surface-alt, #2a2a3e); }
+
+    .modal-overlay {
+        display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.6); z-index: 1000; align-items: center; justify-content: center;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal-box {
+        background: var(--surface, #1e1e2e); border: 1px solid var(--border, #3a3a5e);
+        border-radius: 12px; padding: 24px; width: 90%; max-width: 700px;
+        max-height: 85vh; overflow-y: auto;
+    }
+    .modal-box h3 { margin-top: 0; }
+    .modal-box label { display: block; margin: 8px 0 4px; color: var(--text-secondary, #aaa); font-size: 0.85rem; }
+    .modal-box input, .modal-box select, .modal-box textarea {
+        width: 100%; padding: 8px; border: 1px solid var(--border, #3a3a5e);
+        border-radius: 6px; background: var(--surface-alt, #2a2a3e);
+        color: var(--text, #e0e0e0); font-size: 0.9rem;
+    }
+    .modal-box textarea { font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; resize: vertical; }
+    .modal-box .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .modal-box .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+    .btn-primary { background: var(--primary, #6c5ce7); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
+    .btn-secondary { background: var(--surface-alt, #2a2a3e); color: var(--text, #e0e0e0); border: 1px solid var(--border, #3a3a5e); padding: 8px 16px; border-radius: 6px; cursor: pointer; }
+    .btn-danger { background: rgba(231, 76, 60, 0.2); color: #e74c3c; border: 1px solid #e74c3c; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
+    .checkbox-row { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
+
+    .history-table { margin-top: 12px; }
+    .history-table td { font-size: 0.85rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="content-header">
+    <div>
+        <h2>⏰ Cron Jobs</h2>
+        <p class="text-secondary">
+            Scheduler: <span id="schedulerStatus" class="status-badge status-pending">loading...</span>
+            | <span id="jobCount">0</span> jobs
+            | <span id="activeCount">0</span> active executions
+        </p>
+    </div>
+    <div style="display:flex; gap:8px;">
+        <button class="btn-secondary" onclick="refreshJobs()">🔄 Refresh</button>
+        <button class="btn-primary" onclick="openCreateModal()">➕ New Job</button>
+    </div>
+</div>
+
+<div class="card">
+    <div style="overflow-x: auto;">
+        <table class="data-table cron-table" id="cronTable">
+            <thead>
+                <tr>
+                    <th>Enabled</th>
+                    <th>Name</th>
+                    <th>Schedule</th>
+                    <th>Agent</th>
+                    <th>Last Run</th>
+                    <th>Status</th>
+                    <th>Duration</th>
+                    <th>Runs</th>
+                    <th>Success Rate</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="cronTableBody">
+                <tr><td colspan="10" style="text-align:center; color:var(--text-muted);">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Create/Edit Modal -->
+<div class="modal-overlay" id="jobModal">
+    <div class="modal-box">
+        <h3 id="jobModalTitle">New Cron Job</h3>
+        <form id="jobForm" onsubmit="return false;">
+            <input type="hidden" id="jobId" value="">
+            <div class="row">
+                <div>
+                    <label>Name</label>
+                    <input type="text" id="jobName" required placeholder="e.g. Work Cycle">
+                </div>
+                <div>
+                    <label>Agent</label>
+                    <select id="jobAgent">
+                        <option value="main" selected>main</option>
+                        <option value="aria-talk">aria-talk</option>
+                        <option value="aria-analyst">aria-analyst</option>
+                        <option value="aria-devops">aria-devops</option>
+                        <option value="aria-creator">aria-creator</option>
+                        <option value="aria-memeothy">aria-memeothy</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row-3">
+                <div>
+                    <label>Schedule</label>
+                    <input type="text" id="jobSchedule" required placeholder="15m, 1h, or 0 0 6 * * *">
+                </div>
+                <div>
+                    <label>Session Mode</label>
+                    <select id="jobSessionMode">
+                        <option value="isolated" selected>Isolated</option>
+                        <option value="shared">Shared</option>
+                        <option value="persistent">Persistent</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Max Duration (s)</label>
+                    <input type="number" id="jobMaxDuration" value="300" min="10" max="3600">
+                </div>
+            </div>
+            <div class="row-3">
+                <div>
+                    <label>Payload Type</label>
+                    <select id="jobPayloadType">
+                        <option value="prompt" selected>Prompt</option>
+                        <option value="skill">Skill</option>
+                        <option value="pipeline">Pipeline</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Retry Count</label>
+                    <input type="number" id="jobRetryCount" value="0" min="0" max="5">
+                </div>
+                <div class="checkbox-row">
+                    <input type="checkbox" id="jobEnabled" checked>
+                    <label for="jobEnabled" style="margin:0;">Enabled</label>
+                </div>
+            </div>
+            <div>
+                <label>Payload</label>
+                <textarea id="jobPayload" rows="5" required
+                          placeholder="Enter the prompt text, skill reference, or pipeline name..."></textarea>
+            </div>
+        </form>
+        <div class="modal-actions">
+            <button class="btn-secondary" onclick="closeModal('jobModal')">Cancel</button>
+            <button class="btn-primary" onclick="saveJob()">💾 Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- History Modal -->
+<div class="modal-overlay" id="historyModal">
+    <div class="modal-box">
+        <h3>Execution History: <span id="historyJobName"></span></h3>
+        <table class="data-table history-table">
+            <thead>
+                <tr><th>Time</th><th>Status</th><th>Duration</th><th>Details</th></tr>
+            </thead>
+            <tbody id="historyTableBody">
+                <tr><td colspan="4" style="text-align:center; color:var(--text-muted);">Loading...</td></tr>
+            </tbody>
+        </table>
+        <div class="modal-actions">
+            <button class="btn-secondary" onclick="closeModal('historyModal')">Close</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const API_BASE = '/api/engine/cron';
+
+function humanSchedule(schedule) {
+    if (schedule.endsWith('m')) return `Every ${schedule.slice(0, -1)} min`;
+    if (schedule.endsWith('h')) return `Every ${schedule.slice(0, -1)} hr`;
+    if (schedule.endsWith('s')) return `Every ${schedule.slice(0, -1)} sec`;
+    return schedule;
+}
+
+function statusBadge(status) {
+    const cls = {
+        success: 'status-success', failed: 'status-failed',
+        running: 'status-running',
+    }[status] || 'status-pending';
+    return `<span class="status-badge ${cls}">${status || 'never'}</span>`;
+}
+
+function successRate(s, f) {
+    const total = (s || 0) + (f || 0);
+    if (total === 0) return '—';
+    const rate = ((s || 0) / total * 100).toFixed(0);
+    const color = rate >= 90 ? '#2ecc71' : rate >= 70 ? '#f39c12' : '#e74c3c';
+    return `<span style="color:${color}">${rate}%</span> (${total})`;
+}
+
+function timeAgo(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    const s = Math.floor((Date.now() - d.getTime()) / 1000);
+    if (s < 60) return `${s}s ago`;
+    if (s < 3600) return `${Math.floor(s/60)}m ago`;
+    if (s < 86400) return `${Math.floor(s/3600)}h ago`;
+    return `${Math.floor(s/86400)}d ago`;
+}
+
+function closeModal(id) {
+    document.getElementById(id).classList.remove('active');
+}
+
+async function refreshJobs() {
+    try {
+        const resp = await fetch(API_BASE);
+        const data = await resp.json();
+
+        const statusEl = document.getElementById('schedulerStatus');
+        statusEl.textContent = data.scheduler_running ? '✅ Running' : '⛔ Stopped';
+        statusEl.className = `status-badge ${data.scheduler_running ? 'status-success' : 'status-failed'}`;
+        document.getElementById('jobCount').textContent = data.total;
+
+        // Fetch scheduler status for active count
+        try {
+            const statusResp = await fetch(`${API_BASE}/status`);
+            const statusData = await statusResp.json();
+            document.getElementById('activeCount').textContent = statusData.active_executions;
+        } catch(e) {}
+
+        const tbody = document.getElementById('cronTableBody');
+        if (data.jobs.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; color:var(--text-muted);">No cron jobs</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = data.jobs.map(j => `
+            <tr>
+                <td>
+                    <input type="checkbox" class="toggle-enabled"
+                           ${j.enabled ? 'checked' : ''}
+                           onchange="toggleJob('${j.id}', this.checked)">
+                </td>
+                <td><strong>${j.name}</strong><br><small style="color:var(--text-muted);">${j.id}</small></td>
+                <td>${j.schedule}<br><small class="schedule-human">${humanSchedule(j.schedule)}</small></td>
+                <td><code>${j.agent_id}</code></td>
+                <td><small>${timeAgo(j.last_run_at)}</small></td>
+                <td>${statusBadge(j.last_status)}</td>
+                <td>${j.last_duration_ms ? (j.last_duration_ms / 1000).toFixed(1) + 's' : '—'}</td>
+                <td>${j.run_count || 0}</td>
+                <td>${successRate(j.success_count, j.fail_count)}</td>
+                <td>
+                    <button class="btn-secondary trigger-btn" onclick="triggerJob('${j.id}')" title="Run Now">▶️</button>
+                    <button class="btn-secondary trigger-btn" onclick="openEditModal('${j.id}')" title="Edit">✏️</button>
+                    <button class="btn-secondary trigger-btn" onclick="showHistory('${j.id}', '${j.name}')" title="History">📋</button>
+                    <button class="btn-secondary trigger-btn" onclick="deleteJob('${j.id}')" title="Delete" style="color:#e74c3c;">🗑️</button>
+                </td>
+            </tr>
+        `).join('');
+    } catch (err) {
+        console.error('Failed to load jobs:', err);
+    }
+}
+
+async function toggleJob(jobId, enabled) {
+    await fetch(`${API_BASE}/${jobId}`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({enabled}),
+    });
+    refreshJobs();
+}
+
+async function triggerJob(jobId) {
+    if (!confirm(`Trigger job "${jobId}" now?`)) return;
+    const resp = await fetch(`${API_BASE}/${jobId}/trigger`, {method: 'POST'});
+    const data = await resp.json();
+    alert(data.message || 'Triggered');
+    setTimeout(refreshJobs, 2000);
+}
+
+async function deleteJob(jobId) {
+    if (!confirm(`Delete job "${jobId}"? This cannot be undone.`)) return;
+    await fetch(`${API_BASE}/${jobId}`, {method: 'DELETE'});
+    refreshJobs();
+}
+
+function openCreateModal() {
+    document.getElementById('jobModalTitle').textContent = 'New Cron Job';
+    document.getElementById('jobForm').reset();
+    document.getElementById('jobId').value = '';
+    document.getElementById('jobEnabled').checked = true;
+    document.getElementById('jobModal').classList.add('active');
+}
+
+async function openEditModal(jobId) {
+    const resp = await fetch(`${API_BASE}/${jobId}`);
+    const j = await resp.json();
+    document.getElementById('jobModalTitle').textContent = `Edit: ${j.name}`;
+    document.getElementById('jobId').value = j.id;
+    document.getElementById('jobName').value = j.name;
+    document.getElementById('jobSchedule').value = j.schedule;
+    document.getElementById('jobAgent').value = j.agent_id;
+    document.getElementById('jobSessionMode').value = j.session_mode;
+    document.getElementById('jobMaxDuration').value = j.max_duration_seconds || 300;
+    document.getElementById('jobPayloadType').value = j.payload_type;
+    document.getElementById('jobRetryCount').value = j.retry_count || 0;
+    document.getElementById('jobPayload').value = j.payload || '';
+    document.getElementById('jobEnabled').checked = j.enabled;
+    document.getElementById('jobModal').classList.add('active');
+}
+
+async function saveJob() {
+    const jobId = document.getElementById('jobId').value;
+    const payload = {
+        name: document.getElementById('jobName').value,
+        schedule: document.getElementById('jobSchedule').value,
+        agent_id: document.getElementById('jobAgent').value,
+        session_mode: document.getElementById('jobSessionMode').value,
+        max_duration_seconds: parseInt(document.getElementById('jobMaxDuration').value) || 300,
+        payload_type: document.getElementById('jobPayloadType').value,
+        retry_count: parseInt(document.getElementById('jobRetryCount').value) || 0,
+        payload: document.getElementById('jobPayload').value,
+        enabled: document.getElementById('jobEnabled').checked,
+    };
+
+    const method = jobId ? 'PUT' : 'POST';
+    const url = jobId ? `${API_BASE}/${jobId}` : API_BASE;
+
+    const resp = await fetch(url, {
+        method,
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload),
+    });
+
+    if (resp.ok) {
+        closeModal('jobModal');
+        refreshJobs();
+    } else {
+        const err = await resp.json();
+        alert(`Error: ${err.detail || JSON.stringify(err)}`);
+    }
+}
+
+async function showHistory(jobId, jobName) {
+    document.getElementById('historyJobName').textContent = jobName;
+    document.getElementById('historyTableBody').innerHTML =
+        '<tr><td colspan="4" style="text-align:center;">Loading...</td></tr>';
+    document.getElementById('historyModal').classList.add('active');
+
+    const resp = await fetch(`${API_BASE}/${jobId}/history?limit=30`);
+    const data = await resp.json();
+
+    if (data.entries.length === 0) {
+        document.getElementById('historyTableBody').innerHTML =
+            '<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">No history</td></tr>';
+        return;
+    }
+
+    document.getElementById('historyTableBody').innerHTML = data.entries.map(e => `
+        <tr>
+            <td><small>${new Date(e.created_at).toLocaleString()}</small></td>
+            <td>${statusBadge(e.success ? 'success' : 'failed')}</td>
+            <td>${e.duration_ms ? (e.duration_ms / 1000).toFixed(1) + 's' : '—'}</td>
+            <td><small>${JSON.stringify(e.details || {}).slice(0, 100)}</small></td>
+        </tr>
+    `).join('');
+}
+
+// Auto-refresh every 30 seconds
+refreshJobs();
+setInterval(refreshJobs, 30000);
+</script>
+{% endblock %}

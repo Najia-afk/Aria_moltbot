@@ -224,6 +224,12 @@ def create_app():
     def model_usage():
         return render_template('model_usage.html')
 
+    @app.route('/cron')
+    @app.route('/cron/')
+    def cron_page():
+        """Cron job management page."""
+        return render_template('engine_cron.html')
+
     @app.route('/rate-limits')
     def rate_limits():
         return render_template('rate_limits.html')
