@@ -1,23 +1,20 @@
 [project]
 name = "aria-blue"
-version = "1.2.0"
+version = "2.0.0"
 description = "Autonomous AI agent platform with local-first LLM inference, modular skills, and multi-agent orchestration"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.13"
 license = {file = "LICENSE"}
 authors = [
     {name = "Najia-afk"}
 ]
-keywords = ["ai", "agent", "autonomous", "llm", "aria-engine", "moltbook", "multi-agent"]
+keywords = ["ai", "agent", "autonomous", "llm", "moltbook", "multi-agent", "aria"]
 
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: Other/Proprietary License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
@@ -28,10 +25,15 @@ dependencies = [
     "pyyaml>=6.0",
     "python-dotenv>=1.0.0",
     "structlog>=24.0",
-    "sqlalchemy[asyncio]>=2.0.0",
-    "litellm>=1.0.0",
-    "aiohttp>=3.9.0",
-    "apscheduler>=4.0.0a5",
+    "litellm>=1.55.0",
+    "apscheduler>=4.0",
+    "aiohttp>=3.9",
+    "sqlalchemy[asyncio]>=2.0.30",
+    "alembic>=1.13.0",
+    "prometheus-client>=0.21.0",
+    "websockets>=13.0",
+    "uvicorn[standard]>=0.30.0",
+    "fastapi>=0.115.0",
 ]
 
 [project.optional-dependencies]
@@ -43,6 +45,12 @@ dev = [
     "black>=24.0.0",
     "ruff>=0.1.0",
     "mypy>=1.8.0",
+    "freezegun>=1.4.0",
+    "locust>=2.29.0",
+    "memray>=1.14.0",
+    "py-spy>=0.3.14",
+    "pyupgrade>=3.17.0",
+    "testcontainers>=4.0.0",
 ]
 
 docker = [
@@ -91,6 +99,7 @@ markers = [
     "unit: fast unit tests",
     "integration: requires mocked services",
     "docker: only runs in Docker container",
+    "load: load/performance tests",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning",
@@ -122,7 +131,7 @@ show_missing = true
 
 [tool.black]
 line-length = 100
-target-version = ["py312", "py313"]
+target-version = ["py313"]
 include = '\.pyi?$'
 exclude = '''
 /(
@@ -145,7 +154,7 @@ exclude = '''
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py313"
 
 [tool.ruff.lint]
 select = [
@@ -174,7 +183,7 @@ known-first-party = ["aria_mind", "aria_skills", "aria_agents", "aria_engine"]
 # ============================================================================
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.13"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
