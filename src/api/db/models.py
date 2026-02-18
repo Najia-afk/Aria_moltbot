@@ -751,3 +751,139 @@ class SkillInvocation(Base):
 Index("idx_invocation_skill", SkillInvocation.skill_name)
 Index("idx_invocation_created", SkillInvocation.created_at.desc())
 Index("idx_invocation_success", SkillInvocation.success)
+
+
+# ── Aria Engine (v2.0) ───────────────────────────────────────────────────────
+# Standalone engine tables — replaces OpenClaw runtime state
+
+
+class EngineChatSession(Base):
+    __tablename__ = "engine_chat_sessions"
+
+    id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
+    agent_id: Mapped[str] = mapped_column(String(100), nullable=False, server_default=text("'main'"))
+    session_type: Mapped[str] = mapped_column(String(50), nullable=False, server_default=text("'interactive'"))
+    title: Mapped[str | None] = mapped_column(String(500))
+    system_prompt: Mapped[str | None] = mapped_column(Text)
+    model: Mapped[str | None] = mapped_column(String(200))
+    temperature: Mapped[float] = mapped_column(Float, server_default=text("0.7"))
+    max_tokens: Mapped[int] = mapped_column(Integer, server_default=text("4096"))
+    context_window: Mapped[int] = mapped_column(Integer, server_default=text("50"))
+    status: Mapped[str] = mapped_column(String(20), nullable=False, server_default=text("'active'"))
+    message_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    total_tokens: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    total_cost: Mapped[float] = mapped_column(Numeric(10, 6), server_default=text("0"))
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSONB, server_default=text("'{}'::jsonb"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    messages: Mapped[list["EngineChatMessage"]] = relationship("EngineChatMessage", back_populates="session", cascade="all, delete-orphan")
+
+
+Index("idx_ecs_agent", EngineChatSession.agent_id)
+Index("idx_ecs_status", EngineChatSession.status)
+Index("idx_ecs_created", EngineChatSession.created_at)
+
+
+class EngineChatMessage(Base):
+    __tablename__ = "engine_chat_messages"
+
+    id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
+    session_id: Mapped[Any] = mapped_column(UUID(as_uuid=True), ForeignKey("engine_chat_sessions.id", ondelete="CASCADE"), nullable=False)
+    role: Mapped[str] = mapped_column(String(20), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    thinking: Mapped[str | None] = mapped_column(Text)
+    tool_calls: Mapped[dict | None] = mapped_column(JSONB)
+    tool_results: Mapped[dict | None] = mapped_column(JSONB)
+    model: Mapped[str | None] = mapped_column(String(200))
+    tokens_input: Mapped[int | None] = mapped_column(Integer)
+    tokens_output: Mapped[int | None] = mapped_column(Integer)
+    cost: Mapped[float | None] = mapped_column(Numeric(10, 6))
+    latency_ms: Mapped[int | None] = mapped_column(Integer)
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSONB, server_default=text("'{}'::jsonb"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
+
+    session: Mapped["EngineChatSession"] = relationship("EngineChatSession", back_populates="messages")
+
+
+Index("idx_ecm_session", EngineChatMessage.session_id)
+Index("idx_ecm_role", EngineChatMessage.role)
+Index("idx_ecm_created", EngineChatMessage.created_at)
+
+
+class EngineCronJob(Base):
+    __tablename__ = "engine_cron_jobs"
+
+    id: Mapped[str] = mapped_column(String(100), primary_key=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    schedule: Mapped[str] = mapped_column(String(100), nullable=False)
+    agent_id: Mapped[str] = mapped_column(String(100), server_default=text("'main'"))
+    enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
+    payload_type: Mapped[str] = mapped_column(String(50), server_default=text("'prompt'"))
+    payload: Mapped[str] = mapped_column(Text, nullable=False)
+    session_mode: Mapped[str] = mapped_column(String(50), server_default=text("'isolated'"))
+    max_duration_seconds: Mapped[int] = mapped_column(Integer, server_default=text("300"))
+    retry_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_status: Mapped[str | None] = mapped_column(String(20))
+    last_duration_ms: Mapped[int | None] = mapped_column(Integer)
+    last_error: Mapped[str | None] = mapped_column(Text)
+    next_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    run_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    success_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    fail_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSONB, server_default=text("'{}'::jsonb"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
+
+
+Index("idx_ecj_enabled", EngineCronJob.enabled)
+Index("idx_ecj_next_run", EngineCronJob.next_run_at)
+
+
+class EngineAgentState(Base):
+    __tablename__ = "engine_agent_state"
+
+    agent_id: Mapped[str] = mapped_column(String(100), primary_key=True)
+    display_name: Mapped[str | None] = mapped_column(String(200))
+    model: Mapped[str] = mapped_column(String(200), nullable=False)
+    temperature: Mapped[float] = mapped_column(Float, server_default=text("0.7"))
+    max_tokens: Mapped[int] = mapped_column(Integer, server_default=text("4096"))
+    system_prompt: Mapped[str | None] = mapped_column(Text)
+    focus_type: Mapped[str | None] = mapped_column(String(50))
+    status: Mapped[str] = mapped_column(String(20), server_default=text("'idle'"))
+    current_session_id: Mapped[Any | None] = mapped_column(UUID(as_uuid=True))
+    current_task: Mapped[str | None] = mapped_column(Text)
+    consecutive_failures: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    pheromone_score: Mapped[float] = mapped_column(Numeric(5, 3), server_default=text("0.500"))
+    last_active_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSONB, server_default=text("'{}'::jsonb"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
+
+
+class EngineConfigEntry(Base):
+    __tablename__ = "engine_config"
+
+    key: Mapped[str] = mapped_column(String(200), primary_key=True)
+    value: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
+    updated_by: Mapped[str] = mapped_column(String(100), server_default=text("'system'"))
+
+
+class EngineAgentTool(Base):
+    __tablename__ = "engine_agent_tools"
+
+    id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
+    agent_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    skill_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    function_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    parameters: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
+
+
+Index("idx_eat_agent", EngineAgentTool.agent_id)
