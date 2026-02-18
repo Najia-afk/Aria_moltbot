@@ -233,6 +233,30 @@ def create_app():
         return render_template('api_key_rotations.html')
 
     # ============================================
+    # Operations Hub Routes (Sprint 7)
+    # ============================================
+    @app.route('/operations')
+    @app.route('/operations/')
+    def operations():
+        return render_template('operations.html')
+
+    @app.route('/operations/cron/')
+    def operations_cron():
+        return render_template('engine_operations.html')
+
+    @app.route('/operations/agents/')
+    def operations_agents():
+        return render_template('engine_agents_mgmt.html')
+
+    @app.route('/operations/agents/<agent_id>/prompt')
+    def operations_agent_prompt(agent_id):
+        return render_template('engine_prompt_editor.html', agent_id=agent_id)
+
+    @app.route('/operations/health/')
+    def operations_health():
+        return render_template('engine_health.html')
+
+    # ============================================
     # Engine Routes (New — replaces OpenClaw UI)
     # ============================================
     @app.route('/chat/')
