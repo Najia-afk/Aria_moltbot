@@ -16,9 +16,7 @@ def create_app():
 
     service_host = os.environ['SERVICE_HOST']
     api_base_url = os.environ['API_BASE_URL']
-    clawdbot_public_url = os.environ['CLAWDBOT_PUBLIC_URL']
-    # Extract token from clawdbot URL for dynamic URL generation
-    clawdbot_token = os.environ.get('CLAWDBOT_TOKEN', '')
+    # REMOVED: clawdbot_public_url, clawdbot_token — OpenClaw removed (Operation Independence)
 
     # Internal API service URL (Docker network or localhost fallback)
     _api_internal_url = os.environ.get('API_INTERNAL_URL', 'http://aria-api:8000')
@@ -28,8 +26,7 @@ def create_app():
         return {
             'service_host': service_host,
             'api_base_url': api_base_url,
-            'clawdbot_public_url': clawdbot_public_url,
-            'clawdbot_token': clawdbot_token,
+            # REMOVED: clawdbot_public_url, clawdbot_token
         }
     
     @app.after_request
@@ -70,31 +67,16 @@ def create_app():
         headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded_headers}
         return Response(resp.content, status=resp.status_code, headers=headers)
 
-    # =========================================================================
-    # Clawdbot Reverse Proxy - forwards /clawdbot/* to clawdbot service
-    # Injects auth token like Traefik does
-    # =========================================================================
-    _clawdbot_internal_url = os.environ.get('CLAWDBOT_URL', 'http://clawdbot:18789')
+    # REMOVED: /clawdbot/ proxy route — OpenClaw removed (Operation Independence)
+    # Previously: forwarded to http://clawdbot:18789 with Bearer token injection
+    # Replaced by: native /chat/ route (S6-01) connecting to engine WebSocket
 
-    @app.route('/clawdbot/', defaults={'path': ''}, methods=['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'])
-    @app.route('/clawdbot/<path:path>', methods=['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'])
-    def clawdbot_proxy(path):
-        url = f"{_clawdbot_internal_url}/clawdbot/{path}"
-        fwd_headers = {k: v for k, v in request.headers if k.lower() not in ('host', 'transfer-encoding')}
-        # Inject Bearer token (same as Traefik clawdbot-auth middleware)
-        if clawdbot_token:
-            fwd_headers['Authorization'] = f'Bearer {clawdbot_token}'
-        resp = http_requests.request(
-            method=request.method,
-            url=url,
-            params=request.args,
-            headers=fwd_headers,
-            data=request.get_data(),
-            timeout=30,
-        )
-        excluded_headers = {'content-encoding', 'transfer-encoding', 'connection', 'content-length'}
-        headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded_headers}
-        return Response(resp.content, status=resp.status_code, headers=headers)
+    # Legacy redirect: anyone bookmarking /clawdbot/ gets redirected to /chat/
+    @app.route('/clawdbot/')
+    @app.route('/clawdbot/<path:path>')
+    def clawdbot_redirect(path=''):
+        from flask import redirect
+        return redirect('/chat/', code=301)
 
     # =========================================================================
     # Routes - Pages
@@ -249,6 +231,14 @@ def create_app():
     @app.route('/api-key-rotations')
     def api_key_rotations():
         return render_template('api_key_rotations.html')
+
+    # ============================================
+    # Engine Routes (New — replaces OpenClaw UI)
+    # ============================================
+    @app.route('/chat/')
+    @app.route('/chat/<session_id>')
+    def chat(session_id=None):
+        return render_template('engine_chat.html', session_id=session_id)
 
     # Flask remains UI-only. All data access goes through the FastAPI service.
 
