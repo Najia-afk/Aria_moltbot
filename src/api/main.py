@@ -255,6 +255,7 @@ from routers.skills import router as skills_router
 from routers.lessons import router as lessons_router
 from routers.proposals import router as proposals_router
 from routers.analysis import router as analysis_router
+from routers.engine_cron import router as engine_cron_router
 
 app.include_router(health_router)
 app.include_router(activities_router)
@@ -277,6 +278,7 @@ app.include_router(skills_router)
 app.include_router(lessons_router)
 app.include_router(proposals_router)
 app.include_router(analysis_router)
+app.include_router(engine_cron_router)
 
 # ── GraphQL ──────────────────────────────────────────────────────────────────
 
