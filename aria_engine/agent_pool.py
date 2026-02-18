@@ -1,26 +1,500 @@
 """
-Agent Pool — Async agent lifecycle management.
+Agent Pool — Async lifecycle management for engine agents.
 
-TODO (Sprint 4):
-- Agent spawn/track/terminate
-- Per-agent session isolation
-- Agent auto-routing with pheromone scoring
-- Roundtable multi-agent collaboration
+Manages agent instances backed by aria_engine.agent_state table.
+Features:
+- Load agents from DB on startup
+- Spawn/terminate agents with lifecycle events
+- Concurrent execution with asyncio.TaskGroup
+- Agent state persistence (status, current_session, task)
+- Integration with LLM gateway and skill registry
+- Max 5 concurrent agents (configurable)
 """
+import asyncio
+import logging
+import time
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Any, Callable, Dict, List, Optional
+
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncEngine
+
+from aria_engine.config import EngineConfig
+from aria_engine.exceptions import EngineError
+
+logger = logging.getLogger("aria.engine.agent_pool")
+
+MAX_CONCURRENT_AGENTS = 5
+
+
+@dataclass
+class EngineAgent:
+    """
+    Runtime representation of an agent in the engine.
+
+    Holds agent configuration, current state, and a task queue
+    for processing messages asynchronously.
+    """
+
+    agent_id: str
+    display_name: str = ""
+    model: str = ""
+    temperature: float = 0.7
+    max_tokens: int = 4096
+    system_prompt: str = ""
+    focus_type: Optional[str] = None
+    status: str = "idle"  # idle, busy, error, disabled
+    current_session_id: Optional[str] = None
+    current_task: Optional[str] = None
+    pheromone_score: float = 0.500
+    consecutive_failures: int = 0
+    last_active_at: Optional[datetime] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    # Runtime state (not persisted)
+    _task_queue: asyncio.Queue = field(
+        default_factory=lambda: asyncio.Queue(maxsize=100)
+    )
+    _worker_task: Optional[asyncio.Task] = field(default=None, repr=False)
+    _llm_gateway: Optional[Any] = field(default=None, repr=False)
+    _context: List[Dict[str, str]] = field(default_factory=list, repr=False)
+
+    async def process(self, message: str, **kwargs: Any) -> Dict[str, Any]:
+        """
+        Process a message using the LLM gateway.
+
+        Builds the message context, sends to LLM, and returns the response.
+
+        Args:
+            message: User/system message to process.
+            **kwargs: Additional parameters (temperature, max_tokens overrides).
+
+        Returns:
+            Dict with content, thinking, tool_calls, model, usage stats.
+        """
+        if self._llm_gateway is None:
+            raise EngineError(f"Agent {self.agent_id} has no LLM gateway")
+
+        self.status = "busy"
+        self.current_task = message[:200]
+
+        # Add user message to context
+        self._context.append({"role": "user", "content": message})
+
+        # Build messages for LLM
+        messages = []
+        if self.system_prompt:
+            messages.append({"role": "system", "content": self.system_prompt})
+        # Sliding window: keep last N context messages
+        context_window = kwargs.get("context_window", 50)
+        messages.extend(self._context[-context_window:])
+
+        try:
+            response = await self._llm_gateway.complete(
+                messages=messages,
+                model=kwargs.get("model", self.model),
+                temperature=kwargs.get("temperature", self.temperature),
+                max_tokens=kwargs.get("max_tokens", self.max_tokens),
+                tools=kwargs.get("tools"),
+                enable_thinking=kwargs.get("enable_thinking", False),
+            )
+
+            # Add assistant response to context
+            self._context.append(
+                {"role": "assistant", "content": response.content}
+            )
+
+            self.status = "idle"
+            self.current_task = None
+            self.consecutive_failures = 0
+            self.last_active_at = datetime.now(timezone.utc)
+
+            return {
+                "content": response.content,
+                "thinking": response.thinking,
+                "tool_calls": response.tool_calls,
+                "model": response.model,
+                "input_tokens": response.input_tokens,
+                "output_tokens": response.output_tokens,
+                "cost_usd": response.cost_usd,
+                "latency_ms": response.latency_ms,
+            }
+
+        except Exception as e:
+            self.consecutive_failures += 1
+            self.status = "error" if self.consecutive_failures >= 3 else "idle"
+            self.current_task = None
+            logger.error("Agent %s process failed: %s", self.agent_id, e)
+            raise
+
+    def clear_context(self) -> None:
+        """Clear the agent's conversation context."""
+        self._context.clear()
+
+    def get_summary(self) -> Dict[str, Any]:
+        """Get a summary of the agent's current state."""
+        return {
+            "agent_id": self.agent_id,
+            "display_name": self.display_name,
+            "model": self.model,
+            "status": self.status,
+            "focus_type": self.focus_type,
+            "current_session_id": self.current_session_id,
+            "current_task": self.current_task,
+            "pheromone_score": self.pheromone_score,
+            "consecutive_failures": self.consecutive_failures,
+            "last_active_at": (
+                self.last_active_at.isoformat() if self.last_active_at else None
+            ),
+            "context_length": len(self._context),
+        }
 
 
 class AgentPool:
-    """Manages async agent lifecycle and task routing."""
+    """
+    Manages the lifecycle of all engine agents.
 
-    def __init__(self, session_factory=None, config=None):
-        self.session_factory = session_factory
+    Lifecycle:
+        pool = AgentPool(config, db_engine, llm_gateway)
+        await pool.load_agents()     # load from DB
+        agent = pool.get_agent("main")
+        result = await agent.process("Hello")
+        await pool.terminate_agent("aria-talk")
+    """
+
+    def __init__(
+        self,
+        config: EngineConfig,
+        db_engine: AsyncEngine,
+        llm_gateway: Optional[Any] = None,
+    ):
         self.config = config
-        self.agent_count = 0
+        self._db_engine = db_engine
+        self._llm_gateway = llm_gateway
+        self._agents: Dict[str, EngineAgent] = {}
+        self._concurrency_semaphore = asyncio.Semaphore(MAX_CONCURRENT_AGENTS)
+        self._skill_registry: Optional[Any] = None
 
-    async def load_agents(self):
-        """Load agent definitions from DB."""
-        pass
+    def set_llm_gateway(self, gateway: Any) -> None:
+        """Set the LLM gateway for all agents."""
+        self._llm_gateway = gateway
+        for agent in self._agents.values():
+            agent._llm_gateway = gateway
 
-    async def shutdown(self):
+    def set_skill_registry(self, registry: Any) -> None:
+        """Set the skill registry for tool resolution."""
+        self._skill_registry = registry
+
+    async def load_agents(self) -> int:
+        """
+        Load all agents from the engine_agent_state table.
+
+        Creates EngineAgent instances for each row and stores them
+        in the pool. Agents with status='disabled' are loaded but
+        not activated.
+
+        Returns:
+            Number of agents loaded.
+        """
+        async with self._db_engine.begin() as conn:
+            result = await conn.execute(
+                text("""
+                    SELECT agent_id, display_name, model, temperature,
+                           max_tokens, system_prompt, focus_type, status,
+                           current_session_id, pheromone_score,
+                           consecutive_failures, last_active_at, metadata
+                    FROM aria_engine.agent_state
+                    ORDER BY agent_id
+                """)
+            )
+            rows = result.mappings().all()
+
+        for row in rows:
+            agent = EngineAgent(
+                agent_id=row["agent_id"],
+                display_name=row["display_name"] or row["agent_id"],
+                model=row["model"],
+                temperature=row["temperature"] or 0.7,
+                max_tokens=row["max_tokens"] or 4096,
+                system_prompt=row["system_prompt"] or "",
+                focus_type=row["focus_type"],
+                status=row["status"] or "idle",
+                current_session_id=(
+                    str(row["current_session_id"])
+                    if row["current_session_id"]
+                    else None
+                ),
+                pheromone_score=float(row["pheromone_score"] or 0.5),
+                consecutive_failures=row["consecutive_failures"] or 0,
+                last_active_at=row["last_active_at"],
+                metadata=row["metadata"] or {},
+            )
+            agent._llm_gateway = self._llm_gateway
+            self._agents[row["agent_id"]] = agent
+
+        logger.info("Loaded %d agents from database", len(self._agents))
+        return len(self._agents)
+
+    async def spawn_agent(
+        self,
+        agent_id: str,
+        model: str = "",
+        display_name: str = "",
+        system_prompt: str = "",
+        focus_type: Optional[str] = None,
+        temperature: float = 0.7,
+        max_tokens: int = 4096,
+    ) -> EngineAgent:
+        """
+        Create and register a new agent.
+
+        Inserts a row into agent_state and creates an EngineAgent instance.
+
+        Args:
+            agent_id: Unique identifier for the agent.
+            model: LLM model to use.
+            display_name: Human-readable name.
+            system_prompt: System prompt for the agent.
+            focus_type: Agent's focus area.
+            temperature: LLM temperature.
+            max_tokens: LLM max tokens.
+
+        Returns:
+            The new EngineAgent instance.
+
+        Raises:
+            EngineError: If agent already exists or pool is full.
+        """
+        if agent_id in self._agents:
+            raise EngineError(f"Agent {agent_id!r} already exists")
+
+        if len(self._agents) >= MAX_CONCURRENT_AGENTS:
+            raise EngineError(
+                f"Agent pool full ({MAX_CONCURRENT_AGENTS} max). "
+                "Terminate an agent first."
+            )
+
+        # Insert to DB
+        async with self._db_engine.begin() as conn:
+            await conn.execute(
+                text("""
+                    INSERT INTO aria_engine.agent_state
+                        (agent_id, display_name, model, temperature,
+                         max_tokens, system_prompt, focus_type, status)
+                    VALUES
+                        (:agent_id, :display_name, :model, :temperature,
+                         :max_tokens, :system_prompt, :focus_type, 'idle')
+                    ON CONFLICT (agent_id) DO UPDATE SET
+                        status = 'idle',
+                        model = EXCLUDED.model,
+                        display_name = EXCLUDED.display_name,
+                        system_prompt = EXCLUDED.system_prompt,
+                        updated_at = NOW()
+                """),
+                {
+                    "agent_id": agent_id,
+                    "display_name": display_name or agent_id,
+                    "model": model or self.config.default_model,
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                    "system_prompt": system_prompt,
+                    "focus_type": focus_type,
+                },
+            )
+
+        # Create in-memory agent
+        agent = EngineAgent(
+            agent_id=agent_id,
+            display_name=display_name or agent_id,
+            model=model or self.config.default_model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            system_prompt=system_prompt,
+            focus_type=focus_type,
+            status="idle",
+        )
+        agent._llm_gateway = self._llm_gateway
+        self._agents[agent_id] = agent
+
+        logger.info("Spawned agent: %s (model=%s)", agent_id, agent.model)
+        return agent
+
+    def get_agent(self, agent_id: str) -> Optional[EngineAgent]:
+        """Get an agent by ID. Returns None if not found."""
+        return self._agents.get(agent_id)
+
+    def get_skill(self, skill_name: str) -> Optional[Any]:
+        """Get a skill by name from the registry."""
+        if self._skill_registry is None:
+            return None
+        return self._skill_registry.get(skill_name)
+
+    async def terminate_agent(self, agent_id: str) -> bool:
+        """
+        Gracefully terminate an agent.
+
+        Cancels any running tasks, persists final state, and removes
+        from the in-memory pool.
+
+        Args:
+            agent_id: Agent to terminate.
+
+        Returns:
+            True if the agent was terminated.
+        """
+        agent = self._agents.get(agent_id)
+        if agent is None:
+            return False
+
+        # Cancel worker task if running
+        if agent._worker_task and not agent._worker_task.done():
+            agent._worker_task.cancel()
+            try:
+                await agent._worker_task
+            except asyncio.CancelledError:
+                pass
+
+        # Persist final state
+        await self._persist_agent_state(agent_id, status="disabled")
+
+        # Remove from pool
+        del self._agents[agent_id]
+
+        logger.info("Terminated agent: %s", agent_id)
+        return True
+
+    def list_agents(self) -> List[Dict[str, Any]]:
+        """Get summaries of all agents in the pool."""
+        return [agent.get_summary() for agent in self._agents.values()]
+
+    async def process_with_agent(
+        self,
+        agent_id: str,
+        message: str,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """
+        Process a message with a specific agent, respecting concurrency limits.
+
+        Args:
+            agent_id: Agent to use.
+            message: Message to process.
+            **kwargs: Additional parameters for the agent.
+
+        Returns:
+            Agent response dict.
+
+        Raises:
+            EngineError: If agent not found.
+        """
+        agent = self._agents.get(agent_id)
+        if agent is None:
+            raise EngineError(f"Agent {agent_id!r} not found in pool")
+
+        if agent.status == "disabled":
+            raise EngineError(f"Agent {agent_id!r} is disabled")
+
+        async with self._concurrency_semaphore:
+            try:
+                result = await agent.process(message, **kwargs)
+                # Persist updated state
+                await self._persist_agent_state(agent_id)
+                return result
+            except Exception:
+                await self._persist_agent_state(agent_id)
+                raise
+
+    async def run_parallel(
+        self,
+        tasks: List[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        """
+        Run multiple agent tasks in parallel using TaskGroup.
+
+        Args:
+            tasks: List of dicts with 'agent_id' and 'message' keys.
+
+        Returns:
+            List of result dicts (one per task).
+        """
+        results: List[Dict[str, Any]] = [{}] * len(tasks)
+
+        async with asyncio.TaskGroup() as tg:
+            for i, task in enumerate(tasks):
+
+                async def _run(
+                    idx: int = i, t: Dict[str, Any] = task
+                ) -> None:
+                    try:
+                        result = await self.process_with_agent(
+                            agent_id=t["agent_id"],
+                            message=t["message"],
+                            **{
+                                k: v
+                                for k, v in t.items()
+                                if k not in ("agent_id", "message")
+                            },
+                        )
+                        results[idx] = result
+                    except Exception as e:
+                        results[idx] = {
+                            "content": f"[Error: {e}]",
+                            "agent_id": t["agent_id"],
+                            "error": str(e),
+                        }
+
+                tg.create_task(_run())
+
+        return results
+
+    async def _persist_agent_state(
+        self,
+        agent_id: str,
+        status: Optional[str] = None,
+    ) -> None:
+        """Persist agent runtime state to the database."""
+        agent = self._agents.get(agent_id)
+        if agent is None:
+            return
+
+        async with self._db_engine.begin() as conn:
+            await conn.execute(
+                text("""
+                    UPDATE aria_engine.agent_state
+                    SET status = :status,
+                        current_task = :current_task,
+                        consecutive_failures = :failures,
+                        pheromone_score = :pheromone,
+                        last_active_at = :last_active,
+                        updated_at = NOW()
+                    WHERE agent_id = :agent_id
+                """),
+                {
+                    "agent_id": agent_id,
+                    "status": status or agent.status,
+                    "current_task": agent.current_task,
+                    "failures": agent.consecutive_failures,
+                    "pheromone": agent.pheromone_score,
+                    "last_active": agent.last_active_at,
+                },
+            )
+
+    def get_status(self) -> Dict[str, Any]:
+        """Get pool status summary."""
+        statuses: Dict[str, int] = {}
+        for agent in self._agents.values():
+            statuses[agent.status] = statuses.get(agent.status, 0) + 1
+
+        return {
+            "total_agents": len(self._agents),
+            "max_concurrent": MAX_CONCURRENT_AGENTS,
+            "status_counts": statuses,
+            "agents": [a.get_summary() for a in self._agents.values()],
+        }
+
+    async def shutdown(self) -> None:
         """Gracefully shutdown all agents."""
-        pass
+        for agent_id in list(self._agents.keys()):
+            await self.terminate_agent(agent_id)
+        logger.info("Agent pool shutdown complete")
