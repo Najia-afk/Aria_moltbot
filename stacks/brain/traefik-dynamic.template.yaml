@@ -1,5 +1,4 @@
 # Traefik Dynamic Configuration - HTTP & HTTPS routes
-# TEMPLATE FILE - envsubst replaces ${CLAWDBOT_TOKEN} at runtime
 tls:
   stores:
     default:
@@ -14,17 +13,6 @@ http:
   routers:
     # HTTP Routers (fast LAN access)
     
-    # OpenClaw WebSocket at root - higher priority than portal for WS upgrades
-    clawdbot-ws-http:
-      rule: "PathPrefix(`/`) && Header(`Connection`, `Upgrade`) && Header(`Upgrade`, `websocket`)"
-      priority: 95
-      entryPoints:
-        - web
-      service: clawdbot
-      middlewares:
-        - clawdbot-auth
-        - clawdbot-local
-
     portal-http:
       rule: "PathPrefix(`/`)"
       priority: 1
@@ -51,28 +39,6 @@ http:
       middlewares:
         - api-strip
         - secure-headers
-
-    # Clawdbot WebSocket at /clawdbot - higher priority for WS upgrades
-    clawdbot-ws-path-http:
-      rule: "PathPrefix(`/clawdbot`) && Header(`Connection`, `Upgrade`) && Header(`Upgrade`, `websocket`)"
-      priority: 92
-      entryPoints:
-        - web
-      service: clawdbot
-      middlewares:
-        - clawdbot-auth
-        - clawdbot-local
-
-    # Clawdbot - All traffic (HTTP + WebSocket) - Token auth injected by Traefik
-    clawdbot-http:
-      rule: "PathPrefix(`/clawdbot`)"
-      priority: 90
-      entryPoints:
-        - web
-      service: clawdbot
-      middlewares:
-        - clawdbot-auth
-        - clawdbot-local
 
     grafana-http:
       rule: "PathPrefix(`/grafana`)"
@@ -127,18 +93,6 @@ http:
 
     # HTTPS Routers (secure access)
     
-    # OpenClaw WebSocket at root - higher priority than portal for WS upgrades
-    clawdbot-ws:
-      rule: "PathPrefix(`/`) && Header(`Connection`, `Upgrade`) && Header(`Upgrade`, `websocket`)"
-      priority: 95
-      entryPoints:
-        - websecure
-      service: clawdbot
-      middlewares:
-        - clawdbot-auth
-        - clawdbot-local
-      tls: {}
-
     portal:
       rule: "PathPrefix(`/`)"
       priority: 1
@@ -167,30 +121,6 @@ http:
       middlewares:
         - api-strip
         - secure-headers
-      tls: {}
-
-    # Clawdbot WebSocket at /clawdbot HTTPS - higher priority for WS upgrades
-    clawdbot-ws-path:
-      rule: "PathPrefix(`/clawdbot`) && Header(`Connection`, `Upgrade`) && Header(`Upgrade`, `websocket`)"
-      priority: 92
-      entryPoints:
-        - websecure
-      service: clawdbot
-      middlewares:
-        - clawdbot-auth
-        - clawdbot-local
-      tls: {}
-
-    # Clawdbot HTTPS - All traffic (HTTP + WebSocket) - Token auth injected by Traefik
-    clawdbot:
-      rule: "PathPrefix(`/clawdbot`)"
-      priority: 90
-      entryPoints:
-        - websecure
-      service: clawdbot
-      middlewares:
-        - clawdbot-auth
-        - clawdbot-local
       tls: {}
 
     grafana:
@@ -250,47 +180,10 @@ http:
       tls: {}
 
   middlewares:
-    # Inject OpenClaw gateway token for transparent browser auth
-    # Token from .env CLAWDBOT_TOKEN - injected at runtime via envsubst
-    clawdbot-auth:
-      headers:
-        customRequestHeaders:
-          Authorization: "Bearer ${CLAWDBOT_TOKEN}"
-
-    # Strip X-Forwarded-For so OpenClaw sees Traefik's Docker IP (trusted proxy)
-    # This fixes 'device identity required' errors from external forwarded IPs
-    clawdbot-local:
-      headers:
-        customRequestHeaders:
-          X-Forwarded-For: ""
-          X-Real-IP: ""
-
     api-strip:
       stripPrefix:
         prefixes:
           - /api
-    clawdbot-strip:
-      stripPrefix:
-        prefixes:
-          - /clawdbot
-    # WebSocket-friendly headers for OpenClaw (no Keep-Alive, allow upgrade)
-    clawdbot-headers:
-      headers:
-        accessControlAllowMethods:
-          - GET
-          - POST
-          - PUT
-          - DELETE
-          - OPTIONS
-        accessControlAllowHeaders:
-          - "*"
-        accessControlAllowOriginList: 
-          - "*"
-        accessControlMaxAge: 100
-        addVaryHeader: true
-        # Don't add Connection headers - let WebSocket upgrade work
-        customRequestHeaders:
-          X-Forwarded-Proto: "https"
     grafana-strip:
       stripPrefix:
         prefixes:
@@ -376,13 +269,6 @@ http:
           Connection: "keep-alive"
           Keep-Alive: "timeout=5, max=1000"
 
-  serversTransports:
-    clawdbot-transport:
-      forwardingTimeouts:
-        dialTimeout: "30s"
-        responseHeaderTimeout: "120s"
-        idleConnTimeout: "300s"
-
   services:
     portal:
       loadBalancer:
@@ -392,11 +278,6 @@ http:
       loadBalancer:
         servers:
           - url: "http://aria-api:8000"
-    clawdbot:
-      loadBalancer:
-        serversTransport: clawdbot-transport@file
-        servers:
-          - url: "http://clawdbot:18789"
     grafana:
       loadBalancer:
         servers:
