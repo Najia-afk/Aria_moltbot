@@ -14,4 +14,19 @@ __version__ = "2.0.0"
 from aria_engine.config import EngineConfig
 from aria_engine.exceptions import EngineError, LLMError, SessionError, SchedulerError
 
-__all__ = ["EngineConfig", "EngineError", "LLMError", "SessionError", "SchedulerError"]
+__all__ = ["EngineConfig", "EngineError", "LLMError", "SessionError", "SchedulerError",
+           "get_engine", "set_engine"]
+
+# Global engine instance (set by AriaEngine.start())
+_engine_instance = None
+
+
+def get_engine():
+    """Get the global AriaEngine instance."""
+    return _engine_instance
+
+
+def set_engine(engine):
+    """Set the global AriaEngine instance."""
+    global _engine_instance
+    _engine_instance = engine

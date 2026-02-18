@@ -36,6 +36,21 @@ class AriaEngine:
         self._db_engine = None
         self._session_factory = None
 
+    @property
+    def scheduler(self):
+        """Get the EngineScheduler instance."""
+        return self._scheduler
+
+    @property
+    def agent_pool(self):
+        """Get the AgentPool instance."""
+        return self._agent_pool
+
+    @property
+    def db_engine(self):
+        """Get the async SQLAlchemy engine."""
+        return self._db_engine
+
     async def start(self):
         """Boot sequence (replaces startup.py + openclaw-entrypoint.sh)."""
         logger.info("🚀 Aria Engine starting...")
@@ -59,6 +74,10 @@ class AriaEngine:
         # Phase 5: Health endpoint
         await self._init_health()
         logger.info("✅ Phase 5: Health server on :8081")
+
+        # Register global engine reference
+        from aria_engine import set_engine
+        set_engine(self)
 
         logger.info("🟢 Aria Engine running — all systems nominal")
 
@@ -129,9 +148,9 @@ class AriaEngine:
         from aria_engine.scheduler import EngineScheduler
 
         self._scheduler = EngineScheduler(
-            session_factory=self._session_factory,
-            agent_pool=self._agent_pool,
             config=self.config,
+            db_engine=self._db_engine,
+            agent_pool=self._agent_pool,
         )
         await self._scheduler.start()
 
