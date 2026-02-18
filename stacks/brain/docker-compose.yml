@@ -135,6 +135,46 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
+  # ── Aria Engine (v2.0) — Standalone Python runtime ──────────────────────────
+  # Replaces clawdbot (OpenClaw gateway) with native Python engine
+  # Provides: LLM gateway, scheduler, agent pool, health endpoint
+  aria-engine:
+    build:
+      context: ../../
+      dockerfile: Dockerfile
+    container_name: aria-engine
+    restart: unless-stopped
+    command: ["python", "-m", "aria_engine"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-admin}:${DB_PASSWORD:-admin}@aria-db:5432/${DB_NAME:-aria_warehouse}
+      LITELLM_BASE_URL: http://litellm:4000/v1
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-change-me}
+      ENGINE_DEBUG: ${ENGINE_DEBUG:-false}
+      PYTHONPATH: /app
+    volumes:
+      - ../../aria_memories:/app/aria_memories
+      - ../../aria_mind/soul:/app/aria_mind/soul:ro
+      - ../../aria_models:/app/aria_models:ro
+      - ../../aria_engine:/app/aria_engine:ro
+    depends_on:
+      aria-db:
+        condition: service_healthy
+      litellm:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - aria-net
+    labels:
+      - "com.aria.service=engine"
+    mem_limit: ${ENGINE_MEM_LIMIT:-512m}
+    cpus: ${ENGINE_CPU_LIMIT:-1.0}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
   # Tor Proxy for privacy
   tor-proxy:
     image: dperson/torproxy:latest
