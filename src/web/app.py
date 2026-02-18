@@ -236,6 +236,12 @@ def create_app():
         """Agent management page."""
         return render_template('engine_agents.html')
 
+    @app.route('/agent-dashboard')
+    @app.route('/agent-dashboard/')
+    def agent_dashboard_page():
+        """Agent performance dashboard."""
+        return render_template('engine_agent_dashboard.html')
+
     @app.route('/rate-limits')
     def rate_limits():
         return render_template('rate_limits.html')
