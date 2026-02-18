@@ -125,7 +125,6 @@ Aria_moltbot/
 │   ├── __init__.py
 │   ├── loader.py                 # Model loader
 │   ├── models.yaml               # Model catalog (single source of truth)
-│   ├── openclaw_config.py        # OpenClaw model config
 │   └── README.md                 # Model documentation
 │
 ├── aria_memories/                # Persistent memory storage
