@@ -230,6 +230,12 @@ def create_app():
         """Cron job management page."""
         return render_template('engine_cron.html')
 
+    @app.route('/agents')
+    @app.route('/agents/')
+    def agents_page():
+        """Agent management page."""
+        return render_template('engine_agents.html')
+
     @app.route('/rate-limits')
     def rate_limits():
         return render_template('rate_limits.html')
