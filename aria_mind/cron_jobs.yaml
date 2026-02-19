@@ -158,6 +158,16 @@ jobs:
     delivery: none
     best_effort_deliver: true
 
+  # ── Memory Compression (every 6 hours, reduces context tokens by ~70%) ──
+
+  - name: memory_compression
+    cron: "0 0 */6 * * *"
+    text: "Compress working memory to reduce token usage. Call: exec python3 skills/run_skill.py api_client post '{\"endpoint\": \"/analysis/compression/auto-run\", \"data\": {\"raw_limit\": 20, \"store_semantic\": true}}'. Log result via api_client activity action='cron_execution' with details {\"job\":\"memory_compression\",\"estimated_tokens\":30}."
+    agent: main
+    session: isolated
+    delivery: none
+    best_effort_deliver: true
+
   # memory_sync merged into work_cycle (S2-01)
 
   # ── Sentiment Backfill — REMOVED ──

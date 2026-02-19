@@ -81,3 +81,22 @@
 - **Lexicon word lists need common conversational words.** "better", "clean", "easy", "works" were missing — causing 0% confidence on obviously positive messages. Expand lexicon proactively with everyday language, not just strong emotion words.
 - **Silent exception swallowing hides critical failures.** `except: pass` in the LLM sentiment fallback meant we had no idea the model calls were failing. Always log at least a warning on fallback paths.
 - **Backfill endpoints must write to the correct tables.** `backfill-sessions` wrote to `semantic_memories` only, while the dashboard reads from `sentiment_events`. Both tables need writes for the feature to work end-to-end.
+
+## Sprint S-50→S-57 — Operation Integration (2026-02-19)
+- **Routers exist ≠ Routers mounted.** `engine_chat`, `engine_agents`, `engine_agent_metrics` were fully implemented (800+ lines combined) but never added to `main.py`. Always verify new routers appear in the main app's include_router calls.
+- **`configure_engine()` must be called in lifespan.** Dependency-injected routers that use module-level globals need explicit initialization during app startup. A mounted but unconfigured router returns 503 on every endpoint.
+- **Alembic baseline migration is essential.** 29/36 tables had no migration — `ensure_schema()` at runtime is not enough for fresh installs or CI. Every ORM table needs a corresponding Alembic migration with IF NOT EXISTS for idempotency.
+- **Disconnected Alembic heads break `upgrade head`.** s42 had `down_revision = None`, creating two heads. Always run `alembic heads` after adding migrations to verify single-head linear chain.
+- **Cron YAML→DB sync must be automatic.** Manual `scripts/migrate_cron_jobs.py` is a deployment trap. Auto-sync on startup with upsert logic (insert new, update changed, preserve runtime state) eliminates deployment drift.
+- **Heartbeat tables unused = dashboard shows nothing.** Two heartbeat systems existed but neither wrote to `heartbeat_log`. Always verify the full write→read→display pipeline end-to-end.
+- **Swarm execution with dependency waves works.** 8 tickets executed in 4 waves (parallel within wave, sequential between waves). S-52/S-53 combined since both touched main.py. Total: ~10 min wall-clock for 34 points.
+- **Subagent also resolved S-51 inside S-50.** When a subagent sees adjacent work (fixing s42 chain while creating baseline), let it do both — saves a round trip.
+- **Skills layer was clean — audit confirmed it.** 0 SQLAlchemy violations, 33 skills registered. The architecture boundary between skills and DB held. 4 skills were unregistered due to missing __init__.py imports (not architecture violations, just wiring gaps).
+## Epic E10  Prototype Integration Audit (2026-02-19)
+- **Subagent file-existence audits can return false negatives.** Subagent reported `aria_skills/sentiment_analysis/` as missing  it existed with 962 lines. Always confirm with `read_file` or `grep_search` before creating a replacement file.
+- **Real gaps are often operational, not architectural.** All 6 prototype skills were already implemented in production. The only true gap was that memory compression was never triggered (no cron job). Check the runtime path (cron/event/API call) before auditing the code.
+- **"Stopped as over-engineered" in sprint notes does not mean not shipped.** The 2026-02-16 sprint note said `embedding_memory.py` and `pattern_recognition.py` were stopped  both ended up implemented anyway. Sprint decisions evolve; read the code, not only the docs.
+- **Import-test pattern for skill verification.** `mcp_pylance_mcp_s_pylanceRunCodeSnippet` with a simple import plus print (no emoji, no unicode) is the fastest way to confirm all exports resolve correctly. Emoji in print strings cause codec errors in some terminals.
+- **Compression needs a cron, not just an endpoint.** A skill that is never invoked is the same as a skill that does not exist. For any background-processing skill, creating the cron job is part of the implementation  the endpoint alone is not enough.
+- **Self-fetching endpoints simplify cron integration.** `POST /compression/auto-run` fetches its own data from the DB internally. Cron agents need zero payload knowledge  they just call the endpoint. This pattern (self-fetch + skip-if-not-needed guard) is reusable for any scheduled operation.
+- **Prototype folder should be archived, not deleted.** `aria_mind/prototypes/` contains design rationale and trade-off notes. Move to `aria_souvenirs/` to preserve the research lineage.

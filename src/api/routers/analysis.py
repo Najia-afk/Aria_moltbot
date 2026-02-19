@@ -30,6 +30,7 @@ from db.models import (
     SentimentEvent,
     SessionMessage,
     Thought,
+    WorkingMemory,
 )
 from deps import get_db
 
@@ -1614,6 +1615,92 @@ async def get_compression_history(limit: int = 50, db: AsyncSession = Depends(ge
             for m in items
         ],
         "total": len(items),
+    }
+
+
+# ── Compression Auto-Run (self-fetching, designed for cron calls) ────────────
+
+
+class AutoCompressionRequest(BaseModel):
+    raw_limit: int = Field(20, ge=5, le=100)
+    store_semantic: bool = True
+    dry_run: bool = False
+
+
+@router.post("/compression/auto-run")
+async def run_auto_compression(
+    req: AutoCompressionRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Auto-compress working memory when count exceeds raw_limit.
+    Self-fetches working memory — no memories payload needed.
+    Designed for cron job invocation (every 6 hours).
+    """
+    from aria_skills.memory_compression import MemoryEntry, MemoryCompressor, CompressionManager
+
+    stmt = select(WorkingMemory).order_by(WorkingMemory.updated_at.desc()).limit(200)
+    rows = (await db.execute(stmt)).scalars().all()
+
+    if len(rows) <= req.raw_limit:
+        return {
+            "skipped": True,
+            "reason": f"Only {len(rows)} items (raw_limit={req.raw_limit}), no compression needed",
+            "count": len(rows),
+        }
+
+    mem_objects = [
+        MemoryEntry(
+            id=str(r.id),
+            content=str(r.value or r.key),
+            category=r.category or "general",
+            timestamp=r.updated_at or r.created_at,
+            importance_score=float(r.importance if r.importance is not None else 0.5),
+        )
+        for r in rows
+    ]
+
+    if req.dry_run:
+        return {
+            "dry_run": True,
+            "would_compress": len(mem_objects),
+            "raw_limit": req.raw_limit,
+        }
+
+    compressor = MemoryCompressor(raw_limit=req.raw_limit)
+    manager = CompressionManager(compressor)
+    result = await manager.process_all(mem_objects)
+
+    if req.store_semantic and manager.compressed_store:
+        for cm in manager.compressed_store:
+            try:
+                embedding = await _generate_embedding(cm.summary)
+            except Exception:
+                embedding = [0.0] * 768
+            db.add(SemanticMemory(
+                content=cm.summary,
+                summary=cm.summary[:100],
+                category=f"compressed_{cm.tier}",
+                embedding=embedding,
+                importance=0.7 if cm.tier == "archive" else 0.5,
+                source="compression_auto",
+                metadata_json={
+                    "tier": cm.tier,
+                    "original_count": cm.original_count,
+                    "key_entities": cm.key_entities,
+                    "key_facts": cm.key_facts,
+                },
+            ))
+        await db.commit()
+
+    return {
+        "skipped": False,
+        "compressed": result.success,
+        "memories_processed": result.memories_processed,
+        "compression_ratio": round(result.compression_ratio, 3),
+        "tokens_saved_estimate": getattr(result, "tokens_saved_estimate", 0),
+        "tiers_updated": result.tiers_updated,
+        "summaries_stored": len(manager.compressed_store),
     }
 
 
