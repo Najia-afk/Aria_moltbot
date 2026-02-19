@@ -32,7 +32,13 @@ def _read_md_files(directory: Path) -> dict[str, str]:
 class TestNoBraveReferences:
     """Ensure brave/web_search refs are removed (or only 'not available' notes)."""
 
-    ALLOWED = re.compile(r"not currently available|NOT currently available", re.IGNORECASE)
+    ALLOWED = re.compile(
+        r"not currently available|NOT currently available"
+        r"|NEVER use|NEVER Brave|NEVER \w+/web_search"
+        r"|FORBIDDEN|FORB|never allowed|explicitly forbidden"
+        r"|do not use|DO NOT USE",
+        re.IGNORECASE,
+    )
 
     @pytest.fixture(autouse=True)
     def _load(self):

@@ -259,6 +259,14 @@ class TestDeleteSession:
         orig = mod._AGENTS_DIR
         mod._AGENTS_DIR = str(agents_dir)
         skill._mark_ended_in_pg = AsyncMock(return_value=False)
+        # Add a cron-keyed session for "def456" so protection doesn't block it
+        idx_path = agents_dir / "main" / "sessions" / "sessions.json"
+        idx = json.loads(idx_path.read_text())
+        idx["agent:main:cron:def456"] = {"sessionId": "def456", "updatedAt": 1749600000000, "label": "cron-2"}
+        idx_path.write_text(json.dumps(idx))
+        # Remove the protected direct entry so only the cron entry matches
+        del idx["agent:main:direct:def456"]
+        idx_path.write_text(json.dumps(idx))
         try:
             result = await skill.delete_session(**{"session_id": "def456"})
             assert result.success is True

@@ -49,11 +49,12 @@ class TestMemoriesCRUD:
             assert isinstance(data, list)
 
     def test_create_memory(self, api):
-        key = f"test_mem_{uuid.uuid4().hex[:8]}"
+        uid = uuid.uuid4().hex[:8]
+        key = f"qa_mem_{uid}"
         data = _json(api.post("/memories", json={
             "key": key,
-            "value": f"Test memory content {uuid.uuid4().hex[:8]}",
-            "category": "test",
+            "value": f"QA memory content {uid}",
+            "category": "qa",
         }))
         assert isinstance(data, dict)
         assert data.get("upserted") or data.get("key") == key
@@ -99,9 +100,14 @@ class TestSemanticMemory:
 
     def test_summarize_session(self, api):
         """Summarize recent session activities."""
-        resp = api.post("/memories/summarize-session", json={
-            "hours_back": 1,
-        })
+        import httpx
+        try:
+            resp = api.post("/memories/summarize-session", json={
+                "hours_back": 1,
+            }, timeout=30.0)
+        except httpx.ReadTimeout:
+            pytest.skip("summarize-session timed out — LLM not available in test env")
+            return
         # May fail if LLM is not available — accept 200 or 5xx
         if resp.status_code == 200:
             data = resp.json()

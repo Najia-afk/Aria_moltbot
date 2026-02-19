@@ -42,9 +42,10 @@ def _json(resp, status=200):
 class TestGoalsCRUD:
 
     def test_create_goal(self, api):
+        uid = uuid.uuid4().hex[:8]
         data = _json(api.post("/goals", json={
-            "title": f"Test Goal {uuid.uuid4().hex[:8]}",
-            "description": "Auto test from S5-05",
+            "title": f"Sprint QA Check {uid}",
+            "description": "Automated QA validation from S5-05",
             "status": "active",
             "priority": 1,
         }))
@@ -67,10 +68,11 @@ class TestGoalsCRUD:
 
     def test_create_and_list_goal(self, api):
         """Create a goal and verify it appears in the list."""
-        title = f"Fetch Test {uuid.uuid4().hex[:8]}"
+        uid = uuid.uuid4().hex[:8]
+        title = f"QA Verification {uid}"
         created = _json(api.post("/goals", json={
             "title": title,
-            "description": "Verify round-trip",
+            "description": "Verify round-trip in S5-05",
             "status": "active",
             "priority": 2,
         }))

@@ -34,7 +34,10 @@ class TestHeartbeatInit:
         assert hb._running is False
         assert hb._last_beat is None
         assert hb._beat_count == 0
-        assert hb._interval == 60
+        # Default interval is env-driven (HEARTBEAT_INTERVAL_SECONDS), default 3600
+        import os
+        expected_interval = int(os.environ.get("HEARTBEAT_INTERVAL_SECONDS", "3600"))
+        assert hb._interval == expected_interval
 
     def test_repr_unhealthy_at_start(self):
         from aria_mind.heartbeat import Heartbeat
@@ -76,6 +79,8 @@ class TestIsHealthy:
 
         hb = Heartbeat(_make_mind())
         hb._running = True
+        hb._interval = 60  # force small interval for test
+        # beat more than 2x interval ago => unhealthy
         hb._last_beat = datetime.now(timezone.utc) - timedelta(seconds=300)
         assert hb.is_healthy is False
 

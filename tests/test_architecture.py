@@ -170,7 +170,7 @@ class TestSkillStructure:
         if not pipelines_dir.exists():
             pytest.skip("No pipelines directory")
         for yml_file in pipelines_dir.glob("*.yaml"):
-            data = yaml.safe_load(yml_file.read_text())
+            data = yaml.safe_load(yml_file.read_text(encoding="utf-8"))
             assert "name" in data, f"{yml_file.name} missing 'name'"
             assert "steps" in data, f"{yml_file.name} missing 'steps'"
             for step in data["steps"]:

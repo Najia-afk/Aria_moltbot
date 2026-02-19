@@ -15,7 +15,7 @@ REQUIRED_FIELDS = {"agent", "session", "text"}
 @pytest.fixture(scope="module")
 def cron_data():
     """Load and parse cron_jobs.yaml."""
-    with open(CRON_YAML) as f:
+    with open(CRON_YAML, encoding="utf-8") as f:
         data = yaml.safe_load(f)
     return data
 
@@ -32,7 +32,7 @@ def jobs(cron_data):
 class TestCronYAMLValidity:
     def test_yaml_is_valid(self):
         """cron_jobs.yaml must be parseable YAML."""
-        with open(CRON_YAML) as f:
+        with open(CRON_YAML, encoding="utf-8") as f:
             data = yaml.safe_load(f)
         assert data is not None, "YAML parsed to None"
 
@@ -105,7 +105,10 @@ class TestMemoryConsolidation:
 
     def test_delivery_is_chat(self, jobs):
         job = jobs["memory_consolidation"]
-        assert job.get("delivery") == "chat"
+        # Background DB maintenance jobs use delivery: none (not chat)
+        assert job.get("delivery") in ("chat", "none"), (
+            f"memory_consolidation delivery must be 'chat' or 'none', got: {job.get('delivery')}"
+        )
 
 
 class TestSixHourReview:

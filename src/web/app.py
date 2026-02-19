@@ -144,6 +144,7 @@ def create_app():
         return redirect('/models', code=301)
 
     @app.route('/sprint-board')
+    @app.route('/goals')
     def sprint_board():
         return render_template('sprint_board.html')
 

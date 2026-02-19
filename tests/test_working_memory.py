@@ -371,6 +371,9 @@ class TestAPIRouter:
     async def test_router_list_endpoint(self):
         """GET /working-memory returns items."""
         pytest.importorskip("fastapi", reason="fastapi not installed (runs in container)")
+        import os
+        if not os.environ.get("DATABASE_URL"):
+            pytest.skip("DATABASE_URL not set — skipping router import test")
         import sys
         sys.path.insert(0, "src/api")
         try:
@@ -390,12 +393,16 @@ class TestAPIRouter:
             assert "/working-memory/checkpoint" in routes
             assert "/working-memory/{item_id}" in routes
         finally:
-            sys.path.remove("src/api")
+            if "src/api" in sys.path:
+                sys.path.remove("src/api")
 
     @pytest.mark.asyncio
     async def test_router_has_all_methods(self):
         """Router has GET, POST, PATCH, DELETE endpoints."""
         pytest.importorskip("fastapi", reason="fastapi not installed (runs in container)")
+        import os
+        if not os.environ.get("DATABASE_URL"):
+            pytest.skip("DATABASE_URL not set — skipping router import test")
         import sys
         sys.path.insert(0, "src/api")
         try:
@@ -406,7 +413,8 @@ class TestAPIRouter:
                     methods.update(route.methods)
             assert {"GET", "POST", "PATCH", "DELETE"}.issubset(methods)
         finally:
-            sys.path.remove("src/api")
+            if "src/api" in sys.path:
+                sys.path.remove("src/api")
 
 
 # ============================================================================

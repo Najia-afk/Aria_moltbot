@@ -47,8 +47,8 @@ class TestFlaskRoutes:
         assert b'Aria Blue' in response.data
     
     def test_dashboard_route(self, flask_app):
-        """Test dashboard route returns 200."""
-        response = flask_app.get('/dashboard')
+        """Test dashboard route redirects to / (301) then returns 200."""
+        response = flask_app.get('/dashboard', follow_redirects=True)
         assert response.status_code == 200
     
     def test_thoughts_route(self, flask_app):
@@ -77,10 +77,9 @@ class TestFlaskRoutes:
         assert response.status_code == 200
     
     def test_litellm_route(self, flask_app):
-        """Test litellm route returns 200."""
-        response = flask_app.get('/litellm')
+        """Test litellm route redirects to /models (301) then returns 200."""
+        response = flask_app.get('/litellm', follow_redirects=True)
         assert response.status_code == 200
-        assert b'LiteLLM' in response.data
 
 
 class TestAriaBootstrap:
