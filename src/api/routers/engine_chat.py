@@ -32,7 +32,7 @@ from aria_engine.streaming import StreamManager
 
 logger = logging.getLogger("aria.api.engine_chat")
 
-router = APIRouter(prefix="/api/engine/chat", tags=["Engine Chat"])
+router = APIRouter(prefix="/engine/chat", tags=["Engine Chat"])
 ws_router = APIRouter(tags=["Engine Chat WebSocket"])
 
 

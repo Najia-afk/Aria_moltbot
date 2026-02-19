@@ -22,6 +22,17 @@ from typing import Any
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
 from aria_skills.registry import SkillRegistry
 
+# Load default compression model from models.yaml (single source of truth)
+try:
+    from aria_models.loader import load_catalog as _load_catalog
+    _cat = _load_catalog()
+    _routing = _cat.get("routing", {})
+    _primary = _routing.get("primary", "litellm/kimi")
+    # Strip "litellm/" prefix to get the bare model name for LiteLLM API
+    _DEFAULT_COMPRESSION_MODEL = _primary.removeprefix("litellm/")
+except Exception:
+    _DEFAULT_COMPRESSION_MODEL = "kimi"
+
 
 # ═══════════════════════════════════════════════════════════════════
 # Data Models
@@ -217,7 +228,7 @@ class MemoryCompressor:
         async with httpx.AsyncClient(timeout=60) as client:
             resp = await client.post(
                 f"{litellm_url}/v1/chat/completions",
-                json={"model": "kimi", "messages": [{"role": "user", "content": prompt}],
+                json={"model": _DEFAULT_COMPRESSION_MODEL, "messages": [{"role": "user", "content": prompt}],
                       "max_tokens": 500, "temperature": 0.3},
                 headers={"Authorization": f"Bearer {litellm_key}"},
             )

@@ -18,7 +18,7 @@ from aria_engine.config import EngineConfig
 
 logger = logging.getLogger("aria.api.agent_metrics")
 router = APIRouter(
-    prefix="/api/engine/agents/metrics",
+    prefix="/engine/agents/metrics",
     tags=["engine-agents"],
 )
 

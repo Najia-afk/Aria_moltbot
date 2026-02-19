@@ -15,7 +15,7 @@ from aria_engine.agent_pool import AgentPool
 
 logger = logging.getLogger("aria.api.engine_agents")
 
-router = APIRouter(prefix="/api/engine/agents", tags=["engine-agents"])
+router = APIRouter(prefix="/engine/agents", tags=["engine-agents"])
 
 
 class AgentSummary(BaseModel):

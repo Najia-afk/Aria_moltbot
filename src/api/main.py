@@ -45,6 +45,36 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"⚠️  Database init failed: {e}")
 
+    # S-52/S-53: Initialize Aria Engine (chat, streaming, agents)
+    try:
+        from aria_engine.config import EngineConfig
+        from aria_engine.llm_gateway import LLMGateway
+        from aria_engine.tool_registry import ToolRegistry
+        from aria_engine.chat_engine import ChatEngine
+        from aria_engine.streaming import StreamManager
+        from aria_engine.context_manager import ContextManager
+        from aria_engine.prompts import PromptAssembler
+        from db import AsyncSessionLocal
+
+        engine_cfg = EngineConfig()
+        gateway = LLMGateway(engine_cfg)
+        tool_registry = ToolRegistry()
+        chat_engine = ChatEngine(engine_cfg, gateway, tool_registry, AsyncSessionLocal)
+        stream_manager = StreamManager(engine_cfg, gateway, tool_registry, AsyncSessionLocal)
+        context_manager = ContextManager(engine_cfg)
+        prompt_assembler = PromptAssembler(engine_cfg)
+
+        configure_engine(
+            config=engine_cfg,
+            chat_engine=chat_engine,
+            stream_manager=stream_manager,
+            context_manager=context_manager,
+            prompt_assembler=prompt_assembler,
+        )
+        print("✅ Aria Engine initialized (chat + streaming + agents)")
+    except Exception as e:
+        print(f"⚠️  Engine init failed (chat will be degraded): {e}")
+
     # S4-07: Auto-sync skill graph on startup
     try:
         from graph_sync import sync_skill_graph
@@ -52,6 +82,14 @@ async def lifespan(app: FastAPI):
         print(f"✅ Skill graph synced: {stats['entities']} entities, {stats['relations']} relations")
     except Exception as e:
         print(f"⚠️  Skill graph sync failed (non-fatal): {e}")
+
+    # S-54: Auto-sync cron jobs from YAML → DB
+    try:
+        from cron_sync import sync_cron_jobs_from_yaml
+        cron_summary = await sync_cron_jobs_from_yaml()
+        print(f"✅ Cron jobs synced: {cron_summary}")
+    except Exception as e:
+        print(f"⚠️  Cron job sync failed (non-fatal): {e}")
 
     # Auto-heal skill telemetry gaps on startup (idempotent, toggleable).
     if SKILL_BACKFILL_ON_STARTUP:
@@ -257,6 +295,9 @@ from routers.proposals import router as proposals_router
 from routers.analysis import router as analysis_router
 from routers.engine_cron import router as engine_cron_router
 from routers.engine_sessions import router as engine_sessions_router
+from routers.engine_agents import router as engine_agents_router
+from routers.engine_agent_metrics import router as engine_agent_metrics_router
+from routers.engine_chat import register_engine_chat, configure_engine
 
 app.include_router(health_router)
 app.include_router(activities_router)
@@ -281,6 +322,11 @@ app.include_router(proposals_router)
 app.include_router(analysis_router)
 app.include_router(engine_cron_router)
 app.include_router(engine_sessions_router)
+app.include_router(engine_agents_router)
+app.include_router(engine_agent_metrics_router)
+
+# Engine Chat — REST + WebSocket
+register_engine_chat(app)
 
 # ── GraphQL ──────────────────────────────────────────────────────────────────
 

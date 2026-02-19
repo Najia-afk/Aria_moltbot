@@ -6,7 +6,7 @@ Revises: s37_drop_orphans
 from alembic import op
 
 revision = "s44_gin_indexes"
-down_revision = "s37_drop_orphans"
+down_revision = "s42_add_fk"
 branch_labels = None
 depends_on = None
 

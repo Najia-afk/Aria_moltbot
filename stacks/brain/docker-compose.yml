@@ -54,6 +54,8 @@ services:
       LITELLM_BASE_URL: http://litellm:4000/v1
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-change-me}
       ENGINE_DEBUG: ${ENGINE_DEBUG:-false}
+      # Full URL for heartbeat API posts (not the routing prefix API_BASE_URL)
+      ENGINE_API_BASE_URL: http://aria-api:8000
       PYTHONPATH: /app
     volumes:
       - ../../aria_memories:/app/aria_memories
@@ -65,6 +67,8 @@ services:
         condition: service_healthy
       litellm:
         condition: service_started
+      aria-api:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
       interval: 30s
@@ -379,6 +383,8 @@ services:
       ARIA_SERVICE_CMD_PROMETHEUS_RESTART: ${ARIA_SERVICE_CMD_PROMETHEUS_RESTART:-docker restart prometheus}
       ARIA_SERVICE_CMD_PROMETHEUS_STOP: ${ARIA_SERVICE_CMD_PROMETHEUS_STOP:-docker stop prometheus}
       SKILL_BACKFILL_ON_STARTUP: ${SKILL_BACKFILL_ON_STARTUP:-true}
+      # Cron job YAML path inside container (auto-synced on startup)
+      CRON_JOBS_YAML: /aria_mind/cron_jobs.yaml
     volumes:
       # Mount API source for live reload during development
       - ../../src/api:/app:ro

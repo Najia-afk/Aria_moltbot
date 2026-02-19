@@ -21,7 +21,7 @@ from aria_engine.session_manager import NativeSessionManager
 
 logger = logging.getLogger("aria.api.sessions")
 router = APIRouter(
-    prefix="/api/engine/sessions",
+    prefix="/engine/sessions",
     tags=["engine-sessions"],
 )
 
@@ -88,8 +88,11 @@ async def _get_manager() -> NativeSessionManager:
 
     config = EngineConfig()
     db_url = config.database_url
-    if db_url.startswith("postgresql://"):
-        db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    # Use psycopg3 driver (same as the rest of the API)
+    for prefix in ("postgresql://", "postgresql+asyncpg://", "postgres://"):
+        if db_url.startswith(prefix):
+            db_url = db_url.replace(prefix, "postgresql+psycopg://", 1)
+            break
     db = create_async_engine(db_url, pool_size=5, max_overflow=10)
     return NativeSessionManager(db)
 

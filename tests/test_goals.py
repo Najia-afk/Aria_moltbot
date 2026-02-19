@@ -78,10 +78,8 @@ class TestGoalsCRUD:
         }))
         goal_id = created.get("id") or created.get("goal_id")
         assert goal_id
-        # No GET /goals/{id} endpoint — verify via list
-        data = _json(api.get("/goals", params={"page": 1, "per_page": 50}))
-        items = data.get("items", data) if isinstance(data, dict) else data
-        assert any(
-            g.get("title") == title
-            for g in items
-        ), f"Created goal '{title}' not found in list"
+        # Fetch directly by ID (GET /goals/{id} added in S-57)
+        fetched = _json(api.get(f"/goals/{goal_id}"))
+        assert fetched.get("title") == title, (
+            f"Expected title '{title}', got '{fetched.get('title')}'"
+        )

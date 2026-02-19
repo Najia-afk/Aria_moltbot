@@ -456,19 +456,14 @@ class BaseSkill(ABC):
     async def _write_activity_log(self, action: str, details: str, success: bool):
         """Actually write to activity log. Called as background task."""
         try:
-            from aria_skills.registry import SkillRegistry
-            registry = SkillRegistry()
-            api_client = registry.get("api_client")
-            if api_client:
-                await api_client.execute(action="post", params={
-                    "endpoint": "/activities",
-                    "data": {
-                        "action": action,
-                        "details": details,
-                        "success": success,
-                        "skill": self.name,
-                    }
-                })
+            from aria_skills.api_client import get_api_client
+            client = await get_api_client()
+            await client.create_activity(
+                action=action,
+                skill=self.name,
+                details={"message": details} if details else {},
+                success=success,
+            )
         except Exception as e:
             self.logger.debug(f"Activity log write failed (non-critical): {e}")
 

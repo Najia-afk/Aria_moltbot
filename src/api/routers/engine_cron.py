@@ -23,7 +23,7 @@ from aria_engine.exceptions import SchedulerError
 
 logger = logging.getLogger("aria.api.engine_cron")
 
-router = APIRouter(prefix="/api/engine/cron", tags=["engine-cron"])
+router = APIRouter(prefix="/engine/cron", tags=["engine-cron"])
 
 
 # ── Pydantic Models ─────────────────────────────────────────────────

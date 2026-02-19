@@ -108,6 +108,21 @@ async def create_goal(request: Request, db: AsyncSession = Depends(get_db)):
     return {"id": str(goal.id), "goal_id": goal.goal_id, "created": True}
 
 
+
+@router.get("/goals/{goal_id}")
+async def get_goal(goal_id: str, db: AsyncSession = Depends(get_db)):
+    """Fetch a single goal by UUID or goal_id string."""
+    try:
+        uid = uuid.UUID(goal_id)
+        result = await db.execute(select(Goal).where(Goal.id == uid))
+    except ValueError:
+        result = await db.execute(select(Goal).where(Goal.goal_id == goal_id))
+    goal = result.scalars().first()
+    if not goal:
+        raise HTTPException(status_code=404, detail=f"Goal {goal_id!r} not found")
+    return goal.to_dict()
+
+
 @router.delete("/goals/{goal_id}")
 async def delete_goal(goal_id: str, db: AsyncSession = Depends(get_db)):
     try:

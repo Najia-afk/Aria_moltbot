@@ -157,6 +157,15 @@ class Heartbeat:
                     details=self._health_status,
                     success=True,
                 )
+                # Also record to heartbeat_log table
+                try:
+                    await api.create_heartbeat(
+                        beat_number=self._beat_count,
+                        status="healthy" if self._health_status.get("all_healthy") else "unhealthy",
+                        details=self._health_status,
+                    )
+                except Exception:
+                    pass  # heartbeat_log is supplementary, don't fail the main loop
         except Exception as e:
             self.logger.debug(f"Heartbeat DB log failed: {e}")
 

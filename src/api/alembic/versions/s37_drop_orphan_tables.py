@@ -7,7 +7,7 @@ Create Date: 2025-01-01
 from alembic import op
 
 revision = "s37_drop_orphans"
-down_revision = None
+down_revision = "s49_baseline_all_tables"
 branch_labels = None
 depends_on = None
 

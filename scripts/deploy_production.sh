@@ -175,7 +175,7 @@ deploy() {
     # Step 4: Run database migrations
     log "Step 4/7: Running database migrations..."
     if [ "$DRY_RUN" = false ]; then
-        ssh_cmd "cd $REMOTE_DIR && docker compose run --rm aria-brain python -m alembic upgrade head" || {
+        ssh_cmd "cd $REMOTE_DIR && docker compose exec -T aria-api sh -c 'cd /app && python -m alembic upgrade head'" || {
             error "Database migration failed!"
             warn "Rolling back..."
             rollback

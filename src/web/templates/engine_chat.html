@@ -1563,7 +1563,7 @@
         if (!sessionId) return;
 
         const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const url = `${proto}//${location.host}/api/ws/chat/${sessionId}`;
+        const url = `${proto}//${location.host}/ws/chat/${sessionId}`;
         setStatus('connecting');
 
         ws = new WebSocket(url);
@@ -1852,7 +1852,7 @@
 
     async function createSession() {
         try {
-            const resp = await fetch('/api/engine/sessions', {
+            const resp = await fetch('/api/engine/chat/sessions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1874,7 +1874,7 @@
 
     async function loadSession(sid) {
         try {
-            const resp = await fetch(`/api/engine/sessions/${sid}/messages`);
+            const resp = await fetch(`/api/engine/chat/sessions/${sid}/messages`);
             if (resp.ok) {
                 const data = await resp.json();
                 const messages = data.messages || data || [];

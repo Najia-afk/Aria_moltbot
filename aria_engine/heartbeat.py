@@ -10,6 +10,7 @@ Each agent gets its own heartbeat cron job that:
 """
 import asyncio
 import logging
+import os
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -263,6 +264,14 @@ class AgentHeartbeatManager:
                 elapsed_ms,
             )
 
+            # Record to heartbeat_log via API
+            await self._record_heartbeat_to_db(
+                agent_id=agent_id,
+                beat_number=beat_number,
+                status="healthy" if all_ok else "unhealthy",
+                details=health_status,
+            )
+
             return health_status
 
         except Exception as e:
@@ -273,6 +282,26 @@ class AgentHeartbeatManager:
             health_status["healthy"] = False
             health_status["error"] = str(e)
             return health_status
+
+    async def _record_heartbeat_to_db(
+        self, agent_id: str, beat_number: int, status: str, details: dict,
+    ) -> None:
+        """Record heartbeat to heartbeat_log via API."""
+        try:
+            import httpx
+
+            api_base = os.getenv("ENGINE_API_BASE_URL", "http://aria-api:8000")
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                await client.post(
+                    f"{api_base}/heartbeat",
+                    json={
+                        "beat_number": beat_number,
+                        "status": status,
+                        "details": {"agent_id": agent_id, **details},
+                    },
+                )
+        except Exception as e:
+            logger.warning("Failed to record heartbeat for %s: %s", agent_id, e)
 
     async def _update_last_active(self, agent_id: str) -> None:
         """Update last_active_at timestamp in agent_state."""
