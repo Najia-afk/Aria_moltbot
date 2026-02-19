@@ -1,4 +1,4 @@
-# Dockerfile.test — Lightweight image for running unit tests
+# Dockerfile.test — Lightweight image for running unit + integration tests
 FROM python:3.13-slim
 
 WORKDIR /app
@@ -20,6 +20,8 @@ COPY stacks/ ./stacks/
 COPY Dockerfile ./Dockerfile
 
 # Install with --pre to allow APScheduler 4.0 alpha releases
-RUN pip install --no-cache-dir --pre -e ".[dev]"
+# plus integration test deps (python-socketio, freezegun, flask)
+RUN pip install --no-cache-dir --pre -e ".[dev]" && \
+    pip install --no-cache-dir flask
 
 CMD ["pytest", "tests/unit/", "-v"]
