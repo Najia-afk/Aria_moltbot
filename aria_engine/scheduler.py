@@ -144,7 +144,7 @@ class EngineScheduler:
         logger.info("Starting EngineScheduler...")
 
         # Create APScheduler with PostgreSQL data store
-        data_store = SQLAlchemyDataStore(engine=self._db_engine)
+        data_store = SQLAlchemyDataStore(self._db_engine)
         self._scheduler = AsyncScheduler(data_store=data_store)
 
         # Load and register all enabled jobs from the DB

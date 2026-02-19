@@ -166,16 +166,13 @@ services:
       MOONSHOT_KIMI_KEY: ${MOONSHOT_KIMI_KEY:-}
       OPEN_ROUTER_KEY: ${OPEN_ROUTER_KEY:-}
       OPEN_ROUTER_KEY_DEEP: ${OPEN_ROUTER_KEY_DEEP:-}
-      # Use separate database for LiteLLM to prevent schema conflicts with Aria tables
-      DATABASE_URL: postgresql://${DB_USER:-admin}:${DB_PASSWORD:-admin}@aria-db:5432/litellm
-      LITELLM_DATABASE_URL: postgresql://${DB_USER:-admin}:${DB_PASSWORD:-admin}@aria-db:5432/litellm
-      STORE_MODEL_IN_DB: "True"
+      STORE_MODEL_IN_DB: "False"
       OLLAMA_API_BASE: http://host.docker.internal:11434
     volumes:
       - ./litellm-config.yaml:/app/config.yaml:ro
     ports:
       - "18793:4000"
-    command: ["--config", "/app/config.yaml", "--detailed_debug"]
+    command: ["--config", "/app/config.yaml"]
     networks:
       - aria-net
     mem_limit: ${LITELLM_MEM_LIMIT:-1024m}
@@ -391,6 +388,8 @@ services:
       - ../../aria_models:/aria_models:ro
       # Mount aria_mind for soul/identity file access (read-only)
       - ../../aria_mind:/aria_mind:ro
+      # Mount aria_engine for engine imports (read-only)
+      - ../../aria_engine:/aria_engine:ro
       # Mount aria_skills for knowledge graph sync (read-only)
       - ../../aria_skills:/aria_skills:ro
       # Mount aria_memories for live memory view (read-only)

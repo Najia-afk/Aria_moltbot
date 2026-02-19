@@ -138,8 +138,8 @@ class AriaEngine:
         from aria_engine.agent_pool import AgentPool
 
         self._agent_pool = AgentPool(
-            session_factory=self._session_factory,
             config=self.config,
+            db_engine=self._db_engine,
         )
         await self._agent_pool.load_agents()
 
@@ -165,7 +165,7 @@ class AriaEngine:
                     "engine": "aria_engine",
                     "version": "2.0.0",
                     "scheduler": self._scheduler.is_running if self._scheduler else False,
-                    "agents": self._agent_pool.agent_count if self._agent_pool else 0,
+                    "agents": len(self._agent_pool._agents) if self._agent_pool else 0,
                     "db": self._db_engine is not None,
                 })
 

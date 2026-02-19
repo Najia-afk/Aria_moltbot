@@ -13,3 +13,7 @@ python-dotenv>=1.0.0
 prometheus-fastapi-instrumentator>=6.1.0
 strawberry-graphql[fastapi]>=0.220.0
 pgvector>=0.3.0
+# aria_engine dependencies (mounted via volume)
+apscheduler>=4.0.0a1
+litellm>=1.55.0
+pyyaml>=6.0
