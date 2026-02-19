@@ -3,7 +3,7 @@ JSONL Import/Export — Backward-compatible JSONL I/O for conversations,
 memories, and agent logs.
 
 Provides streaming import/export that handles:
-- Legacy format (OpenClaw era): {role, content, timestamp, session_id, model, tokens}
+- Legacy format (pre-migration era): {role, content, timestamp, session_id, model, tokens}
 - New format (aria_engine v2): adds {engine_version, thinking_content, tool_calls, agent_id, pheromone_score}
 - Corrupt/malformed lines (skipped gracefully)
 - Large files (streaming line-by-line, not loaded into memory)

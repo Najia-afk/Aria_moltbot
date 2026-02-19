@@ -2,7 +2,7 @@
 JSONL export/import backward compatibility tests.
 
 Verifies:
-- Legacy JSONL files (OpenClaw era) can be imported
+- Legacy JSONL files (pre-migration era) can be imported
 - New JSONL exports maintain backward-compatible schema
 - Round-trip: export → reimport produces identical data
 - Large files handle streaming correctly
@@ -17,7 +17,7 @@ import pytest
 
 
 # ---------------------------------------------------------------------------
-# Legacy JSONL formats (pre-migration, OpenClaw era)
+# Legacy JSONL formats (pre-migration era)
 # ---------------------------------------------------------------------------
 
 LEGACY_CONVERSATION_JSONL = """\

@@ -1,6 +1,6 @@
 # Aria Blue — Deployment & Operations Guide
 
-> **Version**: 2.0.0 (aria_engine, post-OpenClaw migration)
+> **Version**: 2.0.0 (aria_engine, post-legacy-gateway migration)
 > **Target**: Mac Mini — najia@192.168.1.53
 > **Last updated**: Sprint 12
 
@@ -36,7 +36,7 @@ pytest tests/ -v --timeout=60
 ### 1. Pre-Deploy Checklist
 - [ ] All unit tests pass: `pytest tests/unit/ -v`
 - [ ] All integration tests pass: `pytest tests/integration/ -v`
-- [ ] No OpenClaw references: `pytest tests/unit/test_no_openclaw.py -v`
+- [ ] No legacy gateway references: `pytest tests/unit/test_no_openclaw.py -v`
 - [ ] Load test acceptable: `bash tests/load/run_load_test.sh`
 - [ ] Memory profile clean: `python tests/profiling/memory_profile.py --quick`
 - [ ] Version bumped in pyproject.toml
@@ -498,7 +498,7 @@ Mac Mini (192.168.1.53)
 │   ├── prometheus (Metrics collection)
 │   └── grafana (Monitoring dashboards)
 ├── /home/najia/aria/
-│   ├── aria_engine/ (NEW — replaces OpenClaw)
+│   ├── aria_engine/ (NEW — replaces legacy gateway)
 │   ├── aria_mind/
 │   ├── aria_skills/
 │   ├── aria_agents/

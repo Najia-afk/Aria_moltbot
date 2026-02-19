@@ -14,12 +14,12 @@
     }
   },
   "routing": {
-    "primary": "litellm/step-35-flash-free",
+    "primary": "litellm/kimi",
     "bypass": false,
     "tier_order": ["local", "free", "paid"],
     "timeout": 300,
     "retries": 2,
-    "fallbacks": ["litellm/step-35-flash-free", "litellm/qwen3-next-free", "litellm/deepseek-free", "litellm/gpt-oss-free", "litellm/trinity-free", "litellm/chimera-free"]
+    "fallbacks": ["litellm/kimi", "litellm/step-35-flash-free", "litellm/qwen3-next-free", "litellm/deepseek-free", "litellm/gpt-oss-free", "litellm/trinity-free", "litellm/chimera-free"]
   },
   "agent_aliases": {
     "litellm/qwen3-mlx": "Qwen3 4B Instruct (MLX Local)",

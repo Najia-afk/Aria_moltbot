@@ -3,7 +3,7 @@ Dashboard page verification — E2E tests for all Flask dashboard pages.
 
 Verifies every registered Flask route returns HTTP 200 (or 301 redirect)
 with valid HTML. This is the smoke test for the Aria dashboard after
-the OpenClaw→aria_engine migration.
+the legacy-gateway to aria_engine migration.
 
 Tests:
 - All GET routes return 200 or 301
@@ -86,7 +86,6 @@ REDIRECT_ROUTES: list[tuple[str, str, str]] = [
     ("/dashboard", "/", "Dashboard redirects to index"),
     ("/litellm", "/models", "LiteLLM redirects to models"),
     ("/wallets", "/models", "Wallets redirects to models"),
-    ("/clawdbot/", "/chat/", "Legacy bot redirects to chat"),
 ]
 
 

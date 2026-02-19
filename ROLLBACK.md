@@ -64,7 +64,7 @@ alembic downgrade base
 | `s42` | Add FK constraints | Adds FKs | Drops FKs |
 | `s37` | Drop orphan tables | Drops tables | **NO RECOVERY** |
 | `s44` | Add GIN indexes | Creates indexes | Drops indexes |
-| `s46` | OpenClaw session ID index | Adds index | Drops index |
+| `s46` | Legacy session ID index | Adds index | Drops index |
 | `s47` | Create sentiment events | Creates table | Drops table |
 | `s48` | Add aria_engine tables (6 tables) | Creates tables + indexes | Drops tables |
 
