@@ -1,8 +1,175 @@
-# LiteLLM proxy config — cloud models only
-# Ollama models excluded (require local ollama server running)
-# To add ollama models: start ollama first, then regenerate with: python scripts/generate_configs.py
+# AUTO-GENERATED from aria_models/models.yaml — do not edit manually
+# Regenerate: python scripts/generate_configs.py
 model_list:
-# === Primary: Kimi (default model) ===
+- model_name: qwen3-mlx
+  litellm_params:
+    model: openai/mlx-community/Qwen3-4B-Instruct-2507-4bit
+    api_base: http://host.docker.internal:8080/v1
+    api_key: not-needed
+  model_info:
+    max_tokens: 8192
+    input_cost_per_token: 0
+    output_cost_per_token: 0
+- model_name: step-35-flash-free
+  litellm_params:
+    model: openrouter/stepfun/step-3.5-flash:free
+    api_key: os.environ/OPEN_ROUTER_KEY
+  model_info:
+    max_tokens: 8192
+    input_cost_per_token: 0
+    output_cost_per_token: 0
+- model_name: trinity-free
+  litellm_params:
+    model: openrouter/arcee-ai/trinity-large-preview:free
+    api_key: os.environ/OPEN_ROUTER_KEY
+  model_info:
+    max_tokens: 8192
+    input_cost_per_token: 0
+    output_cost_per_token: 0
+- model_name: solar-pro-3-free
+  litellm_params:
+    model: openrouter/upstage/solar-pro-3:free
+    api_key: os.environ/OPEN_ROUTER_KEY
+  model_info:
+    max_tokens: 8192
+    input_cost_per_token: 0
+    output_cost_per_token: 0
+- model_name: lfm-25-thinking-free
+  litellm_params:
+    model: openrouter/liquid/lfm-2.5-1.2b-thinking:free
+    api_key: os.environ/OPEN_ROUTER_KEY
+  model_info:
+    max_tokens: 8192
+    input_cost_per_token: 0
+    output_cost_per_token: 0
+- model_name: lfm-25-instruct-free
+  litellm_params:
+    model: openrouter/liquid/lfm-2.5-1.2b-instruct:free
+    api_key: os.environ/OPEN_ROUTER_KEY
+  model_info:
+    max_tokens: 8192
+    input_cost_per_token: 0
+    output_cost_per_token: 0
+- model_name: chimera-free
+  litellm_params:
+    model: openrouter/tngtech/deepseek-r1t2-chimera:free
+    api_key: os.environ/OPEN_ROUTER_KEY_DEEP
+  model_info:
+    max_tokens: 8192
+    input_cost_per_token: 0
+    output_cost_per_token: 0
+- model_name: trinity-mini-free
+  litellm_params:
+    model: openrouter/arcee-ai/trinity-mini:free
+    api_key: os.environ/OPEN_ROUTER_KEY
+  model_info:
+    max_tokens: 8192
+    input_cost_per_token: 0
+    output_cost_per_token: 0
+- model_name: tng-r1t-chimera-free
+  litellm_params:
+    model: openrouter/tngtech/tng-r1t-chimera:free
+    api_key: os.environ/OPEN_ROUTER_KEY
+  model_info:
+    max_tokens: 8192
+    input_cost_per_token: 0
+    output_cost_per_token: 0
+- model_name: nemotron-nano-12b-v2-vl-free
+  litellm_params:
+    model: openrouter/nvidia/nemotron-nano-12b-v2-vl:free
+    api_key: os.environ/OPEN_ROUTER_KEY
+  model_info:
+    max_tokens: 8192
+    input_cost_per_token: 0
+    output_cost_per_token: 0
+- model_name: qwen3-coder-free
+  litellm_params:
+    model: openrouter/qwen/qwen3-coder:free
+    api_key: os.environ/OPEN_ROUTER_KEY
+  model_info:
+    max_tokens: 8192
+    input_cost_per_token: 0
+    output_cost_per_token: 0
+- model_name: qwen3-next-free
+  litellm_params:
+    model: openrouter/qwen/qwen3-next-80b-a3b-instruct:free
+    api_key: os.environ/OPEN_ROUTER_KEY
+  model_info:
+    max_tokens: 8192
+    input_cost_per_token: 0
+    output_cost_per_token: 0
+- model_name: nemotron-nano-9b-v2-free
+  litellm_params:
+    model: openrouter/nvidia/nemotron-nano-9b-v2:free
+    api_key: os.environ/OPEN_ROUTER_KEY
+  model_info:
+    max_tokens: 8192
+    input_cost_per_token: 0
+    output_cost_per_token: 0
+- model_name: glm-free
+  litellm_params:
+    model: openrouter/z-ai/glm-4.5-air:free
+    api_key: os.environ/OPEN_ROUTER_KEY
+  model_info:
+    max_tokens: 8192
+    input_cost_per_token: 0
+    output_cost_per_token: 0
+- model_name: deepseek-free
+  litellm_params:
+    model: openrouter/deepseek/deepseek-r1-0528:free
+    api_key: os.environ/OPEN_ROUTER_KEY_DEEP
+  model_info:
+    max_tokens: 8192
+    input_cost_per_token: 0
+    output_cost_per_token: 0
+- model_name: nemotron-free
+  litellm_params:
+    model: openrouter/nvidia/nemotron-3-nano-30b-a3b:free
+    api_key: os.environ/OPEN_ROUTER_KEY_DEEP
+  model_info:
+    max_tokens: 8192
+    input_cost_per_token: 0
+    output_cost_per_token: 0
+- model_name: gpt-oss-free
+  litellm_params:
+    model: openrouter/openai/gpt-oss-120b:free
+    api_key: os.environ/OPEN_ROUTER_KEY
+  model_info:
+    max_tokens: 8192
+    input_cost_per_token: 0
+    output_cost_per_token: 0
+- model_name: gpt-oss-small-free
+  litellm_params:
+    model: openrouter/openai/gpt-oss-20b:free
+    api_key: os.environ/OPEN_ROUTER_KEY
+  model_info:
+    max_tokens: 8192
+    input_cost_per_token: 0
+    output_cost_per_token: 0
+- model_name: venice-dolphin-free
+  litellm_params:
+    model: openrouter/cognitivecomputations/dolphin-mistral-24b-venice-edition:free
+    api_key: os.environ/OPEN_ROUTER_KEY
+  model_info:
+    max_tokens: 8192
+    input_cost_per_token: 0
+    output_cost_per_token: 0
+- model_name: gemma-3n-e2b-free
+  litellm_params:
+    model: openrouter/google/gemma-3n-e2b-it:free
+    api_key: os.environ/OPEN_ROUTER_KEY
+  model_info:
+    max_tokens: 4096
+    input_cost_per_token: 0
+    output_cost_per_token: 0
+- model_name: gemma-3n-e4b-free
+  litellm_params:
+    model: openrouter/google/gemma-3n-e4b-it:free
+    api_key: os.environ/OPEN_ROUTER_KEY
+  model_info:
+    max_tokens: 4096
+    input_cost_per_token: 0
+    output_cost_per_token: 0
 - model_name: kimi
   litellm_params:
     model: moonshot/kimi-k2.5
@@ -38,35 +205,34 @@ model_list:
     api_base: https://api.moonshot.ai/v1
   model_info:
     max_tokens: 16384
-# === Free fallbacks (OpenRouter) ===
-- model_name: deepseek-free
+- model_name: qwen-cpu-fallback
   litellm_params:
-    model: openrouter/deepseek/deepseek-r1-0528:free
-    api_key: os.environ/OPEN_ROUTER_KEY_DEEP
+    model: ollama/qwen2.5:3b
+    api_base: http://host.docker.internal:11434
   model_info:
-    max_tokens: 8192
+    max_tokens: 4096
     input_cost_per_token: 0
     output_cost_per_token: 0
-- model_name: qwen3-coder-free
+- model_name: phi4-mini-local
   litellm_params:
-    model: openrouter/qwen/qwen3-coder:free
-    api_key: os.environ/OPEN_ROUTER_KEY
+    model: ollama/phi4-mini:3.8b
+    api_base: http://host.docker.internal:11434
   model_info:
-    max_tokens: 8192
+    max_tokens: 4096
     input_cost_per_token: 0
     output_cost_per_token: 0
-- model_name: chimera-free
+- model_name: qwen3-local
   litellm_params:
-    model: openrouter/tngtech/deepseek-r1t2-chimera:free
-    api_key: os.environ/OPEN_ROUTER_KEY_DEEP
+    model: ollama/qwen3:8b
+    api_base: http://host.docker.internal:11434
   model_info:
-    max_tokens: 8192
+    max_tokens: 4096
     input_cost_per_token: 0
     output_cost_per_token: 0
-- model_name: glm-free
+- model_name: nomic-embed-text
   litellm_params:
-    model: openrouter/z-ai/glm-4.5-air:free
-    api_key: os.environ/OPEN_ROUTER_KEY
+    model: ollama/nomic-embed-text
+    api_base: http://host.docker.internal:11434
   model_info:
     max_tokens: 8192
     input_cost_per_token: 0

@@ -135,9 +135,9 @@ services:
       - "--entrypoints.websecure.transport.respondingTimeouts.idleTimeout=300s"
       - "--metrics.prometheus=true"
     ports:
-      - "0.0.0.0:80:80"
-      - "0.0.0.0:443:443"
-      - "0.0.0.0:8081:8080"
+      - "${TRAEFIK_HTTP_PORT:-8080}:80"
+      - "${TRAEFIK_HTTPS_PORT:-8443}:443"
+      - "${TRAEFIK_DASH_PORT:-8081}:8080"
     volumes:
       - ./traefik-entrypoint.sh:/traefik-entrypoint.sh:ro
       - ./traefik-dynamic.template.yaml:/etc/traefik/dynamic.template.yaml:ro
