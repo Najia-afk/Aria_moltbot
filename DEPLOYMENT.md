@@ -1,71 +1,114 @@
-# Aria Blue ⚡️ — Deployment & Operations Guide
+# Aria Blue — Deployment & Operations Guide
 
-Complete deployment and operations guide for the Aria stack.
+> **Version**: 2.0.0 (aria_engine, post-OpenClaw migration)
+> **Target**: Mac Mini — najia@192.168.1.53
+> **Last updated**: Sprint 12
 
-For architecture overview see [ARCHITECTURE.md](ARCHITECTURE.md). For model details see [MODELS.md](MODELS.md). For skill details see [SKILLS.md](SKILLS.md).
-
----
+For architecture overview see [ARCHITECTURE.md](ARCHITECTURE.md). For model details see [MODELS.md](MODELS.md). For skill details see [SKILLS.md](SKILLS.md). For rollback procedures see [ROLLBACK.md](ROLLBACK.md).
 
 ---
 
 ## Prerequisites
 
+- SSH access: `ssh -i ~/.ssh/najia_mac_key najia@192.168.1.53`
 - **macOS with Apple Silicon** (M1/M2/M3/M4) for Metal GPU acceleration
-- Docker & Docker Compose
-- Git
-- SSH access to deployment host (for remote deployment)
+- Docker & Docker Compose installed on Mac Mini
+- At least 5GB free disk space
+- All Sprint 11 tests passing
 
 ---
 
 ## Quick Deploy
 
-### 1. Clone Repository
+```bash
+# 1. Run all tests first
+pytest tests/ -v --timeout=60
+
+# 2. Deploy (with automatic backup and rollback)
+./scripts/deploy_production.sh
+
+# 3. Verify
+./scripts/health_check.sh
+```
+
+## Detailed Steps
+
+### 1. Pre-Deploy Checklist
+- [ ] All unit tests pass: `pytest tests/unit/ -v`
+- [ ] All integration tests pass: `pytest tests/integration/ -v`
+- [ ] No OpenClaw references: `pytest tests/unit/test_no_openclaw.py -v`
+- [ ] Load test acceptable: `bash tests/load/run_load_test.sh`
+- [ ] Memory profile clean: `python tests/profiling/memory_profile.py --quick`
+- [ ] Version bumped in pyproject.toml
+
+### 2. Deploy
+```bash
+./scripts/deploy_production.sh
+```
+
+### 3. Post-Deploy Verification
+```bash
+# Health check
+./scripts/health_check.sh
+
+# Check metrics
+curl http://192.168.1.53:8081/metrics | grep aria_build_info
+
+# Check Grafana dashboard
+open http://192.168.1.53:3000
+
+# Tail logs
+ssh -i ~/.ssh/najia_mac_key najia@192.168.1.53 \
+  "cd /home/najia/aria && docker compose logs -f aria-brain --tail=50"
+```
+
+### 4. If Something Goes Wrong
+See [ROLLBACK.md](ROLLBACK.md) for detailed rollback procedures.
+
+```bash
+# Quick rollback
+./scripts/deploy_production.sh --rollback
+```
+
+### 5. First-Time Setup
 
 ```bash
 git clone https://github.com/Najia-afk/Aria_moltbot.git
 cd Aria_moltbot/stacks/brain
-```
-
-### 2. Configure Environment
-
-```bash
 cp .env.example .env
 nano .env  # Edit with your values
 ```
 
-### 3. Start MLX Server (Metal GPU — Required)
+### 6. Start MLX Server (Metal GPU)
 
 On macOS with Apple Silicon, MLX runs natively for GPU acceleration:
 
 ```bash
-# Install MLX LM
 pip install mlx-lm
-
-# Start MLX server (recommended: configure as launchd service)
 mlx_lm.server --model nightmedia/Qwen3-VLTO-8B-Instruct-qx86x-hi-mlx \
   --host 0.0.0.0 --port 8080 &
 ```
 
 **Performance:** ~25-35 tokens/second on Metal GPU.
 
-### 4. Start Docker Stack
+### 7. Start Docker Stack
 
 ```bash
 docker compose up -d
 docker compose ps  # All services should be healthy
 ```
 
-### 5. Verify
+### 8. Verify
 
 ```bash
-# Gateway health
+# API health
 curl http://localhost:8000/api/health
 
-# Agent identity
-docker exec aria-engine aria-engine agents list
+# aria_engine health
+curl http://localhost:8081/health
 
-# Full status
-docker exec aria-engine aria-engine status
+# Prometheus metrics
+curl http://localhost:8081/metrics | grep aria_
 ```
 
 ---
@@ -442,6 +485,34 @@ docker exec -it aria-db psql -U aria_admin -d aria_warehouse -c 'SELECT COUNT(*)
 
 ---
 
+## Architecture After Migration
+
+```
+Mac Mini (192.168.1.53)
+├── docker compose stack:
+│   ├── aria-db (PostgreSQL 16 + pgvector)
+│   ├── litellm (Ollama proxy)
+│   ├── aria-brain (aria_engine — heartbeat, cron, agents)
+│   ├── aria-api (Flask REST API)
+│   ├── aria-web (Dashboard)
+│   ├── prometheus (Metrics collection)
+│   └── grafana (Monitoring dashboards)
+├── /home/najia/aria/
+│   ├── aria_engine/ (NEW — replaces OpenClaw)
+│   ├── aria_mind/
+│   ├── aria_skills/
+│   ├── aria_agents/
+│   ├── aria_memories/ (persistent data)
+│   └── backups/ (deploy backups)
+└── Ports:
+    ├── 5000 — Flask app
+    ├── 8081 — Prometheus metrics / aria_engine health
+    ├── 3000 — Grafana
+    └── 9090 — Prometheus UI
+```
+
+---
+
 ## License
 
 **Source Available License** — Free for educational and personal use. Commercial use requires a license agreement.
@@ -450,4 +521,4 @@ See [LICENSE](LICENSE) for full terms. For commercial licensing: https://datasci
 
 ---
 
-*Aria Blue ⚡️ — Deployment & Operations Guide*
+*Aria Blue — Deployment & Operations Guide*
