@@ -5,6 +5,8 @@ Job scheduling skill.
 Manages scheduled jobs and recurring tasks.
 Persists via REST API (TICKET-12: eliminate in-memory stubs).
 """
+from __future__ import annotations
+
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 

@@ -13,6 +13,8 @@ Enhanced with:
 - Importance-weighted recall
 - Session checkpointing for continuity across restarts
 """
+from __future__ import annotations
+
 import json
 import logging
 import os

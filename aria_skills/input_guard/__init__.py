@@ -11,6 +11,8 @@ Config:
     rate_limit_rpm: Requests per minute per user (default: 60)
     api_base_url: Base URL for Aria API (default: http://aria-api:8000)
 """
+from __future__ import annotations
+
 import asyncio
 import os
 from typing import Any

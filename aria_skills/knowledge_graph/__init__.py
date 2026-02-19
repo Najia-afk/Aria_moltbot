@@ -5,6 +5,8 @@ Knowledge graph skill.
 Manages entities and relationships in Aria's knowledge base.
 Persists via REST API (TICKET-12: eliminate in-memory stubs).
 """
+from __future__ import annotations
+
 from datetime import datetime, timezone
 from typing import Any
 

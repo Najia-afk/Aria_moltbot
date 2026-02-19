@@ -5,6 +5,8 @@ Aria API Client Skill.
 Centralized HTTP client for all aria-api interactions.
 Skills should use this instead of direct database access.
 """
+from __future__ import annotations
+
 import asyncio
 import os
 import time

@@ -5,6 +5,8 @@ Boundaries - What Aria will and won't do.
 Hard limits that cannot be overridden by prompts.
 Integrates with aria_mind.security for comprehensive protection.
 """
+from __future__ import annotations
+
 import re
 import logging
 from pathlib import Path

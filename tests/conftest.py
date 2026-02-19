@@ -18,6 +18,7 @@ os.environ.setdefault("ARIA_WEB_BASE", "http://aria-web:5000")
 from aria_skills.base import SkillConfig, SkillStatus
 from aria_skills.registry import SkillRegistry
 from aria_agents.base import AgentConfig, AgentRole
+from aria_engine.config import EngineConfig
 
 
 # ============================================================================
@@ -30,6 +31,24 @@ def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
     loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
     loop.close()
+
+
+# ============================================================================
+# Engine config fixture
+# ============================================================================
+
+@pytest.fixture
+def engine_config() -> EngineConfig:
+    """Standard test engine config — no external services."""
+    return EngineConfig(
+        litellm_base_url="http://localhost:4000",
+        litellm_master_key="sk-test-key",
+        default_model="step-35-flash-free",
+        default_temperature=0.7,
+        default_max_tokens=4096,
+        models_yaml_path="aria_models/models.yaml",
+        database_url="postgresql+asyncpg://test:test@localhost:5432/aria_test",
+    )
 
 
 # ============================================================================

@@ -4,6 +4,8 @@ Pytest runner skill.
 
 Executes and reports on pytest test runs.
 """
+from __future__ import annotations
+
 import asyncio
 import subprocess
 import sys

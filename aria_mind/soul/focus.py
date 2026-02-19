@@ -420,7 +420,7 @@ class FocusManager:
         lines.append(f"\nCurrent focus: {self._active.emoji} {self._active.name}")
         return "\n".join(lines)
     
-    def status(self) -> Dict:
+    def status(self) -> dict:
         """Return current focus status."""
         model, temperature, max_tokens = self._active.get_model_profile()
         return {

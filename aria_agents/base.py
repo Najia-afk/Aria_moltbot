@@ -4,6 +4,8 @@ Base agent classes.
 
 Defines the interface for all agents in the system.
 """
+from __future__ import annotations
+
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
