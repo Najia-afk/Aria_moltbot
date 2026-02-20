@@ -74,7 +74,9 @@ class LLMGateway:
         self._latency_samples: list[float] = []
 
         # Configure litellm
-        litellm.api_base = config.litellm_base_url
+        # Note: Do NOT set litellm.api_base globally — each model specifies
+        # its own api_base/api_key in models.yaml.  The global api_base would
+        # override per-call kwargs for providers that use a different base URL.
         litellm.api_key = config.litellm_master_key
         litellm.drop_params = True  # Don't fail on unsupported params
 
@@ -84,22 +86,54 @@ class LLMGateway:
             self._models_config = load_catalog()
         return self._models_config
 
-    def _resolve_model(self, model: str) -> str:
-        """Resolve model alias to LiteLLM model string."""
+    def _resolve_model(self, model: str) -> tuple[str, dict[str, Any]]:
+        """Resolve model alias to (litellm_model_string, extra_kwargs).
+
+        Returns the litellm model identifier and any per-model overrides
+        (``api_key``, ``api_base``, ``temperature``, etc.) from models.yaml
+        so that calls go directly to the provider rather than requiring a
+        litellm proxy.
+        """
+        import os
+
         models = self._load_models()
         model_id = normalize_model_id(model)
-        # Look up in models.yaml for the litellm routing string
         model_entries = models.get("models", {})
         model_def = model_entries.get(model_id, {})
         litellm_block = model_def.get("litellm", {})
         litellm_model = litellm_block.get("model", model)
-        return litellm_model
+
+        extra: dict[str, Any] = {}
+
+        # Per-model api_key (supports "os.environ/VAR" syntax)
+        raw_key = litellm_block.get("api_key", "")
+        if raw_key:
+            if raw_key.startswith("os.environ/"):
+                env_var = raw_key.split("/", 1)[1]
+                resolved_key = os.environ.get(env_var, "")
+                if resolved_key:
+                    extra["api_key"] = resolved_key
+            else:
+                extra["api_key"] = raw_key
+
+        # Per-model api_base
+        raw_base = litellm_block.get("api_base", "")
+        if raw_base:
+            extra["api_base"] = raw_base
+
+        # Forward any other litellm params (temperature, max_tokens, etc.)
+        _reserved = {"model", "api_key", "api_base"}
+        for k, v in litellm_block.items():
+            if k not in _reserved and v is not None:
+                extra[k] = v
+
+        return litellm_model, extra
 
     def _get_fallback_chain(self) -> list[str]:
         """Get fallback model chain from models.yaml."""
         routing = get_routing_config()
         fallbacks = routing.get("fallbacks", [])
-        return [self._resolve_model(m) for m in fallbacks]
+        return [self._resolve_model(m)[0] for m in fallbacks]
 
     def _is_circuit_open(self) -> bool:
         """Check if circuit breaker is open."""
@@ -141,14 +175,17 @@ class LLMGateway:
         if self._is_circuit_open():
             raise LLMError("Circuit breaker open — too many consecutive failures")
 
-        resolved_model = self._resolve_model(model or self.config.default_model)
+        resolved_model, model_extra = self._resolve_model(model or self.config.default_model)
 
         kwargs: dict[str, Any] = {
             "model": resolved_model,
             "messages": messages,
             "temperature": temperature or self.config.default_temperature,
             "max_tokens": max_tokens or self.config.default_max_tokens,
+            "drop_params": True,  # let litellm drop unsupported params per provider
         }
+        # Per-model api_key / api_base from models.yaml
+        kwargs.update(model_extra)
 
         if tools:
             kwargs["tools"] = tools
@@ -231,7 +268,7 @@ class LLMGateway:
         if self._is_circuit_open():
             raise LLMError("Circuit breaker open — too many consecutive failures")
 
-        resolved_model = self._resolve_model(model or self.config.default_model)
+        resolved_model, model_extra = self._resolve_model(model or self.config.default_model)
 
         kwargs: dict[str, Any] = {
             "model": resolved_model,
@@ -239,7 +276,10 @@ class LLMGateway:
             "temperature": temperature or self.config.default_temperature,
             "max_tokens": max_tokens or self.config.default_max_tokens,
             "stream": True,
+            "drop_params": True,  # let litellm drop unsupported params per provider
         }
+        # Per-model api_key / api_base from models.yaml
+        kwargs.update(model_extra)
 
         if tools:
             kwargs["tools"] = tools

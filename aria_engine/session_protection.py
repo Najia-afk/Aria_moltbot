@@ -17,11 +17,12 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import text, select, func
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from aria_engine.config import EngineConfig
 from aria_engine.exceptions import EngineError
+from db.models import EngineChatMessage
 
 logger = logging.getLogger("aria.engine.session_protection")
 
@@ -301,11 +302,9 @@ class SessionProtection:
         """Get current message count for a session."""
         async with self._db.begin() as conn:
             result = await conn.execute(
-                text("""
-                    SELECT COUNT(*) FROM aria_engine.chat_messages
-                    WHERE session_id = :sid
-                """),
-                {"sid": session_id},
+                select(func.count())
+                .select_from(EngineChatMessage)
+                .where(EngineChatMessage.session_id == session_id)
             )
             return result.scalar() or 0
 

@@ -12,7 +12,7 @@ All tests run offline (no DB, no LLM calls).
 """
 import asyncio
 from datetime import datetime, timezone, timedelta
-from typing import Any
+from typing import List, Dict, Any
 
 import pytest
 

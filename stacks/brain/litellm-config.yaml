@@ -1,23 +1,7 @@
-# AUTO-GENERATED from aria_models/models.yaml — do not edit manually
-# Regenerate: python scripts/generate_configs.py
+# Aria LiteLLM Config — trimmed to confirmed working models
+# Original source: aria_models/models.yaml → scripts/generate_configs.py
 model_list:
-- model_name: qwen3-mlx
-  litellm_params:
-    model: openai/mlx-community/Qwen3-4B-Instruct-2507-4bit
-    api_base: http://host.docker.internal:8080/v1
-    api_key: not-needed
-  model_info:
-    max_tokens: 8192
-    input_cost_per_token: 0
-    output_cost_per_token: 0
-- model_name: step-35-flash-free
-  litellm_params:
-    model: openrouter/stepfun/step-3.5-flash:free
-    api_key: os.environ/OPEN_ROUTER_KEY
-  model_info:
-    max_tokens: 8192
-    input_cost_per_token: 0
-    output_cost_per_token: 0
+# ── Moonshot/Kimi (Paid — PRIMARY) ───────────────────────────
 - model_name: trinity-free
   litellm_params:
     model: openrouter/arcee-ai/trinity-large-preview:free
@@ -241,3 +225,7 @@ litellm_settings:
   drop_params: true
   disable_streaming: true
   set_verbose: false
+
+general_settings:
+  database_url: "os.environ/DATABASE_URL"
+  master_key: "os.environ/LITELLM_MASTER_KEY"

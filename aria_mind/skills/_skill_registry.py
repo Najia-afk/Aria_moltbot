@@ -1,5 +1,6 @@
 """Skill registry composition for run_skill runtime."""
 
+from __future__ import annotations
 
 import os
 
@@ -161,7 +162,7 @@ SKILL_REGISTRY = {
         "aria_skills.pytest_runner",
         "PytestSkill",
         lambda: {
-            "workspace": os.environ.get("PYTEST_WORKSPACE", "/app"),
+            "workspace": os.environ.get("PYTEST_WORKSPACE", "/root/.openclaw/workspace"),
             "timeout_sec": int(os.environ.get("PYTEST_TIMEOUT_SEC", "600")),
             "default_args": os.environ.get("PYTEST_DEFAULT_ARGS", "-q"),
         },

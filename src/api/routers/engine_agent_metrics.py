@@ -61,8 +61,16 @@ class AgentMetricsResponse(BaseModel):
 
 async def _get_db():
     """Get database engine from config."""
+    from sqlalchemy.ext.asyncio import create_async_engine
+
     config = EngineConfig()
-    return config.get_db_engine()
+    db_url = config.database_url
+    # Use psycopg3 driver (same as the rest of the API)
+    for prefix in ("postgresql://", "postgresql+asyncpg://", "postgres://"):
+        if db_url.startswith(prefix):
+            db_url = db_url.replace(prefix, "postgresql+psycopg://", 1)
+            break
+    return create_async_engine(db_url, pool_size=5, max_overflow=10)
 
 
 @router.get("", response_model=AgentMetricsResponse)

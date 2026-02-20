@@ -167,7 +167,7 @@ async def create_social_post(request: Request, db: AsyncSession = Depends(get_db
 @router.post("/social/cleanup")
 async def cleanup_social_posts(request: Request, db: AsyncSession = Depends(get_db)):
     """Remove test/noise social rows by pattern/platform; supports dry-run."""
-    data = await request.json()
+    data = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
     patterns = data.get("patterns") or ["test", "live test post", "abc123", "post 42"]
     platform = data.get("platform")
     dry_run = bool(data.get("dry_run", False))

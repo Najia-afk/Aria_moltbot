@@ -19,7 +19,7 @@
     "tier_order": ["local", "free", "paid"],
     "timeout": 300,
     "retries": 2,
-    "fallbacks": ["litellm/kimi", "litellm/step-35-flash-free", "litellm/qwen3-next-free", "litellm/deepseek-free", "litellm/gpt-oss-free", "litellm/trinity-free", "litellm/chimera-free"]
+    "fallbacks": ["litellm/kimi", "litellm/glm-free", "litellm/qwen3-coder-free", "litellm/deepseek-free", "litellm/qwen3-next-free", "litellm/gpt-oss-free", "litellm/trinity-free"]
   },
   "agent_aliases": {
     "litellm/qwen3-mlx": "Qwen3 4B Instruct (MLX Local)",
@@ -381,7 +381,8 @@
       "litellm": {
         "model": "moonshot/kimi-k2.5",
         "api_key": "os.environ/MOONSHOT_KIMI_KEY",
-        "api_base": "https://api.moonshot.ai/v1"
+        "api_base": "https://api.moonshot.ai/v1",
+        "temperature": 1
       },
       "aliases": ["kimi-k2.5", "kimi-local"]
     },
@@ -398,7 +399,8 @@
       "litellm": {
         "model": "moonshot/kimi-k2-thinking",
         "api_key": "os.environ/MOONSHOT_KIMI_KEY",
-        "api_base": "https://api.moonshot.ai/v1"
+        "api_base": "https://api.moonshot.ai/v1",
+        "temperature": 1
       },
       "aliases": ["kimi-k2-thinking-turbo"]
     },

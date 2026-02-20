@@ -1,0 +1,518 @@
+{% extends "base.html" %}
+{% block title %}Aria - Agent Manager{% endblock %}
+
+{% block content %}
+<div class="hero hero-compact">
+    <h1 class="hero-title">🤖 Agent Manager</h1>
+    <p class="hero-subtitle">Create, edit, enable/disable Aria agents &amp; sub-agents — DB-backed CRUD</p>
+</div>
+
+<!-- Action Bar -->
+<div class="section-card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <button class="btn btn-primary btn-sm" onclick="openAddModal()">➕ Add Agent</button>
+    <button class="btn btn-secondary btn-sm" onclick="syncFromMd()">🔄 Sync from AGENTS.md</button>
+    <button class="btn btn-secondary btn-sm" onclick="loadAgents()">♻️ Refresh</button>
+    <div style="flex:1;"></div>
+    <select id="filterType" class="form-select form-select-sm" style="width:auto;" onchange="loadAgents()">
+        <option value="">All Types</option>
+        <option value="agent">🎯 Agent</option>
+        <option value="sub_agent">🔗 Sub-Agent</option>
+        <option value="sub_aria">🌟 Sub-Aria</option>
+        <option value="swarm">🐝 Swarm</option>
+        <option value="focus">🎯 Focus</option>
+    </select>
+    <select id="filterFocus" class="form-select form-select-sm" style="width:auto;" onchange="loadAgents()">
+        <option value="">All Focus</option>
+        <option value="orchestrator">🎯 Orchestrator</option>
+        <option value="devsecops">🔒 DevSecOps</option>
+        <option value="data">📊 Data</option>
+        <option value="social">🌐 Social</option>
+        <option value="creative">🎨 Creative</option>
+        <option value="memory">💾 Memory</option>
+        <option value="trader">📈 Trader</option>
+    </select>
+    <select id="filterStatus" class="form-select form-select-sm" style="width:auto;" onchange="loadAgents()">
+        <option value="">All Status</option>
+        <option value="idle">💤 Idle</option>
+        <option value="busy">⚡ Busy</option>
+        <option value="error">❌ Error</option>
+        <option value="disabled">🚫 Disabled</option>
+    </select>
+    <label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text-secondary);">
+        <input type="checkbox" id="filterEnabled" onchange="loadAgents()"> Enabled only
+    </label>
+    <span id="agentCount" style="font-size:13px;color:var(--text-tertiary);">0 agents</span>
+</div>
+
+<!-- Agents Grid -->
+<div id="agentsGrid" class="agents-mgmt-grid" style="margin-top:16px;">
+    <div class="loading-placeholder" style="text-align:center;padding:48px;color:var(--text-tertiary);">Loading agents…</div>
+</div>
+
+<!-- Add / Edit Modal -->
+<div id="agentModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeModal()">
+<div class="modal-card" style="max-width:720px;max-height:90vh;overflow-y:auto;">
+    <div class="modal-header">
+        <h3 id="modalTitle">Add Agent</h3>
+        <button class="btn-icon" onclick="closeModal()">&times;</button>
+    </div>
+    <form id="agentForm" onsubmit="return saveAgent(event)">
+        <div class="form-grid">
+            <!-- Row 1: ID & Name -->
+            <div class="form-group">
+                <label for="fId">Agent ID *</label>
+                <input id="fId" name="agent_id" required maxlength="100" placeholder="my-agent"
+                       class="form-input" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label for="fName">Display Name</label>
+                <input id="fName" name="display_name" maxlength="200" placeholder="My Agent"
+                       class="form-input">
+            </div>
+            <!-- Row 2: Type & Parent -->
+            <div class="form-group">
+                <label for="fType">Agent Type</label>
+                <select id="fType" name="agent_type" class="form-input">
+                    <option value="agent">🎯 Agent</option>
+                    <option value="sub_agent">🔗 Sub-Agent</option>
+                    <option value="sub_aria">🌟 Sub-Aria</option>
+                    <option value="swarm">🐝 Swarm</option>
+                    <option value="focus">🎯 Focus Mode</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="fParent">Parent Agent</label>
+                <select id="fParent" name="parent_agent_id" class="form-input">
+                    <option value="">— None (top-level) —</option>
+                </select>
+            </div>
+            <!-- Row 3: Model & Fallback -->
+            <div class="form-group">
+                <label for="fModel">Model *</label>
+                <select id="fModel" name="model" class="form-input" required>
+                    <option value="">Select model…</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="fFallback">Fallback Model</label>
+                <select id="fFallback" name="fallback_model" class="form-input">
+                    <option value="">— None —</option>
+                </select>
+            </div>
+            <!-- Row 4: Focus & Status -->
+            <div class="form-group">
+                <label for="fFocus">Focus Type</label>
+                <select id="fFocus" name="focus_type" class="form-input">
+                    <option value="">— None —</option>
+                    <option value="orchestrator">🎯 Orchestrator</option>
+                    <option value="devsecops">🔒 DevSecOps</option>
+                    <option value="data">📊 Data</option>
+                    <option value="trader">📈 Trader</option>
+                    <option value="creative">🎨 Creative</option>
+                    <option value="social">🌐 Social</option>
+                    <option value="journalist">📰 Journalist</option>
+                    <option value="memory">💾 Memory</option>
+                    <option value="conversational">💬 Conversational</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="fTimeout">Timeout (seconds)</label>
+                <input id="fTimeout" name="timeout_seconds" type="number" min="10" value="600" class="form-input">
+            </div>
+            <!-- Row 5: Temperature & Max Tokens -->
+            <div class="form-group">
+                <label for="fTemp">Temperature</label>
+                <input id="fTemp" name="temperature" type="number" step="0.05" min="0" max="2" value="0.7" class="form-input">
+            </div>
+            <div class="form-group">
+                <label for="fMaxTokens">Max Tokens</label>
+                <input id="fMaxTokens" name="max_tokens" type="number" min="1" value="4096" class="form-input">
+            </div>
+            <!-- Row 6: System Prompt -->
+            <div class="form-group" style="grid-column:1/-1;">
+                <label for="fPrompt">System Prompt</label>
+                <textarea id="fPrompt" name="system_prompt" rows="4" maxlength="10000"
+                          placeholder="Custom system prompt for this agent…"
+                          class="form-input" style="resize:vertical;font-family:var(--font-mono);font-size:12px;"></textarea>
+            </div>
+            <!-- Row 7: Skills -->
+            <div class="form-group" style="grid-column:1/-1;">
+                <label for="fSkills">Skills (comma-separated)</label>
+                <input id="fSkills" name="skills" maxlength="500"
+                       placeholder="goals, schedule, database, llm, health"
+                       class="form-input">
+            </div>
+            <!-- Row 8: Capabilities -->
+            <div class="form-group" style="grid-column:1/-1;">
+                <label for="fCapabilities">Capabilities (comma-separated)</label>
+                <input id="fCapabilities" name="capabilities" maxlength="500"
+                       placeholder="task_routing, delegation, code_review, testing"
+                       class="form-input">
+            </div>
+            <!-- Row 9: Enabled -->
+            <div class="form-group" style="grid-column:1/-1;">
+                <label>Options</label>
+                <div style="display:flex;gap:16px;flex-wrap:wrap;">
+                    <label style="display:flex;align-items:center;gap:4px;">
+                        <input type="checkbox" id="fEnabled" name="enabled" checked> ✅ Enabled
+                    </label>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer" style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end;">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>
+            <button type="submit" class="btn btn-primary btn-sm" id="btnSave">💾 Save</button>
+        </div>
+    </form>
+</div>
+</div>
+
+<style>
+.agents-mgmt-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 12px;
+}
+.agent-card {
+    background: var(--card-bg, #1e1e2e);
+    border: 1px solid var(--border, #333);
+    border-radius: 10px;
+    padding: 16px;
+    transition: border-color .2s;
+    position: relative;
+}
+.agent-card:hover { border-color: var(--accent, #7c3aed); }
+.agent-card.disabled { opacity: .55; }
+.agent-card .card-header {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 8px;
+}
+.agent-card .card-header h4 {
+    margin: 0; font-size: 14px; font-weight: 600; color: var(--text-primary, #fff);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 65%;
+}
+.agent-card .card-header .badges { display: flex; gap: 4px; flex-wrap: wrap; }
+.agent-card .card-meta {
+    font-size: 12px; color: var(--text-secondary, #aaa); display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 6px;
+}
+.agent-card .card-meta span { display: flex; align-items: center; gap: 2px; }
+.agent-card .card-detail {
+    font-size: 11px; color: var(--text-tertiary, #777); margin-bottom: 4px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.agent-card .card-skills {
+    display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; margin-bottom: 6px;
+}
+.agent-card .card-skills .skill-tag {
+    font-size: 10px; padding: 2px 6px; border-radius: 4px; background: rgba(108,92,231,0.15);
+    color: var(--accent, #7c3aed);
+}
+.agent-card .card-actions {
+    display: flex; gap: 6px; margin-top: 10px; border-top: 1px solid var(--border, #333); padding-top: 10px;
+}
+.badge-type { font-size: 10px; padding: 2px 6px; border-radius: 6px; font-weight: 600; }
+.badge-type.agent      { background: #164e63; color: #67e8f9; }
+.badge-type.sub_agent  { background: #1e3a5f; color: #93c5fd; }
+.badge-type.sub_aria   { background: #3b0764; color: #d8b4fe; }
+.badge-type.swarm      { background: #713f12; color: #fde047; }
+.badge-type.focus      { background: #14532d; color: #86efac; }
+.badge-status { font-size: 10px; padding: 2px 6px; border-radius: 6px; }
+.badge-status.idle     { background: #1e293b; color: #94a3b8; }
+.badge-status.busy     { background: #14532d; color: #86efac; }
+.badge-status.error    { background: #450a0a; color: #fca5a5; }
+.badge-status.disabled { background: #292524; color: #78716c; }
+.score-bar {
+    height: 4px; border-radius: 2px; background: var(--border, #333); margin-top: 4px;
+    overflow: hidden;
+}
+.score-bar .fill {
+    height: 100%; border-radius: 2px; transition: width .3s;
+}
+
+/* Modal */
+.modal-overlay {
+    position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,.6);
+    display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.modal-card {
+    background: var(--card-bg, #1e1e2e); border: 1px solid var(--border, #333);
+    border-radius: 12px; padding: 24px; width: 100%;
+}
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.modal-header h3 { margin: 0; font-size: 18px; color: var(--text-primary, #fff); }
+.btn-icon { background: none; border: none; font-size: 22px; cursor: pointer; color: var(--text-secondary); }
+.btn-icon:hover { color: var(--text-primary); }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-group label { display: block; font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-bottom: 4px; }
+.form-input, .form-input textarea {
+    width: 100%; padding: 7px 10px; border: 1px solid var(--border, #444);
+    border-radius: 6px; background: var(--input-bg, #111); color: var(--text-primary, #fff);
+    font-size: 13px; box-sizing: border-box;
+}
+.form-input:focus { outline: none; border-color: var(--accent, #7c3aed); }
+.toast {
+    position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+    padding: 12px 20px; border-radius: 8px; font-size: 13px; color: #fff;
+    animation: slideIn .3s ease; max-width: 400px;
+}
+.toast.success { background: #16a34a; }
+.toast.error   { background: #dc2626; }
+@keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+</style>
+
+<script>
+const API = '{{ api_base_url }}';
+let allAgents = [];
+let allModels = [];
+let editingId = null;
+
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadModels();
+    await loadAgents();
+});
+
+// ── Load Data ──────────────────────────────────────────────────
+
+async function loadModels() {
+    try {
+        const resp = await fetch(`${API}/models/db?enabled=true`);
+        if (resp.ok) allModels = await resp.json();
+    } catch (e) { /* models dropdown stays empty if API is down */ }
+    populateModelDropdowns();
+}
+
+function populateModelDropdowns() {
+    const selModel = document.getElementById('fModel');
+    const selFallback = document.getElementById('fFallback');
+    // Clear existing options except first
+    while (selModel.options.length > 1) selModel.remove(1);
+    while (selFallback.options.length > 1) selFallback.remove(1);
+    allModels.forEach(m => {
+        const opt1 = new Option(`${m.name} (${m.id})`, m.id);
+        const opt2 = new Option(`${m.name} (${m.id})`, m.id);
+        selModel.add(opt1);
+        selFallback.add(opt2);
+    });
+}
+
+function populateParentDropdown() {
+    const sel = document.getElementById('fParent');
+    while (sel.options.length > 1) sel.remove(1);
+    allAgents.filter(a => a.agent_type === 'agent' || a.agent_type === 'sub_aria').forEach(a => {
+        sel.add(new Option(`${a.display_name || a.agent_id} (${a.agent_id})`, a.agent_id));
+    });
+}
+
+async function loadAgents() {
+    const agentType = document.getElementById('filterType').value;
+    const focusType = document.getElementById('filterFocus').value;
+    const status = document.getElementById('filterStatus').value;
+    const enabledOnly = document.getElementById('filterEnabled').checked;
+
+    let url = `${API}/agents/db?`;
+    if (agentType) url += `agent_type=${encodeURIComponent(agentType)}&`;
+    if (focusType) url += `focus_type=${encodeURIComponent(focusType)}&`;
+    if (status) url += `status=${encodeURIComponent(status)}&`;
+    if (enabledOnly) url += `enabled=true&`;
+
+    try {
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        allAgents = await resp.json();
+    } catch (e) {
+        allAgents = [];
+        showToast('Failed to load agents: ' + e.message, 'error');
+    }
+    renderAgents();
+    populateParentDropdown();
+    document.getElementById('agentCount').textContent = `${allAgents.length} agents`;
+}
+
+function renderAgents() {
+    const grid = document.getElementById('agentsGrid');
+    if (!allAgents.length) {
+        grid.innerHTML = '<div style="text-align:center;padding:48px;color:var(--text-tertiary);grid-column:1/-1;">No agents found. Click <b>Sync from AGENTS.md</b> or <b>Add Agent</b>.</div>';
+        return;
+    }
+    grid.innerHTML = allAgents.map(a => {
+        const typeClass = a.agent_type || 'agent';
+        const typeEmoji = {agent:'🎯', sub_agent:'🔗', sub_aria:'🌟', swarm:'🐝', focus:'🎯'}[typeClass] || '🤖';
+        const typeLabel = {agent:'Agent', sub_agent:'Sub-Agent', sub_aria:'Sub-Aria', swarm:'Swarm', focus:'Focus'}[typeClass] || typeClass;
+        const statusClass = a.status || 'idle';
+        const statusEmoji = {idle:'💤', busy:'⚡', error:'❌', disabled:'🚫'}[statusClass] || '❓';
+        const focusEmoji = {orchestrator:'🎯', devsecops:'🔒', data:'📊', trader:'📈', creative:'🎨', social:'🌐', journalist:'📰', memory:'💾', conversational:'💬'}[a.focus_type] || '';
+        const disabledClass = a.enabled ? '' : 'disabled';
+        const score = parseFloat(a.pheromone_score || 0.5);
+        const scorePercent = Math.round(score * 100);
+        const scoreColor = score >= 0.7 ? '#16a34a' : score >= 0.4 ? '#eab308' : '#dc2626';
+        const parentLabel = a.parent_agent_id ? `↳ ${a.parent_agent_id}` : 'Top-level';
+        const skills = (a.skills || []).slice(0, 6);
+        const caps = (a.capabilities || []).slice(0, 4);
+
+        return `
+        <div class="agent-card ${disabledClass}">
+            <div class="card-header">
+                <h4 title="${a.display_name || a.agent_id}">${a.display_name || a.agent_id}</h4>
+                <div class="badges">
+                    <span class="badge-type ${typeClass}">${typeEmoji} ${typeLabel}</span>
+                    <span class="badge-status ${statusClass}">${statusEmoji} ${statusClass}</span>
+                </div>
+            </div>
+            <div class="card-meta">
+                <span>🆔 ${a.agent_id}</span>
+                <span>🤖 ${a.model || '—'}</span>
+                ${a.focus_type ? `<span>${focusEmoji} ${a.focus_type}</span>` : ''}
+                <span>📎 ${parentLabel}</span>
+            </div>
+            ${a.fallback_model ? `<div class="card-detail">🔄 Fallback: ${a.fallback_model}</div>` : ''}
+            <div class="card-detail">🌡️ temp=${a.temperature} · tokens=${a.max_tokens} · timeout=${a.timeout_seconds}s</div>
+            ${skills.length ? `<div class="card-skills">${skills.map(s => `<span class="skill-tag">🔧 ${s}</span>`).join('')}</div>` : ''}
+            ${caps.length ? `<div class="card-detail">⚡ ${caps.join(', ')}</div>` : ''}
+            <div class="card-detail" style="display:flex;align-items:center;gap:8px;">
+                🏆 Score: ${scorePercent}%
+                <div class="score-bar" style="flex:1;">
+                    <div class="fill" style="width:${scorePercent}%;background:${scoreColor};"></div>
+                </div>
+                ${a.consecutive_failures > 0 ? `<span style="color:#ef4444;">⚠️ ${a.consecutive_failures} fails</span>` : ''}
+            </div>
+            ${a.current_task ? `<div class="card-detail">📋 ${a.current_task}</div>` : ''}
+            <div class="card-actions">
+                <button class="btn btn-secondary btn-sm" onclick="openEditModal('${a.agent_id}')" style="font-size:12px;">✏️ Edit</button>
+                <button class="btn btn-secondary btn-sm" onclick="toggleEnabled('${a.agent_id}', ${!a.enabled})" style="font-size:12px;">
+                    ${a.enabled ? '🚫 Disable' : '✅ Enable'}
+                </button>
+                <button class="btn btn-secondary btn-sm" style="font-size:12px;color:#ef4444;" onclick="deleteAgent('${a.agent_id}')">🗑️ Delete</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// ── Modal ──────────────────────────────────────────────────────
+
+function openAddModal() {
+    editingId = null;
+    document.getElementById('modalTitle').textContent = 'Add Agent';
+    document.getElementById('agentForm').reset();
+    document.getElementById('fEnabled').checked = true;
+    document.getElementById('fId').disabled = false;
+    document.getElementById('agentModal').style.display = 'flex';
+}
+
+function openEditModal(id) {
+    const a = allAgents.find(x => x.agent_id === id);
+    if (!a) return;
+    editingId = id;
+    document.getElementById('modalTitle').textContent = `Edit: ${a.display_name || a.agent_id}`;
+    document.getElementById('fId').value = a.agent_id;
+    document.getElementById('fId').disabled = true;
+    document.getElementById('fName').value = a.display_name || '';
+    document.getElementById('fType').value = a.agent_type || 'agent';
+    document.getElementById('fParent').value = a.parent_agent_id || '';
+    document.getElementById('fModel').value = a.model || '';
+    document.getElementById('fFallback').value = a.fallback_model || '';
+    document.getElementById('fFocus').value = a.focus_type || '';
+    document.getElementById('fTimeout').value = a.timeout_seconds || 600;
+    document.getElementById('fTemp').value = a.temperature || 0.7;
+    document.getElementById('fMaxTokens').value = a.max_tokens || 4096;
+    document.getElementById('fPrompt').value = a.system_prompt || '';
+    document.getElementById('fSkills').value = (a.skills || []).join(', ');
+    document.getElementById('fCapabilities').value = (a.capabilities || []).join(', ');
+    document.getElementById('fEnabled').checked = a.enabled;
+    document.getElementById('agentModal').style.display = 'flex';
+}
+
+function closeModal() {
+    document.getElementById('agentModal').style.display = 'none';
+    editingId = null;
+}
+
+async function saveAgent(e) {
+    e.preventDefault();
+    const body = {
+        display_name: document.getElementById('fName').value || '',
+        agent_type: document.getElementById('fType').value || 'agent',
+        parent_agent_id: document.getElementById('fParent').value || null,
+        model: document.getElementById('fModel').value,
+        fallback_model: document.getElementById('fFallback').value || null,
+        focus_type: document.getElementById('fFocus').value || null,
+        timeout_seconds: parseInt(document.getElementById('fTimeout').value) || 600,
+        temperature: parseFloat(document.getElementById('fTemp').value) || 0.7,
+        max_tokens: parseInt(document.getElementById('fMaxTokens').value) || 4096,
+        system_prompt: document.getElementById('fPrompt').value || null,
+        skills: document.getElementById('fSkills').value.split(',').map(s => s.trim()).filter(Boolean),
+        capabilities: document.getElementById('fCapabilities').value.split(',').map(s => s.trim()).filter(Boolean),
+        enabled: document.getElementById('fEnabled').checked,
+    };
+
+    try {
+        let resp;
+        if (editingId) {
+            resp = await fetch(`${API}/agents/db/${editingId}`, {
+                method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
+            });
+        } else {
+            body.agent_id = document.getElementById('fId').value;
+            resp = await fetch(`${API}/agents/db`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
+            });
+        }
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.detail || `HTTP ${resp.status}`);
+        }
+        showToast(editingId ? 'Agent updated ✅' : 'Agent created ✅', 'success');
+        closeModal();
+        loadAgents();
+    } catch (e) {
+        showToast('Save failed: ' + e.message, 'error');
+    }
+}
+
+// ── Actions ────────────────────────────────────────────────────
+
+async function toggleEnabled(id, newState) {
+    try {
+        const endpoint = newState ? 'enable' : 'disable';
+        const resp = await fetch(`${API}/agents/db/${id}/${endpoint}`, {method: 'POST'});
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        showToast(`${id} ${newState ? 'enabled' : 'disabled'} ✅`, 'success');
+        loadAgents();
+    } catch (e) {
+        showToast('Toggle failed: ' + e.message, 'error');
+    }
+}
+
+async function deleteAgent(id) {
+    if (!confirm(`Delete agent "${id}"? This cannot be undone.`)) return;
+    try {
+        const resp = await fetch(`${API}/agents/db/${id}`, {method: 'DELETE'});
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        showToast(`${id} deleted 🗑️`, 'success');
+        loadAgents();
+    } catch (e) {
+        showToast('Delete failed: ' + e.message, 'error');
+    }
+}
+
+async function syncFromMd() {
+    try {
+        const resp = await fetch(`${API}/agents/db/sync`, {method: 'POST'});
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        showToast(`Synced: ${data.inserted} new, ${data.updated} updated (${data.total} total) ✅`, 'success');
+        loadAgents();
+    } catch (e) {
+        showToast('Sync failed: ' + e.message, 'error');
+    }
+}
+
+// ── Toast ──────────────────────────────────────────────────────
+
+function showToast(msg, type = 'success') {
+    const el = document.createElement('div');
+    el.className = `toast ${type}`;
+    el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 4000);
+}
+</script>
+{% endblock %}

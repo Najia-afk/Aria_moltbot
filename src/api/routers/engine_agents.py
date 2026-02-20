@@ -40,18 +40,38 @@ class AgentPoolStatus(BaseModel):
 
 
 def get_pool() -> AgentPool:
-    """Get the agent pool from the global engine instance."""
+    """
+    Get the agent pool from the global engine instance.
+
+    First tries the global engine. Falls back to creating a DB-backed
+    pool for read operations (API-only mode where engine runs separately).
+    """
     from aria_engine import get_engine
 
     engine = get_engine()
-    if engine is None or not hasattr(engine, "agent_pool") or engine.agent_pool is None:
-        raise HTTPException(503, "Agent pool not available")
-    return engine.agent_pool
+    if engine is not None and hasattr(engine, "agent_pool") and engine.agent_pool is not None:
+        return engine.agent_pool
+
+    # Fallback: create a DB-backed pool (read-only, loads agents from DB)
+    from aria_engine.config import EngineConfig
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    config = EngineConfig()
+    db_url = config.database_url
+    for prefix in ("postgresql://", "postgresql+asyncpg://", "postgres://"):
+        if db_url.startswith(prefix):
+            db_url = db_url.replace(prefix, "postgresql+psycopg://", 1)
+            break
+    db = create_async_engine(db_url, pool_size=5, max_overflow=10)
+    return AgentPool(config, db)
 
 
 @router.get("", response_model=AgentPoolStatus)
 async def list_agents(pool: AgentPool = Depends(get_pool)) -> AgentPoolStatus:
     """List all agents with their current status."""
+    # Ensure agents are loaded (idempotent if already loaded)
+    if not pool._agents:
+        await pool.load_agents()
     status = pool.get_status()
     return AgentPoolStatus(**status)
 

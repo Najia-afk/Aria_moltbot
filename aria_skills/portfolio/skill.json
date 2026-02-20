@@ -4,80 +4,129 @@
   "description": "ðŸ’¼ Portfolio and position management for Crypto Trader",
   "author": "Aria Blue",
   "layer": 3,
-  "dependencies": ["api_client", "market_data"],
-  "focus_affinity": ["trader"],
+  "dependencies": [
+    "api_client",
+    "market_data"
+  ],
+  "focus_affinity": [
+    "trader"
+  ],
   "tools": [
     {
-      "name": "open_position",
-      "description": "Open a new trading position",
+      "name": "add_position",
+      "description": "Add a new trading position to the portfolio.",
       "parameters": {
         "type": "object",
         "properties": {
-          "symbol": { "type": "string", "description": "The trading pair symbol" },
-          "quantity": { "type": "number", "description": "The quantity to trade" },
-          "price": { "type": "number", "description": "The entry price" },
-          "side": { "type": "string", "description": "The side of the trade (default: long)" },
-          "stop_loss": { "type": "number", "description": "Optional stop loss price" },
-          "take_profit": { "type": "number", "description": "Optional take profit price" }
+          "symbol": {
+            "type": "string",
+            "description": "The trading pair symbol"
+          },
+          "quantity": {
+            "type": "number",
+            "description": "The quantity to trade"
+          },
+          "price": {
+            "type": "number",
+            "description": "The entry price"
+          },
+          "side": {
+            "type": "string",
+            "description": "The side of the trade (default: long)"
+          },
+          "stop_loss": {
+            "type": "number",
+            "description": "Optional stop loss price"
+          },
+          "take_profit": {
+            "type": "number",
+            "description": "Optional take profit price"
+          }
         },
-        "required": ["symbol", "quantity", "price"]
+        "required": [
+          "symbol",
+          "quantity",
+          "price"
+        ]
       }
     },
     {
-      "name": "close_position",
-      "description": "Close an existing position",
+      "name": "remove_position",
+      "description": "Remove/close an existing position.",
       "parameters": {
         "type": "object",
         "properties": {
-          "symbol": { "type": "string", "description": "The trading pair symbol" },
-          "price": { "type": "number", "description": "The exit price" },
-          "reason": { "type": "string", "description": "Reason for closing (default: manual)" }
+          "symbol": {
+            "type": "string",
+            "description": "The trading pair symbol"
+          },
+          "price": {
+            "type": "number",
+            "description": "The exit price"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Reason for closing (default: manual)"
+          }
         },
-        "required": ["symbol", "price"]
+        "required": [
+          "symbol",
+          "price"
+        ]
       }
     },
     {
-      "name": "get_positions",
-      "description": "Get all open positions with unrealized P&L",
+      "name": "get_portfolio",
+      "description": "Get all open positions with unrealized P&L.",
       "parameters": {
         "type": "object",
         "properties": {
-          "current_prices": { "type": "object", "description": "Optional current prices for P&L calculation" }
-        },
-        "required": []
+          "current_prices": {
+            "type": "object",
+            "description": "Optional current prices for P&L calculation"
+          }
+        }
       }
     },
     {
-      "name": "get_trade_history",
-      "description": "Get trade history",
+      "name": "get_position",
+      "description": "Get details of a specific position.",
       "parameters": {
         "type": "object",
         "properties": {
-          "symbol": { "type": "string", "description": "Optional symbol to filter by" },
-          "limit": { "type": "integer", "description": "Number of trades to return (default: 50)" }
+          "symbol": {
+            "type": "string",
+            "description": "The trading pair symbol"
+          }
         },
-        "required": []
+        "required": [
+          "symbol"
+        ]
       }
     },
     {
-      "name": "get_performance_metrics",
-      "description": "Calculate portfolio performance metrics",
-      "parameters": {
-        "type": "object",
-        "properties": {},
-        "required": []
-      }
-    },
-    {
-      "name": "check_risk_limits",
-      "description": "Check if portfolio respects risk limits",
+      "name": "get_transactions",
+      "description": "Get trade/transaction history.",
       "parameters": {
         "type": "object",
         "properties": {
-          "max_position_size": { "type": "number", "description": "Maximum position size as fraction of portfolio (default: 0.2)" },
-          "max_drawdown": { "type": "number", "description": "Maximum allowed drawdown (default: 0.1)" }
-        },
-        "required": []
+          "symbol": {
+            "type": "string",
+            "description": "Optional symbol to filter by"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Number of trades to return (default: 50)"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_summary",
+      "description": "Calculate portfolio performance summary and metrics.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
       }
     }
   ],

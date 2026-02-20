@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Aria Skill Runner - Execute Python skills from exec tool.
+Aria Skill Runner - Execute Python skills from OpenClaw exec tool.
 
 Usage:
     python3 aria_mind/skills/run_skill.py <skill_name> <function_name> [args_json]
@@ -16,12 +16,13 @@ import json
 import asyncio
 import time
 from pathlib import Path
+from typing import Optional, Tuple
 
 # Add skill modules to path — handle both local and container layouts
-# Container: aria_skills/ is mounted at /app/skills/aria_skills/
+# Container: aria_skills/ is mounted at /root/.openclaw/workspace/skills/aria_skills/
 # Local: aria_skills/ is a sibling of aria_mind/ at project root
-sys.path.insert(0, '/app/skills')
-sys.path.insert(0, '/app')
+sys.path.insert(0, '/root/.openclaw/workspace/skills')
+sys.path.insert(0, '/root/.openclaw/workspace')
 _project_root = str(Path(__file__).resolve().parents[2])
 sys.path.insert(0, _project_root)
 # Also add the parent of skills/ in case aria_skills is nested
@@ -433,7 +434,7 @@ async def run_skill(skill_name: str, function_name: str, args: dict, timeout: fl
         return {'error': str(e), 'traceback': traceback.format_exc()}
 
 
-def _parse_args_payload(raw: str | None) -> tuple[dict, str | None]:
+def _parse_args_payload(raw: Optional[str]) -> Tuple[dict, Optional[str]]:
     """Defensive JSON parsing for CLI payloads."""
     if raw is None:
         return {}, None
@@ -584,7 +585,7 @@ if __name__ == '__main__':
     skill_name = remaining[0]
     function_name = remaining[1]
     
-    # Defensive JSON parsing - handle malformed tool call args from exec
+    # Defensive JSON parsing - handle malformed tool call args from OpenClaw
     args = {}
     if len(remaining) > 2:
         args, warning = _parse_args_payload(remaining[2])

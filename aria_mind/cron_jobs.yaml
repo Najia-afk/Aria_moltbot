@@ -1,6 +1,6 @@
 # Aria Cron Jobs Definition
-# These are injected at container startup by entrypoint.sh
-# Format matches cron add CLI parameters
+# These are injected at container startup by openclaw-entrypoint.sh
+# Format matches `openclaw cron add` CLI parameters
 # NOTE: All times are in UTC! Server runs PST (UTC-8)
 #   To schedule 8am PST, use 16 (8+8=16 UTC)
 #   To schedule 11pm PST, use 7 next day (23+8=31=7 UTC)
@@ -15,7 +15,7 @@
 #   Memeothy → aria-memeothy (independent, 1 post/2 days)
 #
 # ⚠️ PATH RULES (aria_mind/ IS the workspace root in the container):
-#   CORRECT:  skills/run_skill.py  OR  /app/skills/run_skill.py
+#   CORRECT:  skills/run_skill.py  OR  /root/.openclaw/workspace/skills/run_skill.py
 #   WRONG:    aria_mind/skills/run_skill.py  (does NOT exist — aria_mind/ is /)
 #   Skills:   skills/aria_skills/<name>/  (NOT aria_skills/<name>/ at root)
 
@@ -31,7 +31,7 @@ jobs:
 
   - name: moltbook_check
     every: "60m"
-    text: "Read HEARTBEAT.md moltbook_check guidance. If 60+ minutes since aria_memories/memory/moltbook_state.json:last_check, check Moltbook DMs and feed (latest 5), reply to mentions, engage thoughtfully on relevant posts, optionally post only if high-value insight, then update moltbook_state.json last_check and log cron execution via api_client activity action='cron_execution' with details {'job':'moltbook_check','estimated_tokens':120}."
+    text: "moltbook_check: If 60+ min since last_check in state file, check feed (5 posts), reply mentions, engage on relevant posts. Update state. Log via api_client. Skip email checks. Token target: 100."
     agent: main
     session: isolated
     delivery: none
@@ -47,7 +47,7 @@ jobs:
 
   - name: health_check
     cron: "0 0 0 * * *"
-    text: "Run health check on all systems: exec python3 /app/skills/run_skill.py health health_check '{}', exec python3 /app/skills/run_skill.py api_client health_check '{}'. If any check fails, log an alert via api_client. If all pass, silently continue."
+    text: "Run health check on all systems: exec python3 /root/.openclaw/workspace/skills/run_skill.py health health_check '{}', exec python3 /root/.openclaw/workspace/skills/run_skill.py api_client health_check '{}'. If any check fails, log an alert via api_client. If all pass, silently continue."
     agent: main
     session: isolated
     delivery: none
@@ -115,7 +115,7 @@ jobs:
 
   - name: weekly_security_scan
     cron: "0 0 4 * * 0"
-    text: "Run security scan on workspace: exec python3 skills/run_skill.py security_scan scan_directory '{\"directory\": \"/app\", \"extensions\": [\".py\", \".yaml\", \".json\"]}'. Log findings via api_client."
+    text: "Run security scan on workspace: exec python3 skills/run_skill.py security_scan scan_directory '{\"directory\": \"/root/.openclaw/workspace\", \"extensions\": [\".py\", \".yaml\", \".json\"]}'. Log findings via api_client."
     agent: main
     session: isolated
     delivery: none
@@ -153,16 +153,6 @@ jobs:
   - name: memory_bridge
     cron: "0 0 */3 * * *"
     text: "Bridge activity data into semantic memory for cognitive skills. Call POST /api/analysis/seed-memories?limit=100&skip_existing=true via api_client. This backfills recent activities and thoughts into semantic_memories so pattern_recognition, sentiment_analysis, and unified_search have fresh data. Log result to activity_log via api_client activity action='cron_execution' with details {'job':'memory_bridge','estimated_tokens':50}."
-    agent: main
-    session: isolated
-    delivery: none
-    best_effort_deliver: true
-
-  # ── Memory Compression (every 6 hours, reduces context tokens by ~70%) ──
-
-  - name: memory_compression
-    cron: "0 0 */6 * * *"
-    text: "Compress working memory to reduce token usage. Call: exec python3 skills/run_skill.py api_client post '{\"endpoint\": \"/analysis/compression/auto-run\", \"data\": {\"raw_limit\": 20, \"store_semantic\": true}}'. Log result via api_client activity action='cron_execution' with details {\"job\":\"memory_compression\",\"estimated_tokens\":30}."
     agent: main
     session: isolated
     delivery: none

@@ -3,6 +3,11 @@ SQLAlchemy 2.0 ORM models for Aria Brain (aria_warehouse).
 
 Canonical source of truth for all database tables.
 Driver: psycopg 3 via SQLAlchemy async.
+
+Schemas:
+  - aria_data:   Aria's knowledge, memories, activities, execution history
+  - aria_engine: Engine infrastructure — sessions, agents, cron, models
+  - litellm:     LiteLLM proxy tables (managed by LiteLLM itself)
 """
 
 import uuid as uuid_mod
@@ -60,6 +65,7 @@ class Base(DeclarativeBase):
 
 class Memory(Base):
     __tablename__ = "memories"
+    __table_args__ = {"schema": "aria_data"}
 
     id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
     key: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
@@ -78,6 +84,7 @@ Index("idx_memories_value_gin", Memory.value, postgresql_using="gin")
 
 class Thought(Base):
     __tablename__ = "thoughts"
+    __table_args__ = {"schema": "aria_data"}
 
     id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
     content: Mapped[str] = mapped_column(Text, nullable=False)
@@ -93,6 +100,7 @@ Index("idx_thoughts_content_trgm", Thought.content, postgresql_using="gin", post
 
 class Goal(Base):
     __tablename__ = "goals"
+    __table_args__ = {"schema": "aria_data"}
 
     id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
     goal_id: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
@@ -124,6 +132,7 @@ Index("idx_goals_sprint_column_position", Goal.sprint, Goal.board_column, Goal.p
 
 class ActivityLog(Base):
     __tablename__ = "activity_log"
+    __table_args__ = {"schema": "aria_data"}
 
     id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
     action: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -146,13 +155,14 @@ Index("idx_activity_details_gin", ActivityLog.details, postgresql_using="gin")
 
 class SocialPost(Base):
     __tablename__ = "social_posts"
+    __table_args__ = {"schema": "aria_data"}
 
     id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
     platform: Mapped[str] = mapped_column(String(50), server_default=text("'moltbook'"))
     post_id: Mapped[str | None] = mapped_column(String(100), unique=True)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     visibility: Mapped[str] = mapped_column(String(50), server_default=text("'public'"))
-    reply_to: Mapped[str | None] = mapped_column(String(100), ForeignKey("social_posts.post_id", ondelete="SET NULL"))
+    reply_to: Mapped[str | None] = mapped_column(String(100), ForeignKey("aria_data.social_posts.post_id", ondelete="SET NULL"))
     url: Mapped[str | None] = mapped_column(Text)
     posted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
     metadata_json: Mapped[dict] = mapped_column("metadata", JSONB, server_default=text("'{}'::jsonb"))
@@ -169,6 +179,7 @@ Index("idx_posts_post_id", SocialPost.post_id)
 
 class HourlyGoal(Base):
     __tablename__ = "hourly_goals"
+    __table_args__ = {"schema": "aria_data"}
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     hour_slot: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -188,6 +199,7 @@ Index("idx_hourly_created", HourlyGoal.created_at.desc())
 
 class KnowledgeEntity(Base):
     __tablename__ = "knowledge_entities"
+    __table_args__ = {"schema": "aria_data"}
 
     id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
     name: Mapped[str] = mapped_column(Text, nullable=False)
@@ -207,10 +219,11 @@ Index("idx_kg_properties_gin", KnowledgeEntity.properties, postgresql_using="gin
 
 class KnowledgeRelation(Base):
     __tablename__ = "knowledge_relations"
+    __table_args__ = {"schema": "aria_data"}
 
     id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
-    from_entity: Mapped[Any] = mapped_column(UUID(as_uuid=True), ForeignKey("knowledge_entities.id", ondelete="CASCADE"), nullable=False)
-    to_entity: Mapped[Any] = mapped_column(UUID(as_uuid=True), ForeignKey("knowledge_entities.id", ondelete="CASCADE"), nullable=False)
+    from_entity: Mapped[Any] = mapped_column(UUID(as_uuid=True), ForeignKey("aria_data.knowledge_entities.id", ondelete="CASCADE"), nullable=False)
+    to_entity: Mapped[Any] = mapped_column(UUID(as_uuid=True), ForeignKey("aria_data.knowledge_entities.id", ondelete="CASCADE"), nullable=False)
     relation_type: Mapped[str] = mapped_column(Text, nullable=False)
     properties: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
@@ -239,6 +252,7 @@ class SkillGraphEntity(Base):
 
     __table_args__ = (
         UniqueConstraint("name", "type", name="uq_sg_entity_name_type"),
+        {"schema": "aria_data"},
     )
 
     def to_dict(self) -> dict:
@@ -253,10 +267,11 @@ class SkillGraphEntity(Base):
 
 class SkillGraphRelation(Base):
     __tablename__ = "skill_graph_relations"
+    __table_args__ = {"schema": "aria_data"}
 
     id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
-    from_entity: Mapped[Any] = mapped_column(UUID(as_uuid=True), ForeignKey("skill_graph_entities.id", ondelete="CASCADE"), nullable=False)
-    to_entity: Mapped[Any] = mapped_column(UUID(as_uuid=True), ForeignKey("skill_graph_entities.id", ondelete="CASCADE"), nullable=False)
+    from_entity: Mapped[Any] = mapped_column(UUID(as_uuid=True), ForeignKey("aria_data.skill_graph_entities.id", ondelete="CASCADE"), nullable=False)
+    to_entity: Mapped[Any] = mapped_column(UUID(as_uuid=True), ForeignKey("aria_data.skill_graph_entities.id", ondelete="CASCADE"), nullable=False)
     relation_type: Mapped[str] = mapped_column(String(100), nullable=False)  # provides, belongs_to, affinity, depends_on
     properties: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
@@ -282,6 +297,7 @@ Index("idx_sg_relation_type", SkillGraphRelation.relation_type)
 # S4-05: Knowledge Query Log
 class KnowledgeQueryLog(Base):
     __tablename__ = "knowledge_query_log"
+    __table_args__ = {"schema": "aria_data"}
 
     id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
     query_type: Mapped[str] = mapped_column(String(50), nullable=False)  # traverse, search, skill_for_task
@@ -302,6 +318,7 @@ Index("idx_kql_source", KnowledgeQueryLog.source)
 
 class PerformanceLog(Base):
     __tablename__ = "performance_log"
+    __table_args__ = {"schema": "aria_data"}
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     review_period: Mapped[str] = mapped_column(String(20), nullable=False)
@@ -316,6 +333,7 @@ Index("idx_perflog_created", PerformanceLog.created_at.desc())
 
 class PendingComplexTask(Base):
     __tablename__ = "pending_complex_tasks"
+    __table_args__ = {"schema": "aria_data"}
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     task_id: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
@@ -338,6 +356,7 @@ Index("idx_pct_created", PendingComplexTask.created_at.desc())
 
 class HeartbeatLog(Base):
     __tablename__ = "heartbeat_log"
+    __table_args__ = {"schema": "aria_data"}
 
     id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
     beat_number: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -353,6 +372,7 @@ Index("idx_heartbeat_created", HeartbeatLog.created_at.desc())
 
 class ScheduledJob(Base):
     __tablename__ = "scheduled_jobs"
+    __table_args__ = {"schema": "aria_engine"}
 
     id: Mapped[str] = mapped_column(String(50), primary_key=True)
     agent_id: Mapped[str] = mapped_column(String(50), server_default=text("'main'"))
@@ -397,6 +417,7 @@ Index("idx_jobs_next_run", ScheduledJob.next_run_at)
 
 class SecurityEvent(Base):
     __tablename__ = "security_events"
+    __table_args__ = {"schema": "aria_data"}
 
     id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
     threat_level: Mapped[str] = mapped_column(String(20), nullable=False)
@@ -421,6 +442,7 @@ Index("idx_security_threat_created", SecurityEvent.threat_level, SecurityEvent.c
 
 class ScheduleTick(Base):
     __tablename__ = "schedule_tick"
+    __table_args__ = {"schema": "aria_engine"}
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     last_tick: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -440,6 +462,7 @@ class ScheduleTick(Base):
 
 class AgentSession(Base):
     __tablename__ = "agent_sessions"
+    __table_args__ = {"schema": "aria_data"}
 
     id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
     agent_id: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -469,7 +492,7 @@ class SessionMessage(Base):
     __tablename__ = "session_messages"
 
     id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
-    session_id: Mapped[Any | None] = mapped_column(UUID(as_uuid=True), ForeignKey("agent_sessions.id", ondelete="SET NULL"))
+    session_id: Mapped[Any | None] = mapped_column(UUID(as_uuid=True), ForeignKey("aria_data.agent_sessions.id", ondelete="SET NULL"))
     external_session_id: Mapped[str | None] = mapped_column(String(120))
     agent_id: Mapped[str | None] = mapped_column(String(100))
     role: Mapped[str] = mapped_column(String(20), nullable=False)
@@ -481,6 +504,7 @@ class SessionMessage(Base):
 
     __table_args__ = (
         UniqueConstraint("external_session_id", "role", "content_hash", name="uq_session_message_ext_role_hash"),
+        {"schema": "aria_data"},
     )
 
 
@@ -496,8 +520,8 @@ class SentimentEvent(Base):
     __tablename__ = "sentiment_events"
 
     id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
-    message_id: Mapped[Any] = mapped_column(UUID(as_uuid=True), ForeignKey("session_messages.id", ondelete="CASCADE"), nullable=False)
-    session_id: Mapped[Any | None] = mapped_column(UUID(as_uuid=True), ForeignKey("agent_sessions.id", ondelete="SET NULL"))
+    message_id: Mapped[Any] = mapped_column(UUID(as_uuid=True), ForeignKey("aria_data.session_messages.id", ondelete="CASCADE"), nullable=False)
+    session_id: Mapped[Any | None] = mapped_column(UUID(as_uuid=True), ForeignKey("aria_data.agent_sessions.id", ondelete="SET NULL"))
     external_session_id: Mapped[str | None] = mapped_column(String(120))
     speaker: Mapped[str | None] = mapped_column(String(20))       # user | assistant | system
     agent_id: Mapped[str | None] = mapped_column(String(100))     # e.g. "main", "coder", …
@@ -513,6 +537,7 @@ class SentimentEvent(Base):
 
     __table_args__ = (
         UniqueConstraint("message_id", name="uq_sentiment_event_message"),
+        {"schema": "aria_data"},
     )
 
 
@@ -529,6 +554,7 @@ Index("idx_sentiment_events_agent_id", SentimentEvent.agent_id)
 
 class ModelUsage(Base):
     __tablename__ = "model_usage"
+    __table_args__ = {"schema": "aria_data"}
 
     id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
     model: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -539,7 +565,7 @@ class ModelUsage(Base):
     latency_ms: Mapped[int | None] = mapped_column(Integer)
     success: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
     error_message: Mapped[str | None] = mapped_column(Text)
-    session_id: Mapped[Any | None] = mapped_column(UUID(as_uuid=True), ForeignKey("agent_sessions.id", ondelete="SET NULL"))
+    session_id: Mapped[Any | None] = mapped_column(UUID(as_uuid=True), ForeignKey("aria_data.agent_sessions.id", ondelete="SET NULL"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
 
     session: Mapped["AgentSession | None"] = relationship("AgentSession", lazy="selectin")
@@ -556,6 +582,7 @@ Index("idx_model_usage_model_provider", ModelUsage.model, ModelUsage.provider)
 
 class RateLimit(Base):
     __tablename__ = "rate_limits"
+    __table_args__ = {"schema": "aria_engine"}
 
     id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
     skill: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
@@ -572,6 +599,7 @@ Index("idx_rate_limits_skill", RateLimit.skill)
 
 class ApiKeyRotation(Base):
     __tablename__ = "api_key_rotations"
+    __table_args__ = {"schema": "aria_engine"}
 
     id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
     service: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -589,6 +617,7 @@ Index("idx_akr_rotated", ApiKeyRotation.rotated_at.desc())
 
 class AgentPerformance(Base):
     __tablename__ = "agent_performance"
+    __table_args__ = {"schema": "aria_data"}
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     agent_id: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -609,6 +638,7 @@ Index("idx_agent_perf_created", AgentPerformance.created_at.desc())
 
 class WorkingMemory(Base):
     __tablename__ = "working_memory"
+    __table_args__ = {"schema": "aria_data"}
 
     id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
     category: Mapped[str] = mapped_column(String(50), nullable=False)
@@ -636,6 +666,7 @@ Index("uq_wm_category_key", WorkingMemory.category, WorkingMemory.key, unique=Tr
 
 class SkillStatusRecord(Base):
     __tablename__ = "skill_status"
+    __table_args__ = {"schema": "aria_data"}
 
     id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
     skill_name: Mapped[str] = mapped_column(String(100), nullable=False, unique=True, index=True)
@@ -659,6 +690,7 @@ Index("idx_skill_status_layer", SkillStatusRecord.layer)
 
 class SemanticMemory(Base):
     __tablename__ = "semantic_memories"
+    __table_args__ = {"schema": "aria_data"}
 
     id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
     content: Mapped[str] = mapped_column(Text, nullable=False)
@@ -698,6 +730,7 @@ class LessonLearned(Base):
 
     __table_args__ = (
         UniqueConstraint("error_pattern", name="uq_lesson_pattern"),
+        {"schema": "aria_data"},
     )
 
 
@@ -710,6 +743,7 @@ Index("idx_lesson_skill", LessonLearned.skill_name)
 
 class ImprovementProposal(Base):
     __tablename__ = "improvement_proposals"
+    __table_args__ = {"schema": "aria_data"}
 
     id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
     title: Mapped[str] = mapped_column(String(200), nullable=False)
@@ -735,6 +769,7 @@ Index("idx_proposal_category", ImprovementProposal.category)
 
 class SkillInvocation(Base):
     __tablename__ = "skill_invocations"
+    __table_args__ = {"schema": "aria_data"}
 
     id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
     skill_name: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -757,7 +792,8 @@ Index("idx_invocation_success", SkillInvocation.success)
 
 
 class EngineChatSession(Base):
-    __tablename__ = "engine_chat_sessions"
+    __tablename__ = "chat_sessions"
+    __table_args__ = {"schema": "aria_engine"}
 
     id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
     agent_id: Mapped[str] = mapped_column(String(100), nullable=False, server_default=text("'main'"))
@@ -786,10 +822,12 @@ Index("idx_ecs_created", EngineChatSession.created_at)
 
 
 class EngineChatMessage(Base):
-    __tablename__ = "engine_chat_messages"
+    __tablename__ = "chat_messages"
+    __table_args__ = {"schema": "aria_engine"}
 
     id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
-    session_id: Mapped[Any] = mapped_column(UUID(as_uuid=True), ForeignKey("engine_chat_sessions.id", ondelete="CASCADE"), nullable=False)
+    session_id: Mapped[Any] = mapped_column(UUID(as_uuid=True), ForeignKey("aria_engine.chat_sessions.id", ondelete="CASCADE"), nullable=False)
+    agent_id: Mapped[str | None] = mapped_column(String(100))
     role: Mapped[str] = mapped_column(String(20), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     thinking: Mapped[str | None] = mapped_column(Text)
@@ -800,6 +838,7 @@ class EngineChatMessage(Base):
     tokens_output: Mapped[int | None] = mapped_column(Integer)
     cost: Mapped[float | None] = mapped_column(Numeric(10, 6))
     latency_ms: Mapped[int | None] = mapped_column(Integer)
+    embedding: Mapped[Any] = mapped_column(Vector(1536), nullable=True) if HAS_PGVECTOR else mapped_column(JSONB, nullable=True)
     metadata_json: Mapped[dict] = mapped_column("metadata", JSONB, server_default=text("'{}'::jsonb"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
 
@@ -812,7 +851,8 @@ Index("idx_ecm_created", EngineChatMessage.created_at)
 
 
 class EngineCronJob(Base):
-    __tablename__ = "engine_cron_jobs"
+    __tablename__ = "cron_jobs"
+    __table_args__ = {"schema": "aria_engine"}
 
     id: Mapped[str] = mapped_column(String(100), primary_key=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
@@ -842,20 +882,29 @@ Index("idx_ecj_next_run", EngineCronJob.next_run_at)
 
 
 class EngineAgentState(Base):
-    __tablename__ = "engine_agent_state"
+    __tablename__ = "agent_state"
+    __table_args__ = {"schema": "aria_engine"}
 
     agent_id: Mapped[str] = mapped_column(String(100), primary_key=True)
     display_name: Mapped[str | None] = mapped_column(String(200))
+    agent_type: Mapped[str] = mapped_column(String(30), server_default=text("'agent'"), comment="agent, sub_agent, sub_aria, swarm, focus")
+    parent_agent_id: Mapped[str | None] = mapped_column(String(100), comment="Parent agent for hierarchy")
     model: Mapped[str] = mapped_column(String(200), nullable=False)
+    fallback_model: Mapped[str | None] = mapped_column(String(200), comment="Fallback model if primary fails")
     temperature: Mapped[float] = mapped_column(Float, server_default=text("0.7"))
     max_tokens: Mapped[int] = mapped_column(Integer, server_default=text("4096"))
     system_prompt: Mapped[str | None] = mapped_column(Text)
     focus_type: Mapped[str | None] = mapped_column(String(50))
     status: Mapped[str] = mapped_column(String(20), server_default=text("'idle'"))
+    enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
+    skills: Mapped[list] = mapped_column(JSONB, server_default=text("'[]'::jsonb"), comment="Assigned skill names")
+    capabilities: Mapped[list] = mapped_column(JSONB, server_default=text("'[]'::jsonb"), comment="Agent capabilities")
     current_session_id: Mapped[Any | None] = mapped_column(UUID(as_uuid=True))
     current_task: Mapped[str | None] = mapped_column(Text)
     consecutive_failures: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     pheromone_score: Mapped[float] = mapped_column(Numeric(5, 3), server_default=text("0.500"))
+    timeout_seconds: Mapped[int] = mapped_column(Integer, server_default=text("600"))
+    rate_limit: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"), comment="Rate limit config")
     last_active_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     metadata_json: Mapped[dict] = mapped_column("metadata", JSONB, server_default=text("'{}'::jsonb"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
@@ -863,7 +912,8 @@ class EngineAgentState(Base):
 
 
 class EngineConfigEntry(Base):
-    __tablename__ = "engine_config"
+    __tablename__ = "config"
+    __table_args__ = {"schema": "aria_engine"}
 
     key: Mapped[str] = mapped_column(String(200), primary_key=True)
     value: Mapped[dict] = mapped_column(JSONB, nullable=False)
@@ -873,7 +923,8 @@ class EngineConfigEntry(Base):
 
 
 class EngineAgentTool(Base):
-    __tablename__ = "engine_agent_tools"
+    __tablename__ = "agent_tools"
+    __table_args__ = {"schema": "aria_engine"}
 
     id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
     agent_id: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -886,3 +937,46 @@ class EngineAgentTool(Base):
 
 
 Index("idx_eat_agent", EngineAgentTool.agent_id)
+
+
+# ── LLM Model Catalog (DB-backed) ────────────────────────────────────────────
+# Persistent model catalog — seeded from models.yaml, editable via API/UI.
+
+
+class LlmModelEntry(Base):
+    """One LLM model available in the system.
+
+    Seeded from ``models.yaml`` at startup; thereafter editable through the
+    admin UI so operators can add/remove/tweak models without redeploying.
+    """
+    __tablename__ = "llm_models"
+    __table_args__ = {"schema": "aria_engine"}
+
+    id: Mapped[str] = mapped_column(String(100), primary_key=True, comment="Short unique key, e.g. 'kimi'")
+    name: Mapped[str] = mapped_column(String(300), nullable=False, comment="Human-readable display name")
+    provider: Mapped[str] = mapped_column(String(50), nullable=False, server_default=text("'litellm'"), comment="Provider group (litellm, ollama, openrouter …)")
+    tier: Mapped[str] = mapped_column(String(30), nullable=False, server_default=text("'free'"), comment="Cost tier: local / free / paid")
+    reasoning: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    vision: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    tool_calling: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    input_types: Mapped[list] = mapped_column(JSONB, server_default=text("'[\"text\"]'::jsonb"), comment="['text'], ['text','image'], …")
+    context_window: Mapped[int] = mapped_column(Integer, server_default=text("8192"))
+    max_tokens: Mapped[int] = mapped_column(Integer, server_default=text("4096"))
+    cost_input: Mapped[float] = mapped_column(Numeric(12, 6), server_default=text("0"), comment="$/1M input tokens")
+    cost_output: Mapped[float] = mapped_column(Numeric(12, 6), server_default=text("0"), comment="$/1M output tokens")
+    cost_cache_read: Mapped[float] = mapped_column(Numeric(12, 6), server_default=text("0"))
+    litellm_model: Mapped[str | None] = mapped_column(String(300), comment="litellm SDK model string, e.g. moonshot/kimi-k2.5")
+    litellm_api_key: Mapped[str | None] = mapped_column(String(500), comment="'os.environ/VAR' or raw key")
+    litellm_api_base: Mapped[str | None] = mapped_column(String(500), comment="Per-model API base URL")
+    route_skill: Mapped[str | None] = mapped_column(String(100))
+    aliases: Mapped[list] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
+    enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
+    sort_order: Mapped[int] = mapped_column(Integer, server_default=text("100"))
+    extra: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"), comment="Arbitrary extra config")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
+
+
+Index("idx_llm_models_provider", LlmModelEntry.provider)
+Index("idx_llm_models_tier", LlmModelEntry.tier)
+Index("idx_llm_models_enabled", LlmModelEntry.enabled)

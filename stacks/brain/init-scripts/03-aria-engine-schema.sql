@@ -2,6 +2,7 @@
 -- Creates the aria_engine schema and all engine tables
 -- Required by: aria_engine container (agent_pool, scheduler, chat_engine, etc.)
 
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE SCHEMA IF NOT EXISTS aria_engine;
 
 -- ============================================================================
@@ -37,6 +38,7 @@ CREATE INDEX IF NOT EXISTS idx_ae_cs_created ON aria_engine.chat_sessions(create
 CREATE TABLE IF NOT EXISTS aria_engine.chat_messages (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     session_id UUID NOT NULL REFERENCES aria_engine.chat_sessions(id) ON DELETE CASCADE,
+    agent_id VARCHAR(100),
     role VARCHAR(20) NOT NULL,
     content TEXT NOT NULL,
     thinking TEXT,
@@ -52,8 +54,17 @@ CREATE TABLE IF NOT EXISTS aria_engine.chat_messages (
 );
 
 CREATE INDEX IF NOT EXISTS idx_ae_cm_session ON aria_engine.chat_messages(session_id);
+CREATE INDEX IF NOT EXISTS idx_ae_cm_agent ON aria_engine.chat_messages(agent_id);
 CREATE INDEX IF NOT EXISTS idx_ae_cm_role ON aria_engine.chat_messages(role);
 CREATE INDEX IF NOT EXISTS idx_ae_cm_created ON aria_engine.chat_messages(created_at);
+
+-- Compatibility hardening for existing deployments:
+-- some runtime paths expect aria_engine.chat_messages.agent_id to exist.
+ALTER TABLE aria_engine.chat_messages
+    ADD COLUMN IF NOT EXISTS agent_id VARCHAR(100);
+
+CREATE INDEX IF NOT EXISTS idx_ae_cm_agent
+    ON aria_engine.chat_messages(agent_id);
 
 -- ============================================================================
 -- Cron Jobs

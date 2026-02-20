@@ -1,9 +1,12 @@
 """
-Native Session Manager — PostgreSQL-backed session lifecycle.
+Native Session Manager — PostgreSQL-backed session lifecycle (ORM).
+
+Uses SQLAlchemy ORM models (EngineChatSession, EngineChatMessage) instead of
+raw SQL.  All schema-awareness comes from the model __table_args__.
 
 Replaces aria_skills/session_manager with direct DB access:
 - No sessions.json, no JSONL files
-- Full CRUD via chat_sessions + chat_messages
+- Full CRUD via ORM on chat_sessions + chat_messages
 - Native pagination, search, and filtering
 - Backward-compatible method signatures
 - Agent-scoped queries via agent_id parameter
@@ -13,11 +16,13 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlalchemy import select, insert, update, delete, func, and_, or_, cast, literal
+from sqlalchemy.dialects.postgresql import JSONB as PG_JSONB
+from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
 from aria_engine.config import EngineConfig
 from aria_engine.exceptions import EngineError
+from db.models import EngineChatSession, EngineChatMessage
 
 logger = logging.getLogger("aria.engine.session_manager")
 
@@ -30,7 +35,7 @@ MAX_MESSAGE_LENGTH = 100_000  # 100KB per message
 
 class NativeSessionManager:
     """
-    PostgreSQL-backed session manager.
+    PostgreSQL-backed session manager (ORM).
 
     Manages the full lifecycle of chat sessions and messages
     using aria_engine.chat_sessions and aria_engine.chat_messages.
@@ -64,6 +69,9 @@ class NativeSessionManager:
 
     def __init__(self, db_engine: AsyncEngine):
         self._db = db_engine
+        self._async_session = async_sessionmaker(
+            db_engine, expire_on_commit=False,
+        )
 
     # ── Session CRUD ──────────────────────────────────────────
 
@@ -86,50 +94,36 @@ class NativeSessionManager:
         Returns:
             Session dict with session_id, title, agent_id, etc.
         """
-        session_id = uuid4().hex[:16]
+        session_id = str(uuid4())
         if not title:
             title = f"Session {session_id[:8]}"
         title = title[:MAX_TITLE_LENGTH]
 
-        import json as _json
+        async with self._async_session() as session:
+            async with session.begin():
+                obj = EngineChatSession(
+                    id=session_id,
+                    title=title,
+                    agent_id=agent_id,
+                    session_type=session_type,
+                    metadata_json=metadata or {},
+                )
+                session.add(obj)
+                await session.flush()
 
-        meta_str = _json.dumps(metadata) if metadata else None
+                logger.info(
+                    "Created session %s for %s: %s",
+                    session_id, agent_id, title,
+                )
 
-        async with self._db.begin() as conn:
-            result = await conn.execute(
-                text("""
-                    INSERT INTO aria_engine.chat_sessions
-                        (session_id, title, agent_id, session_type,
-                         metadata)
-                    VALUES
-                        (:sid, :title, :agent, :stype,
-                         :meta::jsonb)
-                    RETURNING session_id, title, agent_id,
-                              session_type, created_at
-                """),
-                {
-                    "sid": session_id,
-                    "title": title,
-                    "agent": agent_id,
-                    "stype": session_type,
-                    "meta": meta_str,
-                },
-            )
-            row = result.mappings().first()
-
-        logger.info(
-            "Created session %s for %s: %s",
-            session_id, agent_id, title,
-        )
-
-        return {
-            "session_id": row["session_id"],
-            "title": row["title"],
-            "agent_id": row["agent_id"],
-            "session_type": row["session_type"],
-            "created_at": row["created_at"].isoformat(),
-            "message_count": 0,
-        }
+                return {
+                    "session_id": str(obj.id),
+                    "title": obj.title,
+                    "agent_id": obj.agent_id,
+                    "session_type": obj.session_type,
+                    "created_at": obj.created_at.isoformat(),
+                    "message_count": 0,
+                }
 
     async def get_session(
         self,
@@ -141,31 +135,43 @@ class NativeSessionManager:
         Returns:
             Session dict or None if not found.
         """
-        async with self._db.begin() as conn:
-            result = await conn.execute(
-                text("""
-                    SELECT
-                        s.session_id, s.title, s.agent_id,
-                        s.session_type, s.metadata, s.created_at,
-                        s.updated_at,
-                        COUNT(m.id) AS message_count,
-                        MAX(m.created_at) AS last_message_at
-                    FROM aria_engine.chat_sessions s
-                    LEFT JOIN aria_engine.chat_messages m
-                        ON m.session_id = s.session_id
-                    WHERE s.session_id = :sid
-                    GROUP BY s.session_id, s.title, s.agent_id,
-                             s.session_type, s.metadata,
-                             s.created_at, s.updated_at
-                """),
-                {"sid": session_id},
+        stmt = (
+            select(
+                EngineChatSession,
+                func.count(EngineChatMessage.id).label("message_count"),
+                func.max(EngineChatMessage.created_at).label("last_message_at"),
             )
-            row = result.mappings().first()
+            .outerjoin(
+                EngineChatMessage,
+                EngineChatMessage.session_id == EngineChatSession.id,
+            )
+            .where(EngineChatSession.id == session_id)
+            .group_by(EngineChatSession.id)
+        )
+
+        async with self._async_session() as session:
+            result = await session.execute(stmt)
+            row = result.first()
 
         if not row:
             return None
 
-        return self._row_to_session(row)
+        s = row[0]
+        return {
+            "session_id": str(s.id),
+            "title": s.title or "Untitled",
+            "agent_id": s.agent_id or "unknown",
+            "session_type": s.session_type,
+            "metadata": dict(s.metadata_json) if s.metadata_json else None,
+            "message_count": row.message_count,
+            "created_at": s.created_at.isoformat(),
+            "updated_at": s.updated_at.isoformat() if s.updated_at else None,
+            "last_message_at": (
+                row.last_message_at.isoformat()
+                if row.last_message_at
+                else None
+            ),
+        }
 
     async def list_sessions(
         self,
@@ -201,70 +207,87 @@ class NativeSessionManager:
         if order not in ("asc", "desc"):
             order = "desc"
 
-        # Build WHERE clauses
-        conditions = []
-        params: dict[str, Any] = {"limit": limit, "offset": offset}
-
+        # Build WHERE filters
+        filters = []
         if agent_id:
-            conditions.append("s.agent_id = :agent_id")
-            params["agent_id"] = agent_id
-
+            filters.append(EngineChatSession.agent_id == agent_id)
         if session_type:
-            conditions.append("s.session_type = :stype")
-            params["stype"] = session_type
-
+            filters.append(EngineChatSession.session_type == session_type)
         if search:
-            conditions.append("""
-                (s.title ILIKE :search
-                 OR EXISTS (
-                     SELECT 1 FROM aria_engine.chat_messages cm
-                     WHERE cm.session_id = s.session_id
-                       AND cm.content ILIKE :search
-                 ))
-            """)
-            params["search"] = f"%{search}%"
-
-        where = (
-            "WHERE " + " AND ".join(conditions) if conditions else ""
-        )
-
-        async with self._db.begin() as conn:
-            # Count total
-            count_result = await conn.execute(
-                text(f"""
-                    SELECT COUNT(*) AS total
-                    FROM aria_engine.chat_sessions s
-                    {where}
-                """),
-                params,
+            pattern = f"%{search}%"
+            search_in_messages = (
+                select(literal(1))
+                .where(
+                    and_(
+                        EngineChatMessage.session_id == EngineChatSession.id,
+                        EngineChatMessage.content.ilike(pattern),
+                    )
+                )
+                .correlate(EngineChatSession)
+                .exists()
             )
-            total = count_result.scalar()
+            filters.append(
+                or_(
+                    EngineChatSession.title.ilike(pattern),
+                    search_in_messages,
+                )
+            )
+
+        where = and_(*filters) if filters else True
+
+        # Sort column
+        sort_col = getattr(EngineChatSession, sort, EngineChatSession.updated_at)
+        order_clause = sort_col.desc() if order == "desc" else sort_col.asc()
+
+        async with self._async_session() as session:
+            # Count total
+            count_stmt = (
+                select(func.count())
+                .select_from(EngineChatSession)
+                .where(where)
+            )
+            total = (await session.execute(count_stmt)).scalar() or 0
 
             # Fetch page
-            result = await conn.execute(
-                text(f"""
-                    SELECT
-                        s.session_id, s.title, s.agent_id,
-                        s.session_type, s.metadata,
-                        s.created_at, s.updated_at,
-                        COUNT(m.id) AS message_count,
-                        MAX(m.created_at) AS last_message_at
-                    FROM aria_engine.chat_sessions s
-                    LEFT JOIN aria_engine.chat_messages m
-                        ON m.session_id = s.session_id
-                    {where}
-                    GROUP BY s.session_id, s.title, s.agent_id,
-                             s.session_type, s.metadata,
-                             s.created_at, s.updated_at
-                    ORDER BY s.{sort} {order}
-                    LIMIT :limit OFFSET :offset
-                """),
-                params,
+            data_stmt = (
+                select(
+                    EngineChatSession,
+                    func.count(EngineChatMessage.id).label("message_count"),
+                    func.max(EngineChatMessage.created_at).label("last_message_at"),
+                )
+                .outerjoin(
+                    EngineChatMessage,
+                    EngineChatMessage.session_id == EngineChatSession.id,
+                )
+                .where(where)
+                .group_by(EngineChatSession.id)
+                .order_by(order_clause)
+                .limit(limit)
+                .offset(offset)
             )
-            rows = result.mappings().all()
+            rows = (await session.execute(data_stmt)).all()
+
+        sessions_list = []
+        for row in rows:
+            s = row[0]
+            sessions_list.append({
+                "session_id": str(s.id),
+                "title": s.title or "Untitled",
+                "agent_id": s.agent_id or "unknown",
+                "session_type": s.session_type,
+                "metadata": dict(s.metadata_json) if s.metadata_json else None,
+                "message_count": row.message_count,
+                "created_at": s.created_at.isoformat(),
+                "updated_at": s.updated_at.isoformat() if s.updated_at else None,
+                "last_message_at": (
+                    row.last_message_at.isoformat()
+                    if row.last_message_at
+                    else None
+                ),
+            })
 
         return {
-            "sessions": [self._row_to_session(r) for r in rows],
+            "sessions": sessions_list,
             "total": total,
             "limit": limit,
             "offset": offset,
@@ -278,31 +301,25 @@ class NativeSessionManager:
         metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any] | None:
         """Update session title and/or metadata."""
-        sets = ["updated_at = NOW()"]
-        params: dict[str, Any] = {"sid": session_id}
+        values: dict[str, Any] = {"updated_at": func.now()}
 
         if title is not None:
-            sets.append("title = :title")
-            params["title"] = title[:MAX_TITLE_LENGTH]
-
+            values["title"] = title[:MAX_TITLE_LENGTH]
         if metadata is not None:
-            import json as _json
+            values["metadata_json"] = metadata
 
-            sets.append("metadata = :meta::jsonb")
-            params["meta"] = _json.dumps(metadata)
+        stmt = (
+            update(EngineChatSession)
+            .where(EngineChatSession.id == session_id)
+            .values(**values)
+            .returning(EngineChatSession.id)
+        )
 
-        async with self._db.begin() as conn:
-            result = await conn.execute(
-                text(f"""
-                    UPDATE aria_engine.chat_sessions
-                    SET {', '.join(sets)}
-                    WHERE session_id = :sid
-                    RETURNING session_id
-                """),
-                params,
-            )
-            if not result.first():
-                return None
+        async with self._async_session() as session:
+            async with session.begin():
+                result = await session.execute(stmt)
+                if not result.first():
+                    return None
 
         return await self.get_session(session_id)
 
@@ -319,25 +336,20 @@ class NativeSessionManager:
         Returns:
             True if session existed and was deleted.
         """
-        async with self._db.begin() as conn:
-            # Delete messages first (safe even with CASCADE)
-            await conn.execute(
-                text("""
-                    DELETE FROM aria_engine.chat_messages
-                    WHERE session_id = :sid
-                """),
-                {"sid": session_id},
-            )
+        async with self._async_session() as session:
+            async with session.begin():
+                # Delete messages first (safe even with CASCADE)
+                await session.execute(
+                    delete(EngineChatMessage)
+                    .where(EngineChatMessage.session_id == session_id)
+                )
 
-            result = await conn.execute(
-                text("""
-                    DELETE FROM aria_engine.chat_sessions
-                    WHERE session_id = :sid
-                    RETURNING session_id
-                """),
-                {"sid": session_id},
-            )
-            deleted = result.first() is not None
+                result = await session.execute(
+                    delete(EngineChatSession)
+                    .where(EngineChatSession.id == session_id)
+                    .returning(EngineChatSession.id)
+                )
+                deleted = result.first() is not None
 
         if deleted:
             logger.info("Deleted session %s", session_id)
@@ -356,19 +368,23 @@ class NativeSessionManager:
         Returns:
             True if session exists.
         """
-        async with self._db.begin() as conn:
-            result = await conn.execute(
-                text("""
-                    UPDATE aria_engine.chat_sessions
-                    SET updated_at = NOW(),
-                        metadata = COALESCE(metadata, '{}'::jsonb)
-                            || '{"ended": true}'::jsonb
-                    WHERE session_id = :sid
-                    RETURNING session_id
-                """),
-                {"sid": session_id},
+        stmt = (
+            update(EngineChatSession)
+            .where(EngineChatSession.id == session_id)
+            .values(
+                updated_at=func.now(),
+                metadata_json=func.coalesce(
+                    EngineChatSession.metadata_json,
+                    cast("{}", PG_JSONB),
+                ).op("||")(cast({"ended": True}, PG_JSONB)),
             )
-            return result.first() is not None
+            .returning(EngineChatSession.id)
+        )
+
+        async with self._async_session() as session:
+            async with session.begin():
+                result = await session.execute(stmt)
+                return result.first() is not None
 
     # ── Message Operations ────────────────────────────────────
 
@@ -398,60 +414,46 @@ class NativeSessionManager:
         """
         content = content[:MAX_MESSAGE_LENGTH]
 
-        import json as _json
+        async with self._async_session() as session:
+            async with session.begin():
+                # Verify session exists
+                check = await session.execute(
+                    select(EngineChatSession.id)
+                    .where(EngineChatSession.id == session_id)
+                )
+                if not check.first():
+                    raise EngineError(f"Session {session_id} not found")
 
-        meta_str = _json.dumps(metadata) if metadata else None
+                # Build metadata with agent_id
+                meta = dict(metadata) if metadata else {}
+                if agent_id:
+                    meta["agent_id"] = agent_id
 
-        async with self._db.begin() as conn:
-            # Verify session exists
-            check = await conn.execute(
-                text("""
-                    SELECT session_id FROM aria_engine.chat_sessions
-                    WHERE session_id = :sid
-                """),
-                {"sid": session_id},
-            )
-            if not check.first():
-                raise EngineError(f"Session {session_id} not found")
+                # Insert message
+                msg = EngineChatMessage(
+                    session_id=session_id,
+                    role=role,
+                    content=content,
+                    metadata_json=meta,
+                )
+                session.add(msg)
+                await session.flush()
 
-            result = await conn.execute(
-                text("""
-                    INSERT INTO aria_engine.chat_messages
-                        (session_id, role, content, agent_id, metadata)
-                    VALUES
-                        (:sid, :role, :content, :agent,
-                         :meta::jsonb)
-                    RETURNING id, session_id, role, content,
-                              agent_id, created_at
-                """),
-                {
-                    "sid": session_id,
-                    "role": role,
-                    "content": content,
-                    "agent": agent_id,
-                    "meta": meta_str,
-                },
-            )
-            row = result.mappings().first()
+                # Touch session updated_at
+                await session.execute(
+                    update(EngineChatSession)
+                    .where(EngineChatSession.id == session_id)
+                    .values(updated_at=func.now())
+                )
 
-            # Touch session updated_at
-            await conn.execute(
-                text("""
-                    UPDATE aria_engine.chat_sessions
-                    SET updated_at = NOW()
-                    WHERE session_id = :sid
-                """),
-                {"sid": session_id},
-            )
-
-        return {
-            "id": row["id"],
-            "session_id": row["session_id"],
-            "role": row["role"],
-            "content": row["content"],
-            "agent_id": row["agent_id"],
-            "created_at": row["created_at"].isoformat(),
-        }
+                return {
+                    "id": str(msg.id),
+                    "session_id": str(msg.session_id),
+                    "role": msg.role,
+                    "content": msg.content,
+                    "agent_id": agent_id,
+                    "created_at": msg.created_at.isoformat(),
+                }
 
     async def get_messages(
         self,
@@ -472,42 +474,33 @@ class NativeSessionManager:
         Returns:
             List of message dicts.
         """
-        params: dict[str, Any] = {
-            "sid": session_id,
-            "limit": min(limit, 500),
-            "offset": offset,
-        }
-
-        since_clause = ""
+        filters = [EngineChatMessage.session_id == session_id]
         if since:
-            since_clause = "AND created_at > :since"
-            params["since"] = since
+            filters.append(EngineChatMessage.created_at > since)
 
-        async with self._db.begin() as conn:
-            result = await conn.execute(
-                text(f"""
-                    SELECT id, session_id, role, content,
-                           agent_id, metadata, created_at
-                    FROM aria_engine.chat_messages
-                    WHERE session_id = :sid {since_clause}
-                    ORDER BY created_at ASC
-                    LIMIT :limit OFFSET :offset
-                """),
-                params,
-            )
-            rows = result.mappings().all()
+        stmt = (
+            select(EngineChatMessage)
+            .where(and_(*filters))
+            .order_by(EngineChatMessage.created_at.asc())
+            .limit(min(limit, 500))
+            .offset(offset)
+        )
+
+        async with self._async_session() as session:
+            result = await session.execute(stmt)
+            messages = result.scalars().all()
 
         return [
             {
-                "id": row["id"],
-                "session_id": row["session_id"],
-                "role": row["role"],
-                "content": row["content"],
-                "agent_id": row["agent_id"],
-                "metadata": dict(row["metadata"]) if row["metadata"] else None,
-                "created_at": row["created_at"].isoformat(),
+                "id": str(m.id),
+                "session_id": str(m.session_id),
+                "role": m.role,
+                "content": m.content or "",
+                "agent_id": (m.metadata_json or {}).get("agent_id"),
+                "metadata": dict(m.metadata_json) if m.metadata_json else None,
+                "created_at": m.created_at.isoformat(),
             }
-            for row in rows
+            for m in messages
         ]
 
     async def delete_message(
@@ -516,16 +509,21 @@ class NativeSessionManager:
         session_id: str,
     ) -> bool:
         """Delete a single message (must match session_id for safety)."""
-        async with self._db.begin() as conn:
-            result = await conn.execute(
-                text("""
-                    DELETE FROM aria_engine.chat_messages
-                    WHERE id = :mid AND session_id = :sid
-                    RETURNING id
-                """),
-                {"mid": message_id, "sid": session_id},
+        stmt = (
+            delete(EngineChatMessage)
+            .where(
+                and_(
+                    EngineChatMessage.id == message_id,
+                    EngineChatMessage.session_id == session_id,
+                )
             )
-            return result.first() is not None
+            .returning(EngineChatMessage.id)
+        )
+
+        async with self._async_session() as session:
+            async with session.begin():
+                result = await session.execute(stmt)
+                return result.first() is not None
 
     # ── Maintenance ───────────────────────────────────────────
 
@@ -544,54 +542,48 @@ class NativeSessionManager:
         Returns:
             Dict with 'pruned_count' and 'message_count'.
         """
-        async with self._db.begin() as conn:
-            # Find stale sessions
-            result = await conn.execute(
-                text("""
-                    SELECT s.session_id, COUNT(m.id) AS msg_count
-                    FROM aria_engine.chat_sessions s
-                    LEFT JOIN aria_engine.chat_messages m
-                        ON m.session_id = s.session_id
-                    WHERE s.updated_at < NOW() - MAKE_INTERVAL(days => :days)
-                    GROUP BY s.session_id
-                """),
-                {"days": days},
-            )
-            stale = result.mappings().all()
+        cutoff = func.now() - func.make_interval(0, 0, 0, days)
 
-            if dry_run or not stale:
-                return {
-                    "pruned_count": len(stale),
-                    "message_count": sum(
-                        r["msg_count"] for r in stale
-                    ),
-                    "dry_run": dry_run,
-                }
-
-            stale_ids = [r["session_id"] for r in stale]
-            placeholders = ", ".join(
-                f":s{i}" for i in range(len(stale_ids))
+        # Find stale sessions
+        stale_stmt = (
+            select(
+                EngineChatSession.id,
+                func.count(EngineChatMessage.id).label("msg_count"),
             )
-            sparams = {
-                f"s{i}": sid for i, sid in enumerate(stale_ids)
-            }
-
-            msg_result = await conn.execute(
-                text(f"""
-                    DELETE FROM aria_engine.chat_messages
-                    WHERE session_id IN ({placeholders})
-                """),
-                sparams,
+            .outerjoin(
+                EngineChatMessage,
+                EngineChatMessage.session_id == EngineChatSession.id,
             )
-            msg_count = msg_result.rowcount
+            .where(EngineChatSession.updated_at < cutoff)
+            .group_by(EngineChatSession.id)
+        )
 
-            await conn.execute(
-                text(f"""
-                    DELETE FROM aria_engine.chat_sessions
-                    WHERE session_id IN ({placeholders})
-                """),
-                sparams,
-            )
+        async with self._async_session() as session:
+            async with session.begin():
+                result = await session.execute(stale_stmt)
+                stale = result.all()
+
+                if dry_run or not stale:
+                    return {
+                        "pruned_count": len(stale),
+                        "message_count": sum(r.msg_count for r in stale),
+                        "dry_run": dry_run,
+                    }
+
+                stale_ids = [r.id for r in stale]
+
+                # Delete messages
+                msg_result = await session.execute(
+                    delete(EngineChatMessage)
+                    .where(EngineChatMessage.session_id.in_(stale_ids))
+                )
+                msg_count = msg_result.rowcount
+
+                # Delete sessions
+                await session.execute(
+                    delete(EngineChatSession)
+                    .where(EngineChatSession.id.in_(stale_ids))
+                )
 
         logger.info(
             "Pruned %d sessions (%d messages, >%d days old)",
@@ -606,60 +598,37 @@ class NativeSessionManager:
 
     async def get_stats(self) -> dict[str, Any]:
         """Get session statistics."""
-        async with self._db.begin() as conn:
-            result = await conn.execute(
-                text("""
-                    SELECT
-                        COUNT(DISTINCT s.session_id) AS total_sessions,
-                        COUNT(m.id) AS total_messages,
-                        COUNT(DISTINCT s.agent_id) AS active_agents,
-                        MIN(s.created_at) AS oldest_session,
-                        MAX(s.updated_at) AS newest_activity
-                    FROM aria_engine.chat_sessions s
-                    LEFT JOIN aria_engine.chat_messages m
-                        ON m.session_id = s.session_id
-                """)
+        stmt = (
+            select(
+                func.count(func.distinct(EngineChatSession.id)).label("total_sessions"),
+                func.count(EngineChatMessage.id).label("total_messages"),
+                func.count(func.distinct(EngineChatSession.agent_id)).label("active_agents"),
+                func.min(EngineChatSession.created_at).label("oldest_session"),
+                func.max(EngineChatSession.updated_at).label("newest_activity"),
             )
-            row = result.mappings().first()
+            .select_from(EngineChatSession)
+            .outerjoin(
+                EngineChatMessage,
+                EngineChatMessage.session_id == EngineChatSession.id,
+            )
+        )
+
+        async with self._async_session() as session:
+            result = await session.execute(stmt)
+            row = result.first()
 
         return {
-            "total_sessions": row["total_sessions"],
-            "total_messages": row["total_messages"],
-            "active_agents": row["active_agents"],
+            "total_sessions": row.total_sessions,
+            "total_messages": row.total_messages,
+            "active_agents": row.active_agents,
             "oldest_session": (
-                row["oldest_session"].isoformat()
-                if row["oldest_session"]
+                row.oldest_session.isoformat()
+                if row.oldest_session
                 else None
             ),
             "newest_activity": (
-                row["newest_activity"].isoformat()
-                if row["newest_activity"]
-                else None
-            ),
-        }
-
-    # ── Internal Helpers ──────────────────────────────────────
-
-    def _row_to_session(self, row) -> dict[str, Any]:
-        """Convert a DB row to a session dict."""
-        return {
-            "session_id": row["session_id"],
-            "title": row["title"],
-            "agent_id": row["agent_id"],
-            "session_type": row["session_type"],
-            "metadata": (
-                dict(row["metadata"]) if row["metadata"] else None
-            ),
-            "message_count": row["message_count"],
-            "created_at": row["created_at"].isoformat(),
-            "updated_at": (
-                row["updated_at"].isoformat()
-                if row["updated_at"]
-                else None
-            ),
-            "last_message_at": (
-                row["last_message_at"].isoformat()
-                if row["last_message_at"]
+                row.newest_activity.isoformat()
+                if row.newest_activity
                 else None
             ),
         }

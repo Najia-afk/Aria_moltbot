@@ -4,18 +4,27 @@
   "description": "Manage user goals, habits, and progress tracking. Create, update, and query goals with reminders and milestones.",
   "author": "Aria Team",
   "layer": 3,
-  "dependencies": ["api_client"],
-  "focus_affinity": ["orchestrator"],
+  "dependencies": [
+    "api_client"
+  ],
+  "focus_affinity": [
+    "orchestrator"
+  ],
   "tools": [
     {
-      "name": "goals_list",
+      "name": "list_goals",
       "description": "List all active goals with their status and progress.",
       "parameters": {
         "type": "object",
         "properties": {
           "status": {
             "type": "string",
-            "enum": ["active", "completed", "paused", "all"],
+            "enum": [
+              "active",
+              "completed",
+              "paused",
+              "all"
+            ],
             "description": "Filter by goal status (default: active)"
           },
           "category": {
@@ -26,7 +35,7 @@
       }
     },
     {
-      "name": "goals_create",
+      "name": "create_goal",
       "description": "Create a new goal with optional milestones and target date.",
       "parameters": {
         "type": "object",
@@ -49,16 +58,20 @@
           },
           "milestones": {
             "type": "array",
-            "items": { "type": "string" },
+            "items": {
+              "type": "string"
+            },
             "description": "List of milestone descriptions"
           }
         },
-        "required": ["title"]
+        "required": [
+          "title"
+        ]
       }
     },
     {
-      "name": "goals_update_progress",
-      "description": "Update progress on a goal.",
+      "name": "update_goal",
+      "description": "Update progress or details on a goal.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -75,12 +88,46 @@
             "description": "Progress note"
           }
         },
-        "required": ["goal_id"]
+        "required": [
+          "goal_id"
+        ]
       }
     },
     {
-      "name": "goals_complete_milestone",
-      "description": "Mark a milestone as completed.",
+      "name": "get_goal",
+      "description": "Get details of a specific goal.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "goal_id": {
+            "type": "integer",
+            "description": "Goal ID"
+          }
+        },
+        "required": [
+          "goal_id"
+        ]
+      }
+    },
+    {
+      "name": "get_summary",
+      "description": "Get a summary of all goals and their overall progress.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "get_next_actions",
+      "description": "Get recommended next actions across all active goals.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "add_subtask",
+      "description": "Add a subtask to an existing goal.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -88,12 +135,36 @@
             "type": "integer",
             "description": "Goal ID"
           },
-          "milestone_index": {
-            "type": "integer",
-            "description": "Milestone index (0-based)"
+          "title": {
+            "type": "string",
+            "description": "Subtask title"
           }
         },
-        "required": ["goal_id", "milestone_index"]
+        "required": [
+          "goal_id",
+          "title"
+        ]
+      }
+    },
+    {
+      "name": "complete_subtask",
+      "description": "Mark a subtask as completed.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "goal_id": {
+            "type": "integer",
+            "description": "Goal ID"
+          },
+          "subtask_index": {
+            "type": "integer",
+            "description": "Subtask index (0-based)"
+          }
+        },
+        "required": [
+          "goal_id",
+          "subtask_index"
+        ]
       }
     }
   ],

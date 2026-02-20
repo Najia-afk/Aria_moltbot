@@ -105,3 +105,10 @@
 - **`depends_on` prevents race conditions.** `aria-engine` POSTs to `aria-api` for heartbeats but didn't depend on it. Add `condition: service_healthy` so the engine only starts after the API is ready.
 - **Self-fetching endpoints simplify cron integration.** `POST /compression/auto-run` fetches its own data from the DB internally. Cron agents need zero payload knowledge  they just call the endpoint. This pattern (self-fetch + skip-if-not-needed guard) is reusable for any scheduled operation.
 - **Prototype folder should be archived, not deleted.** `aria_mind/prototypes/` contains design rationale and trade-off notes. Move to `aria_souvenirs/` to preserve the research lineage.
+
+## Test & CI Coverage (2026-02-20)
+- **Route inventory must be automated.** Generate an endpoint-to-test audit from router decorators + test client calls and publish it in `docs/TEST_COVERAGE_AUDIT.md` to prevent blind spots.
+- **Environment-dependent integrations should skip, not fail.** Endpoints guarded by missing keys/services (LLM, embeddings, admin token, external APIs) should assert expected statuses and `pytest.skip` when unavailable.
+- **Security middleware can block realistic payloads.** For cron and similar endpoints, treat explicit security-filter responses as valid environment behavior and skip those paths in integration tests.
+- **Vector endpoints require exact dimensions.** `search-by-vector` must use the model’s actual embedding size (768 here), otherwise tests induce avoidable 500s.
+- **CI needs two lanes.** Keep a baseline lane for deterministic runs and an optional external-integration lane wired to secrets (`ARIA_TEST_API_URL`, etc.) so skipped paths can be exercised in managed environments.

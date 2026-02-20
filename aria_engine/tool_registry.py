@@ -116,6 +116,217 @@ class ToolRegistry:
         logger.info("Discovered %d tools from %d skills", count, len(self._skill_instances))
         return count
 
+    def discover_from_manifests(self, skills_base: str | Path | None = None) -> int:
+        """
+        Auto-discover tools from skill.json manifests only (no live instances needed).
+
+        Reads each aria_skills/*/skill.json to register tool definitions for
+        LLM function calling. Handlers are bound lazily on first execution via
+        _lazy_import_handler().
+
+        After registration, validates each handler is importable and removes
+        orphan tools (manifest exists but no Python handler).
+
+        Args:
+            skills_base: Optional path to aria_skills directory. Defaults to
+                ``/aria_skills`` (Docker mount) or sibling ``aria_skills/``.
+
+        Returns:
+            Number of verified tools registered.
+        """
+        if skills_base:
+            skills_dir = Path(skills_base)
+        else:
+            # Try Docker mount path first, then relative to this file
+            docker_path = Path("/aria_skills")
+            local_path = Path(__file__).parent.parent / "aria_skills"
+            skills_dir = docker_path if docker_path.is_dir() else local_path
+
+        if not skills_dir.is_dir():
+            logger.warning("Skills directory not found: %s", skills_dir)
+            return 0
+
+        count = 0
+        skill_stats: dict[str, dict] = {}
+        for skill_dir in sorted(skills_dir.iterdir()):
+            if not skill_dir.is_dir() or skill_dir.name.startswith("_"):
+                continue
+
+            manifest_path = skill_dir / "skill.json"
+            if not manifest_path.exists():
+                continue
+
+            try:
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                tools = manifest.get("tools", [])
+                registered = 0
+                for tool_def in tools:
+                    tool_name = f"{skill_dir.name}__{tool_def['name']}"
+                    if tool_name in self._tools:
+                        continue  # Already registered by discover_from_skills
+
+                    self._tools[tool_name] = ToolDefinition(
+                        name=tool_name,
+                        description=tool_def.get("description", ""),
+                        parameters=tool_def.get("parameters", {
+                            "type": "object", "properties": {},
+                        }),
+                        skill_name=skill_dir.name,
+                        function_name=tool_def["name"],
+                        _handler=None,  # Lazy — bound on first call
+                    )
+                    registered += 1
+                    count += 1
+
+                skill_stats[skill_dir.name] = {"manifest_tools": len(tools), "registered": registered}
+
+            except Exception as e:
+                logger.warning("Failed to read manifest from %s: %s", skill_dir.name, e)
+
+        logger.info("Discovered %d tool definitions from %d skill manifests", count, len(skill_stats))
+
+        # ── Handler Validation ────────────────────────────────────────────
+        # Try to import each skill and bind handlers eagerly.
+        # Skills that fail to import stay registered with lazy handlers.
+        # Only truly un-importable skills (no __init__.py) are removed.
+        verified = 0
+        lazy = 0
+        removed = 0
+        verified_skills: list[str] = []
+        removed_skills: list[str] = []
+
+        for skill_name, stats in skill_stats.items():
+            try:
+                import importlib
+                mod = importlib.import_module(f"aria_skills.{skill_name}")
+
+                # Find the primary skill class (inherits BaseSkill or has execute methods)
+                skill_cls = None
+                for attr_name in dir(mod):
+                    cls = getattr(mod, attr_name)
+                    if not isinstance(cls, type) or cls.__module__ != mod.__name__:
+                        continue
+                    # Prefer classes that inherit BaseSkill
+                    if any(base.__name__ == "BaseSkill" for base in cls.__mro__):
+                        skill_cls = cls
+                        break
+                    # Fallback: any class defined in this module
+                    if skill_cls is None:
+                        skill_cls = cls
+
+                if skill_cls is None:
+                    # Namespace package or empty module — no usable class, remove tools
+                    skill_tools = [name for name, t in self._tools.items() if t.skill_name == skill_name]
+                    for tool_name in skill_tools:
+                        del self._tools[tool_name]
+                    removed += len(skill_tools)
+                    removed_skills.append(f"{skill_name}({len(skill_tools)})")
+                    continue
+
+                # Try instantiation with SkillConfig (most skills need it)
+                instance = None
+                try:
+                    from aria_skills.base import SkillConfig
+                    instance = skill_cls(SkillConfig(name=skill_name))
+                except TypeError:
+                    try:
+                        instance = skill_cls()
+                    except Exception:
+                        pass
+
+                if instance is None:
+                    # Can't instantiate — keep tools as lazy (will try again at call time)
+                    lazy += stats["registered"]
+                    continue
+
+                self._skill_instances[skill_name] = instance
+
+                # Bind handlers for all tools from this skill
+                skill_tools = [t for t in self._tools.values() if t.skill_name == skill_name]
+                bound = 0
+                for tool in skill_tools:
+                    handler = getattr(instance, tool.function_name, None)
+                    if handler is not None:
+                        tool._handler = handler
+                        bound += 1
+                    else:
+                        lazy += 1  # Method name mismatch — stays lazy
+
+                if bound > 0:
+                    verified += bound
+                    verified_skills.append(f"{skill_name}({bound})")
+
+            except ImportError:
+                # No __init__.py — genuine orphan, remove tools
+                skill_tools = [name for name, t in self._tools.items() if t.skill_name == skill_name]
+                for tool_name in skill_tools:
+                    del self._tools[tool_name]
+                removed += len(skill_tools)
+                removed_skills.append(f"{skill_name}({len(skill_tools)})")
+            except Exception as e:
+                # Other error (syntax, dependency) — keep as lazy
+                lazy += stats["registered"]
+                logger.debug("Skill %s init failed (kept lazy): %s", skill_name, e)
+
+        logger.info(
+            "Tool validation: %d verified, %d lazy, %d removed. "
+            "Verified: [%s]. Removed: [%s]",
+            verified, lazy, removed,
+            ", ".join(verified_skills[:15]),
+            ", ".join(removed_skills) if removed_skills else "none",
+        )
+        return len(self._tools)
+
+    def _lazy_import_handler(self, tool: ToolDefinition) -> Callable | None:
+        """Attempt to import and bind a skill handler on first call."""
+        if tool.skill_name in self._skill_instances:
+            handler = getattr(self._skill_instances[tool.skill_name], tool.function_name, None)
+            tool._handler = handler
+            return handler
+
+        # Try dynamic import: aria_skills.<skill>
+        try:
+            import importlib
+            mod = importlib.import_module(f"aria_skills.{tool.skill_name}")
+
+            # Find the primary skill class
+            skill_cls = None
+            for attr_name in dir(mod):
+                cls = getattr(mod, attr_name)
+                if not isinstance(cls, type) or cls.__module__ != mod.__name__:
+                    continue
+                if any(base.__name__ == "BaseSkill" for base in cls.__mro__):
+                    skill_cls = cls
+                    break
+                if skill_cls is None:
+                    skill_cls = cls
+
+            if skill_cls is None:
+                return None
+
+            # Try instantiation with SkillConfig, then without
+            instance = None
+            try:
+                from aria_skills.base import SkillConfig
+                instance = skill_cls(SkillConfig(name=tool.skill_name))
+            except (TypeError, ImportError):
+                try:
+                    instance = skill_cls()
+                except Exception:
+                    pass
+
+            if instance is None:
+                return None
+
+            self._skill_instances[tool.skill_name] = instance
+            handler = getattr(instance, tool.function_name, None)
+            tool._handler = handler
+            return handler
+        except Exception as e:
+            logger.debug("Lazy import failed for %s: %s", tool.skill_name, e)
+
+        return None
+
     def register_tool(
         self,
         name: str,
@@ -185,12 +396,15 @@ class ToolRegistry:
             )
 
         if not tool._handler:
-            return ToolResult(
-                tool_call_id=tool_call_id,
-                name=function_name,
-                content=json.dumps({"error": f"No handler for tool: {function_name}"}),
-                success=False,
-            )
+            # Try lazy import before giving up
+            tool._handler = self._lazy_import_handler(tool)
+            if not tool._handler:
+                return ToolResult(
+                    tool_call_id=tool_call_id,
+                    name=function_name,
+                    content=json.dumps({"error": f"No handler for tool: {function_name}"}),
+                    success=False,
+                )
 
         # Parse arguments
         if isinstance(arguments, str):

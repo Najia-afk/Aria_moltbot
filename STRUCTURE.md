@@ -172,6 +172,34 @@ Aria_moltbot/
 │       ├── server.py
 │       └── README.md
 │
+├── aria_engine/                  # Async chat engine (v1.2)
+│   ├── __init__.py
+│   ├── __main__.py               # Engine CLI entrypoint
+│   ├── agent_pool.py             # Agent pool management
+│   ├── auto_session.py           # Auto-session title generation
+│   ├── chat_engine.py            # Core chat loop & LLM streaming
+│   ├── config.py                 # Engine configuration
+│   ├── config_loader.py          # Config file loader
+│   ├── context_manager.py        # Context window management
+│   ├── cross_session.py          # Cross-session memory
+│   ├── entrypoint.py             # HTTP server (FastAPI)
+│   ├── exceptions.py             # Engine exceptions
+│   ├── export.py                 # Session export
+│   ├── heartbeat.py              # Heartbeat scheduler
+│   ├── jsonl_io.py               # JSONL I/O utilities
+│   ├── llm_gateway.py            # LLM provider gateway
+│   ├── metrics.py                # Prometheus metrics
+│   ├── prompts.py                # PromptAssembler (soul/identity/tools)
+│   ├── roundtable.py             # Multi-agent roundtable
+│   ├── routing.py                # Agent routing & scoring
+│   ├── scheduler.py              # APScheduler 4.x cron system
+│   ├── session_isolation.py      # Session isolation
+│   ├── session_manager.py        # Session CRUD (ORM)
+│   ├── session_protection.py     # Rate limiting & input sanitization
+│   ├── streaming.py              # SSE streaming
+│   ├── thinking.py               # Thinking/reasoning extraction
+│   └── tool_registry.py          # Skill dispatch from engine
+│
 ├── src/                          # Application source
 │   ├── api/                      # FastAPI v3.0 backend
 │   │   ├── main.py               # App factory, middleware, routers
@@ -187,29 +215,40 @@ Aria_moltbot/
 │   │   │   └── versions/
 │   │   ├── db/                   # SQLAlchemy 2.0 ORM layer (v1.1)
 │   │   │   ├── __init__.py
-│   │   │   ├── models.py         # 20+ ORM models
-│   │   │   ├── session.py        # Async engine + sessionmaker
+│   │   │   ├── models.py         # 37 ORM models (aria_data + aria_engine schemas)
+│   │   │   ├── session.py        # Async engine + sessionmaker + schema bootstrap
 │   │   │   └── MODELS.md         # Model documentation
 │   │   ├── gql/                  # Strawberry GraphQL (v1.1)
 │   │   │   ├── __init__.py
 │   │   │   ├── schema.py         # GraphQL schema
 │   │   │   ├── types.py          # GraphQL type definitions
 │   │   │   └── resolvers.py      # Query resolvers
-│   │   └── routers/              # 17 REST routers
+│   │   └── routers/              # 28 REST routers
 │   │       ├── activities.py     # Activity log CRUD + stats
 │   │       ├── admin.py          # Admin operations
+│   │       ├── agents_crud.py    # Agent CRUD lifecycle (v1.2)
+│   │       ├── analysis.py       # Analysis endpoints
+│   │       ├── engine_agents.py   # Engine agent proxy (v1.2)
+│   │       ├── engine_agent_metrics.py # Agent performance metrics (v1.2)
+│   │       ├── engine_chat.py    # Engine chat proxy (v1.2)
+│   │       ├── engine_cron.py    # Cron/scheduler proxy (v1.2)
+│   │       ├── engine_sessions.py# Engine session proxy (v1.2)
 │   │       ├── goals.py          # Goal tracking + progress
 │   │       ├── health.py         # Liveness, readiness, service status
 │   │       ├── knowledge.py      # Knowledge graph entities
+│   │       ├── lessons.py        # Lessons learned
 │   │       ├── litellm.py        # LiteLLM proxy stats + spend
 │   │       ├── memories.py       # Long-term memory storage
 │   │       ├── models_config.py  # Dynamic model config from models.yaml
+│   │       ├── models_crud.py    # Model DB CRUD lifecycle (v1.2)
 │   │       ├── model_usage.py    # LLM usage metrics + cost tracking
 │   │       ├── operations.py     # Operational metrics
+│   │       ├── proposals.py      # Feature proposals
 │   │       ├── providers.py      # Model provider management
 │   │       ├── records.py        # General record management
 │   │       ├── security.py       # Security audit log + threats
 │   │       ├── sessions.py       # Session management + analytics
+│   │       ├── skills.py         # Skill registry endpoints (v1.2)
 │   │       ├── social.py         # Social posts + community
 │   │       ├── thoughts.py       # Thought stream + analysis
 │   │       └── working_memory.py # Working memory API (v1.1)
@@ -253,40 +292,49 @@ Aria_moltbot/
 ├── tasks/                        # Task documentation
 │   └── lessons.md
 │
-└── tests/                        # Pytest test suite
+└── tests/                        # Pytest test suite (462 tests)
     ├── __init__.py
-    ├── conftest.py               # Fixtures & configuration
-    ├── test_activity_logging.py  # @logged_method tests (v1.1)
-    ├── test_agents.py            # Agent unit tests
-    ├── test_agent_manager.py     # Agent manager tests (v1.1)
-    ├── test_cron_config.py       # Cron configuration tests
-    ├── test_diagnostics.py       # Self-diagnostic tests (v1.1)
-    ├── test_endpoints.py         # API endpoint tests
-    ├── test_imports.py           # Import validation
-    ├── test_integration.py       # Integration tests
-    ├── test_kernel.py            # Kernel layer tests (v1.1)
-    ├── test_logging.py           # Logging tests (v1.1)
-    ├── test_log_analysis.py      # Log analysis tests (v1.1)
-    ├── test_memory_deque.py      # Memory deque tests (v1.1)
-    ├── test_model_loader.py      # Model loader tests
-    ├── test_model_naming.py      # Model naming tests (v1.1)
-    ├── test_model_profiles.py    # Model profile tests
-    ├── test_model_refs.py        # Model reference tests (v1.1)
-    ├── test_pipeline.py          # Pipeline tests (v1.1)
-    ├── test_run_skill_catalog.py # Skill catalog tests (v1.1)
-    ├── test_sandbox.py           # Sandbox tests (v1.1)
-    ├── test_sandbox_skill.py     # Sandbox skill tests (v1.1)
+    ├── conftest.py               # Fixtures, DB health gate, API client
+    ├── test_activities.py        # Activity CRUD tests
+    ├── test_admin.py             # Admin endpoint tests
+    ├── test_advanced_memory.py   # Advanced memory tests
+    ├── test_agents_crud.py       # Agent CRUD lifecycle tests (v1.2)
+    ├── test_analysis.py          # Analysis endpoint tests
+    ├── test_architecture.py      # Architecture validation tests
+    ├── test_cross_entity.py      # Cross-entity integration tests
+    ├── test_engine_agents.py     # Engine agent proxy tests
+    ├── test_engine_chat.py       # Engine chat + messages tests (v1.2)
+    ├── test_engine_cron.py       # Engine cron/scheduler tests
+    ├── test_engine_internals.py  # Engine pure-function unit tests (v1.2)
+    ├── test_engine_sessions.py   # Engine session proxy tests
+    ├── test_goals.py             # Goal tracking tests
+    ├── test_graphql.py           # GraphQL schema tests
+    ├── test_health.py            # Health endpoint tests
+    ├── test_knowledge.py         # Knowledge graph tests
+    ├── test_lessons.py           # Lessons learned tests
+    ├── test_litellm.py           # LiteLLM proxy tests
+    ├── test_memories.py          # Memory CRUD tests
+    ├── test_models_config.py     # Model config tests
+    ├── test_models_crud.py       # Model DB CRUD lifecycle tests (v1.2)
+    ├── test_model_usage.py       # Model usage metric tests
+    ├── test_noise_filters.py     # Noise filter tests
+    ├── test_operations.py        # Operations endpoint tests
+    ├── test_proposals.py         # Proposal endpoint tests
+    ├── test_providers.py         # Provider endpoint tests
+    ├── test_records.py           # Record endpoint tests
     ├── test_security.py          # Security tests
-    ├── test_self_diagnostic.py   # Self-diagnostic tests (v1.1)
-    ├── test_session_manager.py   # Session manager tests (v1.1)
+    ├── test_security_middleware.py # Security middleware tests
+    ├── test_sessions.py          # Session management tests
     ├── test_skills.py            # Skill unit tests
-    ├── test_skill_naming.py      # Skill naming tests (v1.1)
-    ├── test_skill_persistence.py # Skill persistence tests (v1.1)
-    ├── test_social_platform.py   # Social platform tests
-    ├── test_system_prompt.py     # System prompt tests (v1.1)
-    ├── test_telegram_skill.py    # Telegram skill tests (v1.1)
+    ├── test_smoke.py             # Smoke tests
+    ├── test_social.py            # Social platform tests
+    ├── test_thoughts.py          # Thought stream tests
+    ├── test_validation.py        # Input validation tests
+    ├── test_websocket.py         # WebSocket tests
+    ├── test_web_routes.py        # Flask web route tests
     ├── test_working_memory.py    # Working memory tests (v1.1)
-    └── manual/                   # Manual test procedures
+    ├── integration/              # Integration test suite
+    └── unit/                     # Unit test suite
 ```
 
 ---
@@ -324,10 +372,11 @@ Aria_moltbot/
 ```
 init-scripts/
 ├── 00-create-litellm-db.sh     # Creates separate 'litellm' database
-└── 01-schema.sql               # Creates Aria's tables in 'aria_warehouse'
+├── 01-schema.sql               # Creates Aria's tables in 'aria_warehouse'
+└── 02-migrations.sql           # Schema migrations (v1.1)
 ```
 
-> **Why separate databases?** LiteLLM uses Prisma migrations that can drop tables not in its schema. Keeping Aria's tables in `aria_warehouse` and LiteLLM's in `litellm` prevents data loss.
+> **Schema layout:** One database `aria_warehouse` with two schemas — `aria_data` (26 domain tables) and `aria_engine` (11 infrastructure tables). LiteLLM uses a separate `litellm` database with its own Prisma-managed schema. All 37 ORM models have explicit `__table_args__ = {"schema": ...}` annotations. Zero raw SQL in production code.
 
 ---
 

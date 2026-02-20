@@ -13,12 +13,14 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import text, select, update, func, cast, and_, or_, not_
+from sqlalchemy.dialects.postgresql import JSONB as PG_JSONB
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from aria_engine.config import EngineConfig
 from aria_engine.exceptions import EngineError
 from aria_engine.session_manager import NativeSessionManager
+from db.models import EngineChatSession
 
 logger = logging.getLogger("aria.engine.auto_session")
 
@@ -274,39 +276,36 @@ class AutoSessionManager:
 
         async with self._db.begin() as conn:
             # Find idle sessions that aren't already ended
-            result = await conn.execute(
-                text("""
-                    SELECT s.session_id
-                    FROM aria_engine.chat_sessions s
-                    WHERE s.updated_at < :cutoff
-                      AND (
-                          s.metadata IS NULL
-                          OR NOT (s.metadata ? 'ended')
-                          OR s.metadata->>'ended' = 'false'
-                      )
-                      AND s.session_type = 'chat'
-                """),
-                {"cutoff": cutoff},
+            stmt = (
+                select(EngineChatSession.id)
+                .where(
+                    and_(
+                        EngineChatSession.updated_at < cutoff,
+                        or_(
+                            EngineChatSession.metadata_json.is_(None),
+                            not_(EngineChatSession.metadata_json.has_key("ended")),
+                            EngineChatSession.metadata_json["ended"].astext == "false",
+                        ),
+                        EngineChatSession.session_type == "chat",
+                    )
+                )
             )
+            result = await conn.execute(stmt)
             idle_ids = [row[0] for row in result.fetchall()]
 
             if idle_ids:
-                placeholders = ", ".join(
-                    f":s{i}" for i in range(len(idle_ids))
-                )
-                params = {
-                    f"s{i}": sid for i, sid in enumerate(idle_ids)
-                }
-
                 await conn.execute(
-                    text(f"""
-                        UPDATE aria_engine.chat_sessions
-                        SET metadata = COALESCE(metadata, '{{}}'::jsonb)
-                            || '{{"ended": true, "end_reason": "idle_timeout"}}'::jsonb,
-                            updated_at = NOW()
-                        WHERE session_id IN ({placeholders})
-                    """),
-                    params,
+                    update(EngineChatSession)
+                    .where(EngineChatSession.id.in_(idle_ids))
+                    .values(
+                        metadata_json=func.coalesce(
+                            EngineChatSession.metadata_json,
+                            cast("{}", PG_JSONB),
+                        ).op("||")(
+                            cast({"ended": True, "end_reason": "idle_timeout"}, PG_JSONB)
+                        ),
+                        updated_at=func.now(),
+                    )
                 )
 
         if idle_ids:

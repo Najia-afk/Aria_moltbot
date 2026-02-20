@@ -20,12 +20,15 @@ def create_app():
 
     # Internal API service URL (Docker network or localhost fallback)
     _api_internal_url = os.environ.get('API_INTERNAL_URL', 'http://aria-api:8000')
+    # WebSocket base URL (browser-accessible) — used for WS chat connections
+    _ws_base_url = os.environ.get('WS_BASE_URL', '')
 
     @app.context_processor
     def inject_config():
         return {
             'service_host': service_host,
             'api_base_url': api_base_url,
+            'ws_base_url': _ws_base_url,
             # REMOVED: legacy bot proxy config
         }
     
@@ -137,6 +140,16 @@ def create_app():
     @app.route('/models')
     def models():
         return render_template('models.html')
+
+    @app.route('/models/manager')
+    @app.route('/model-manager')
+    def models_manager():
+        return render_template('models_manager.html')
+
+    @app.route('/agents/manager')
+    @app.route('/agent-manager')
+    def agent_manager():
+        return render_template('agent_manager.html')
 
     @app.route('/wallets')
     def wallets():

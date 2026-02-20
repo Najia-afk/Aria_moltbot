@@ -167,6 +167,11 @@ def _get_config() -> EngineConfig:
     return _engine_config
 
 
+def _get_prompt_assembler() -> PromptAssembler | None:
+    """Dependency: get PromptAssembler instance (may be None if init failed)."""
+    return _prompt_assembler
+
+
 # ── REST Endpoints ───────────────────────────────────────────────────────────
 
 
@@ -174,18 +179,40 @@ def _get_config() -> EngineConfig:
 async def create_session(
     body: CreateSessionRequest,
     engine: ChatEngine = Depends(_get_engine),
+    assembler: PromptAssembler | None = Depends(_get_prompt_assembler),
 ):
     """
     Create a new chat session.
 
-    Returns the created session with its UUID.
+    If no system_prompt is provided, assembles one from Aria's soul files
+    (IDENTITY.md + SOUL.md), agent-specific prompt, and active goals.
     """
     try:
+        # Assemble system prompt from soul files if caller didn't provide one
+        system_prompt = body.system_prompt
+        if not system_prompt and assembler is not None:
+            try:
+                try:
+                    from .db import AsyncSessionLocal
+                except ImportError:
+                    from db import AsyncSessionLocal
+                assembled = await assembler.assemble_for_session(
+                    agent_id=body.agent_id or "main",
+                    db_session_factory=AsyncSessionLocal,
+                )
+                system_prompt = str(assembled)
+                logger.info(
+                    "Assembled system prompt for agent=%s: %d chars, sections=%s",
+                    body.agent_id, assembled.total_chars, assembled.sections,
+                )
+            except Exception as pe:
+                logger.warning("Prompt assembly failed (using None): %s", pe)
+
         session = await engine.create_session(
             agent_id=body.agent_id,
             model=body.model,
             session_type=body.session_type,
-            system_prompt=body.system_prompt,
+            system_prompt=system_prompt,
             temperature=body.temperature,
             max_tokens=body.max_tokens,
             context_window=body.context_window,
@@ -306,6 +333,27 @@ async def get_session(
         raise HTTPException(status_code=404, detail=str(e))
 
 
+@router.get("/sessions/{session_id}/messages")
+async def get_session_messages(
+    session_id: str,
+    engine: ChatEngine = Depends(_get_engine),
+):
+    """
+    Get all messages for a session (used by the chat UI to load history).
+
+    Returns ``{"messages": [...]}`` with each message containing role, content,
+    thinking, tool_calls, model, and timestamp fields.
+    """
+    from aria_engine.exceptions import SessionError
+
+    try:
+        session = await engine.resume_session(session_id)
+        messages = session.get("messages", [])
+        return {"messages": messages}
+    except SessionError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
 @router.post("/sessions/{session_id}/messages", response_model=SendMessageResponse)
 async def send_message(
     session_id: str,
@@ -391,7 +439,7 @@ async def export_session_endpoint(
             db_session_factory=engine._db_factory,
             config=config,
             format=format,
-            save_to_disk=True,
+            save_to_disk=False,
         )
 
         if format == "jsonl":

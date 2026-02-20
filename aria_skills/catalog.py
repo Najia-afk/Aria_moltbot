@@ -16,6 +16,7 @@ def generate_catalog(skills_dir: str = "aria_skills") -> dict:
             try:
                 with open(sj_path) as f:
                     sj = json.load(f)
+                has_handler = (skill_dir / "__init__.py").is_file()
                 catalog["skills"].append({
                     "name": sj.get("name", skill_dir.name),
                     "layer": sj.get("layer", 3),
@@ -24,7 +25,7 @@ def generate_catalog(skills_dir: str = "aria_skills") -> dict:
                     "tools": [t["name"] for t in sj.get("tools", [])],
                     "focus_affinity": sj.get("focus_affinity", []),
                     "dependencies": sj.get("dependencies", []),
-                    "status": "active",
+                    "status": "active" if has_handler else "planned",
                 })
             except (json.JSONDecodeError, KeyError) as e:
                 catalog["skills"].append({

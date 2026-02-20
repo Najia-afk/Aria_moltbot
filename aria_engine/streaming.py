@@ -104,7 +104,19 @@ class StreamManager:
         4. Listen for messages and stream responses
         5. Clean up on disconnect
         """
+        try:
+            await self._validate_session(session_id)
+        except SessionError as e:
+            logger.info("Rejected websocket for invalid session %s: %s", session_id, e)
+            await websocket.close()
+            return
+        except (ValueError, TypeError) as e:
+            logger.info("Rejected websocket for malformed session id %s: %s", session_id, e)
+            await websocket.close()
+            return
+
         await websocket.accept()
+
         connection_id = f"{session_id}:{uuid.uuid4().hex[:8]}"
         self._active_connections[connection_id] = websocket
 
@@ -116,9 +128,6 @@ class StreamManager:
         )
 
         try:
-            # Validate session
-            await self._validate_session(session_id)
-
             # Listen for messages
             while True:
                 try:

@@ -252,6 +252,9 @@
                             <a href="/heartbeat" class="{% if '/heartbeat' in request.path %}active{% endif %}">
                                 💓 Heartbeat
                             </a>
+                            <a href="/agent-manager" class="{% if '/agent-manager' in request.path %}active{% endif %}">
+                                🤖 Agent Manager
+                            </a>
                             <a href="/sessions" class="{% if '/sessions' in request.path %}active{% endif %}">
                                 💬 Sessions
                             </a>
@@ -269,7 +272,7 @@
 
                     <!-- Models Dropdown -->
                     <div class="nav-dropdown">
-                        <button class="nav-dropdown-toggle {% if '/models' in request.path or '/model-usage' in request.path or '/rate-limits' in request.path %}active{% endif %}">
+                        <button class="nav-dropdown-toggle {% if '/models' in request.path or '/model-usage' in request.path or '/rate-limits' in request.path or '/model-manager' in request.path %}active{% endif %}">
                             <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
                                 <path d="M4 11a1 1 0 1 1 2 0v1a1 1 0 1 1-2 0v-1zm6-4a1 1 0 1 1 2 0v5a1 1 0 1 1-2 0V7zM7 9a1 1 0 0 1 2 0v3a1 1 0 1 1-2 0V9z"/>
                                 <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/>
@@ -282,6 +285,9 @@
                         <div class="nav-dropdown-menu">
                             <a href="/models" class="{% if '/models' == request.path %}active{% endif %}">
                                 🤖 Models & Pricing
+                            </a>
+                            <a href="/model-manager" class="{% if '/model-manager' in request.path %}active{% endif %}">
+                                ⚙️ Model Manager
                             </a>
                             <a href="/model-usage" class="{% if '/model-usage' in request.path %}active{% endif %}">
                                 📊 Model Usage

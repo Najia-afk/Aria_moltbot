@@ -1558,17 +1558,43 @@
     }
 
     // ── WebSocket ───────────────────────────────────────────────
+    let wsAttempts = 0;
+
+    function buildWsUrls(sid) {
+        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const urls = [];
+
+        // Priority 1: explicitly configured WS base URL
+        const configured = '{{ ws_base_url }}'.trim();
+        if (configured) urls.push(`${proto}//${configured}/ws/chat/${sid}`);
+
+        // Priority 2: same host (works when accessed via Traefik)
+        urls.push(`${proto}//${location.host}/ws/chat/${sid}`);
+
+        // Priority 3: API direct on port 8000 (fallback for Flask direct access)
+        if (location.port !== '8000') {
+            urls.push(`${proto}//${location.hostname}:8000/ws/chat/${sid}`);
+        }
+
+        // Deduplicate
+        return [...new Set(urls)];
+    }
+
     function connectWS() {
         if (ws && ws.readyState <= 1) return;
         if (!sessionId) return;
 
-        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const url = `${proto}//${location.host}/ws/chat/${sessionId}`;
+        const urls = buildWsUrls(sessionId);
+        const urlIdx = wsAttempts % urls.length;
+        const url = urls[urlIdx];
+
         setStatus('connecting');
+        console.log(`WebSocket connecting (attempt ${wsAttempts + 1}):`, url);
 
         ws = new WebSocket(url);
 
         ws.onopen = () => {
+            wsAttempts = 0;  // reset on successful connection
             setStatus('connected');
             console.log('WebSocket connected to session:', sessionId);
         };
@@ -1581,8 +1607,13 @@
         ws.onclose = (e) => {
             setStatus('disconnected');
             console.log('WebSocket closed:', e.code, e.reason);
+            wsAttempts++;
             if (sessionId) {
-                setTimeout(() => connectWS(), 3000);
+                // Quick retry (1s) when cycling through fallback URLs,
+                // slower retry (3s) once all URLs have been tried
+                const urls = buildWsUrls(sessionId);
+                const delay = wsAttempts < urls.length ? 1000 : 3000;
+                setTimeout(() => connectWS(), delay);
             }
         };
 

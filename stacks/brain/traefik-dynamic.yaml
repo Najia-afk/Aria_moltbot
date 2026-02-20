@@ -32,6 +32,15 @@ http:
         - api-strip
         - secure-headers
 
+    ws-http:
+      rule: "PathPrefix(`/ws`)"
+      priority: 100
+      entryPoints:
+        - web
+      service: aria-api
+      middlewares:
+        - secure-headers-ws
+
     grafana-http:
       rule: "PathPrefix(`/grafana`)"
       priority: 80
@@ -104,6 +113,16 @@ http:
       middlewares:
         - api-strip
         - secure-headers
+      tls: {}
+
+    ws:
+      rule: "PathPrefix(`/ws`)"
+      priority: 100
+      entryPoints:
+        - websecure
+      service: aria-api
+      middlewares:
+        - secure-headers-ws
       tls: {}
 
     grafana:

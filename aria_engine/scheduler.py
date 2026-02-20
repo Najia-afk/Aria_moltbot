@@ -21,11 +21,12 @@ from apscheduler import AsyncScheduler
 from apscheduler.datastores.sqlalchemy import SQLAlchemyDataStore
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from sqlalchemy import text, select, insert, update, delete, func
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine, async_sessionmaker
 
 from aria_engine.config import EngineConfig
 from aria_engine.exceptions import SchedulerError
+from db.models import EngineCronJob, ActivityLog
 
 logger = logging.getLogger("aria.engine.scheduler")
 
@@ -34,6 +35,35 @@ MAX_CONCURRENT_JOBS = 5
 
 # Retry backoff cap (seconds)
 MAX_BACKOFF_SECONDS = 600
+
+# Module-level reference to the active EngineScheduler instance.
+# Required because APScheduler 4.x serializes task references and cannot
+# handle bound methods — only module-level callables.
+_active_scheduler: "EngineScheduler | None" = None
+
+
+async def _scheduler_dispatch(
+    job_id: str,
+    agent_id: str,
+    payload_type: str,
+    payload: str,
+    session_mode: str,
+    max_duration: int,
+    retry_count: int,
+) -> None:
+    """Module-level trampoline that APScheduler can serialize."""
+    if _active_scheduler is None:
+        logger.error("Scheduler dispatch called but no active scheduler")
+        return
+    await _active_scheduler._execute_job(
+        job_id=job_id,
+        agent_id=agent_id,
+        payload_type=payload_type,
+        payload=payload,
+        session_mode=session_mode,
+        max_duration=max_duration,
+        retry_count=retry_count,
+    )
 
 
 def parse_schedule(schedule_str: str) -> CronTrigger | IntervalTrigger:
@@ -143,16 +173,21 @@ class EngineScheduler:
 
         logger.info("Starting EngineScheduler...")
 
+        global _active_scheduler
+
         # Create APScheduler with PostgreSQL data store
         data_store = SQLAlchemyDataStore(self._db_engine)
         self._scheduler = AsyncScheduler(data_store=data_store)
 
+        # Start the scheduler FIRST (enters async context manager)
+        # so that add_schedule() calls in _load_jobs_from_db() work
+        await self._scheduler.__aenter__()
+        self._running = True
+        _active_scheduler = self
+
         # Load and register all enabled jobs from the DB
         await self._load_jobs_from_db()
 
-        # Start the scheduler
-        await self._scheduler.__aenter__()
-        self._running = True
         logger.info("EngineScheduler started — jobs loaded and scheduled")
 
     async def stop(self) -> None:
@@ -160,8 +195,10 @@ class EngineScheduler:
         if not self._running:
             return
 
+        global _active_scheduler
         logger.info("Stopping EngineScheduler...")
         self._running = False
+        _active_scheduler = None
 
         # Cancel active executions
         for job_id, task in list(self._active_executions.items()):
@@ -185,40 +222,36 @@ class EngineScheduler:
     async def _load_jobs_from_db(self) -> None:
         """Load all enabled cron jobs from aria_engine.cron_jobs and register them."""
         async with self._db_engine.begin() as conn:
-            result = await conn.execute(
-                text("""
-                    SELECT id, name, schedule, agent_id, enabled,
-                           payload_type, payload, session_mode,
-                           max_duration_seconds, retry_count, metadata
-                    FROM aria_engine.cron_jobs
-                    WHERE enabled = true
-                    ORDER BY name
-                """)
+            stmt = (
+                select(EngineCronJob)
+                .where(EngineCronJob.enabled == True)
+                .order_by(EngineCronJob.name)
             )
-            rows = result.mappings().all()
+            result = await conn.execute(stmt)
+            rows = result.scalars().all()
 
         registered = 0
         for row in rows:
             try:
-                trigger = parse_schedule(row["schedule"])
+                trigger = parse_schedule(row.schedule)
                 await self._scheduler.add_schedule(
-                    self._execute_job,
+                    _scheduler_dispatch,
                     trigger=trigger,
-                    id=row["id"],
+                    id=row.id,
                     kwargs={
-                        "job_id": row["id"],
-                        "agent_id": row["agent_id"],
-                        "payload_type": row["payload_type"],
-                        "payload": row["payload"],
-                        "session_mode": row["session_mode"],
-                        "max_duration": row["max_duration_seconds"],
-                        "retry_count": row["retry_count"],
+                        "job_id": row.id,
+                        "agent_id": row.agent_id,
+                        "payload_type": row.payload_type,
+                        "payload": row.payload,
+                        "session_mode": row.session_mode,
+                        "max_duration": row.max_duration_seconds,
+                        "retry_count": row.retry_count,
                     },
                 )
                 registered += 1
-                logger.debug("Registered job: %s (%s)", row["name"], row["schedule"])
+                logger.debug("Registered job: %s (%s)", row.name, row.schedule)
             except Exception as e:
-                logger.error("Failed to register job %s: %s", row["id"], e)
+                logger.error("Failed to register job %s: %s", row.id, e, exc_info=True)
 
         logger.info("Loaded %d/%d enabled cron jobs", registered, len(rows))
 
@@ -384,36 +417,31 @@ class EngineScheduler:
         increment_fail: bool = False,
     ) -> None:
         """Update job execution state in the database."""
-        set_clauses = ["updated_at = NOW()"]
-        params: dict[str, Any] = {"job_id": job_id}
+        values: dict[str, Any] = {"updated_at": func.now()}
 
         if status is not None:
-            set_clauses.append("last_status = :status")
-            params["status"] = status
+            values["last_status"] = status
         if last_run_at is not None:
-            set_clauses.append("last_run_at = :last_run_at")
-            params["last_run_at"] = last_run_at
+            values["last_run_at"] = last_run_at
         if last_duration_ms is not None:
-            set_clauses.append("last_duration_ms = :last_duration_ms")
-            params["last_duration_ms"] = last_duration_ms
+            values["last_duration_ms"] = last_duration_ms
         if last_error is not None:
-            set_clauses.append("last_error = :last_error")
-            params["last_error"] = last_error
+            values["last_error"] = last_error
         if increment_success:
-            set_clauses.append("run_count = run_count + 1")
-            set_clauses.append("success_count = success_count + 1")
+            values["run_count"] = EngineCronJob.run_count + 1
+            values["success_count"] = EngineCronJob.success_count + 1
         if increment_fail:
-            set_clauses.append("run_count = run_count + 1")
-            set_clauses.append("fail_count = fail_count + 1")
+            values["run_count"] = EngineCronJob.run_count + 1
+            values["fail_count"] = EngineCronJob.fail_count + 1
 
-        query = f"""
-            UPDATE aria_engine.cron_jobs
-            SET {', '.join(set_clauses)}
-            WHERE id = :job_id
-        """
+        stmt = (
+            update(EngineCronJob)
+            .where(EngineCronJob.id == job_id)
+            .values(**values)
+        )
 
         async with self._db_engine.begin() as conn:
-            await conn.execute(text(query), params)
+            await conn.execute(stmt)
 
     # ── Public management API ────────────────────────────────────────
 
@@ -431,34 +459,25 @@ class EngineScheduler:
         job_id = job_data.get("id") or str(uuid4())
 
         async with self._db_engine.begin() as conn:
-            await conn.execute(
-                text("""
-                    INSERT INTO aria_engine.cron_jobs
-                        (id, name, schedule, agent_id, enabled, payload_type,
-                         payload, session_mode, max_duration_seconds, retry_count)
-                    VALUES
-                        (:id, :name, :schedule, :agent_id, :enabled, :payload_type,
-                         :payload, :session_mode, :max_duration, :retry_count)
-                """),
-                {
-                    "id": job_id,
-                    "name": job_data["name"],
-                    "schedule": job_data["schedule"],
-                    "agent_id": job_data.get("agent_id", "main"),
-                    "enabled": job_data.get("enabled", True),
-                    "payload_type": job_data.get("payload_type", "prompt"),
-                    "payload": job_data["payload"],
-                    "session_mode": job_data.get("session_mode", "isolated"),
-                    "max_duration": job_data.get("max_duration_seconds", 300),
-                    "retry_count": job_data.get("retry_count", 0),
-                },
+            stmt = insert(EngineCronJob).values(
+                id=job_id,
+                name=job_data["name"],
+                schedule=job_data["schedule"],
+                agent_id=job_data.get("agent_id", "main"),
+                enabled=job_data.get("enabled", True),
+                payload_type=job_data.get("payload_type", "prompt"),
+                payload=job_data["payload"],
+                session_mode=job_data.get("session_mode", "isolated"),
+                max_duration_seconds=job_data.get("max_duration_seconds", 300),
+                retry_count=job_data.get("retry_count", 0),
             )
+            await conn.execute(stmt)
 
         # Register with APScheduler if enabled
         if job_data.get("enabled", True) and self._scheduler:
             trigger = parse_schedule(job_data["schedule"])
             await self._scheduler.add_schedule(
-                self._execute_job,
+                _scheduler_dispatch,
                 trigger=trigger,
                 id=job_id,
                 kwargs={
@@ -494,19 +513,16 @@ class EngineScheduler:
         if not filtered:
             return False
 
-        set_parts = [f"{k} = :{k}" for k in filtered]
-        set_parts.append("updated_at = NOW()")
-        filtered["job_id"] = job_id
+        filtered["updated_at"] = func.now()
+
+        stmt = (
+            update(EngineCronJob)
+            .where(EngineCronJob.id == job_id)
+            .values(**filtered)
+        )
 
         async with self._db_engine.begin() as conn:
-            result = await conn.execute(
-                text(f"""
-                    UPDATE aria_engine.cron_jobs
-                    SET {', '.join(set_parts)}
-                    WHERE id = :job_id
-                """),
-                filtered,
-            )
+            result = await conn.execute(stmt)
             if result.rowcount == 0:
                 return False
 
@@ -525,7 +541,7 @@ class EngineScheduler:
                 if job:
                     trigger = parse_schedule(job["schedule"])
                     await self._scheduler.add_schedule(
-                        self._execute_job,
+                        _scheduler_dispatch,
                         trigger=trigger,
                         id=job_id,
                         kwargs={
@@ -546,8 +562,8 @@ class EngineScheduler:
         """Remove a job from the database and APScheduler."""
         async with self._db_engine.begin() as conn:
             result = await conn.execute(
-                text("DELETE FROM aria_engine.cron_jobs WHERE id = :job_id"),
-                {"job_id": job_id},
+                delete(EngineCronJob)
+                .where(EngineCronJob.id == job_id)
             )
 
         if self._scheduler:
@@ -597,27 +613,51 @@ class EngineScheduler:
         """Get a single job by ID."""
         async with self._db_engine.begin() as conn:
             result = await conn.execute(
-                text("SELECT * FROM aria_engine.cron_jobs WHERE id = :job_id"),
-                {"job_id": job_id},
+                select(EngineCronJob)
+                .where(EngineCronJob.id == job_id)
             )
-            row = result.mappings().first()
-            return dict(row) if row else None
+            row = result.scalars().first()
+            if not row:
+                return None
+            return {
+                "id": row.id, "name": row.name, "schedule": row.schedule,
+                "agent_id": row.agent_id, "enabled": row.enabled,
+                "payload_type": row.payload_type, "payload": row.payload,
+                "session_mode": row.session_mode,
+                "max_duration_seconds": row.max_duration_seconds,
+                "retry_count": row.retry_count,
+                "last_run_at": row.last_run_at, "last_status": row.last_status,
+                "last_duration_ms": row.last_duration_ms,
+                "last_error": row.last_error, "next_run_at": row.next_run_at,
+                "run_count": row.run_count, "success_count": row.success_count,
+                "fail_count": row.fail_count,
+                "metadata": row.metadata_json,
+                "created_at": row.created_at, "updated_at": row.updated_at,
+            }
 
     async def list_jobs(self) -> list[dict[str, Any]]:
         """List all cron jobs with current state."""
         async with self._db_engine.begin() as conn:
             result = await conn.execute(
-                text("""
-                    SELECT id, name, schedule, agent_id, enabled,
-                           payload_type, session_mode, last_run_at,
-                           last_status, last_duration_ms, last_error,
-                           next_run_at, run_count, success_count, fail_count,
-                           created_at, updated_at
-                    FROM aria_engine.cron_jobs
-                    ORDER BY name
-                """)
+                select(EngineCronJob).order_by(EngineCronJob.name)
             )
-            return [dict(row) for row in result.mappings().all()]
+            rows = result.scalars().all()
+
+        return [
+            {
+                "id": r.id, "name": r.name, "schedule": r.schedule,
+                "agent_id": r.agent_id, "enabled": r.enabled,
+                "payload_type": r.payload_type,
+                "session_mode": r.session_mode,
+                "last_run_at": r.last_run_at, "last_status": r.last_status,
+                "last_duration_ms": r.last_duration_ms,
+                "last_error": r.last_error, "next_run_at": r.next_run_at,
+                "run_count": r.run_count, "success_count": r.success_count,
+                "fail_count": r.fail_count,
+                "created_at": r.created_at, "updated_at": r.updated_at,
+            }
+            for r in rows
+        ]
 
     async def get_job_history(
         self, job_id: str, limit: int = 50
@@ -628,20 +668,28 @@ class EngineScheduler:
         Cron job executions are logged as activities with
         action='cron_execution' and details.job=<job_id>.
         """
-        async with self._db_engine.begin() as conn:
-            result = await conn.execute(
-                text("""
-                    SELECT id, action, skill, details, success,
-                           created_at, duration_ms
-                    FROM activity_log
-                    WHERE action = 'cron_execution'
-                      AND details->>'job' = :job_id
-                    ORDER BY created_at DESC
-                    LIMIT :limit
-                """),
-                {"job_id": job_id, "limit": limit},
+        stmt = (
+            select(ActivityLog)
+            .where(
+                ActivityLog.action == "cron_execution",
+                ActivityLog.details["job"].astext == job_id,
             )
-            return [dict(row) for row in result.mappings().all()]
+            .order_by(ActivityLog.created_at.desc())
+            .limit(limit)
+        )
+
+        async with self._db_engine.begin() as conn:
+            result = await conn.execute(stmt)
+            rows = result.scalars().all()
+
+        return [
+            {
+                "id": str(r.id), "action": r.action, "skill": r.skill,
+                "details": r.details, "success": r.success,
+                "created_at": r.created_at, "duration_ms": (r.details or {}).get("duration_ms"),
+            }
+            for r in rows
+        ]
 
     @property
     def is_running(self) -> bool:

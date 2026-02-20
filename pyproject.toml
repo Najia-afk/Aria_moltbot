@@ -90,7 +90,6 @@ addopts = [
     "-ra",
     "-q",
     "--strict-markers",
-    "--asyncio-mode=auto",
 ]
 testpaths = ["tests"]
 pythonpath = ["."]

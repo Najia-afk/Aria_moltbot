@@ -6,6 +6,7 @@ ORM:    SQLAlchemy 2.0 async
 """
 
 import logging
+import os
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -23,14 +24,23 @@ logger = logging.getLogger("aria.db")
 # ── URL helpers ──────────────────────────────────────────────────────────────
 
 def _as_psycopg_url(url: str) -> str:
-    """Convert any PostgreSQL URL to the psycopg3 async dialect."""
+    """Convert any PostgreSQL URL to the runtime async dialect.
+
+    Windows: asyncpg (psycopg async has Proactor loop limitations)
+    Others:  psycopg
+    """
+    target_prefix = (
+        "postgresql+asyncpg://"
+        if os.name == "nt"
+        else "postgresql+psycopg://"
+    )
     for prefix in (
         "postgresql+psycopg://",
         "postgresql+asyncpg://",
         "postgresql://",
     ):
         if url.startswith(prefix):
-            return url.replace(prefix, "postgresql+psycopg://", 1)
+            return url.replace(prefix, target_prefix, 1)
     return url
 
 
@@ -92,6 +102,14 @@ async def ensure_schema() -> None:
     then creates each table individually so one failure doesn't cascade.
     """
     async with async_engine.begin() as conn:
+        # Create named schemas — nothing in public
+        for schema_name in ("aria_data", "aria_engine"):
+            try:
+                await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema_name}"))
+                logger.info("Schema '%s' ensured", schema_name)
+            except Exception as e:
+                logger.warning("Could not create %s schema: %s", schema_name, e)
+
         # Extensions — pgvector MUST be installed before SemanticMemory table
         for ext in ("uuid-ossp", "pg_trgm", "vector"):
             try:
@@ -116,6 +134,15 @@ async def ensure_schema() -> None:
             # (table, column, type_sql, default)
             ("sentiment_events", "speaker", "VARCHAR(20)", None),
             ("sentiment_events", "agent_id", "VARCHAR(100)", None),
+            # Agent state new columns for agent management
+            ("aria_engine.agent_state", "agent_type", "VARCHAR(30)", "'agent'"),
+            ("aria_engine.agent_state", "parent_agent_id", "VARCHAR(100)", None),
+            ("aria_engine.agent_state", "fallback_model", "VARCHAR(200)", None),
+            ("aria_engine.agent_state", "enabled", "BOOLEAN", "true"),
+            ("aria_engine.agent_state", "skills", "JSONB", "'[]'::jsonb"),
+            ("aria_engine.agent_state", "capabilities", "JSONB", "'[]'::jsonb"),
+            ("aria_engine.agent_state", "timeout_seconds", "INTEGER", "600"),
+            ("aria_engine.agent_state", "rate_limit", "JSONB", "'{}'::jsonb"),
         ]
         for tbl, col, col_type, default in _column_migrations:
             try:
@@ -126,6 +153,46 @@ async def ensure_schema() -> None:
                 logger.info("Column '%s.%s' ensured", tbl, col)
             except Exception as e:
                 logger.warning("Column migration '%s.%s' failed: %s", tbl, col, e)
+
+        # ── Migrate data from public.engine_* to aria_engine.* ─────────
+        # One-time migration for existing deployments that had data in
+        # the old public-schema tables before we moved to aria_engine.
+        _migration_pairs = [
+            ("engine_cron_jobs",      "aria_engine.cron_jobs"),
+            ("engine_agent_state",    "aria_engine.agent_state"),
+            ("engine_config",         "aria_engine.config"),
+            ("engine_agent_tools",    "aria_engine.agent_tools"),
+            ("engine_chat_sessions",  "aria_engine.chat_sessions"),
+            ("engine_chat_messages",  "aria_engine.chat_messages"),
+        ]
+        for old_tbl, new_tbl in _migration_pairs:
+            try:
+                # Check if old table exists and has rows
+                check = await conn.execute(text(
+                    f"SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+                    f"WHERE table_schema='public' AND table_name='{old_tbl}')"
+                ))
+                if not check.scalar():
+                    continue
+                cnt = await conn.execute(text(f"SELECT count(*) FROM public.{old_tbl}"))
+                row_count = cnt.scalar()
+                if row_count == 0:
+                    continue
+                # Copy rows that don't already exist in the target
+                # Use ON CONFLICT DO NOTHING to be idempotent
+                pk_check = await conn.execute(text(
+                    f"SELECT column_name FROM information_schema.key_column_usage "
+                    f"WHERE table_schema='aria_engine' AND table_name='{new_tbl.split('.')[-1]}' "
+                    f"AND constraint_name LIKE '%pkey'"
+                ))
+                pk_col = pk_check.scalar() or "id"
+                await conn.execute(text(
+                    f"INSERT INTO {new_tbl} SELECT * FROM public.{old_tbl} "
+                    f"ON CONFLICT ({pk_col}) DO NOTHING"
+                ))
+                logger.info("Migrated %d rows from public.%s → %s", row_count, old_tbl, new_tbl)
+            except Exception as e:
+                logger.warning("Migration public.%s → %s failed: %s", old_tbl, new_tbl, e)
 
         # ── Backfill speaker/agent_id from session_messages ──────────
         try:
@@ -160,9 +227,10 @@ async def check_database_health() -> dict:
     """Return database health info: existing tables, missing tables, extensions."""
     expected_tables = {t.name for t in Base.metadata.sorted_tables}
     async with async_engine.connect() as conn:
-        # Existing tables
+        # Existing tables across both schemas
         result = await conn.execute(text(
-            "SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname = 'public'"
+            "SELECT tablename FROM pg_catalog.pg_tables "
+            "WHERE schemaname IN ('aria_data', 'aria_engine')"
         ))
         existing_tables = {row[0] for row in result.all()}
 

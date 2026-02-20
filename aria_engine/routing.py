@@ -14,8 +14,9 @@ import re
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import text, select, update
 from sqlalchemy.ext.asyncio import AsyncEngine
+from db.models import EngineAgentState
 
 from aria_engine.config import EngineConfig
 from aria_engine.exceptions import EngineError
@@ -276,6 +277,56 @@ class EngineRouter:
 
         return best
 
+    async def get_fallback_chain(
+        self,
+        agent_id: str,
+    ) -> list[dict[str, str]]:
+        """
+        Build a fallback chain for an agent: primary → fallback_model → parent.
+
+        Returns a list of dicts with 'agent_id' and 'model' keys, ordered
+        from primary to last-resort parent. Used by ChatEngine when the
+        primary model returns an error.
+
+        Example chain:
+            [
+                {"agent_id": "analyst", "model": "deepseek-free"},       # primary
+                {"agent_id": "analyst", "model": "qwen3-next-free"},     # fallback_model
+                {"agent_id": "aria",    "model": "qwen3-mlx"},           # parent
+            ]
+        """
+        chain: list[dict[str, str]] = []
+        visited: set[str] = set()
+
+        current_id = agent_id
+        while current_id and current_id not in visited:
+            visited.add(current_id)
+            state = await self._load_agent_states([current_id])
+            info = state.get(current_id)
+            if info is None:
+                break
+
+            model = info.get("model", "")
+            fallback = info.get("fallback_model")
+            parent_id = info.get("parent_agent_id")
+
+            # Step 1: Primary model
+            if model:
+                chain.append({"agent_id": current_id, "model": model})
+
+            # Step 2: Fallback model on the same agent
+            if fallback and fallback != model:
+                chain.append({"agent_id": current_id, "model": fallback})
+
+            # Move to parent agent for the next iteration
+            current_id = parent_id
+
+        if not chain:
+            chain.append({"agent_id": agent_id, "model": ""})
+
+        logger.debug("Fallback chain for %s: %s", agent_id, chain)
+        return chain
+
     async def update_scores(
         self,
         agent_id: str,
@@ -346,23 +397,34 @@ class EngineRouter:
         if not agent_ids:
             return {}
 
-        placeholders = ", ".join(f":a{i}" for i in range(len(agent_ids)))
-        params = {f"a{i}": aid for i, aid in enumerate(agent_ids)}
-
         async with self._db_engine.begin() as conn:
             result = await conn.execute(
-                text(f"""
-                    SELECT agent_id, focus_type, status,
-                           consecutive_failures, pheromone_score,
-                           last_active_at
-                    FROM aria_engine.agent_state
-                    WHERE agent_id IN ({placeholders})
-                """),
-                params,
+                select(EngineAgentState)
+                .where(
+                    EngineAgentState.agent_id.in_(agent_ids),
+                    EngineAgentState.enabled == True,
+                )
             )
-            rows = result.mappings().all()
+            rows = result.scalars().all()
 
-        return {row["agent_id"]: dict(row) for row in rows}
+        return {
+            row.agent_id: {
+                "agent_id": row.agent_id,
+                "agent_type": row.agent_type,
+                "focus_type": row.focus_type,
+                "model": row.model,
+                "fallback_model": row.fallback_model,
+                "parent_agent_id": row.parent_agent_id,
+                "status": row.status,
+                "enabled": row.enabled,
+                "skills": row.skills,
+                "capabilities": row.capabilities,
+                "consecutive_failures": row.consecutive_failures,
+                "pheromone_score": row.pheromone_score,
+                "last_active_at": row.last_active_at,
+            }
+            for row in rows
+        }
 
     async def _persist_score(
         self,
@@ -372,33 +434,30 @@ class EngineRouter:
         """Persist pheromone score to agent_state table."""
         async with self._db_engine.begin() as conn:
             await conn.execute(
-                text("""
-                    UPDATE aria_engine.agent_state
-                    SET pheromone_score = :score,
-                        updated_at = NOW()
-                    WHERE agent_id = :agent_id
-                """),
-                {"agent_id": agent_id, "score": round(score, 3)},
+                update(EngineAgentState)
+                .where(EngineAgentState.agent_id == agent_id)
+                .values(
+                    pheromone_score=round(score, 3),
+                    updated_at=text("NOW()"),
+                )
             )
 
     async def get_routing_table(self) -> list[dict[str, Any]]:
         """Get current routing table with all agent scores and stats."""
         async with self._db_engine.begin() as conn:
             result = await conn.execute(
-                text("""
-                    SELECT agent_id, display_name, focus_type, status,
-                           pheromone_score, consecutive_failures,
-                           last_active_at
-                    FROM aria_engine.agent_state
-                    WHERE status != 'disabled'
-                    ORDER BY pheromone_score DESC
-                """)
+                select(EngineAgentState)
+                .where(
+                    EngineAgentState.status != "disabled",
+                    EngineAgentState.enabled == True,
+                )
+                .order_by(EngineAgentState.pheromone_score.desc())
             )
-            rows = result.mappings().all()
+            rows = result.scalars().all()
 
         table = []
         for row in rows:
-            agent_id = row["agent_id"]
+            agent_id = row.agent_id
             records = self._records.get(agent_id, [])
             recent = records[-10:] if records else []
             success_rate = (
@@ -409,18 +468,21 @@ class EngineRouter:
 
             table.append({
                 "agent_id": agent_id,
-                "display_name": row["display_name"],
-                "focus_type": row["focus_type"],
-                "status": row["status"],
-                "pheromone_score": float(row["pheromone_score"] or 0.5),
-                "consecutive_failures": row["consecutive_failures"],
+                "display_name": row.display_name,
+                "agent_type": row.agent_type or "agent",
+                "focus_type": row.focus_type,
+                "status": row.status,
+                "skills": row.skills or [],
+                "capabilities": row.capabilities or [],
+                "pheromone_score": float(row.pheromone_score or 0.5),
+                "consecutive_failures": row.consecutive_failures,
                 "recent_success_rate": (
                     round(success_rate, 3) if success_rate is not None else None
                 ),
                 "total_records": len(records),
                 "last_active_at": (
-                    row["last_active_at"].isoformat()
-                    if row["last_active_at"]
+                    row.last_active_at.isoformat()
+                    if row.last_active_at
                     else None
                 ),
             })

@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 import litellm
-from sqlalchemy import text
+from sqlalchemy import select, update, exists, literal, func, or_
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from aria_engine.config import EngineConfig
@@ -177,56 +177,59 @@ class CrossSessionContext:
         exclude_session_id: str | None,
     ) -> list[dict[str, Any]]:
         """Search using pgvector cosine similarity."""
-        exclude_clause = ""
-        params: dict[str, Any] = {
-            "agent_id": agent_id,
-            "embedding": str(embedding),
-            "threshold": threshold,
-            "limit": max_results,
-        }
+        from db.models import EngineChatMessage, EngineChatSession
+
+        similarity = (
+            literal(1) - EngineChatMessage.embedding.cosine_distance(embedding)
+        ).label("similarity")
+
+        query = (
+            select(
+                EngineChatMessage.id,
+                EngineChatMessage.session_id,
+                EngineChatMessage.role,
+                EngineChatMessage.content,
+                EngineChatMessage.agent_id,
+                EngineChatMessage.created_at,
+                EngineChatSession.title.label("session_title"),
+                similarity,
+            )
+            .join(
+                EngineChatSession,
+                EngineChatSession.id == EngineChatMessage.session_id,
+            )
+            .where(
+                EngineChatMessage.agent_id == agent_id,
+                EngineChatMessage.embedding.isnot(None),
+                (literal(1) - EngineChatMessage.embedding.cosine_distance(embedding)) > threshold,
+            )
+        )
 
         if exclude_session_id:
-            exclude_clause = "AND m.session_id != :exclude_sid"
-            params["exclude_sid"] = exclude_session_id
+            query = query.where(
+                EngineChatMessage.session_id != exclude_session_id
+            )
+
+        query = (
+            query
+            .order_by(EngineChatMessage.embedding.cosine_distance(embedding))
+            .limit(max_results)
+        )
 
         async with self._db.begin() as conn:
-            result = await conn.execute(
-                text(f"""
-                    SELECT
-                        m.id,
-                        m.session_id,
-                        m.role,
-                        m.content,
-                        m.agent_id,
-                        m.created_at,
-                        s.title AS session_title,
-                        1 - (m.embedding <=> :embedding::vector)
-                            AS similarity
-                    FROM aria_engine.chat_messages m
-                    JOIN aria_engine.chat_sessions s
-                        ON s.session_id = m.session_id
-                    WHERE m.agent_id = :agent_id
-                      AND m.embedding IS NOT NULL
-                      AND 1 - (m.embedding <=> :embedding::vector)
-                          > :threshold
-                      {exclude_clause}
-                    ORDER BY m.embedding <=> :embedding::vector
-                    LIMIT :limit
-                """),
-                params,
-            )
-            rows = result.mappings().all()
+            result = await conn.execute(query)
+            rows = result.all()
 
         return [
             {
-                "id": row["id"],
-                "session_id": row["session_id"],
-                "session_title": row["session_title"],
-                "role": row["role"],
-                "content": row["content"],
-                "agent_id": row["agent_id"],
-                "similarity": round(float(row["similarity"]), 3),
-                "created_at": row["created_at"].isoformat(),
+                "id": row.id,
+                "session_id": row.session_id,
+                "session_title": row.session_title,
+                "role": row.role,
+                "content": row.content,
+                "agent_id": row.agent_id,
+                "similarity": round(float(row.similarity), 3),
+                "created_at": row.created_at.isoformat(),
             }
             for row in rows
         ]
@@ -239,6 +242,8 @@ class CrossSessionContext:
         exclude_session_id: str | None,
     ) -> list[dict[str, Any]]:
         """Fallback keyword search using ILIKE."""
+        from db.models import EngineChatMessage, EngineChatSession
+
         # Extract meaningful keywords
         keywords = [
             w
@@ -262,56 +267,52 @@ class CrossSessionContext:
             return []
 
         # Build OR conditions for each keyword
-        conditions = []
-        params: dict[str, Any] = {
-            "agent_id": agent_id,
-            "limit": max_results,
-        }
-        for i, kw in enumerate(keywords[:5]):  # Max 5 keywords
-            conditions.append(f"m.content ILIKE :kw{i}")
-            params[f"kw{i}"] = f"%{kw}%"
+        conditions = [
+            EngineChatMessage.content.ilike(f"%{kw}%")
+            for kw in keywords[:5]  # Max 5 keywords
+        ]
 
-        where_keywords = " OR ".join(conditions)
+        stmt = (
+            select(
+                EngineChatMessage.id,
+                EngineChatMessage.session_id,
+                EngineChatMessage.role,
+                EngineChatMessage.content,
+                EngineChatMessage.agent_id,
+                EngineChatMessage.created_at,
+                EngineChatSession.title.label("session_title"),
+            )
+            .join(
+                EngineChatSession,
+                EngineChatSession.id == EngineChatMessage.session_id,
+            )
+            .where(
+                EngineChatMessage.agent_id == agent_id,
+                or_(*conditions),
+            )
+        )
 
-        exclude_clause = ""
         if exclude_session_id:
-            exclude_clause = "AND m.session_id != :exclude_sid"
-            params["exclude_sid"] = exclude_session_id
+            stmt = stmt.where(
+                EngineChatMessage.session_id != exclude_session_id
+            )
+
+        stmt = stmt.order_by(EngineChatMessage.created_at.desc()).limit(max_results)
 
         async with self._db.begin() as conn:
-            result = await conn.execute(
-                text(f"""
-                    SELECT
-                        m.id,
-                        m.session_id,
-                        m.role,
-                        m.content,
-                        m.agent_id,
-                        m.created_at,
-                        s.title AS session_title
-                    FROM aria_engine.chat_messages m
-                    JOIN aria_engine.chat_sessions s
-                        ON s.session_id = m.session_id
-                    WHERE m.agent_id = :agent_id
-                      AND ({where_keywords})
-                      {exclude_clause}
-                    ORDER BY m.created_at DESC
-                    LIMIT :limit
-                """),
-                params,
-            )
-            rows = result.mappings().all()
+            result = await conn.execute(stmt)
+            rows = result.all()
 
         return [
             {
-                "id": row["id"],
-                "session_id": row["session_id"],
-                "session_title": row["session_title"],
-                "role": row["role"],
-                "content": row["content"],
-                "agent_id": row["agent_id"],
+                "id": row.id,
+                "session_id": row.session_id,
+                "session_title": row.session_title,
+                "role": row.role,
+                "content": row.content,
+                "agent_id": row.agent_id,
                 "similarity": None,  # Not available for keyword search
-                "created_at": row["created_at"].isoformat(),
+                "created_at": row.created_at.isoformat(),
             }
             for row in rows
         ]
@@ -329,33 +330,30 @@ class CrossSessionContext:
         Returns:
             True if embedding was stored successfully.
         """
+        from db.models import EngineChatMessage
+
         async with self._db.begin() as conn:
             result = await conn.execute(
-                text("""
-                    SELECT id, content
-                    FROM aria_engine.chat_messages
-                    WHERE id = :mid AND embedding IS NULL
-                """),
-                {"mid": message_id},
+                select(EngineChatMessage.id, EngineChatMessage.content).where(
+                    EngineChatMessage.id == message_id,
+                    EngineChatMessage.embedding.is_(None),
+                )
             )
-            row = result.mappings().first()
+            row = result.first()
 
         if not row:
             return False  # Already embedded or not found
 
         try:
-            embedding = await generate_embedding(row["content"])
+            emb = await generate_embedding(row.content)
         except EngineError:
             return False
 
         async with self._db.begin() as conn:
             await conn.execute(
-                text("""
-                    UPDATE aria_engine.chat_messages
-                    SET embedding = :emb::vector
-                    WHERE id = :mid
-                """),
-                {"mid": message_id, "emb": str(embedding)},
+                update(EngineChatMessage)
+                .where(EngineChatMessage.id == message_id)
+                .values(embedding=emb)
             )
 
         return True
@@ -379,26 +377,22 @@ class CrossSessionContext:
         Returns:
             Number of messages successfully embedded.
         """
-        agent_filter = ""
-        params: dict[str, Any] = {"limit": batch_size}
+        from db.models import EngineChatMessage
+
+        stmt = (
+            select(EngineChatMessage.id, EngineChatMessage.content)
+            .where(
+                EngineChatMessage.embedding.is_(None),
+                func.length(EngineChatMessage.content) > 20,
+            )
+        )
         if agent_id:
-            agent_filter = "AND agent_id = :agent_id"
-            params["agent_id"] = agent_id
+            stmt = stmt.where(EngineChatMessage.agent_id == agent_id)
+        stmt = stmt.order_by(EngineChatMessage.created_at.desc()).limit(batch_size)
 
         async with self._db.begin() as conn:
-            result = await conn.execute(
-                text(f"""
-                    SELECT id, content
-                    FROM aria_engine.chat_messages
-                    WHERE embedding IS NULL
-                      AND LENGTH(content) > 20
-                      {agent_filter}
-                    ORDER BY created_at DESC
-                    LIMIT :limit
-                """),
-                params,
-            )
-            rows = result.mappings().all()
+            result = await conn.execute(stmt)
+            rows = result.all()
 
         if not rows:
             return 0
@@ -406,20 +400,17 @@ class CrossSessionContext:
         embedded = 0
         for row in rows:
             try:
-                emb = await generate_embedding(row["content"])
+                emb = await generate_embedding(row.content)
                 async with self._db.begin() as conn:
                     await conn.execute(
-                        text("""
-                            UPDATE aria_engine.chat_messages
-                            SET embedding = :emb::vector
-                            WHERE id = :mid
-                        """),
-                        {"mid": row["id"], "emb": str(emb)},
+                        update(EngineChatMessage)
+                        .where(EngineChatMessage.id == row.id)
+                        .values(embedding=emb)
                     )
                 embedded += 1
             except Exception as e:
                 logger.warning(
-                    "Failed to embed message %d: %s", row["id"], e
+                    "Failed to embed message %d: %s", row.id, e
                 )
 
         logger.info(
@@ -433,17 +424,16 @@ class CrossSessionContext:
 
     async def _has_embeddings(self, agent_id: str) -> bool:
         """Check if any messages for this agent have embeddings."""
+        from db.models import EngineChatMessage
+
         async with self._db.begin() as conn:
             result = await conn.execute(
-                text("""
-                    SELECT EXISTS (
-                        SELECT 1 FROM aria_engine.chat_messages
-                        WHERE agent_id = :agent_id
-                          AND embedding IS NOT NULL
-                        LIMIT 1
-                    ) AS has_emb
-                """),
-                {"agent_id": agent_id},
+                select(
+                    exists().where(
+                        EngineChatMessage.agent_id == agent_id,
+                        EngineChatMessage.embedding.isnot(None),
+                    )
+                )
             )
             return result.scalar()
 

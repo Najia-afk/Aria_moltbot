@@ -17,11 +17,13 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Callable
 
-from sqlalchemy import text
+from sqlalchemy import text, select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from aria_engine.config import EngineConfig
 from aria_engine.exceptions import EngineError
+from db.models import EngineAgentState
 
 logger = logging.getLogger("aria.engine.agent_pool")
 
@@ -39,12 +41,20 @@ class EngineAgent:
 
     agent_id: str
     display_name: str = ""
+    agent_type: str = "agent"  # agent, sub_agent, sub_aria, swarm, focus
+    parent_agent_id: str | None = None
     model: str = ""
+    fallback_model: str | None = None
     temperature: float = 0.7
     max_tokens: int = 4096
     system_prompt: str = ""
     focus_type: str | None = None
     status: str = "idle"  # idle, busy, error, disabled
+    enabled: bool = True
+    skills: list[str] = field(default_factory=list)
+    capabilities: list[str] = field(default_factory=list)
+    timeout_seconds: int = 600
+    rate_limit: dict[str, Any] = field(default_factory=dict)
     current_session_id: str | None = None
     current_task: str | None = None
     pheromone_score: float = 0.500
@@ -137,9 +147,16 @@ class EngineAgent:
         return {
             "agent_id": self.agent_id,
             "display_name": self.display_name,
+            "agent_type": self.agent_type,
+            "parent_agent_id": self.parent_agent_id,
             "model": self.model,
+            "fallback_model": self.fallback_model,
             "status": self.status,
+            "enabled": self.enabled,
             "focus_type": self.focus_type,
+            "skills": self.skills,
+            "capabilities": self.capabilities,
+            "timeout_seconds": self.timeout_seconds,
             "current_session_id": self.current_session_id,
             "current_task": self.current_task,
             "pheromone_score": self.pheromone_score,
@@ -199,39 +216,44 @@ class AgentPool:
         """
         async with self._db_engine.begin() as conn:
             result = await conn.execute(
-                text("""
-                    SELECT agent_id, display_name, model, temperature,
-                           max_tokens, system_prompt, focus_type, status,
-                           current_session_id, pheromone_score,
-                           consecutive_failures, last_active_at, metadata
-                    FROM aria_engine.agent_state
-                    ORDER BY agent_id
-                """)
+                select(EngineAgentState)
+                .order_by(EngineAgentState.agent_id)
             )
-            rows = result.mappings().all()
+            rows = result.scalars().all()
 
         for row in rows:
+            is_enabled = row.enabled
+            if is_enabled is None:
+                is_enabled = True
             agent = EngineAgent(
-                agent_id=row["agent_id"],
-                display_name=row["display_name"] or row["agent_id"],
-                model=row["model"],
-                temperature=row["temperature"] or 0.7,
-                max_tokens=row["max_tokens"] or 4096,
-                system_prompt=row["system_prompt"] or "",
-                focus_type=row["focus_type"],
-                status=row["status"] or "idle",
+                agent_id=row.agent_id,
+                display_name=row.display_name or row.agent_id,
+                agent_type=row.agent_type or "agent",
+                parent_agent_id=row.parent_agent_id,
+                model=row.model,
+                fallback_model=row.fallback_model,
+                temperature=row.temperature or 0.7,
+                max_tokens=row.max_tokens or 4096,
+                system_prompt=row.system_prompt or "",
+                focus_type=row.focus_type,
+                status=row.status or "idle",
+                enabled=is_enabled,
+                skills=row.skills or [],
+                capabilities=row.capabilities or [],
+                timeout_seconds=row.timeout_seconds or 600,
+                rate_limit=row.rate_limit or {},
                 current_session_id=(
-                    str(row["current_session_id"])
-                    if row["current_session_id"]
+                    str(row.current_session_id)
+                    if row.current_session_id
                     else None
                 ),
-                pheromone_score=float(row["pheromone_score"] or 0.5),
-                consecutive_failures=row["consecutive_failures"] or 0,
-                last_active_at=row["last_active_at"],
-                metadata=row["metadata"] or {},
+                pheromone_score=float(row.pheromone_score or 0.5),
+                consecutive_failures=row.consecutive_failures or 0,
+                last_active_at=row.last_active_at,
+                metadata=row.metadata_json or {},
             )
             agent._llm_gateway = self._llm_gateway
-            self._agents[row["agent_id"]] = agent
+            self._agents[row.agent_id] = agent
 
         logger.info("Loaded %d agents from database", len(self._agents))
         return len(self._agents)
@@ -275,33 +297,31 @@ class AgentPool:
                 "Terminate an agent first."
             )
 
-        # Insert to DB
+        # Insert to DB (upsert)
         async with self._db_engine.begin() as conn:
-            await conn.execute(
-                text("""
-                    INSERT INTO aria_engine.agent_state
-                        (agent_id, display_name, model, temperature,
-                         max_tokens, system_prompt, focus_type, status)
-                    VALUES
-                        (:agent_id, :display_name, :model, :temperature,
-                         :max_tokens, :system_prompt, :focus_type, 'idle')
-                    ON CONFLICT (agent_id) DO UPDATE SET
-                        status = 'idle',
-                        model = EXCLUDED.model,
-                        display_name = EXCLUDED.display_name,
-                        system_prompt = EXCLUDED.system_prompt,
-                        updated_at = NOW()
-                """),
-                {
-                    "agent_id": agent_id,
-                    "display_name": display_name or agent_id,
-                    "model": model or self.config.default_model,
-                    "temperature": temperature,
-                    "max_tokens": max_tokens,
-                    "system_prompt": system_prompt,
-                    "focus_type": focus_type,
+            stmt = pg_insert(EngineAgentState).values(
+                agent_id=agent_id,
+                display_name=display_name or agent_id,
+                agent_type="agent",
+                model=model or self.config.default_model,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                system_prompt=system_prompt,
+                focus_type=focus_type,
+                status="idle",
+                enabled=True,
+            )
+            stmt = stmt.on_conflict_do_update(
+                index_elements=["agent_id"],
+                set_={
+                    "status": "idle",
+                    "model": stmt.excluded.model,
+                    "display_name": stmt.excluded.display_name,
+                    "system_prompt": stmt.excluded.system_prompt,
+                    "updated_at": text("NOW()"),
                 },
             )
+            await conn.execute(stmt)
 
         # Create in-memory agent
         agent = EngineAgent(
@@ -460,24 +480,16 @@ class AgentPool:
 
         async with self._db_engine.begin() as conn:
             await conn.execute(
-                text("""
-                    UPDATE aria_engine.agent_state
-                    SET status = :status,
-                        current_task = :current_task,
-                        consecutive_failures = :failures,
-                        pheromone_score = :pheromone,
-                        last_active_at = :last_active,
-                        updated_at = NOW()
-                    WHERE agent_id = :agent_id
-                """),
-                {
-                    "agent_id": agent_id,
-                    "status": status or agent.status,
-                    "current_task": agent.current_task,
-                    "failures": agent.consecutive_failures,
-                    "pheromone": agent.pheromone_score,
-                    "last_active": agent.last_active_at,
-                },
+                update(EngineAgentState)
+                .where(EngineAgentState.agent_id == agent_id)
+                .values(
+                    status=status or agent.status,
+                    current_task=agent.current_task,
+                    consecutive_failures=agent.consecutive_failures,
+                    pheromone_score=agent.pheromone_score,
+                    last_active_at=agent.last_active_at,
+                    updated_at=text("NOW()"),
+                )
             )
 
     def get_status(self) -> dict[str, Any]:

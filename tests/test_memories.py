@@ -1,117 +1,160 @@
-# tests/test_memories.py
+﻿"""Memories  KV memory lifecycle and semantic memory integration tests.
+
+Chain 4: upsert -> read -> upsert update -> read updated -> delete -> verify 404.
 """
-S5-05 · Memory endpoint tests (including S5-01 semantic memory).
-
-Tests semantic store, search, and session summarization.
-Auto-skips when aria-api is unreachable.
-"""
-
-import os
-import uuid
-
-import httpx
 import pytest
 
-API_BASE = os.environ.get("ARIA_API_URL", "http://localhost:8000")
 
+class TestMemoryKVLifecycle:
+    """Ordered scenario: full key-value memory lifecycle."""
 
-@pytest.fixture(scope="module")
-def api(request):
-    client = httpx.Client(base_url=API_BASE, timeout=httpx.Timeout(15.0, connect=3.0))
-    try:
-        r = client.get("/health")
-        if r.status_code != 200:
-            pytest.skip("aria-api not healthy")
-    except httpx.ConnectError:
-        pytest.skip("aria-api not reachable")
-    yield client
-    client.close()
+    def test_01_upsert_memory(self, api, uid):
+        """POST /memories -> upsert with key/value/category."""
+        payload = {
+            "key": f"user-preference-{uid}",
+            "value": {"theme": "dark", "lang": "en", "timezone": "UTC"},
+            "category": "preferences",
+        }
+        r = api.post("/memories", json=payload)
+        if r.status_code in (502, 503):
+            pytest.skip("memories service unavailable")
+        assert r.status_code in (200, 201), f"Upsert failed: {r.status_code} {r.text}"
+        data = r.json()
+        if data.get("stored") is False or data.get("skipped") is True:
+            pytest.skip("noise filter blocked payload")
+        assert "id" in data or "key" in data, f"Missing id/key in response: {data}"
+        TestMemoryKVLifecycle._key = f"user-preference-{uid}"
+        TestMemoryKVLifecycle._uid = uid
 
-
-def _json(resp, status=200):
-    assert resp.status_code == status, f"Expected {status}, got {resp.status_code}: {resp.text[:300]}"
-    return resp.json()
-
-
-# ============================================================================
-# Standard memory endpoints
-# ============================================================================
-
-
-@pytest.mark.integration
-class TestMemoriesCRUD:
-
-    def test_list_memories(self, api):
-        data = _json(api.get("/memories", params={"page": 1, "per_page": 5}))
-        if isinstance(data, dict):
-            assert any(k in data for k in ("items", "memories", "data"))
-        else:
-            assert isinstance(data, list)
-
-    def test_create_memory(self, api):
-        uid = uuid.uuid4().hex[:8]
-        key = f"qa_mem_{uid}"
-        data = _json(api.post("/memories", json={
-            "key": key,
-            "value": f"QA memory content {uid}",
-            "category": "qa",
-        }))
+    def test_02_read_memory(self, api):
+        """GET /memories/{key} -> verify value matches."""
+        key = getattr(TestMemoryKVLifecycle, "_key", None)
+        if not key:
+            pytest.skip("no memory created")
+        r = api.get(f"/memories/{key}")
+        assert r.status_code == 200, f"Read failed: {r.status_code} {r.text}"
+        data = r.json()
         assert isinstance(data, dict)
-        assert data.get("upserted") or data.get("key") == key
+        val = data.get("value", data)
+        if isinstance(val, dict):
+            assert val.get("theme") == "dark", f"Value mismatch: {val}"
+            assert val.get("lang") == "en", f"Value mismatch: {val}"
+
+    def test_03_upsert_same_key_new_value(self, api):
+        """POST /memories -> upsert same key with new value -> verify upserted."""
+        key = getattr(TestMemoryKVLifecycle, "_key", None)
+        if not key:
+            pytest.skip("no memory created")
+        payload = {
+            "key": key,
+            "value": {"theme": "light", "lang": "es", "timezone": "CET"},
+            "category": "preferences",
+        }
+        r = api.post("/memories", json=payload)
+        assert r.status_code in (200, 201), f"Upsert update failed: {r.status_code} {r.text}"
+        data = r.json()
+        assert data.get("upserted") is True or "id" in data, f"Missing upsert confirmation: {data}"
+
+    def test_04_read_updated_value(self, api):
+        """GET /memories/{key} -> verify updated value."""
+        key = getattr(TestMemoryKVLifecycle, "_key", None)
+        if not key:
+            pytest.skip("no memory created")
+        r = api.get(f"/memories/{key}")
+        assert r.status_code == 200
+        data = r.json()
+        val = data.get("value", data)
+        if isinstance(val, dict):
+            assert val.get("theme") == "light", f"Expected 'light', got: {val}"
+            assert val.get("lang") == "es", f"Expected 'es', got: {val}"
+
+    def test_05_delete_memory(self, api):
+        """DELETE /memories/{key} -> cleanup."""
+        key = getattr(TestMemoryKVLifecycle, "_key", None)
+        if not key:
+            pytest.skip("no memory created")
+        r = api.delete(f"/memories/{key}")
+        assert r.status_code in (200, 204), f"Delete failed: {r.status_code} {r.text}"
+
+    def test_06_verify_deleted(self, api):
+        """GET /memories/{key} -> verify 404."""
+        key = getattr(TestMemoryKVLifecycle, "_key", None)
+        if not key:
+            pytest.skip("no memory created")
+        r = api.get(f"/memories/{key}")
+        assert r.status_code == 404, f"Memory still exists after delete: {r.status_code}"
 
 
-# ============================================================================
-# Semantic memory endpoints (S5-01)
-# ============================================================================
-
-
-@pytest.mark.integration
 class TestSemanticMemory:
+    """Semantic memory  skip if embedding service unavailable."""
 
-    def test_store_semantic_memory(self, api):
-        """Store a semantic memory with embedding."""
-        resp = api.post("/memories/semantic", json={
-            "content": f"Sprint 5 test memory {uuid.uuid4().hex[:8]}",
-            "category": "test",
-            "importance": 0.5,
-            "source": "test_suite",
+    def test_01_store_semantic_memory(self, api, uid):
+        """POST /memories/semantic -> store with content/category/importance."""
+        payload = {
+            "content": f"API latency optimization completed successfully for deployment {uid}",
+            "category": "engineering",
+            "importance": 0.7,
+            "source": "integration-suite",
+            "summary": f"Latency optimization ref {uid}",
+        }
+        r = api.post("/memories/semantic", json=payload)
+        if r.status_code in (502, 503):
+            pytest.skip("embedding service unavailable")
+        assert r.status_code in (200, 201, 422), f"Semantic store failed: {r.status_code} {r.text}"
+        if r.status_code in (200, 201):
+            data = r.json()
+            assert "id" in data or "stored" in data, f"Missing id/stored: {data}"
+            TestSemanticMemory._stored_id = data.get("id")
+
+    def test_02_list_semantic_memories(self, api):
+        """GET /memories/semantic -> verify it is in the list."""
+        r = api.get("/memories/semantic")
+        if r.status_code in (502, 503):
+            pytest.skip("embedding service unavailable")
+        assert r.status_code in (200, 422), f"List semantic failed: {r.status_code}"
+        if r.status_code == 200:
+            data = r.json()
+            assert isinstance(data, (dict, list))
+
+    def test_03_search_memories(self, api):
+        """GET /memories/search -> semantic search."""
+        r = api.get("/memories/search", params={"query": "latency optimization"})
+        if r.status_code in (502, 503):
+            pytest.skip("embedding service unavailable")
+        assert r.status_code == 200, f"Search failed: {r.status_code} {r.text}"
+        data = r.json()
+        assert isinstance(data, dict)
+        assert "memories" in data or "query" in data, f"Missing search keys: {list(data.keys())}"
+
+    def test_04_search_by_vector(self, api):
+        """POST /memories/search-by-vector -> vector search endpoint reachable."""
+        r = api.post("/memories/search-by-vector", json={
+            "embedding": [0.0] * 768,
+            "limit": 3,
         })
-        # 502 acceptable if embedding model not configured
-        assert resp.status_code in (200, 502)
-        if resp.status_code == 200:
-            data = resp.json()
-            assert "id" in data or "memory_id" in data or "stored" in data
+        if r.status_code in (502, 503):
+            pytest.skip("embedding service unavailable")
+        assert r.status_code in (200, 400, 422), f"Vector search failed: {r.status_code} {r.text}"
 
-    def test_search_semantic_memory(self, api):
-        """Search semantic memories by vector similarity."""
-        resp = api.get("/memories/search", params={
-            "query": "sprint verification test",
-            "limit": 5,
-        })
-        # 502 acceptable if embedding model not configured
-        assert resp.status_code in (200, 502)
-        if resp.status_code == 200:
-            data = resp.json()
-            if isinstance(data, dict):
-                items = data.get("items", data.get("memories", []))
-            else:
-                items = data
-            assert isinstance(items, list)
+    def test_05_summarize_session(self, api):
+        """POST /memories/summarize-session -> summarization endpoint reachable."""
+        r = api.post("/memories/summarize-session", json={"hours_back": 1})
+        if r.status_code in (502, 503):
+            pytest.skip("embedding service unavailable")
+        assert r.status_code in (200, 422), f"Summarize session failed: {r.status_code} {r.text}"
 
-    def test_summarize_session(self, api):
-        """Summarize recent session activities."""
-        import httpx
-        try:
-            resp = api.post("/memories/summarize-session", json={
-                "hours_back": 1,
-            }, timeout=30.0)
-        except httpx.ReadTimeout:
-            pytest.skip("summarize-session timed out — LLM not available in test env")
-            return
-        # May fail if LLM is not available — accept 200 or 5xx
-        if resp.status_code == 200:
-            data = resp.json()
-            assert isinstance(data, dict)
-        else:
-            # LLM dependency may not be available in test
-            assert resp.status_code in (200, 500, 502, 503)
+
+class TestMemoryEdgeCases:
+    """Edge cases for memories."""
+
+    def test_nonexistent_memory_returns_404(self, api):
+        """GET /memories/{nonexistent} -> 404."""
+        r = api.get("/memories/nonexistent-key-xyz-never-created-999")
+        assert r.status_code == 404
+
+    def test_list_memories_paginated(self, api):
+        """GET /memories -> verify paginated structure."""
+        r = api.get("/memories", params={"page": 1, "limit": 5})
+        assert r.status_code == 200
+        data = r.json()
+        assert isinstance(data, (dict, list))

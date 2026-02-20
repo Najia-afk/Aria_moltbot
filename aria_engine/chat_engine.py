@@ -25,7 +25,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import select, update, func
+from sqlalchemy import select, update, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aria_engine.config import EngineConfig
@@ -301,7 +301,33 @@ class ChatEngine:
                 messages = await self._build_context(db, session, content)
 
             # ── 4. LLM completion with tool-call loop ─────────────────────
-            tools_for_llm = self.tools.get_tools_for_llm() if enable_tools else None
+            # Filter tools by agent's allowed skills (capability matching)
+            allowed_skills = None
+            if enable_tools and session.agent_id:
+                from db.models import EngineAgentState
+                agent_skills = await db.execute(
+                    select(EngineAgentState.skills).where(
+                        EngineAgentState.agent_id == session.agent_id
+                    )
+                )
+                row = agent_skills.first()
+                if row and row[0]:
+                    try:
+                        skills_list = (
+                            json.loads(row[0])
+                            if isinstance(row[0], str)
+                            else row[0]
+                        )
+                        if isinstance(skills_list, list) and skills_list:
+                            allowed_skills = skills_list
+                    except Exception:
+                        pass  # Malformed — allow all
+
+            tools_for_llm = (
+                self.tools.get_tools_for_llm(filter_skills=allowed_skills)
+                if enable_tools
+                else None
+            )
             accumulated_tool_calls: list[dict[str, Any]] = []
             accumulated_tool_results: list[dict[str, Any]] = []
             total_input_tokens = 0
@@ -347,11 +373,37 @@ class ChatEngine:
                 })
 
                 for tc in llm_response.tool_calls:
-                    tool_result: ToolResult = await self.tools.execute(
-                        tool_call_id=tc["id"],
-                        function_name=tc["function"]["name"],
-                        arguments=tc["function"]["arguments"],
-                    )
+                    fn_name = tc["function"]["name"]
+
+                    # Capability enforcement: reject tools outside agent's skills
+                    if allowed_skills:
+                        skill_part = fn_name.split("__")[0] if "__" in fn_name else ""
+                        if skill_part and skill_part not in allowed_skills:
+                            logger.warning(
+                                "Agent %s blocked from tool %s (skill %s not in %s)",
+                                session.agent_id, fn_name, skill_part, allowed_skills,
+                            )
+                            tool_result = ToolResult(
+                                tool_call_id=tc["id"],
+                                name=fn_name,
+                                content=json.dumps({
+                                    "error": f"Capability denied: agent '{session.agent_id}' "
+                                    f"does not have access to skill '{skill_part}'"
+                                }),
+                                success=False,
+                            )
+                        else:
+                            tool_result = await self.tools.execute(
+                                tool_call_id=tc["id"],
+                                function_name=fn_name,
+                                arguments=tc["function"]["arguments"],
+                            )
+                    else:
+                        tool_result = await self.tools.execute(
+                            tool_call_id=tc["id"],
+                            function_name=fn_name,
+                            arguments=tc["function"]["arguments"],
+                        )
                     accumulated_tool_results.append({
                         "tool_call_id": tool_result.tool_call_id,
                         "name": tool_result.name,
@@ -507,6 +559,7 @@ class ChatEngine:
             "session_type": session.session_type,
             "title": session.title,
             "model": session.model,
+            "system_prompt": session.system_prompt,
             "temperature": session.temperature,
             "max_tokens": session.max_tokens,
             "context_window": session.context_window,

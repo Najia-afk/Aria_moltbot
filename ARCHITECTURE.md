@@ -221,10 +221,13 @@ Focuses are defined in `aria_mind/soul/focus.py`. Agent roles and delegation pat
 
 ### Database Isolation
 
-| Database | Purpose |
-|----------|---------|
-| `aria_warehouse` | Aria's data — all application tables |
-| `litellm` | LiteLLM Prisma tables (isolated to prevent migration conflicts) |
+| Database | Schema | Purpose |
+|----------|--------|---------|
+| `aria_warehouse` | `aria_data` | Knowledge, memories, goals, activities, social, logs, performance — all domain data (26 tables) |
+| `aria_warehouse` | `aria_engine` | Chat sessions, messages, cron jobs, agent state, config, LLM models — engine infrastructure (11 tables) |
+| `litellm` | `public` | LiteLLM Prisma tables (isolated to prevent migration conflicts) |
+
+All 37 ORM models have explicit schema annotations in `src/api/db/models.py`. No tables in `public` schema. Zero raw SQL — all database access through SQLAlchemy ORM.
 
 Implementation details: `aria_mind/memory.py`, `aria_skills/working_memory/`, `aria_skills/knowledge_graph/`
 

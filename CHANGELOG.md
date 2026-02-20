@@ -6,6 +6,63 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.3.0] — 2026-02-XX (Schema Architecture & Swiss-Clock Audit)
+
+**Theme:** Zero raw SQL, dual-schema ORM, comprehensive endpoint audit, 100% test coverage.  
+**Philosophy:** "Every chain from DB to API to UI verified — Swiss-clock precision."
+
+### Added — New Capabilities
+
+#### Dual-Schema Architecture
+- **ONE database** (`aria_warehouse`), **TWO schemas**: `aria_data` (26 domain tables), `aria_engine` (11 infrastructure tables)
+- All 37 ORM models annotated with explicit `__table_args__ = {"schema": ...}`
+- All 10 ForeignKey strings updated with schema-qualified prefixes
+- `session.py` bootstraps both schemas on startup (`CREATE SCHEMA IF NOT EXISTS`)
+- Migration SQL script: `scripts/migrate_schemas.sql`
+
+#### Zero Raw SQL
+- Converted all 46 raw SQL statements to SQLAlchemy ORM across 9 engine files
+- Files converted: `session_manager.py` (17→0), `scheduler.py` (8→0), `cross_session.py` (7→0), `heartbeat.py` (4→0), `agent_pool.py` (3→0), `routing.py` (3→0), `auto_session.py` (2→0), `chat_engine.py` (1→0), `session_protection.py` (1→0)
+- Only `SELECT 1` health probes and LiteLLM Prisma queries remain (acceptable)
+
+#### Agent & Model CRUD System (v1.2 routers)
+- `agents_crud.py` — Full agent lifecycle: create, read, update, disable, enable, delete, sync-from-MD
+- `models_crud.py` — Full model lifecycle: create, read, update, delete, sync-from-YAML, `/models/available`
+- Engine proxy routers: `engine_chat.py`, `engine_cron.py`, `engine_agents.py`, `engine_sessions.py`
+
+#### 62 New Tests (462 total, 0 failures)
+- `test_agents_crud.py` — 14 tests: full CRUD lifecycle + filters + sync
+- `test_models_crud.py` — 13 tests: full CRUD + filters + sync + models/available
+- `test_engine_chat.py` — 2 new tests: GET messages + 404 nonexistent session
+- `test_engine_internals.py` — 33 unit tests: routing scoring (16), auto_session titles (6), session_protection (11)
+
+#### Aria's Soul & Identity
+- `PromptAssembler` wired into `create_session()` — assembles SOUL.md + IDENTITY.md + TOOLS.md
+- Aria's personality, boundaries, and values loaded into every engine session
+
+### Fixed — Bug Fixes
+
+- **`session.py` health check** — queried `public` schema but tables are in `aria_data`/`aria_engine` → always "degraded". Fixed to query both named schemas.
+- **`catalog.py` stub skills** — 6 manifest-only skills (brainstorm, community, database, experiment, fact_check, model_switcher) shown as "active". Fixed to check for `__init__.py` and mark as "planned".
+- **`scheduler.py` duration_ms crash** — `get_job_history()` accessed nonexistent `ActivityLog.duration_ms` column → extract from JSONB `details` dict.
+- **`scheduler.py` APScheduler serialization** — `add_job()` and `update_job()` passed bound method `self._execute_job` which APScheduler 4.x can't serialize → use `_scheduler_dispatch` module-level trampoline.
+
+### Changed — Documentation Updates
+
+- **ARCHITECTURE.md** — Database Isolation section: 3-schema layout with table counts
+- **API.md** — Added 6 new endpoint rows + updated ORM section (37 models, two schemas)
+- **STRUCTURE.md** — Added `aria_engine/` directory (26 files), updated routers (17→28), tests (462), models (37), DB schema notes
+- **CHANGELOG.md** — This entry
+- **MODELS.md** — Schema annotations per model documented
+
+### Identified — Technical Debt
+
+- 3 orphan models defined but unused: `AgentPerformance`, `EngineConfigEntry`, `EngineAgentTool`
+- 4 engine modules built but not wired into production: `routing.py`, `auto_session.py`, `session_protection.py`, `cross_session.py`
+- 6 skills are manifest-only stubs (planned, not implemented)
+
+---
+
 ## [1.2.0] — 2026-02-XX (Cognitive Upgrade — "Make Her Better")
 
 **Theme:** Deep cognitive improvements to make Aria more autonomous, self-aware, and capable.  

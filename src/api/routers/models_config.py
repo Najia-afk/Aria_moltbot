@@ -93,6 +93,81 @@ async def api_models_config():
     }
 
 
+@router.get("/models/available")
+async def api_models_available():
+    """Available models as a flat list — used by the chat UI model selector.
+
+    Tries DB (``llm_models`` table) first, falls back to models.yaml.
+    Returns ``{"models": [...]}``, each entry carrying ``provider``,
+    ``id``, ``name``, ``tier``, context info and capability flags so
+    the frontend can group by provider without extra transformation.
+    """
+    # ── Try DB first ─────────────────────────────────────────────
+    try:
+        from db.models import LlmModelEntry
+        from db import AsyncSessionLocal
+        from sqlalchemy import select as sa_select
+
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(
+                sa_select(LlmModelEntry)
+                .where(LlmModelEntry.enabled == True)  # noqa: E712
+                .order_by(LlmModelEntry.sort_order.asc(), LlmModelEntry.name.asc())
+            )
+            rows = result.scalars().all()
+            if rows:
+                models_list = [
+                    {
+                        "id": r.id,
+                        "model_id": r.id,
+                        "name": r.name,
+                        "provider": r.provider,
+                        "tier": r.tier,
+                        "reasoning": r.reasoning,
+                        "input_types": r.input_types or ["text"],
+                        "context_length": r.context_window,
+                        "max_tokens": r.max_tokens,
+                        "litellm_model": r.litellm_model or "",
+                        "tool_calling": r.tool_calling,
+                        "thinking": r.reasoning,
+                        "vision": r.vision,
+                        "display_name": r.name,
+                        "cost_input": float(r.cost_input or 0),
+                        "cost_output": float(r.cost_output or 0),
+                    }
+                    for r in rows
+                ]
+                return {"models": models_list, "source": "db"}
+    except Exception:
+        pass  # Fall through to YAML
+
+    # ── Fallback: models.yaml ────────────────────────────────────
+    catalog = _load_catalog()
+    models_raw = catalog.get("models", {})
+
+    models_list: list[dict[str, Any]] = []
+    for model_id, entry in models_raw.items():
+        litellm_cfg = entry.get("litellm", {})
+        models_list.append({
+            "id": model_id,
+            "model_id": model_id,
+            "name": entry.get("name", model_id),
+            "provider": entry.get("provider", "other"),
+            "tier": entry.get("tier", "unknown"),
+            "reasoning": entry.get("reasoning", False),
+            "input_types": entry.get("input", ["text"]),
+            "context_length": entry.get("contextWindow", 0),
+            "max_tokens": entry.get("maxTokens", 0),
+            "litellm_model": litellm_cfg.get("model", ""),
+            "tool_calling": entry.get("tool_calling", False),
+            "thinking": entry.get("reasoning", False),
+            "vision": "image" in entry.get("input", []),
+            "display_name": entry.get("name", model_id),
+        })
+
+    return {"models": models_list, "source": "yaml"}
+
+
 @router.get("/models/pricing")
 async def api_models_pricing():
     """Lightweight pricing-only view for frontend cost calculations.

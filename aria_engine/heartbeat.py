@@ -15,11 +15,12 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import text, select, update
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from aria_engine.config import EngineConfig
 from aria_engine.exceptions import EngineError
+from db.models import EngineAgentState
 
 logger = logging.getLogger("aria.engine.heartbeat")
 
@@ -134,17 +135,14 @@ class AgentHeartbeatManager:
         # Discover agents from DB
         async with self._db_engine.begin() as conn:
             result = await conn.execute(
-                text("""
-                    SELECT agent_id, status
-                    FROM aria_engine.agent_state
-                    WHERE status != 'disabled'
-                """)
+                select(EngineAgentState.agent_id, EngineAgentState.status)
+                .where(EngineAgentState.status != "disabled")
             )
-            agents = result.mappings().all()
+            agents = result.all()
 
         # Configure any discovered agents not yet configured
         for agent in agents:
-            agent_id = agent["agent_id"]
+            agent_id = agent.agent_id
             if agent_id not in self._heartbeat_configs:
                 self.configure_agent(agent_id)
 
@@ -307,31 +305,25 @@ class AgentHeartbeatManager:
         """Update last_active_at timestamp in agent_state."""
         async with self._db_engine.begin() as conn:
             await conn.execute(
-                text("""
-                    UPDATE aria_engine.agent_state
-                    SET last_active_at = NOW(),
-                        updated_at = NOW()
-                    WHERE agent_id = :agent_id
-                """),
-                {"agent_id": agent_id},
+                update(EngineAgentState)
+                .where(EngineAgentState.agent_id == agent_id)
+                .values(
+                    last_active_at=text("NOW()"),
+                    updated_at=text("NOW()"),
+                )
             )
 
     async def _set_agent_status(self, agent_id: str, status: str) -> None:
         """Update agent status in agent_state."""
         async with self._db_engine.begin() as conn:
             await conn.execute(
-                text("""
-                    UPDATE aria_engine.agent_state
-                    SET status = :status,
-                        consecutive_failures = :failures,
-                        updated_at = NOW()
-                    WHERE agent_id = :agent_id
-                """),
-                {
-                    "agent_id": agent_id,
-                    "status": status,
-                    "failures": self._consecutive_failures.get(agent_id, 0),
-                },
+                update(EngineAgentState)
+                .where(EngineAgentState.agent_id == agent_id)
+                .values(
+                    status=status,
+                    consecutive_failures=self._consecutive_failures.get(agent_id, 0),
+                    updated_at=text("NOW()"),
+                )
             )
 
     async def _check_agent_health(self, agent_id: str) -> bool:
@@ -392,20 +384,21 @@ class AgentHeartbeatManager:
 
         async with self._db_engine.begin() as conn:
             result = await conn.execute(
-                text("""
-                    SELECT agent_id, status, last_active_at,
-                           consecutive_failures
-                    FROM aria_engine.agent_state
-                """)
+                select(
+                    EngineAgentState.agent_id,
+                    EngineAgentState.status,
+                    EngineAgentState.last_active_at,
+                    EngineAgentState.consecutive_failures,
+                )
             )
-            agents = result.mappings().all()
+            agents = result.all()
 
         now = datetime.now(timezone.utc)
 
         for agent in agents:
-            agent_id = agent["agent_id"]
+            agent_id = agent.agent_id
             hb_config = self._heartbeat_configs.get(agent_id)
-            last_active = agent["last_active_at"]
+            last_active = agent.last_active_at
 
             # Check for missed beats
             missed_beat = False
@@ -415,7 +408,7 @@ class AgentHeartbeatManager:
                 elapsed = (now - last_active).total_seconds()
                 missed_beat = elapsed > hb_config.miss_threshold_seconds
 
-            status = agent["status"]
+            status = agent.status
             if missed_beat and status != "disabled":
                 status = "unhealthy"
                 # Update DB
@@ -427,7 +420,7 @@ class AgentHeartbeatManager:
                 "last_active_at": (
                     last_active.isoformat() if last_active else None
                 ),
-                "consecutive_failures": agent["consecutive_failures"],
+                "consecutive_failures": agent.consecutive_failures,
                 "missed_beat": missed_beat,
                 "beat_count": self._beat_counts.get(agent_id, 0),
                 "interval_seconds": (

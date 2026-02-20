@@ -1,0 +1,131 @@
+# API Test Coverage Audit
+
+- Total routes: **177**
+- Covered routes: **177**
+- Uncovered routes: **0**
+- Coverage: **100.0%**
+
+## Largest Gaps by Router File
+
+## Uncovered Routes
+## Covered Routes (sample)
+- GET /activities — tests/test_activities.py, tests/test_smoke.py
+- POST /activities — tests/test_activities.py, tests/test_cross_entity.py
+- GET /activities/cron-summary — tests/test_activities.py
+- GET /activities/timeline — tests/test_activities.py
+- GET /activities/visualization — tests/test_activities.py
+- GET /admin/files/agents — tests/test_admin.py
+- GET /admin/files/agents/{path:path} — tests/test_admin.py
+- GET /admin/files/memories — tests/test_admin.py
+- GET /admin/files/memories/{path:path} — tests/test_admin.py
+- GET /admin/files/mind — tests/test_admin.py
+- GET /admin/files/mind/{path:path} — tests/test_admin.py
+- GET /admin/files/souvenirs — tests/test_admin.py
+- GET /admin/files/souvenirs/{path:path} — tests/test_admin.py
+- POST /admin/services/{service_id}/{action} — tests/test_admin.py
+- POST /analysis/compression/auto-run — tests/test_analysis.py
+- GET /analysis/compression/history — tests/test_analysis.py
+- POST /analysis/compression/run — tests/test_analysis.py
+- POST /analysis/patterns/detect — tests/test_analysis.py
+- GET /analysis/patterns/history — tests/test_analysis.py
+- POST /analysis/seed-memories — tests/test_analysis.py
+- POST /analysis/sentiment/auto-promote — tests/test_analysis.py
+- POST /analysis/sentiment/backfill-messages — tests/test_analysis.py
+- POST /analysis/sentiment/backfill-sessions — tests/test_analysis.py
+- POST /analysis/sentiment/cleanup-placeholders — tests/test_analysis.py
+- POST /analysis/sentiment/conversation — tests/test_analysis.py
+- POST /analysis/sentiment/feedback — tests/test_analysis.py
+- GET /analysis/sentiment/history — tests/test_analysis.py
+- POST /analysis/sentiment/message — tests/test_analysis.py
+- POST /analysis/sentiment/reply — tests/test_analysis.py
+- POST /analysis/sentiment/seed-references — tests/test_analysis.py
+- GET /api-key-rotations — tests/test_operations.py
+- POST /api-key-rotations — tests/test_operations.py
+- GET /api/metrics — tests/test_health.py
+- GET /engine/agents — tests/test_engine_agents.py
+- GET /engine/agents/metrics — tests/test_engine_agents.py
+- GET /engine/agents/metrics/{agent_id} — tests/test_engine_agents.py
+- GET /engine/agents/metrics/{agent_id}/history — tests/test_engine_agents.py
+- GET /engine/agents/{agent_id} — tests/test_engine_agents.py
+- GET /engine/chat/sessions — tests/test_engine_chat.py, tests/test_smoke.py
+- POST /engine/chat/sessions — tests/test_cross_entity.py, tests/test_engine_chat.py
+- DELETE /engine/chat/sessions/{session_id} — tests/test_cross_entity.py, tests/test_engine_chat.py
+- GET /engine/chat/sessions/{session_id} — tests/test_cross_entity.py, tests/test_engine_chat.py
+- GET /engine/chat/sessions/{session_id}/export — tests/test_cross_entity.py, tests/test_engine_chat.py
+- POST /engine/chat/sessions/{session_id}/messages — tests/test_cross_entity.py, tests/test_engine_chat.py
+- GET /engine/cron — tests/test_engine_cron.py
+- POST /engine/cron — tests/test_engine_cron.py
+- GET /engine/cron/status — tests/test_engine_cron.py
+- DELETE /engine/cron/{job_id} — tests/test_engine_cron.py
+- GET /engine/cron/{job_id} — tests/test_engine_cron.py
+- PUT /engine/cron/{job_id} — tests/test_engine_cron.py
+- GET /engine/cron/{job_id}/history — tests/test_engine_cron.py
+- POST /engine/cron/{job_id}/trigger — tests/test_engine_cron.py
+- GET /engine/sessions — tests/test_engine_sessions.py
+- GET /engine/sessions/stats — tests/test_engine_sessions.py
+- DELETE /engine/sessions/{session_id} — tests/test_cross_entity.py, tests/test_engine_sessions.py
+- GET /engine/sessions/{session_id} — tests/test_engine_sessions.py
+- POST /engine/sessions/{session_id}/end — tests/test_engine_sessions.py
+- GET /engine/sessions/{session_id}/messages — tests/test_engine_sessions.py
+- GET /export — tests/test_records.py
+- GET /goals — tests/test_goals.py, tests/test_validation.py
+- POST /goals — tests/test_goals.py, tests/test_graphql.py
+- GET /goals/archive — tests/test_goals.py
+- GET /goals/board — tests/test_goals.py
+- GET /goals/history — tests/test_goals.py
+- GET /goals/sprint-summary — tests/test_goals.py
+- DELETE /goals/{goal_id} — tests/test_goals.py, tests/test_graphql.py
+- GET /goals/{goal_id} — tests/test_goals.py, tests/test_smoke.py
+- PATCH /goals/{goal_id} — tests/test_goals.py, tests/test_smoke.py
+- PATCH /goals/{goal_id}/move — tests/test_goals.py
+- GET /health — tests/test_health.py, tests/test_security_middleware.py
+- GET /health/db — tests/test_health.py, tests/test_smoke.py
+- GET /heartbeat — tests/test_operations.py
+- POST /heartbeat — tests/test_operations.py
+- GET /heartbeat/latest — tests/test_operations.py
+- GET /host-stats — tests/test_health.py
+- GET /hourly-goals — tests/test_goals.py
+- POST /hourly-goals — tests/test_goals.py, tests/test_validation.py
+- PATCH /hourly-goals/{goal_id} — tests/test_goals.py
+- GET /jobs — tests/test_operations.py
+- GET /jobs/live — tests/test_operations.py
+- POST /jobs/sync — tests/test_operations.py
+- GET /jobs/{job_id} — tests/test_operations.py, tests/test_validation.py
+- GET /knowledge-graph — tests/test_knowledge.py, tests/test_smoke.py
+- DELETE /knowledge-graph/auto-generated — tests/test_cross_entity.py, tests/test_knowledge.py
+- GET /knowledge-graph/entities — tests/test_knowledge.py
+- POST /knowledge-graph/entities — tests/test_cross_entity.py, tests/test_knowledge.py
+- GET /knowledge-graph/query-log — tests/test_knowledge.py
+- GET /knowledge-graph/relations — tests/test_cross_entity.py, tests/test_knowledge.py
+- POST /knowledge-graph/relations — tests/test_cross_entity.py, tests/test_knowledge.py
+- GET /knowledge-graph/search — tests/test_knowledge.py, tests/test_validation.py
+- GET /knowledge-graph/skill-for-task — tests/test_knowledge.py
+- POST /knowledge-graph/sync-skills — tests/test_cross_entity.py, tests/test_knowledge.py
+- GET /knowledge-graph/traverse — tests/test_knowledge.py
+- GET /lessons — tests/test_lessons.py
+- POST /lessons — tests/test_cross_entity.py, tests/test_lessons.py
+- GET /lessons/check — tests/test_cross_entity.py, tests/test_lessons.py
+- POST /lessons/seed — tests/test_lessons.py
+- GET /litellm/global-spend — tests/test_litellm.py
+- GET /litellm/health — tests/test_litellm.py
+- GET /litellm/models — tests/test_litellm.py
+- GET /litellm/spend — tests/test_litellm.py
+- POST /maintenance — tests/test_admin.py
+- GET /memories — tests/test_memories.py, tests/test_validation.py
+- POST /memories — tests/test_memories.py, tests/test_noise_filters.py
+- GET /memories/search — tests/test_memories.py, tests/test_validation.py
+- POST /memories/search-by-vector — tests/test_memories.py
+- GET /memories/semantic — tests/test_memories.py
+- POST /memories/semantic — tests/test_memories.py
+- POST /memories/summarize-session — tests/test_memories.py
+- DELETE /memories/{key} — tests/test_graphql.py, tests/test_memories.py
+- GET /memories/{key} — tests/test_memories.py, tests/test_smoke.py
+- GET /model-usage — tests/test_model_usage.py
+- POST /model-usage — tests/test_model_usage.py, tests/test_validation.py
+- GET /model-usage/stats — tests/test_model_usage.py
+- GET /models/config — tests/test_models_config.py, tests/test_smoke.py
+- GET /models/pricing — tests/test_models_config.py
+- POST /models/reload — tests/test_models_config.py
+- GET /performance — tests/test_operations.py
+- POST /performance — tests/test_operations.py, tests/test_validation.py
+- GET /proposals — tests/test_proposals.py

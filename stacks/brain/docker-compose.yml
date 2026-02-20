@@ -56,12 +56,14 @@ services:
       ENGINE_DEBUG: ${ENGINE_DEBUG:-false}
       # Full URL for heartbeat API posts (not the routing prefix API_BASE_URL)
       ENGINE_API_BASE_URL: http://aria-api:8000
-      PYTHONPATH: /app
+      PYTHONPATH: /
     volumes:
       - ../../aria_memories:/app/aria_memories
-      - ../../aria_mind/soul:/app/aria_mind/soul:ro
-      - ../../aria_models:/app/aria_models:ro
-      - ../../aria_engine:/app/aria_engine:ro
+      - ../../aria_mind:/aria_mind:ro
+      - ../../aria_models:/aria_models:ro
+      - ../../aria_engine:/aria_engine:ro
+      - ../../aria_skills:/aria_skills:ro
+      - ../../aria_agents:/aria_agents:ro
     depends_on:
       aria-db:
         condition: service_healthy
@@ -167,16 +169,20 @@ services:
     restart: unless-stopped
     environment:
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-change-me}
+      DATABASE_URL: postgresql://${DB_USER:-admin}:${DB_PASSWORD:-admin}@aria-db:5432/litellm
       MOONSHOT_KIMI_KEY: ${MOONSHOT_KIMI_KEY:-}
       OPEN_ROUTER_KEY: ${OPEN_ROUTER_KEY:-}
       OPEN_ROUTER_KEY_DEEP: ${OPEN_ROUTER_KEY_DEEP:-}
-      STORE_MODEL_IN_DB: "False"
+      STORE_MODEL_IN_DB: "True"
       OLLAMA_API_BASE: http://host.docker.internal:11434
     volumes:
       - ./litellm-config.yaml:/app/config.yaml:ro
     ports:
       - "18793:4000"
     command: ["--config", "/app/config.yaml"]
+    depends_on:
+      aria-db:
+        condition: service_healthy
     networks:
       - aria-net
     mem_limit: ${LITELLM_MEM_LIMIT:-1024m}
@@ -316,6 +322,10 @@ services:
       SECRET_KEY: ${WEB_SECRET_KEY:-aria-dev-secret-key}
       SERVICE_HOST: ${SERVICE_HOST:-localhost}
       API_BASE_URL: ${API_BASE_URL:-/api}
+      # WS_BASE_URL: browser-accessible host:port for WebSocket chat.
+      # Leave empty to auto-detect (works via Traefik or direct API fallback).
+      # Set explicitly if behind a custom reverse proxy, e.g. "myhost:8080"
+      WS_BASE_URL: ${WS_BASE_URL:-}
       GRAFANA_URL: http://grafana:3000
       PROMETHEUS_URL: http://prometheus:9090
       OLLAMA_URL: http://host.docker.internal:11434

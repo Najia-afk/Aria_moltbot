@@ -15,7 +15,7 @@ The following audit findings have been **addressed** or **partially addressed** 
 | **MEDIUM-4:** Dashboard double-fetch of `/activities` | ✅ Addressed | TICKET-06 (Critical Bug Fixes) |
 | **LOW-1:** Unused API endpoints | 🟡 Partially | Documented; some cleaned up in TICKET-09 |
 | **LOW-2:** Inconsistent API variable names | 🟡 Partially | Standardization in progress |
-| **Testing:** 11 test failures | ✅ Addressed | TICKET-09, 31 (677+ tests, 0 failures) |
+| **Testing:** 11 test failures | ✅ Addressed | TICKET-09, 31 → v1.3: 462 tests, 0 failures, 9 skipped |
 | **Observability:** No structured logging | ✅ Addressed | TICKET-11, 17 (logging & observability stack) |
 | **Directory:** `experiment/` skill (dead code) | ✅ Resolved | S-18 (deprecated skill removed) |
 | **Directory:** `hooks/` flagged as dead code | ✅ Reclassified | Contains `soul-evil/` (evil mode toggle) — not dead code |
@@ -74,8 +74,8 @@ const API_BASE_URL = "{{ api_base_url }}";
 window.ARIA_API_BASE_URL = API_BASE_URL;
 ```
 
-**API Routers** (15 routers + GraphQL):
-`health`, `activities`, `thoughts`, `memories`, `goals`, `sessions`, `model_usage`, `litellm`, `providers`, `security`, `knowledge`, `social`, `operations`, `records`, `admin`
+**API Routers** (28 routers + GraphQL):
+`health`, `activities`, `thoughts`, `memories`, `goals`, `sessions`, `model_usage`, `litellm`, `providers`, `security`, `knowledge`, `social`, `operations`, `records`, `admin`, `agents_crud`, `models_crud`, `models_config`, `analysis`, `lessons`, `proposals`, `skills`, `working_memory`, `engine_chat`, `engine_cron`, `engine_agents`, `engine_agent_metrics`, `engine_sessions`
 
 ---
 

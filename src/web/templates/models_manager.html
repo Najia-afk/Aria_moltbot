@@ -1,0 +1,462 @@
+{% extends "base.html" %}
+{% block title %}Aria - Model Manager{% endblock %}
+
+{% block content %}
+<div class="hero hero-compact">
+    <h1 class="hero-title">⚙️ Model Manager</h1>
+    <p class="hero-subtitle">Add, edit, enable/disable LLM models — DB-backed CRUD</p>
+</div>
+
+<!-- Action Bar -->
+<div class="section-card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <button class="btn btn-primary btn-sm" onclick="openAddModal()">➕ Add Model</button>
+    <button class="btn btn-secondary btn-sm" onclick="syncFromYaml()">🔄 Sync from YAML</button>
+    <button class="btn btn-secondary btn-sm" onclick="loadModels()">♻️ Refresh</button>
+    <div style="flex:1;"></div>
+    <select id="filterProvider" class="form-select form-select-sm" style="width:auto;" onchange="loadModels()">
+        <option value="">All Providers</option>
+    </select>
+    <select id="filterTier" class="form-select form-select-sm" style="width:auto;" onchange="loadModels()">
+        <option value="">All Tiers</option>
+        <option value="local">🖥️ Local</option>
+        <option value="free">🆓 Free</option>
+        <option value="paid">💰 Paid</option>
+    </select>
+    <label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text-secondary);">
+        <input type="checkbox" id="filterEnabled" checked onchange="loadModels()"> Enabled only
+    </label>
+    <span id="modelCount" style="font-size:13px;color:var(--text-tertiary);">0 models</span>
+</div>
+
+<!-- Models Grid -->
+<div id="modelsGrid" class="models-mgmt-grid" style="margin-top:16px;">
+    <div class="loading-placeholder" style="text-align:center;padding:48px;color:var(--text-tertiary);">Loading models…</div>
+</div>
+
+<!-- Add / Edit Modal -->
+<div id="modelModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeModal()">
+<div class="modal-card" style="max-width:680px;max-height:90vh;overflow-y:auto;">
+    <div class="modal-header">
+        <h3 id="modalTitle">Add Model</h3>
+        <button class="btn-icon" onclick="closeModal()">&times;</button>
+    </div>
+    <form id="modelForm" onsubmit="return saveModel(event)">
+        <div class="form-grid">
+            <!-- Row 1 -->
+            <div class="form-group">
+                <label for="fId">ID *</label>
+                <input id="fId" name="id" required maxlength="100" placeholder="my-model-id"
+                       class="form-input" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label for="fName">Display Name *</label>
+                <input id="fName" name="name" required maxlength="300" placeholder="My Model Name"
+                       class="form-input">
+            </div>
+            <!-- Row 2 -->
+            <div class="form-group">
+                <label for="fProvider">Provider</label>
+                <select id="fProvider" name="provider" class="form-input">
+                    <option value="litellm">litellm</option>
+                    <option value="ollama">ollama</option>
+                    <option value="openrouter">openrouter</option>
+                    <option value="moonshot">moonshot</option>
+                    <option value="other">other</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="fTier">Tier</label>
+                <select id="fTier" name="tier" class="form-input">
+                    <option value="free">Free</option>
+                    <option value="local">Local</option>
+                    <option value="paid">Paid</option>
+                </select>
+            </div>
+            <!-- Row 3 -->
+            <div class="form-group">
+                <label for="fContextWindow">Context Window</label>
+                <input id="fContextWindow" name="context_window" type="number" min="1" value="8192" class="form-input">
+            </div>
+            <div class="form-group">
+                <label for="fMaxTokens">Max Tokens</label>
+                <input id="fMaxTokens" name="max_tokens" type="number" min="1" value="4096" class="form-input">
+            </div>
+            <!-- Row 4: LiteLLM -->
+            <div class="form-group" style="grid-column:1/-1;">
+                <label for="fLitellmModel">LiteLLM Model String</label>
+                <input id="fLitellmModel" name="litellm_model" maxlength="300"
+                       placeholder="moonshot/kimi-k2.5 or openrouter/provider/model" class="form-input">
+            </div>
+            <div class="form-group">
+                <label for="fApiKey">API Key (or os.environ/VAR)</label>
+                <input id="fApiKey" name="litellm_api_key" maxlength="500"
+                       placeholder="os.environ/MOONSHOT_KIMI_KEY" class="form-input">
+            </div>
+            <div class="form-group">
+                <label for="fApiBase">API Base URL</label>
+                <input id="fApiBase" name="litellm_api_base" maxlength="500"
+                       placeholder="https://api.moonshot.ai/v1" class="form-input">
+            </div>
+            <!-- Row 5: Costs -->
+            <div class="form-group">
+                <label for="fCostInput">Cost Input ($/1M tok)</label>
+                <input id="fCostInput" name="cost_input" type="number" step="0.001" min="0" value="0" class="form-input">
+            </div>
+            <div class="form-group">
+                <label for="fCostOutput">Cost Output ($/1M tok)</label>
+                <input id="fCostOutput" name="cost_output" type="number" step="0.001" min="0" value="0" class="form-input">
+            </div>
+            <!-- Row 6: Capabilities -->
+            <div class="form-group" style="grid-column:1/-1;">
+                <label>Capabilities</label>
+                <div style="display:flex;gap:16px;flex-wrap:wrap;">
+                    <label style="display:flex;align-items:center;gap:4px;">
+                        <input type="checkbox" id="fReasoning" name="reasoning"> 💭 Reasoning
+                    </label>
+                    <label style="display:flex;align-items:center;gap:4px;">
+                        <input type="checkbox" id="fVision" name="vision"> 👁️ Vision
+                    </label>
+                    <label style="display:flex;align-items:center;gap:4px;">
+                        <input type="checkbox" id="fToolCalling" name="tool_calling"> 🔧 Tool Calling
+                    </label>
+                    <label style="display:flex;align-items:center;gap:4px;">
+                        <input type="checkbox" id="fEnabled" name="enabled" checked> ✅ Enabled
+                    </label>
+                </div>
+            </div>
+            <!-- Row 7: Aliases -->
+            <div class="form-group" style="grid-column:1/-1;">
+                <label for="fAliases">Aliases (comma-separated)</label>
+                <input id="fAliases" name="aliases" maxlength="500"
+                       placeholder="alias-1, alias-2" class="form-input">
+            </div>
+            <div class="form-group">
+                <label for="fSortOrder">Sort Order</label>
+                <input id="fSortOrder" name="sort_order" type="number" min="0" value="100" class="form-input">
+            </div>
+            <div class="form-group">
+                <label for="fRouteSkill">Route Skill</label>
+                <input id="fRouteSkill" name="route_skill" maxlength="100" placeholder="litellm" class="form-input">
+            </div>
+        </div>
+        <div class="modal-footer" style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end;">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>
+            <button type="submit" class="btn btn-primary btn-sm" id="btnSave">💾 Save</button>
+        </div>
+    </form>
+</div>
+</div>
+
+<style>
+.models-mgmt-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 12px;
+}
+.model-mgmt-card {
+    background: var(--card-bg, #1e1e2e);
+    border: 1px solid var(--border, #333);
+    border-radius: 10px;
+    padding: 16px;
+    transition: border-color .2s;
+    position: relative;
+}
+.model-mgmt-card:hover { border-color: var(--accent, #7c3aed); }
+.model-mgmt-card.disabled { opacity: .55; }
+.model-mgmt-card .card-header {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 8px;
+}
+.model-mgmt-card .card-header h4 {
+    margin: 0; font-size: 14px; font-weight: 600; color: var(--text-primary, #fff);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70%;
+}
+.model-mgmt-card .card-header .badges { display: flex; gap: 4px; flex-wrap: wrap; }
+.model-mgmt-card .card-meta {
+    font-size: 12px; color: var(--text-secondary, #aaa); display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;
+}
+.model-mgmt-card .card-meta span { display: flex; align-items: center; gap: 2px; }
+.model-mgmt-card .card-detail {
+    font-size: 11px; color: var(--text-tertiary, #777); margin-bottom: 4px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.model-mgmt-card .card-actions {
+    display: flex; gap: 6px; margin-top: 10px; border-top: 1px solid var(--border, #333); padding-top: 10px;
+}
+.badge-tier { font-size: 10px; padding: 2px 6px; border-radius: 6px; font-weight: 600; }
+.badge-tier.local { background: #164e63; color: #67e8f9; }
+.badge-tier.free  { background: #14532d; color: #86efac; }
+.badge-tier.paid  { background: #713f12; color: #fde047; }
+.badge-cap { font-size: 11px; }
+
+/* Modal */
+.modal-overlay {
+    position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,.6);
+    display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.modal-card {
+    background: var(--card-bg, #1e1e2e); border: 1px solid var(--border, #333);
+    border-radius: 12px; padding: 24px; width: 100%;
+}
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.modal-header h3 { margin: 0; font-size: 18px; color: var(--text-primary, #fff); }
+.btn-icon { background: none; border: none; font-size: 22px; cursor: pointer; color: var(--text-secondary); }
+.btn-icon:hover { color: var(--text-primary); }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-group label { display: block; font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-bottom: 4px; }
+.form-input {
+    width: 100%; padding: 7px 10px; border: 1px solid var(--border, #444);
+    border-radius: 6px; background: var(--input-bg, #111); color: var(--text-primary, #fff);
+    font-size: 13px; box-sizing: border-box;
+}
+.form-input:focus { outline: none; border-color: var(--accent, #7c3aed); }
+.toast {
+    position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+    padding: 12px 20px; border-radius: 8px; font-size: 13px; color: #fff;
+    animation: slideIn .3s ease; max-width: 400px;
+}
+.toast.success { background: #16a34a; }
+.toast.error   { background: #dc2626; }
+@keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+</style>
+
+<script>
+const API = '{{ api_base_url }}';
+let allModels = [];
+let editingId = null;
+
+document.addEventListener('DOMContentLoaded', () => loadModels());
+
+async function loadModels() {
+    const provider = document.getElementById('filterProvider').value;
+    const tier = document.getElementById('filterTier').value;
+    const enabledOnly = document.getElementById('filterEnabled').checked;
+
+    let url = `${API}/models/db?`;
+    if (provider) url += `provider=${encodeURIComponent(provider)}&`;
+    if (tier) url += `tier=${encodeURIComponent(tier)}&`;
+    if (enabledOnly) url += `enabled=true&`;
+
+    try {
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        allModels = await resp.json();
+    } catch (e) {
+        allModels = [];
+        showToast('Failed to load models: ' + e.message, 'error');
+    }
+    renderModels();
+    document.getElementById('modelCount').textContent = `${allModels.length} models`;
+    updateProviderFilter();
+}
+
+function updateProviderFilter() {
+    const sel = document.getElementById('filterProvider');
+    const current = sel.value;
+    const providers = [...new Set(allModels.map(m => m.provider))].sort();
+    // Keep existing options
+    const existingValues = [...sel.options].map(o => o.value);
+    providers.forEach(p => {
+        if (!existingValues.includes(p)) {
+            const opt = document.createElement('option');
+            opt.value = p; opt.textContent = p;
+            sel.appendChild(opt);
+        }
+    });
+    sel.value = current;
+}
+
+function renderModels() {
+    const grid = document.getElementById('modelsGrid');
+    if (!allModels.length) {
+        grid.innerHTML = '<div style="text-align:center;padding:48px;color:var(--text-tertiary);grid-column:1/-1;">No models found. Click <b>Sync from YAML</b> or <b>Add Model</b>.</div>';
+        return;
+    }
+    grid.innerHTML = allModels.map(m => {
+        const tierClass = m.tier || 'free';
+        const tierLabel = {local:'🖥️ Local', free:'🆓 Free', paid:'💰 Paid'}[tierClass] || m.tier;
+        const caps = [];
+        if (m.reasoning) caps.push('<span class="badge-cap" title="Reasoning">💭</span>');
+        if (m.vision)    caps.push('<span class="badge-cap" title="Vision">👁️</span>');
+        if (m.tool_calling) caps.push('<span class="badge-cap" title="Tool Calling">🔧</span>');
+        const disabledClass = m.enabled ? '' : 'disabled';
+        const ctx = m.context_window ? `${(m.context_window/1000).toFixed(0)}K ctx` : '';
+        const cost = (m.cost_input || m.cost_output)
+            ? `$${Number(m.cost_input).toFixed(2)}/$${Number(m.cost_output).toFixed(2)}`
+            : 'Free';
+
+        return `
+        <div class="model-mgmt-card ${disabledClass}">
+            <div class="card-header">
+                <h4 title="${m.name}">${m.name}</h4>
+                <div class="badges">
+                    <span class="badge-tier ${tierClass}">${tierLabel}</span>
+                    ${caps.join('')}
+                </div>
+            </div>
+            <div class="card-meta">
+                <span>🆔 ${m.id}</span>
+                <span>📐 ${ctx}</span>
+                <span>💲 ${cost}</span>
+            </div>
+            <div class="card-detail" title="${m.litellm_model || ''}">
+                🔗 ${m.litellm_model || '—'}
+            </div>
+            <div class="card-detail">
+                🔑 ${m.litellm_api_key_set ? '✅ Set' : '❌ Not set'}
+                ${m.litellm_api_base ? ` &nbsp;🌐 ${m.litellm_api_base}` : ''}
+            </div>
+            ${m.aliases && m.aliases.length ? `<div class="card-detail">📎 ${m.aliases.join(', ')}</div>` : ''}
+            <div class="card-actions">
+                <button class="btn btn-secondary btn-sm" onclick="openEditModal('${m.id}')" style="font-size:12px;">✏️ Edit</button>
+                <button class="btn btn-secondary btn-sm" onclick="toggleEnabled('${m.id}', ${!m.enabled})" style="font-size:12px;">
+                    ${m.enabled ? '🚫 Disable' : '✅ Enable'}
+                </button>
+                <button class="btn btn-secondary btn-sm" style="font-size:12px;color:#ef4444;" onclick="deleteModel('${m.id}')">🗑️ Delete</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// ── Modal ──────────────────────────────────────────────────────
+
+function openAddModal() {
+    editingId = null;
+    document.getElementById('modalTitle').textContent = 'Add Model';
+    document.getElementById('modelForm').reset();
+    document.getElementById('fEnabled').checked = true;
+    document.getElementById('fId').disabled = false;
+    document.getElementById('modelModal').style.display = 'flex';
+}
+
+function openEditModal(id) {
+    const m = allModels.find(x => x.id === id);
+    if (!m) return;
+    editingId = id;
+    document.getElementById('modalTitle').textContent = `Edit: ${m.name}`;
+    document.getElementById('fId').value = m.id;
+    document.getElementById('fId').disabled = true;
+    document.getElementById('fName').value = m.name;
+    document.getElementById('fProvider').value = m.provider;
+    document.getElementById('fTier').value = m.tier;
+    document.getElementById('fContextWindow').value = m.context_window;
+    document.getElementById('fMaxTokens').value = m.max_tokens;
+    document.getElementById('fLitellmModel').value = m.litellm_model || '';
+    document.getElementById('fApiKey').value = '';  // Never prefill keys
+    document.getElementById('fApiBase').value = m.litellm_api_base || '';
+    document.getElementById('fCostInput').value = m.cost_input || 0;
+    document.getElementById('fCostOutput').value = m.cost_output || 0;
+    document.getElementById('fReasoning').checked = m.reasoning;
+    document.getElementById('fVision').checked = m.vision;
+    document.getElementById('fToolCalling').checked = m.tool_calling;
+    document.getElementById('fEnabled').checked = m.enabled;
+    document.getElementById('fAliases').value = (m.aliases || []).join(', ');
+    document.getElementById('fSortOrder').value = m.sort_order || 100;
+    document.getElementById('fRouteSkill').value = m.route_skill || '';
+    document.getElementById('modelModal').style.display = 'flex';
+}
+
+function closeModal() {
+    document.getElementById('modelModal').style.display = 'none';
+    editingId = null;
+}
+
+async function saveModel(e) {
+    e.preventDefault();
+    const body = {
+        name: document.getElementById('fName').value,
+        provider: document.getElementById('fProvider').value,
+        tier: document.getElementById('fTier').value,
+        context_window: parseInt(document.getElementById('fContextWindow').value) || 8192,
+        max_tokens: parseInt(document.getElementById('fMaxTokens').value) || 4096,
+        litellm_model: document.getElementById('fLitellmModel').value || null,
+        litellm_api_base: document.getElementById('fApiBase').value || null,
+        cost_input: parseFloat(document.getElementById('fCostInput').value) || 0,
+        cost_output: parseFloat(document.getElementById('fCostOutput').value) || 0,
+        reasoning: document.getElementById('fReasoning').checked,
+        vision: document.getElementById('fVision').checked,
+        tool_calling: document.getElementById('fToolCalling').checked,
+        enabled: document.getElementById('fEnabled').checked,
+        aliases: document.getElementById('fAliases').value.split(',').map(s => s.trim()).filter(Boolean),
+        sort_order: parseInt(document.getElementById('fSortOrder').value) || 100,
+        route_skill: document.getElementById('fRouteSkill').value || null,
+    };
+
+    // Only include api_key if user typed something (avoid blanking it on edit)
+    const keyVal = document.getElementById('fApiKey').value;
+    if (keyVal) body.litellm_api_key = keyVal;
+
+    try {
+        let resp;
+        if (editingId) {
+            resp = await fetch(`${API}/models/db/${editingId}`, {
+                method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
+            });
+        } else {
+            body.id = document.getElementById('fId').value;
+            resp = await fetch(`${API}/models/db`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
+            });
+        }
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.detail || `HTTP ${resp.status}`);
+        }
+        showToast(editingId ? 'Model updated ✅' : 'Model created ✅', 'success');
+        closeModal();
+        loadModels();
+    } catch (e) {
+        showToast('Save failed: ' + e.message, 'error');
+    }
+}
+
+// ── Actions ────────────────────────────────────────────────────
+
+async function toggleEnabled(id, newState) {
+    try {
+        const resp = await fetch(`${API}/models/db/${id}`, {
+            method: 'PUT', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({enabled: newState}),
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        showToast(`${id} ${newState ? 'enabled' : 'disabled'} ✅`, 'success');
+        loadModels();
+    } catch (e) {
+        showToast('Toggle failed: ' + e.message, 'error');
+    }
+}
+
+async function deleteModel(id) {
+    if (!confirm(`Delete model "${id}"? This cannot be undone.`)) return;
+    try {
+        const resp = await fetch(`${API}/models/db/${id}`, {method: 'DELETE'});
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        showToast(`${id} deleted 🗑️`, 'success');
+        loadModels();
+    } catch (e) {
+        showToast('Delete failed: ' + e.message, 'error');
+    }
+}
+
+async function syncFromYaml() {
+    try {
+        const resp = await fetch(`${API}/models/db/sync`, {method: 'POST'});
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        showToast(`Synced: ${data.inserted} new, ${data.updated} updated (${data.total} total) ✅`, 'success');
+        loadModels();
+    } catch (e) {
+        showToast('Sync failed: ' + e.message, 'error');
+    }
+}
+
+// ── Toast ──────────────────────────────────────────────────────
+
+function showToast(msg, type = 'success') {
+    const el = document.createElement('div');
+    el.className = `toast ${type}`;
+    el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 4000);
+}
+</script>
+{% endblock %}

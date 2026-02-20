@@ -4,12 +4,48 @@ All environment variables and service configuration in one place.
 """
 
 import os
+import logging
+from pathlib import Path
 from datetime import datetime, timezone
+
+
+def _load_stack_env_if_present() -> None:
+    """Best-effort load of stacks/brain/.env into process env.
+
+    Only fills missing keys; never overrides explicitly provided env vars.
+    """
+    env_path = Path(__file__).resolve().parents[2] / "stacks" / "brain" / ".env"
+    if not env_path.exists():
+        return
+
+    try:
+        for raw_line in env_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            if key and key not in os.environ:
+                os.environ[key] = value
+    except Exception:
+        pass
 
 # ── Database ──────────────────────────────────────────────────────────────────
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
-    raise ValueError("DATABASE_URL environment variable is required")
+    _load_stack_env_if_present()
+    db_user = os.getenv("DB_USER", "aria_admin")
+    db_password = os.getenv("DB_PASSWORD", "admin")
+    db_host = os.getenv("DB_HOST", "localhost")
+    db_port = os.getenv("DB_PORT", "5432")
+    db_name = os.getenv("DB_NAME", "aria_warehouse")
+    DATABASE_URL = (
+        f"postgresql+asyncpg://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+    )
+    logging.getLogger("aria.api").warning(
+        "DATABASE_URL not set — using fallback DSN from DB_* env/defaults"
+    )
 
 # ── Networking ────────────────────────────────────────────────────────────────
 DOCKER_HOST_IP = os.getenv("DOCKER_HOST_IP", "host.docker.internal")

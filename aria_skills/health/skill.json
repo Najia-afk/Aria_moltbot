@@ -4,11 +4,16 @@
   "description": "System health checks, self-diagnostics, and auto-recovery for Aria services.",
   "author": "Aria Team",
   "layer": 2,
-  "dependencies": ["api_client"],
-  "focus_affinity": ["orchestrator", "devsecops"],
+  "dependencies": [
+    "api_client"
+  ],
+  "focus_affinity": [
+    "orchestrator",
+    "devsecops"
+  ],
   "tools": [
     {
-      "name": "health_check_all",
+      "name": "check_system",
       "description": "Run health checks on all Aria services and return status summary.",
       "parameters": {
         "type": "object",
@@ -16,68 +21,41 @@
       }
     },
     {
-      "name": "health_check_service",
+      "name": "health_check",
       "description": "Check health of a specific service.",
       "parameters": {
         "type": "object",
         "properties": {
           "service": {
             "type": "string",
-            "enum": ["database", "ollama", "litellm", "moltbook"],
+            "enum": [
+              "database",
+              "ollama",
+              "litellm",
+              "moltbook"
+            ],
             "description": "Service to check"
           }
         },
-        "required": ["service"]
+        "required": [
+          "service"
+        ]
       }
     },
     {
-      "name": "diagnostics_summary",
-      "description": "Get overall health ledger summary including anomalies and severity counts.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "window_minutes": {
-            "type": "integer",
-            "description": "Time window in minutes for anomaly detection (default 60)",
-            "default": 60
-          }
-        }
-      }
-    },
-    {
-      "name": "diagnostics_component",
-      "description": "Get health status for a specific component.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "component": {
-            "type": "string",
-            "description": "Component name to check (e.g. database, llm, service)"
-          }
-        },
-        "required": ["component"]
-      }
-    },
-    {
-      "name": "recovery_evaluate",
-      "description": "Evaluate current anomalies and execute matching recovery playbooks.",
+      "name": "get_last_check",
+      "description": "Get the result of the last health check.",
       "parameters": {
         "type": "object",
         "properties": {}
       }
     },
     {
-      "name": "failure_patterns",
-      "description": "Get recurring failure patterns for learning and prevention.",
+      "name": "get_metrics",
+      "description": "Get collected health metrics and statistics.",
       "parameters": {
         "type": "object",
-        "properties": {
-          "min_occurrences": {
-            "type": "integer",
-            "description": "Minimum occurrence count to qualify as a pattern (default 3)",
-            "default": 3
-          }
-        }
+        "properties": {}
       }
     }
   ],

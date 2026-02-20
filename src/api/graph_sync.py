@@ -53,7 +53,7 @@ def _read_skill_jsons() -> list[dict]:
         sj_path = skill_dir / "skill.json"
         if sj_path.is_file():
             try:
-                with open(sj_path) as f:
+                with open(sj_path, encoding="utf-8", errors="replace") as f:
                     data = json.load(f)
                 data["_dir"] = skill_dir.name
                 skills.append(data)

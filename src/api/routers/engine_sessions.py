@@ -32,8 +32,8 @@ class SessionResponse(BaseModel):
     """Session summary in list responses."""
 
     session_id: str
-    title: str
-    agent_id: str
+    title: str = "Untitled"
+    agent_id: str = "unknown"
     session_type: str = "chat"
     message_count: int = 0
     created_at: str
@@ -55,10 +55,10 @@ class SessionListResponse(BaseModel):
 class MessageResponse(BaseModel):
     """Chat message in session view."""
 
-    id: int
+    id: str
     session_id: str
     role: str
-    content: str
+    content: str = ""
     agent_id: str | None = None
     metadata: dict[str, Any] | None = None
     created_at: str

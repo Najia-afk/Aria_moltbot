@@ -194,17 +194,29 @@ def get_scheduler() -> EngineScheduler:
     """
     Get the global EngineScheduler instance.
 
-    Injected at app startup via app.state.scheduler.
+    First tries the global engine instance (full engine mode).
+    Falls back to creating a DB-only scheduler for CRUD operations
+    (API-only mode where engine runs in a separate container).
     """
     from aria_engine import get_engine
 
     engine = get_engine()
-    if engine is None or engine.scheduler is None:
-        raise HTTPException(
-            status_code=503,
-            detail="Scheduler not available — engine not started",
-        )
-    return engine.scheduler
+    if engine is not None and engine.scheduler is not None:
+        return engine.scheduler
+
+    # Fallback: create a DB-backed scheduler for CRUD operations
+    # (scheduler won't execute jobs, but CRUD + list + trigger work)
+    from aria_engine.config import EngineConfig
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    config = EngineConfig()
+    db_url = config.database_url
+    for prefix in ("postgresql://", "postgresql+asyncpg://", "postgres://"):
+        if db_url.startswith(prefix):
+            db_url = db_url.replace(prefix, "postgresql+psycopg://", 1)
+            break
+    db = create_async_engine(db_url, pool_size=5, max_overflow=10)
+    return EngineScheduler(config, db)
 
 
 # ── Endpoints ────────────────────────────────────────────────────────

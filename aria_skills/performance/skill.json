@@ -4,11 +4,15 @@
   "description": "Log and query Aria's performance reviews and self-assessments.",
   "author": "Aria Team",
   "layer": 4,
-  "dependencies": ["api_client"],
-  "focus_affinity": ["orchestrator"],
+  "dependencies": [
+    "api_client"
+  ],
+  "focus_affinity": [
+    "orchestrator"
+  ],
   "tools": [
     {
-      "name": "perf_log",
+      "name": "log_review",
       "description": "Log a performance review or self-assessment entry.",
       "parameters": {
         "type": "object",
@@ -27,12 +31,16 @@
           },
           "strengths": {
             "type": "array",
-            "items": { "type": "string" },
+            "items": {
+              "type": "string"
+            },
             "description": "List of strengths identified"
           },
           "improvements": {
             "type": "array",
-            "items": { "type": "string" },
+            "items": {
+              "type": "string"
+            },
             "description": "Areas for improvement"
           },
           "metadata": {
@@ -40,11 +48,14 @@
             "description": "Additional metadata"
           }
         },
-        "required": ["period", "summary"]
+        "required": [
+          "period",
+          "summary"
+        ]
       }
     },
     {
-      "name": "perf_list",
+      "name": "get_reviews",
       "description": "Get performance review history.",
       "parameters": {
         "type": "object",
@@ -61,8 +72,8 @@
       }
     },
     {
-      "name": "perf_stats",
-      "description": "Get performance statistics and trends.",
+      "name": "get_improvement_summary",
+      "description": "Get performance statistics, trends, and improvement summary.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -71,6 +82,14 @@
             "description": "Number of days to analyze (default: 30)"
           }
         }
+      }
+    },
+    {
+      "name": "get_metrics",
+      "description": "Get current performance metrics.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
       }
     }
   ],

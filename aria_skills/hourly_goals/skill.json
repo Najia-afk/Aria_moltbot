@@ -4,11 +4,16 @@
   "description": "Manage Aria's hourly goals and micro-tasks for short-term focus.",
   "author": "Aria Team",
   "layer": 4,
-  "dependencies": ["api_client", "goals"],
-  "focus_affinity": ["orchestrator"],
+  "dependencies": [
+    "api_client",
+    "goals"
+  ],
+  "focus_affinity": [
+    "orchestrator"
+  ],
   "tools": [
     {
-      "name": "hourly_create",
+      "name": "set_goal",
       "description": "Create an hourly goal for focused short-term work.",
       "parameters": {
         "type": "object",
@@ -27,7 +32,12 @@
           },
           "priority": {
             "type": "string",
-            "enum": ["low", "medium", "high", "critical"],
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "critical"
+            ],
             "description": "Priority level"
           },
           "parent_goal_id": {
@@ -35,18 +45,26 @@
             "description": "Link to parent main goal"
           }
         },
-        "required": ["title"]
+        "required": [
+          "title"
+        ]
       }
     },
     {
-      "name": "hourly_list",
-      "description": "List hourly goals with optional status filter.",
+      "name": "get_current_goals",
+      "description": "List current hourly goals with optional status filter.",
       "parameters": {
         "type": "object",
         "properties": {
           "status": {
             "type": "string",
-            "enum": ["pending", "in_progress", "completed", "failed", "all"],
+            "enum": [
+              "pending",
+              "in_progress",
+              "completed",
+              "failed",
+              "all"
+            ],
             "description": "Filter by status"
           },
           "date": {
@@ -57,31 +75,28 @@
       }
     },
     {
-      "name": "hourly_update",
-      "description": "Update an hourly goal's status or progress.",
+      "name": "complete_goal",
+      "description": "Mark an hourly goal as completed.",
       "parameters": {
         "type": "object",
         "properties": {
           "goal_id": {
             "type": "integer",
-            "description": "Goal ID to update"
-          },
-          "status": {
-            "type": "string",
-            "enum": ["pending", "in_progress", "completed", "failed"],
-            "description": "New status"
+            "description": "Goal ID to complete"
           },
           "notes": {
             "type": "string",
-            "description": "Progress notes"
+            "description": "Completion notes"
           }
         },
-        "required": ["goal_id"]
+        "required": [
+          "goal_id"
+        ]
       }
     },
     {
-      "name": "hourly_stats",
-      "description": "Get hourly goal completion statistics.",
+      "name": "get_day_summary",
+      "description": "Get hourly goal completion statistics and day summary.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -90,6 +105,14 @@
             "description": "Days to analyze (default: 7)"
           }
         }
+      }
+    },
+    {
+      "name": "clear_past_goals",
+      "description": "Clear completed or expired hourly goals from past periods.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
       }
     }
   ],

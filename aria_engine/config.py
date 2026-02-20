@@ -22,7 +22,7 @@ class EngineConfig:
     litellm_master_key: str = field(default_factory=lambda: os.environ.get(
         "LITELLM_MASTER_KEY", ""
     ))
-    default_model: str = "step-35-flash-free"
+    default_model: str = "kimi"
     default_temperature: float = 0.7
     default_max_tokens: int = 4096
 

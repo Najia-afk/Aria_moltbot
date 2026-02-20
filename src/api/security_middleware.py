@@ -69,6 +69,15 @@ EXEMPT_ENDPOINTS = {
     "/metrics",
 }
 
+# Endpoint prefixes exempt from body scanning (internal management APIs
+# that legitimately use cron expressions like */30, SQL-like payload text, etc.)
+EXEMPT_PREFIXES = (
+    "/engine/cron",
+    "/engine/chat",
+    "/engine/sessions",
+    "/graphql",
+)
+
 # Sensitive field names that should be redacted in logs
 SENSITIVE_FIELDS = {"password", "api_key", "token", "secret", "authorization", "credentials"}
 
@@ -180,6 +189,12 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             response = await call_next(request)
             return self._add_security_headers(response)
         
+        # Skip body scanning for exempt prefix paths (internal APIs)
+        path = request.url.path.rstrip("/")
+        # Strip /api prefix if present
+        scan_path = path[4:] if path.startswith("/api") else path
+        skip_body_scan = any(scan_path.startswith(p) for p in EXEMPT_PREFIXES)
+        
         # Skip rate limiting for safe read methods (GET/HEAD/OPTIONS)
         # Dashboard pages fire many concurrent GET requests for charts/stats
         if request.method in ("GET", "HEAD", "OPTIONS"):
@@ -204,8 +219,8 @@ class SecurityMiddleware(BaseHTTPMiddleware):
                 content={"detail": "Request body too large"},
             )
         
-        # Scan request body for threats
-        if self.scan_body and request.method in ("POST", "PUT", "PATCH"):
+        # Scan request body for threats (skip exempt paths)
+        if self.scan_body and not skip_body_scan and request.method in ("POST", "PUT", "PATCH"):
             body_scan_result = await self._scan_body(request)
             if body_scan_result:
                 threat_type, pattern = body_scan_result
