@@ -22,15 +22,13 @@ http:
       middlewares:
         - secure-headers
 
-    api-http:
-      rule: "PathPrefix(`/api`)"
-      priority: 100
+    # Traefik internal API - dashboard JS calls /api/overview, /api/http/*, etc.
+    traefik-api-http:
+      rule: "Path(`/api/overview`) || Path(`/api/entrypoints`) || Path(`/api/version`) || Path(`/api/rawdata`) || PathPrefix(`/api/http/`) || PathPrefix(`/api/tcp/`) || PathPrefix(`/api/udp/`)"
+      priority: 110
       entryPoints:
         - web
-      service: aria-api
-      middlewares:
-        - api-strip
-        - secure-headers
+      service: api@internal
 
     ws-http:
       rule: "PathPrefix(`/ws`)"
@@ -40,6 +38,16 @@ http:
       service: aria-api
       middlewares:
         - secure-headers-ws
+
+    api-http:
+      rule: "PathPrefix(`/api/`) || Path(`/api`)"
+      priority: 100
+      entryPoints:
+        - web
+      service: aria-api
+      middlewares:
+        - api-strip
+        - secure-headers
 
     grafana-http:
       rule: "PathPrefix(`/grafana`)"
@@ -74,14 +82,14 @@ http:
       middlewares:
         - ollama-strip
 
-    litellm-http:
-      rule: "PathPrefix(`/litellm`)"
+    litellm-proxy-http:
+      rule: "PathPrefix(`/litellm-proxy`)"
       priority: 80
       entryPoints:
         - web
       service: litellm
       middlewares:
-        - litellm-strip
+        - litellm-proxy-strip
 
     traefik-dashboard-http:
       rule: "PathPrefix(`/traefik`)"
@@ -104,15 +112,13 @@ http:
         - secure-headers
       tls: {}
 
-    api:
-      rule: "PathPrefix(`/api`)"
-      priority: 100
+    # Traefik internal API - dashboard JS calls /api/overview, /api/http/*, etc.
+    traefik-api:
+      rule: "Path(`/api/overview`) || Path(`/api/entrypoints`) || Path(`/api/version`) || Path(`/api/rawdata`) || PathPrefix(`/api/http/`) || PathPrefix(`/api/tcp/`) || PathPrefix(`/api/udp/`)"
+      priority: 110
       entryPoints:
         - websecure
-      service: aria-api
-      middlewares:
-        - api-strip
-        - secure-headers
+      service: api@internal
       tls: {}
 
     ws:
@@ -123,6 +129,17 @@ http:
       service: aria-api
       middlewares:
         - secure-headers-ws
+      tls: {}
+
+    api:
+      rule: "PathPrefix(`/api/`) || Path(`/api`)"
+      priority: 100
+      entryPoints:
+        - websecure
+      service: aria-api
+      middlewares:
+        - api-strip
+        - secure-headers
       tls: {}
 
     grafana:
@@ -161,14 +178,14 @@ http:
         - ollama-strip
       tls: {}
 
-    litellm:
-      rule: "PathPrefix(`/litellm`)"
+    litellm-proxy:
+      rule: "PathPrefix(`/litellm-proxy`)"
       priority: 80
       entryPoints:
         - websecure
       service: litellm
       middlewares:
-        - litellm-strip
+        - litellm-proxy-strip
       tls: {}
 
     traefik-dashboard:
@@ -202,10 +219,10 @@ http:
       stripPrefix:
         prefixes:
           - /ollama
-    litellm-strip:
+    litellm-proxy-strip:
       stripPrefix:
         prefixes:
-          - /litellm
+          - /litellm-proxy
     traefik-strip:
       stripPrefix:
         prefixes:

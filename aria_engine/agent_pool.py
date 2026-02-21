@@ -20,6 +20,7 @@ from typing import Any, Callable
 from sqlalchemy import text, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlalchemy.orm import Session as _OrmSession
 
 from aria_engine.config import EngineConfig
 from aria_engine.exceptions import EngineError
@@ -214,8 +215,12 @@ class AgentPool:
         Returns:
             Number of agents loaded.
         """
-        async with self._db_engine.begin() as conn:
-            result = await conn.execute(
+        # Use an ORM session so .scalars() returns model instances
+        # (raw conn.execute + .scalars() yields first-column strings).
+        from sqlalchemy.ext.asyncio import AsyncSession
+
+        async with AsyncSession(self._db_engine) as session:
+            result = await session.execute(
                 select(EngineAgentState)
                 .order_by(EngineAgentState.agent_id)
             )

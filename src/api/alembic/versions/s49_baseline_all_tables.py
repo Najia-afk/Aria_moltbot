@@ -733,6 +733,7 @@ def upgrade():
         sa.Column("tokens_output", sa.Integer, nullable=True),
         sa.Column("cost", sa.Numeric(10, 6), nullable=True),
         sa.Column("latency_ms", sa.Integer, nullable=True),
+        sa.Column("agent_id", sa.String(100), nullable=True),
         sa.Column("metadata", JSONB, server_default=sa.text("'{}'::jsonb")),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()")),
         sa.ForeignKeyConstraint(["session_id"], ["engine_chat_sessions.id"], name="fk_ecm_session", ondelete="CASCADE"),

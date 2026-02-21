@@ -30,6 +30,15 @@ http:
         - web
       service: api@internal
 
+    ws-http:
+      rule: "PathPrefix(`/ws`)"
+      priority: 100
+      entryPoints:
+        - web
+      service: aria-api
+      middlewares:
+        - secure-headers-ws
+
     api-http:
       rule: "PathPrefix(`/api/`) || Path(`/api`)"
       priority: 100
@@ -110,6 +119,16 @@ http:
       entryPoints:
         - websecure
       service: api@internal
+      tls: {}
+
+    ws:
+      rule: "PathPrefix(`/ws`)"
+      priority: 100
+      entryPoints:
+        - websecure
+      service: aria-api
+      middlewares:
+        - secure-headers-ws
       tls: {}
 
     api:

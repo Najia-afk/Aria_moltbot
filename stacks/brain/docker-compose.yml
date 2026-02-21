@@ -428,8 +428,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-    mem_limit: ${ARIA_API_MEM_LIMIT:-256m}
-    cpus: ${ARIA_API_CPU_LIMIT:-0.5}
+    mem_limit: ${ARIA_API_MEM_LIMIT:-512m}
+    cpus: ${ARIA_API_CPU_LIMIT:-1.0}
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
