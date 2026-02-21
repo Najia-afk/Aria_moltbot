@@ -34,6 +34,12 @@ LLM_TIMEOUT_SECONDS = 30
 SEMANTIC_TIMEOUT_SECONDS = 15
 COMMIT_EVERY = 5
 
+# ── Configurable method/model ────────────────────────────────────────────────
+# SENTIMENT_METHOD: "auto" (default) | "semantic" | "llm" | "lexicon"
+# SENTIMENT_MODEL: override the LLM model (default: profiles.sentiment from models.yaml)
+SENTIMENT_METHOD = os.environ.get("SENTIMENT_METHOD", "auto").lower().strip()
+SENTIMENT_MODEL = os.environ.get("SENTIMENT_MODEL", "").strip() or None
+
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 def _sentiment_label(valence: float) -> str:
@@ -336,7 +342,8 @@ async def _score_batch(db: AsyncSession) -> int:
     print(f"🎯 _score_batch: {len(rows)} unscored messages to process")
 
     semantic_classifier = EmbeddingSentimentClassifier()
-    llm_classifier = LLMSentimentClassifier()
+    llm_classifier = LLMSentimentClassifier(model=SENTIMENT_MODEL)
+    print(f"🎯 _score_batch: method={SENTIMENT_METHOD}, llm_model={llm_classifier._model}")
 
     scored = 0
     pending_inserts = 0
@@ -411,25 +418,31 @@ async def _score_batch(db: AsyncSession) -> int:
             continue
 
         sentiment = None
-        method = "semantic"
+        method = "lexicon"  # default, overridden below
 
-        try:
-            sentiment = await asyncio.wait_for(
-                semantic_classifier.classify(text),
-                timeout=SEMANTIC_TIMEOUT_SECONDS,
-            )
-        except asyncio.TimeoutError:
-            print(f"🎯 _score_batch: semantic timeout for msg {msg.id}")
-        except Exception as e:
-            print(f"🎯 _score_batch: semantic analyze failed for msg {msg.id}: {e}")
+        # ── Semantic (embedding) ──────────────────────────────────
+        if SENTIMENT_METHOD in ("auto", "semantic"):
+            try:
+                sentiment = await asyncio.wait_for(
+                    semantic_classifier.classify(text),
+                    timeout=SEMANTIC_TIMEOUT_SECONDS,
+                )
+                if sentiment is not None:
+                    method = "semantic"
+            except asyncio.TimeoutError:
+                print(f"🎯 _score_batch: semantic timeout for msg {msg.id}")
+            except Exception as e:
+                print(f"🎯 _score_batch: semantic analyze failed for msg {msg.id}: {e}")
 
-        if sentiment is None:
-            method = "llm"
+        # ── LLM ───────────────────────────────────────────────────
+        if sentiment is None and SENTIMENT_METHOD in ("auto", "llm"):
             try:
                 sentiment = await asyncio.wait_for(
                     llm_classifier.classify(text),
                     timeout=LLM_TIMEOUT_SECONDS,
                 )
+                if sentiment is not None:
+                    method = "llm"
             except asyncio.TimeoutError:
                 print(f"🎯 _score_batch: llm timeout for msg {msg.id}")
                 sentiment = None
@@ -437,8 +450,8 @@ async def _score_batch(db: AsyncSession) -> int:
                 print(f"🎯 _score_batch: llm analyze failed for msg {msg.id}: {e}")
                 sentiment = None
 
+        # ── Lexicon (always available as fallback) ────────────────
         if sentiment is None:
-            method = "lexicon"
             l_val, l_aro, l_dom = SentimentLexicon.score(text)
             if l_val >= 0.25:
                 lex_emotion = "happy"

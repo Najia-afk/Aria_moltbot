@@ -397,6 +397,11 @@ services:
       ARIA_SERVICE_CMD_PROMETHEUS_RESTART: ${ARIA_SERVICE_CMD_PROMETHEUS_RESTART:-docker restart prometheus}
       ARIA_SERVICE_CMD_PROMETHEUS_STOP: ${ARIA_SERVICE_CMD_PROMETHEUS_STOP:-docker stop prometheus}
       SKILL_BACKFILL_ON_STARTUP: ${SKILL_BACKFILL_ON_STARTUP:-true}
+      # Sentiment auto-scorer configuration
+      # SENTIMENT_METHOD: auto (semantic→llm→lexicon) | semantic | llm | lexicon
+      SENTIMENT_METHOD: ${SENTIMENT_METHOD:-auto}
+      # SENTIMENT_MODEL: override LLM model (default: profiles.sentiment from models.yaml)
+      SENTIMENT_MODEL: ${SENTIMENT_MODEL:-}
       # Cron job YAML path inside container (auto-synced on startup)
       CRON_JOBS_YAML: /aria_mind/cron_jobs.yaml
     volumes:
