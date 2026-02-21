@@ -309,7 +309,22 @@ async def run_skill(skill_name: str, function_name: str, args: dict, timeout: fl
         # Create and initialize skill
         config = SkillConfig(name=skill_name, config=config_factory())
         skill = skill_class(config)
-        await skill.initialize()
+        init_ok = await skill.initialize()
+        if not init_ok:
+            duration_ms = (time.monotonic() - t0) * 1000
+            error_msg = f'Skill {skill_name} failed to initialize (initialize() returned False)'
+            _write_aria_mind_run_report({
+                'requested_skill_name': requested_skill_name,
+                'normalized_skill_name': skill_name,
+                'function_name': function_name,
+                'args_keys': sorted(list((args or {}).keys())),
+                'status': 'failed',
+                'error': error_msg,
+                'duration_ms': round(duration_ms, 2),
+                'coherence': coherence,
+                'mandatory_enforced': True,
+            })
+            return {'error': error_msg}
         
         # Get the function and call it
         func = getattr(skill, function_name, None)

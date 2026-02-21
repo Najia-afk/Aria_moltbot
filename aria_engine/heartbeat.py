@@ -15,7 +15,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from sqlalchemy import text, select, update
+from sqlalchemy import text, select, update, func
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from aria_engine.config import EngineConfig
@@ -308,8 +308,8 @@ class AgentHeartbeatManager:
                 update(EngineAgentState)
                 .where(EngineAgentState.agent_id == agent_id)
                 .values(
-                    last_active_at=text("NOW()"),
-                    updated_at=text("NOW()"),
+                    last_active_at=func.now(),
+                    updated_at=func.now(),
                 )
             )
 
@@ -322,7 +322,7 @@ class AgentHeartbeatManager:
                 .values(
                     status=status,
                     consecutive_failures=self._consecutive_failures.get(agent_id, 0),
-                    updated_at=text("NOW()"),
+                    updated_at=func.now(),
                 )
             )
 

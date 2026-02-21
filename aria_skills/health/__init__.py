@@ -75,12 +75,12 @@ class HealthMonitorSkill(BaseSkill):
         self.logger.info("Health monitor initialized")
         return True
     
-    async def health_check(self) -> SkillStatus:
+    async def health_check(self, **kwargs) -> SkillStatus:
         """Check own health (meta!)."""
         return self._status
     
     @logged_method()
-    async def check_system(self) -> SkillResult:
+    async def check_system(self, **kwargs) -> SkillResult:
         """
         Run comprehensive system health check.
         

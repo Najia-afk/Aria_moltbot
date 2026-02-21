@@ -575,6 +575,12 @@
     margin-left: -300px;
     min-width: 0;
     width: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.chat-sidebar:not(.collapsed) {
+    pointer-events: auto;
 }
 
 .sidebar-header {
@@ -778,6 +784,20 @@
     border-color: rgba(255, 68, 68, 0.3);
 }
 
+.session-action-btn.archive:hover {
+    background: rgba(102, 126, 234, 0.15);
+    color: #667eea;
+    border-color: rgba(102, 126, 234, 0.3);
+}
+
+.session-item.archived {
+    opacity: 0.6;
+}
+
+.session-item.archived .session-item-title {
+    font-style: italic;
+}
+
 .session-empty {
     text-align: center;
     padding: 40px 20px;
@@ -842,10 +862,13 @@
         bottom: 0;
         z-index: 100;
         box-shadow: 4px 0 20px rgba(0,0,0,0.4);
+        transition: transform 0.3s ease;
     }
     .chat-sidebar.collapsed {
         transform: translateX(-100%);
         margin-left: 0;
+        width: 300px;
+        min-width: 300px;
     }
 }
 </style>
@@ -1237,14 +1260,17 @@
     });
 
     // ── Init ────────────────────────────────────────────────────
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', async () => {
         loadModelsEnhanced();
         loadAgents();
-        loadSessions();
+        await loadSessions();  // await so allSessions is populated before auto-select
         setupInput();
         setupScrollDetection();
         if (sessionId) {
             loadSession(sessionId);
+        } else if (allSessions.length) {
+            // Auto-select the most recent session so the user sees their last chat
+            switchSession(allSessions[0].id);
         }
         // Mobile: start sidebar collapsed
         if (window.innerWidth <= 768) {
@@ -1451,12 +1477,13 @@
             const msgCount = s.message_count || 0;
             const model = s.model || '';
             const isActive = s.id === sessionId;
+            const isArchived = (s.status === 'archived');
 
             return `
-                <div class="session-item ${isActive ? 'active' : ''}"
+                <div class="session-item ${isActive ? 'active' : ''} ${isArchived ? 'archived' : ''}"
                      onclick="switchSession('${s.id}')" data-id="${s.id}"
                      data-agent="${agent}" data-title="${escapeAttr(title)}">
-                    <div class="session-item-title">${escapeHtml(title)}</div>
+                    <div class="session-item-title">${isArchived ? '📦 ' : ''}${escapeHtml(title)}</div>
                     <div class="session-item-meta">
                         <span class="agent-badge">${escapeHtml(agent)}</span>
                         <span>${dateStr}</span>
@@ -1464,6 +1491,7 @@
                         ${model ? `<span>${escapeHtml(model.split('/').pop())}</span>` : ''}
                     </div>
                     <div class="session-item-actions">
+                        ${!isArchived ? `<button class="session-action-btn archive" onclick="event.stopPropagation(); archiveSession('${s.id}')" title="Archive">📦</button>` : ''}
                         <button class="session-action-btn delete" onclick="event.stopPropagation(); deleteSession('${s.id}')" title="Delete">🗑</button>
                     </div>
                 </div>
@@ -1497,11 +1525,14 @@
         if (sid === sessionId) return;
 
         if (ws && ws.readyState <= 1) {
+            ws._intentionalClose = true;  // flag so onclose doesn't auto-retry
             ws.close();
             ws = null;
         }
 
         sessionId = sid;
+        wsAttempts = 0;  // reset retry counter for new session
+        _titleGenerated = false;  // reset for loaded session
         history.replaceState(null, '', `/chat/${sid}`);
 
         const messagesContainer = document.getElementById('chatMessages');
@@ -1546,6 +1577,7 @@
 
     async function createNewSession() {
         if (ws && ws.readyState <= 1) {
+            ws._intentionalClose = true;
             ws.close();
         }
         sessionId = '';
@@ -1627,12 +1659,20 @@
         if (ws && ws.readyState <= 1) return;
         if (!sessionId) return;
 
+        // Stop retrying after too many failed attempts
+        const MAX_WS_RETRIES = 10;
+        if (wsAttempts >= MAX_WS_RETRIES) {
+            setStatus('disconnected');
+            console.warn(`WebSocket: gave up after ${wsAttempts} attempts for session ${sessionId}`);
+            return;
+        }
+
         const urls = buildWsUrls(sessionId);
         const urlIdx = wsAttempts % urls.length;
         const url = urls[urlIdx];
 
         setStatus('connecting');
-        console.log(`WebSocket connecting (attempt ${wsAttempts + 1}):`, url);
+        console.log(`WebSocket connecting (attempt ${wsAttempts + 1}/${MAX_WS_RETRIES}):`, url);
 
         ws = new WebSocket(url);
 
@@ -1656,12 +1696,14 @@
         ws.onclose = (e) => {
             setStatus('disconnected');
             console.log('WebSocket closed:', e.code, e.reason);
+            // Don't auto-retry if the close was intentional (switchSession / createNewSession)
+            if (e.target._intentionalClose) return;
             wsAttempts++;
-            if (sessionId) {
+            if (sessionId && wsAttempts < MAX_WS_RETRIES) {
                 // Quick retry (1s) when cycling through fallback URLs,
-                // slower retry (3s) once all URLs have been tried
+                // slower retry (3s) once all URLs have been tried, back off further
                 const urls = buildWsUrls(sessionId);
-                const delay = wsAttempts < urls.length ? 1000 : 3000;
+                const delay = wsAttempts < urls.length ? 1000 : Math.min(3000 * wsAttempts, 15000);
                 setTimeout(() => connectWS(), delay);
             }
         };
@@ -1708,7 +1750,7 @@
                 finalizeStreamingMessage(msg);
                 break;
             case 'error':
-                showError(msg.content || msg.error || 'Unknown error');
+                showError(msg.content || msg.message || msg.error || 'Unknown error');
                 break;
             case 'message':
                 addMessage(msg.role || 'assistant', msg.content, {
@@ -1727,7 +1769,8 @@
         streamContent = '';
         streamThinking = '';
         streamingMessageId = 'msg-' + Date.now();
-        document.getElementById('chatEmpty').style.display = 'none';
+        const _emptyEl = document.getElementById('chatEmpty');
+        if (_emptyEl) _emptyEl.style.display = 'none';
 
         const container = document.getElementById('chatMessages');
         const msgEl = createMessageElement('assistant', '', { id: streamingMessageId });
@@ -1819,7 +1862,8 @@
 
     // ── Messages ────────────────────────────────────────────────
     function addMessage(role, content, opts = {}) {
-        document.getElementById('chatEmpty').style.display = 'none';
+        const _empty = document.getElementById('chatEmpty');
+        if (_empty) _empty.style.display = 'none';
         const container = document.getElementById('chatMessages');
         const msgEl = createMessageElement(role, content, opts);
         container.appendChild(msgEl);
@@ -1955,6 +1999,7 @@
             });
             const data = await resp.json();
             sessionId = data.id || data.session_id;
+            wsAttempts = 0;  // reset retry counter for fresh session
             document.getElementById('chatTitle').textContent = data.title || 'New Chat';
             history.replaceState(null, '', `/chat/${sessionId}`);
             connectWS();
@@ -1974,7 +2019,8 @@
                 // engine_sessions returns list directly, engine_chat wraps in {messages:[]}
                 const messages = Array.isArray(data) ? data : (data.messages || []);
                 if (messages.length) {
-                    document.getElementById('chatEmpty').style.display = 'none';
+                    const _e = document.getElementById('chatEmpty');
+                    if (_e) _e.style.display = 'none';
                 }
                 messages.forEach(m => {
                     addMessage(m.role, m.content, {
@@ -2048,6 +2094,61 @@
         document.getElementById('sendBtn').disabled = false;
     }
 
+    // ── Auto‑title generation ────────────────────────────────────
+    let _titleGenerated = false;
+
+    async function autoGenerateTitle() {
+        if (!sessionId || _titleGenerated) return;
+
+        // Only generate after the first assistant response (2 messages: user + assistant)
+        const msgs = document.querySelectorAll('#chatMessages .message');
+        const userMsgs = document.querySelectorAll('#chatMessages .message.user');
+        const assistantMsgs = document.querySelectorAll('#chatMessages .message.assistant');
+        if (userMsgs.length < 1 || assistantMsgs.length < 1) return;
+
+        // Extract the first user message text for title
+        const firstUser = userMsgs[0]?.querySelector('.message-content')?.textContent?.trim() || '';
+        if (!firstUser) return;
+
+        _titleGenerated = true;
+
+        // Create a short title from the first user message (max 60 chars)
+        let title = firstUser.replace(/\s+/g, ' ').substring(0, 60);
+        if (firstUser.length > 60) title += '…';
+
+        try {
+            await fetch(`/api/engine/sessions/${sessionId}/title`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title }),
+            });
+
+            // Update in-page title
+            document.getElementById('chatTitle').textContent = title;
+
+            // Update sidebar item
+            const item = document.querySelector(`.session-item[data-id="${sessionId}"]`);
+            if (item) {
+                item.dataset.title = title;
+                const titleEl = item.querySelector('.session-item-title');
+                if (titleEl) titleEl.textContent = title;
+            }
+
+            // Update allSessions cache
+            const sess = allSessions.find(s => s.id === sessionId);
+            if (sess) sess.title = title;
+        } catch(e) {
+            console.warn('Failed to auto-set title:', e);
+        }
+    }
+
+    // Reset title flag when creating a new session
+    const _origCreateNewSession = createNewSession;
+    createNewSession = async function() {
+        _titleGenerated = false;
+        return _origCreateNewSession();
+    };
+
     // ── Utility ─────────────────────────────────────────────────
     function escapeHtml(str) {
         if (!str) return '';
@@ -2067,6 +2168,7 @@
     window.switchSession = switchSession;
     window.createNewSession = createNewSession;
     window.deleteSession = deleteSession;
+    window.archiveSession = archiveSession;
     window.filterSessions = filterSessions;
     window.loadModelsEnhanced = loadModelsEnhanced;
 })();

@@ -17,10 +17,11 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks, WebSocket
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select, text
-from sqlalchemy.ext.asyncio import AsyncSession, AsyncEngine
+from sqlalchemy import func, select, update, and_
+from sqlalchemy.ext.asyncio import AsyncSession, AsyncEngine, async_sessionmaker
 from starlette.websockets import WebSocketDisconnect, WebSocketState
 
+from db.models import EngineChatSession, EngineChatMessage, EngineAgentState
 from aria_engine.roundtable import Roundtable, RoundtableResult
 
 logger = logging.getLogger("aria.api.engine_roundtable")
@@ -98,6 +99,7 @@ class RoundtableStatusResponse(BaseModel):
 
 _roundtable: Roundtable | None = None
 _db_engine: AsyncEngine | None = None
+_db_session: async_sessionmaker | None = None
 
 # In-memory tracking of running roundtable tasks
 _running: dict[str, dict[str, Any]] = {}
@@ -109,9 +111,10 @@ def configure_roundtable(
     db_engine: AsyncEngine,
 ) -> None:
     """Called from main.py lifespan to inject instances."""
-    global _roundtable, _db_engine
+    global _roundtable, _db_engine, _db_session
     _roundtable = roundtable
     _db_engine = db_engine
+    _db_session = async_sessionmaker(db_engine, expire_on_commit=False)
     logger.info("Roundtable router configured")
 
 
@@ -244,13 +247,12 @@ async def list_roundtables(
         rows = await roundtable.list_roundtables(limit=page_size, offset=offset)
 
         # Get total count
-        if _db_engine is not None:
-            async with _db_engine.begin() as conn:
-                result = await conn.execute(
-                    text("""
-                        SELECT COUNT(*) FROM aria_engine.chat_sessions
-                        WHERE session_type = 'roundtable'
-                    """)
+        if _db_session is not None:
+            async with _db_session() as session:
+                result = await session.execute(
+                    select(func.count(EngineChatSession.id)).where(
+                        EngineChatSession.session_type == "roundtable"
+                    )
                 )
                 total = result.scalar() or 0
         else:
@@ -282,31 +284,28 @@ async def list_roundtables(
 @router.get("/agents/available")
 async def get_available_agents():
     """Get list of agents available for roundtable participation."""
-    if _db_engine is None:
+    if _db_session is None:
         raise HTTPException(status_code=503, detail="Database not available")
 
     try:
-        async with _db_engine.begin() as conn:
-            result = await conn.execute(
-                text("""
-                    SELECT agent_id, display_name, agent_type, status,
-                           focus_type, pheromone_score
-                    FROM aria_engine.engine_agent_state
-                    WHERE status != 'terminated'
-                    ORDER BY pheromone_score DESC
-                """)
+        async with _db_session() as session:
+            stmt = (
+                select(EngineAgentState)
+                .where(EngineAgentState.status != "terminated")
+                .order_by(EngineAgentState.pheromone_score.desc())
             )
-            rows = result.mappings().all()
+            result = await session.execute(stmt)
+            rows = result.scalars().all()
 
         return {
             "agents": [
                 {
-                    "agent_id": r["agent_id"],
-                    "display_name": r["display_name"],
-                    "agent_type": r["agent_type"],
-                    "status": r["status"],
-                    "focus_type": r["focus_type"],
-                    "pheromone_score": float(r["pheromone_score"]) if r["pheromone_score"] else 0.0,
+                    "agent_id": r.agent_id,
+                    "display_name": r.display_name,
+                    "agent_type": r.agent_type,
+                    "status": r.status,
+                    "focus_type": r.focus_type,
+                    "pheromone_score": float(r.pheromone_score) if r.pheromone_score else 0.0,
                 }
                 for r in rows
             ]
@@ -359,55 +358,54 @@ async def get_roundtable(session_id: str):
         return result.to_dict()
 
     # Fallback: load from DB
-    if _db_engine is None:
+    if _db_session is None:
         raise HTTPException(status_code=503, detail="Database not available")
 
     try:
-        async with _db_engine.begin() as conn:
+        async with _db_session() as session:
             # Load session
-            session_result = await conn.execute(
-                text("""
-                    SELECT id, title, metadata, created_at
-                    FROM aria_engine.chat_sessions
-                    WHERE id = :sid AND session_type = 'roundtable'
-                """),
-                {"sid": session_id},
+            stmt = (
+                select(EngineChatSession)
+                .where(
+                    and_(
+                        EngineChatSession.id == session_id,
+                        EngineChatSession.session_type == "roundtable",
+                    )
+                )
             )
-            session_row = session_result.mappings().first()
+            result = await session.execute(stmt)
+            session_row = result.scalar_one_or_none()
             if session_row is None:
                 raise HTTPException(status_code=404, detail=f"Roundtable {session_id} not found")
 
             # Load all messages/turns
-            msg_result = await conn.execute(
-                text("""
-                    SELECT role, content, metadata, created_at
-                    FROM aria_engine.chat_messages
-                    WHERE session_id = :sid
-                    ORDER BY created_at ASC
-                """),
-                {"sid": session_id},
+            msg_stmt = (
+                select(EngineChatMessage)
+                .where(EngineChatMessage.session_id == session_id)
+                .order_by(EngineChatMessage.created_at.asc())
             )
-            messages = msg_result.mappings().all()
+            msg_result = await session.execute(msg_stmt)
+            messages = msg_result.scalars().all()
 
-            metadata = session_row["metadata"] or {}
+            metadata = session_row.metadata_json or {}
             participants = metadata.get("participants", []) if isinstance(metadata, dict) else []
 
             turns = []
             synthesis = ""
             for msg in messages:
-                meta = msg.get("metadata") or {}
+                meta = msg.metadata_json or {}
                 if isinstance(meta, str):
                     try:
                         meta = json.loads(meta)
                     except Exception:
                         meta = {}
 
-                if msg["role"] == "synthesis":
-                    synthesis = msg["content"]
+                if msg.role == "synthesis":
+                    synthesis = msg.content
                 else:
                     # Parse round number from role like "round-1"
                     round_num = 0
-                    role = msg["role"] or ""
+                    role = msg.role or ""
                     if role.startswith("round-"):
                         try:
                             round_num = int(role.split("-")[1])
@@ -417,20 +415,20 @@ async def get_roundtable(session_id: str):
                     turns.append({
                         "agent_id": meta.get("agent_id", "unknown"),
                         "round": round_num,
-                        "content": msg["content"],
+                        "content": msg.content,
                         "duration_ms": 0,
                     })
 
             return {
-                "session_id": str(session_row["id"]),
-                "topic": (session_row["title"] or "").replace("Roundtable: ", ""),
+                "session_id": str(session_row.id),
+                "topic": (session_row.title or "").replace("Roundtable: ", ""),
                 "participants": participants,
                 "rounds": max((t["round"] for t in turns), default=0),
                 "turn_count": len(turns),
                 "synthesis": synthesis,
                 "synthesizer_id": "main",
                 "total_duration_ms": 0,
-                "created_at": session_row["created_at"].isoformat() if session_row["created_at"] else None,
+                "created_at": session_row.created_at.isoformat() if session_row.created_at else None,
                 "turns": turns,
             }
 
@@ -463,26 +461,23 @@ async def get_roundtable_turns(session_id: str):
         }
 
     # From DB
-    if _db_engine is None:
+    if _db_session is None:
         raise HTTPException(status_code=503, detail="Database not available")
 
-    async with _db_engine.begin() as conn:
-        msg_result = await conn.execute(
-            text("""
-                SELECT role, content, metadata
-                FROM aria_engine.chat_messages
-                WHERE session_id = :sid
-                ORDER BY created_at ASC
-            """),
-            {"sid": session_id},
+    async with _db_session() as session:
+        stmt = (
+            select(EngineChatMessage)
+            .where(EngineChatMessage.session_id == session_id)
+            .order_by(EngineChatMessage.created_at.asc())
         )
-        messages = msg_result.mappings().all()
+        result = await session.execute(stmt)
+        messages = result.scalars().all()
 
     turns = []
     for msg in messages:
-        role = msg["role"] or ""
+        role = msg.role or ""
         if role.startswith("round-"):
-            meta = msg.get("metadata") or {}
+            meta = msg.metadata_json or {}
             if isinstance(meta, str):
                 try:
                     meta = json.loads(meta)
@@ -495,7 +490,7 @@ async def get_roundtable_turns(session_id: str):
             turns.append({
                 "agent_id": meta.get("agent_id", "unknown"),
                 "round": round_num,
-                "content": msg["content"],
+                "content": msg.content,
                 "duration_ms": 0,
             })
 
@@ -505,23 +500,27 @@ async def get_roundtable_turns(session_id: str):
 @router.delete("/{session_id}")
 async def delete_roundtable(session_id: str):
     """End/archive a roundtable session."""
-    if _db_engine is None:
+    if _db_session is None:
         raise HTTPException(status_code=503, detail="Database not available")
 
     try:
-        async with _db_engine.begin() as conn:
-            result = await conn.execute(
-                text("""
-                    UPDATE aria_engine.chat_sessions
-                    SET status = 'ended', updated_at = NOW()
-                    WHERE id = :sid AND session_type = 'roundtable'
-                    RETURNING id
-                """),
-                {"sid": session_id},
-            )
-            row = result.first()
-            if row is None:
-                raise HTTPException(status_code=404, detail=f"Roundtable {session_id} not found")
+        async with _db_session() as session:
+            async with session.begin():
+                stmt = (
+                    update(EngineChatSession)
+                    .where(
+                        and_(
+                            EngineChatSession.id == session_id,
+                            EngineChatSession.session_type == "roundtable",
+                        )
+                    )
+                    .values(status="ended", updated_at=func.now())
+                    .returning(EngineChatSession.id)
+                )
+                result = await session.execute(stmt)
+                row = result.first()
+                if row is None:
+                    raise HTTPException(status_code=404, detail=f"Roundtable {session_id} not found")
 
         # Clean up in-memory cache
         _completed.pop(session_id, None)
@@ -652,66 +651,66 @@ async def get_swarm(session_id: str):
     if session_id in _swarm_completed:
         return _swarm_completed[session_id].to_dict()
 
-    if _db_engine is None:
+    if _db_session is None:
         raise HTTPException(status_code=503, detail="Database not available")
 
     # Fallback: load from DB (same schema as roundtable but session_type='swarm')
     try:
-        async with _db_engine.begin() as conn:
-            session_result = await conn.execute(
-                text("""
-                    SELECT id, title, metadata, created_at
-                    FROM aria_engine.chat_sessions
-                    WHERE id = :sid AND session_type = 'swarm'
-                """),
-                {"sid": session_id},
+        async with _db_session() as session:
+            stmt = (
+                select(EngineChatSession)
+                .where(
+                    and_(
+                        EngineChatSession.id == session_id,
+                        EngineChatSession.session_type == "swarm",
+                    )
+                )
             )
-            row = session_result.mappings().first()
+            result = await session.execute(stmt)
+            row = result.scalar_one_or_none()
             if row is None:
                 raise HTTPException(status_code=404, detail=f"Swarm {session_id} not found")
 
-            msg_result = await conn.execute(
-                text("""
-                    SELECT role, content, metadata
-                    FROM aria_engine.chat_messages
-                    WHERE session_id = :sid ORDER BY created_at ASC
-                """),
-                {"sid": session_id},
+            msg_stmt = (
+                select(EngineChatMessage)
+                .where(EngineChatMessage.session_id == session_id)
+                .order_by(EngineChatMessage.created_at.asc())
             )
-            messages = msg_result.mappings().all()
+            msg_result = await session.execute(msg_stmt)
+            messages = msg_result.scalars().all()
 
-            metadata = row["metadata"] or {}
+            metadata = row.metadata_json or {}
             participants = metadata.get("participants", []) if isinstance(metadata, dict) else []
 
             votes = []
             consensus = ""
             for msg in messages:
-                meta = msg.get("metadata") or {}
+                meta = msg.metadata_json or {}
                 if isinstance(meta, str):
                     try:
                         meta = json.loads(meta)
                     except Exception:
                         meta = {}
 
-                if msg["role"] == "consensus":
-                    consensus = msg["content"]
-                elif (msg["role"] or "").startswith("swarm-"):
+                if msg.role == "consensus":
+                    consensus = msg.content
+                elif (msg.role or "").startswith("swarm-"):
                     try:
-                        iteration = int(msg["role"].split("-")[1])
+                        iteration = int(msg.role.split("-")[1])
                     except (IndexError, ValueError):
                         iteration = 0
                     votes.append({
                         "agent_id": meta.get("agent_id", "unknown"),
                         "iteration": iteration,
-                        "content": msg["content"],
+                        "content": msg.content,
                         "vote": "extend",
                         "confidence": 0.5,
                         "duration_ms": 0,
                     })
 
             return {
-                "session_id": str(row["id"]),
-                "topic": (row["title"] or "").replace("Swarm: ", ""),
+                "session_id": str(row.id),
+                "topic": (row.title or "").replace("Swarm: ", ""),
                 "participants": participants,
                 "iterations": max((v["iteration"] for v in votes), default=0),
                 "vote_count": len(votes),
@@ -719,7 +718,7 @@ async def get_swarm(session_id: str):
                 "consensus_score": 0.0,
                 "converged": False,
                 "total_duration_ms": 0,
-                "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+                "created_at": row.created_at.isoformat() if row.created_at else None,
                 "votes": votes,
             }
     except HTTPException:

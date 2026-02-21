@@ -81,7 +81,7 @@ class SandboxSkill(BaseSkill):
         return self._status
 
     @logged_method()
-    async def run_code(self, code: str, timeout: int = 30) -> SkillResult:
+    async def run_code(self, code: str, timeout: int = 30, **kwargs) -> SkillResult:
         """Execute Python code in the sandbox."""
         if not self._client:
             return SkillResult.fail("Not initialized")
@@ -107,8 +107,12 @@ class SandboxSkill(BaseSkill):
             return SkillResult.fail(f"Sandbox execution failed: {e}")
 
     @logged_method()
-    async def write_file(self, path: str, content: str) -> SkillResult:
+    async def write_file(self, path: str = "", content: str = "", *, file_path: str = "") -> SkillResult:
         """Write a file in the sandbox via code execution."""
+        # Accept both 'path' and 'file_path' — LLMs sometimes hallucinate param names
+        path = path or file_path
+        if not path:
+            return SkillResult.fail("Missing 'path' parameter")
         if not self._client:
             return SkillResult.fail("Not initialized")
 
@@ -123,8 +127,12 @@ class SandboxSkill(BaseSkill):
         return await self.run_code(code, timeout=10)
 
     @logged_method()
-    async def read_file(self, path: str) -> SkillResult:
+    async def read_file(self, path: str = "", *, file_path: str = "") -> SkillResult:
         """Read a file from the sandbox via code execution."""
+        # Accept both 'path' and 'file_path' — LLMs sometimes hallucinate param names
+        path = path or file_path
+        if not path:
+            return SkillResult.fail("Missing 'path' parameter")
         if not self._client:
             return SkillResult.fail("Not initialized")
 

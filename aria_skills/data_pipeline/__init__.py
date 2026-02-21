@@ -44,6 +44,10 @@ class DataPipelineSkill(BaseSkill):
     - Schema inference and enforcement
     - Data quality checks
     """
+
+    # Guard: absolute max records accepted per call to prevent OOM
+    MAX_RECORDS = 50_000
+    MAX_PIPELINE_STEPS = 100
     
     @property
     def name(self) -> str:
@@ -79,6 +83,11 @@ class DataPipelineSkill(BaseSkill):
             SkillResult with pipeline definition
         """
         try:
+            if len(steps) > self.MAX_PIPELINE_STEPS:
+                return SkillResult.fail(
+                    f"Too many pipeline steps ({len(steps)}). Max allowed: {self.MAX_PIPELINE_STEPS}"
+                )
+
             pipeline_steps = []
             for i, step in enumerate(steps):
                 pipeline_steps.append(PipelineStep(
@@ -116,6 +125,11 @@ class DataPipelineSkill(BaseSkill):
             SkillResult with validation results
         """
         try:
+            if len(data) > self.MAX_RECORDS:
+                return SkillResult.fail(
+                    f"Input too large ({len(data)} records). Max allowed: {self.MAX_RECORDS}"
+                )
+
             data_schema = DataSchema(
                 fields=schema.get("fields", {}),
                 required=schema.get("required", []),
@@ -170,6 +184,10 @@ class DataPipelineSkill(BaseSkill):
         try:
             if not data:
                 return SkillResult.fail("No data provided for schema inference")
+            if len(data) > self.MAX_RECORDS:
+                return SkillResult.fail(
+                    f"Input too large ({len(data)} records). Max allowed: {self.MAX_RECORDS}"
+                )
             
             fields = {}
             required = []
@@ -233,6 +251,11 @@ class DataPipelineSkill(BaseSkill):
             SkillResult with transformed data
         """
         try:
+            if len(data) > self.MAX_RECORDS:
+                return SkillResult.fail(
+                    f"Input too large ({len(data)} records). Max allowed: {self.MAX_RECORDS}"
+                )
+
             result = data.copy()
             
             for transform in transformations:
@@ -297,6 +320,10 @@ class DataPipelineSkill(BaseSkill):
         try:
             if not data:
                 return SkillResult.fail("No data provided")
+            if len(data) > self.MAX_RECORDS:
+                return SkillResult.fail(
+                    f"Input too large ({len(data)} records). Max allowed: {self.MAX_RECORDS}"
+                )
             
             total_records = len(data)
             all_fields = set()

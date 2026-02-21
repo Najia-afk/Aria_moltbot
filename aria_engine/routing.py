@@ -14,7 +14,7 @@ import re
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import text, select, update
+from sqlalchemy import select, update, func
 from sqlalchemy.ext.asyncio import AsyncEngine
 from db.models import EngineAgentState
 
@@ -455,7 +455,7 @@ class EngineRouter:
                 .where(EngineAgentState.agent_id == agent_id)
                 .values(
                     pheromone_score=round(score, 3),
-                    updated_at=text("NOW()"),
+                    updated_at=func.now(),
                 )
             )
 

@@ -18,8 +18,10 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import text
+from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncEngine
+
+from db.models import EngineChatSession, EngineChatMessage
 
 from aria_engine.agent_pool import AgentPool
 from aria_engine.config import EngineConfig
@@ -122,9 +124,14 @@ class Roundtable:
         agent_pool: AgentPool,
         router: EngineRouter,
     ):
+        from sqlalchemy.ext.asyncio import async_sessionmaker
+
         self._db_engine = db_engine
         self._pool = agent_pool
         self._router = router
+        self._async_session = async_sessionmaker(
+            db_engine, expire_on_commit=False,
+        )
 
     async def discuss(
         self,
@@ -499,28 +506,19 @@ class Roundtable:
         topic: str,
         agent_ids: list[str],
     ) -> None:
-        """Create a roundtable session in the DB."""
-        import json
-
+        """Create a roundtable session in the DB (ORM)."""
         title = f"Roundtable: {topic[:100]}"
-        meta = json.dumps({"participants": agent_ids})
 
-        async with self._db_engine.begin() as conn:
-            await conn.execute(
-                text("""
-                    INSERT INTO aria_engine.chat_sessions
-                        (id, title, agent_id, session_type, metadata)
-                    VALUES
-                        (:sid, :title, :agent, 'roundtable',
-                         :meta::jsonb)
-                """),
-                {
-                    "sid": session_id,
-                    "title": title,
-                    "agent": "roundtable",
-                    "meta": meta,
-                },
-            )
+        async with self._async_session() as session:
+            async with session.begin():
+                obj = EngineChatSession(
+                    id=session_id,
+                    title=title,
+                    agent_id="roundtable",
+                    session_type="roundtable",
+                    metadata_json={"participants": agent_ids},
+                )
+                session.add(obj)
 
     async def _persist_message(
         self,
@@ -529,57 +527,60 @@ class Roundtable:
         content: str,
         role: str,
     ) -> None:
-        """Persist a roundtable message to chat_messages."""
-        async with self._db_engine.begin() as conn:
-            await conn.execute(
-                text("""
-                    INSERT INTO aria_engine.chat_messages
-                        (session_id, role, content, metadata)
-                    VALUES
-                        (:sid, :role, :content, :meta::jsonb)
-                """),
-                {
-                    "sid": session_id,
-                    "role": role,
-                    "content": content,
-                    "meta": f'{{"agent_id": "{agent_id}"}}',
-                },
-            )
+        """Persist a roundtable message to chat_messages (ORM)."""
+        async with self._async_session() as session:
+            async with session.begin():
+                msg = EngineChatMessage(
+                    session_id=session_id,
+                    role=role,
+                    content=content,
+                    metadata_json={"agent_id": agent_id},
+                )
+                session.add(msg)
 
     async def list_roundtables(
         self,
         limit: int = 20,
         offset: int = 0,
     ) -> list[dict[str, Any]]:
-        """List recent roundtable sessions."""
-        async with self._db_engine.begin() as conn:
-            result = await conn.execute(
-                text("""
-                    SELECT s.id, s.title, s.metadata,
-                           s.created_at,
-                           COUNT(m.id) AS message_count
-                    FROM aria_engine.chat_sessions s
-                    LEFT JOIN aria_engine.chat_messages m
-                        ON m.session_id = s.id
-                    WHERE s.session_type = 'roundtable'
-                    GROUP BY s.id, s.title, s.metadata,
-                             s.created_at
-                    ORDER BY s.created_at DESC
-                    LIMIT :limit OFFSET :offset
-                """),
-                {"limit": limit, "offset": offset},
+        """List recent roundtable sessions (ORM)."""
+        stmt = (
+            select(
+                EngineChatSession.id,
+                EngineChatSession.title,
+                EngineChatSession.metadata_json,
+                EngineChatSession.created_at,
+                func.count(EngineChatMessage.id).label("message_count"),
             )
-            rows = result.mappings().all()
+            .outerjoin(
+                EngineChatMessage,
+                EngineChatMessage.session_id == EngineChatSession.id,
+            )
+            .where(EngineChatSession.session_type == "roundtable")
+            .group_by(
+                EngineChatSession.id,
+                EngineChatSession.title,
+                EngineChatSession.metadata_json,
+                EngineChatSession.created_at,
+            )
+            .order_by(EngineChatSession.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+
+        async with self._async_session() as session:
+            result = await session.execute(stmt)
+            rows = result.all()
 
         return [
             {
-                "session_id": str(row["id"]),
-                "title": row["title"],
-                "participants": (row["metadata"] or {}).get(
+                "session_id": str(row.id),
+                "title": row.title,
+                "participants": (row.metadata_json or {}).get(
                     "participants", []
                 ),
-                "message_count": row["message_count"],
-                "created_at": row["created_at"].isoformat(),
+                "message_count": row.message_count,
+                "created_at": row.created_at.isoformat(),
             }
             for row in rows
         ]

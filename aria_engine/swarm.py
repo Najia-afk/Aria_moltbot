@@ -19,8 +19,10 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlalchemy import select, func, and_
+from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
+
+from db.models import EngineChatSession, EngineChatMessage, EngineAgentState
 
 from aria_engine.agent_pool import AgentPool
 from aria_engine.config import EngineConfig
@@ -127,6 +129,9 @@ class SwarmOrchestrator:
         self._db_engine = db_engine
         self._pool = agent_pool
         self._router = router
+        self._async_session = async_sessionmaker(
+            db_engine, expire_on_commit=False,
+        )
 
     async def execute(
         self,
@@ -626,23 +631,22 @@ class SwarmOrchestrator:
     async def _get_pheromone_weights(
         self, agent_ids: list[str]
     ) -> dict[str, float]:
-        """Load pheromone scores for agents from the routing table."""
+        """Load pheromone scores for agents from the routing table (ORM)."""
         weights: dict[str, float] = {}
         try:
-            async with self._db_engine.begin() as conn:
-                from db.models import EngineAgentState
-
-                result = await conn.execute(
-                    text("""
-                        SELECT agent_id, pheromone_score
-                        FROM aria_engine.engine_agent_state
-                        WHERE agent_id = ANY(:ids)
-                    """),
-                    {"ids": agent_ids},
+            stmt = (
+                select(
+                    EngineAgentState.agent_id,
+                    EngineAgentState.pheromone_score,
                 )
-                for row in result.mappings():
-                    weights[row["agent_id"]] = float(
-                        row["pheromone_score"] or 0.5
+                .where(EngineAgentState.agent_id.in_(agent_ids))
+            )
+
+            async with self._async_session() as session:
+                result = await session.execute(stmt)
+                for row in result:
+                    weights[row.agent_id] = float(
+                        row.pheromone_score or 0.5
                     )
         except Exception as e:
             logger.warning("Failed to load pheromone weights: %s", e)
@@ -660,27 +664,19 @@ class SwarmOrchestrator:
         topic: str,
         agent_ids: list[str],
     ) -> None:
-        """Create a swarm session in the database."""
-        import json
-
+        """Create a swarm session in the database (ORM)."""
         title = f"Swarm: {topic[:100]}"
-        meta = json.dumps({"participants": agent_ids, "mode": "swarm"})
 
-        async with self._db_engine.begin() as conn:
-            await conn.execute(
-                text("""
-                    INSERT INTO aria_engine.chat_sessions
-                        (id, title, agent_id, session_type, metadata)
-                    VALUES
-                        (:sid, :title, :agent, 'swarm', :meta::jsonb)
-                """),
-                {
-                    "sid": session_id,
-                    "title": title,
-                    "agent": "swarm",
-                    "meta": meta,
-                },
-            )
+        async with self._async_session() as session:
+            async with session.begin():
+                obj = EngineChatSession(
+                    id=session_id,
+                    title=title,
+                    agent_id="swarm",
+                    session_type="swarm",
+                    metadata_json={"participants": agent_ids, "mode": "swarm"},
+                )
+                session.add(obj)
 
     async def _persist_message(
         self,
@@ -689,59 +685,62 @@ class SwarmOrchestrator:
         content: str,
         role: str,
     ) -> None:
-        """Persist a swarm message to the database."""
-        async with self._db_engine.begin() as conn:
-            await conn.execute(
-                text("""
-                    INSERT INTO aria_engine.chat_messages
-                        (session_id, role, content, metadata)
-                    VALUES
-                        (:sid, :role, :content, :meta::jsonb)
-                """),
-                {
-                    "sid": session_id,
-                    "role": role,
-                    "content": content,
-                    "meta": f'{{"agent_id": "{agent_id}"}}',
-                },
-            )
+        """Persist a swarm message to the database (ORM)."""
+        async with self._async_session() as session:
+            async with session.begin():
+                msg = EngineChatMessage(
+                    session_id=session_id,
+                    role=role,
+                    content=content,
+                    metadata_json={"agent_id": agent_id},
+                )
+                session.add(msg)
 
     async def list_swarms(
         self,
         limit: int = 20,
         offset: int = 0,
     ) -> list[dict[str, Any]]:
-        """List past swarm sessions."""
-        async with self._db_engine.begin() as conn:
-            result = await conn.execute(
-                text("""
-                    SELECT s.id, s.title, s.metadata,
-                           s.created_at,
-                           COUNT(m.id) AS message_count
-                    FROM aria_engine.chat_sessions s
-                    LEFT JOIN aria_engine.chat_messages m
-                        ON m.session_id = s.id
-                    WHERE s.session_type = 'swarm'
-                    GROUP BY s.id, s.title, s.metadata,
-                             s.created_at
-                    ORDER BY s.created_at DESC
-                    LIMIT :limit OFFSET :offset
-                """),
-                {"limit": limit, "offset": offset},
+        """List past swarm sessions (ORM)."""
+        stmt = (
+            select(
+                EngineChatSession.id,
+                EngineChatSession.title,
+                EngineChatSession.metadata_json,
+                EngineChatSession.created_at,
+                func.count(EngineChatMessage.id).label("message_count"),
             )
-            rows = result.mappings().all()
+            .outerjoin(
+                EngineChatMessage,
+                EngineChatMessage.session_id == EngineChatSession.id,
+            )
+            .where(EngineChatSession.session_type == "swarm")
+            .group_by(
+                EngineChatSession.id,
+                EngineChatSession.title,
+                EngineChatSession.metadata_json,
+                EngineChatSession.created_at,
+            )
+            .order_by(EngineChatSession.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+
+        async with self._async_session() as session:
+            result = await session.execute(stmt)
+            rows = result.all()
 
         return [
             {
-                "session_id": str(row["id"]),
-                "title": row["title"],
+                "session_id": str(row.id),
+                "title": row.title,
                 "participants": (
-                    (row["metadata"] or {}).get("participants", [])
-                    if isinstance(row["metadata"], dict)
+                    (row.metadata_json or {}).get("participants", [])
+                    if isinstance(row.metadata_json, dict)
                     else []
                 ),
-                "message_count": row["message_count"],
-                "created_at": row["created_at"].isoformat(),
+                "message_count": row.message_count,
+                "created_at": row.created_at.isoformat(),
             }
             for row in rows
         ]

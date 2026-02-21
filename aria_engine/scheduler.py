@@ -21,7 +21,7 @@ from apscheduler import AsyncScheduler
 from apscheduler.datastores.sqlalchemy import SQLAlchemyDataStore
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
-from sqlalchemy import text, select, insert, update, delete, func
+from sqlalchemy import select, insert, update, delete, func
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine, async_sessionmaker
 
 from aria_engine.config import EngineConfig
@@ -232,30 +232,30 @@ class EngineScheduler:
                 .order_by(EngineCronJob.name)
             )
             result = await conn.execute(stmt)
-            rows = result.scalars().all()
+            rows = result.mappings().all()
 
         registered = 0
         for row in rows:
             try:
-                trigger = parse_schedule(row.schedule)
+                trigger = parse_schedule(row["schedule"])
                 await self._scheduler.add_schedule(
                     _scheduler_dispatch,
                     trigger=trigger,
-                    id=row.id,
+                    id=row["id"],
                     kwargs={
-                        "job_id": row.id,
-                        "agent_id": row.agent_id,
-                        "payload_type": row.payload_type,
-                        "payload": row.payload,
-                        "session_mode": row.session_mode,
-                        "max_duration": row.max_duration_seconds,
-                        "retry_count": row.retry_count,
+                        "job_id": row["id"],
+                        "agent_id": row["agent_id"],
+                        "payload_type": row["payload_type"],
+                        "payload": row["payload"],
+                        "session_mode": row["session_mode"],
+                        "max_duration": row["max_duration_seconds"],
+                        "retry_count": row["retry_count"],
                     },
                 )
                 registered += 1
-                logger.debug("Registered job: %s (%s)", row.name, row.schedule)
+                logger.debug("Registered job: %s (%s)", row["name"], row["schedule"])
             except Exception as e:
-                logger.error("Failed to register job %s: %s", row.id, e, exc_info=True)
+                logger.error("Failed to register job %s: %s", row["id"], e, exc_info=True)
 
         logger.info("Loaded %d/%d enabled cron jobs", registered, len(rows))
 

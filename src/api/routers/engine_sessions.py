@@ -6,6 +6,8 @@ Provides:
 - GET /api/engine/sessions/{session_id} — single session detail
 - GET /api/engine/sessions/{session_id}/messages — session messages
 - DELETE /api/engine/sessions/{session_id} — delete session
+- PATCH /api/engine/sessions/{session_id}/title — update session title
+- POST /api/engine/sessions/{session_id}/archive — archive session
 - POST /api/engine/sessions/{session_id}/end — end session
 - GET /api/engine/sessions/stats — aggregate statistics
 """
@@ -65,6 +67,9 @@ class MessageResponse(BaseModel):
     session_id: str
     role: str
     content: str = ""
+    thinking: str | None = None
+    tool_calls: list | dict | None = None
+    model: str | None = None
     agent_id: str | None = None
     metadata: dict[str, Any] | None = None
     created_at: str
@@ -88,8 +93,15 @@ class SessionStatsResponse(BaseModel):
 
 # ── Helpers ───────────────────────────────────────────────────
 
+_cached_manager: NativeSessionManager | None = None
+
+
 async def _get_manager() -> NativeSessionManager:
-    """Get NativeSessionManager instance."""
+    """Get NativeSessionManager instance (cached engine for connection pooling)."""
+    global _cached_manager
+    if _cached_manager is not None:
+        return _cached_manager
+
     from sqlalchemy.ext.asyncio import create_async_engine
 
     config = EngineConfig()
@@ -100,7 +112,8 @@ async def _get_manager() -> NativeSessionManager:
             db_url = db_url.replace(prefix, "postgresql+psycopg://", 1)
             break
     db = create_async_engine(db_url, pool_size=5, max_overflow=10)
-    return NativeSessionManager(db)
+    _cached_manager = NativeSessionManager(db)
+    return _cached_manager
 
 
 # ── Endpoints ─────────────────────────────────────────────────
@@ -302,6 +315,89 @@ async def end_session(session_id: str):
         raise HTTPException(404, f"Session {session_id} not found")
 
     return {"status": "ended", "session_id": session_id}
+
+
+class TitleUpdateRequest(BaseModel):
+    """Request body for updating a session title."""
+    title: str = Field(..., min_length=1, max_length=500)
+
+
+async def _get_db_engine():
+    """Get or create a cached async engine for direct ORM operations."""
+    mgr = await _get_manager()
+    return mgr._db  # reuse the same pooled engine
+
+
+@router.patch("/{session_id}/title")
+async def update_session_title(session_id: str, body: TitleUpdateRequest):
+    """
+    Update a session's title.
+
+    Used by the frontend for auto-generated titles after first message exchange.
+    Uses SQLAlchemy ORM — no raw SQL.
+    """
+    engine = await _get_db_engine()
+
+    try:
+        from db.models import EngineChatSession
+    except ImportError:
+        from .db.models import EngineChatSession
+
+    from sqlalchemy.ext.asyncio import AsyncSession as _AS
+    from sqlalchemy import select as _sel
+
+    async with _AS(engine) as db:
+        async with db.begin():
+            result = await db.execute(
+                _sel(EngineChatSession).where(
+                    EngineChatSession.id == session_id
+                )
+            )
+            session = result.scalar_one_or_none()
+            if not session:
+                raise HTTPException(404, f"Session {session_id} not found")
+
+            session.title = body.title
+            session.updated_at = datetime.now(timezone.utc)
+
+    logger.info("Title updated for session %s: %s", session_id, body.title[:60])
+    return {"status": "updated", "session_id": session_id, "title": body.title}
+
+
+@router.post("/{session_id}/archive")
+async def archive_session(session_id: str):
+    """
+    Archive a session (set status='archived').
+
+    Data is preserved — only the status changes.  The frontend hides or
+    dims archived sessions. Uses SQLAlchemy ORM — no raw SQL.
+    """
+    engine = await _get_db_engine()
+
+    try:
+        from db.models import EngineChatSession
+    except ImportError:
+        from .db.models import EngineChatSession
+
+    from sqlalchemy.ext.asyncio import AsyncSession as _AS
+    from sqlalchemy import select as _sel
+
+    async with _AS(engine) as db:
+        async with db.begin():
+            result = await db.execute(
+                _sel(EngineChatSession).where(
+                    EngineChatSession.id == session_id
+                )
+            )
+            session = result.scalar_one_or_none()
+            if not session:
+                raise HTTPException(404, f"Session {session_id} not found")
+
+            session.status = "archived"
+            session.updated_at = datetime.now(timezone.utc)
+
+    logger.info("Archived session %s", session_id)
+    return {"status": "archived", "session_id": session_id}
 
 
 @router.post("/cleanup")

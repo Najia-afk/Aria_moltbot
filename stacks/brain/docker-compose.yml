@@ -64,6 +64,8 @@ services:
       - ../../aria_engine:/aria_engine:ro
       - ../../aria_skills:/aria_skills:ro
       - ../../aria_agents:/aria_agents:ro
+      # db.models needed by agent_pool, routing, heartbeat
+      - ../../src/api/db:/db:ro
     depends_on:
       aria-db:
         condition: service_healthy

@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Callable
 
-from sqlalchemy import text, select, update
+from sqlalchemy import select, update, func
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlalchemy.orm import Session as _OrmSession
@@ -323,7 +323,7 @@ class AgentPool:
                     "model": stmt.excluded.model,
                     "display_name": stmt.excluded.display_name,
                     "system_prompt": stmt.excluded.system_prompt,
-                    "updated_at": text("NOW()"),
+                    "updated_at": func.now(),
                 },
             )
             await conn.execute(stmt)
@@ -493,7 +493,7 @@ class AgentPool:
                     consecutive_failures=agent.consecutive_failures,
                     pheromone_score=agent.pheromone_score,
                     last_active_at=agent.last_active_at,
-                    updated_at=text("NOW()"),
+                    updated_at=func.now(),
                 )
             )
 

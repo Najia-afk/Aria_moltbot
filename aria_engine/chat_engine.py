@@ -31,6 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from aria_engine.config import EngineConfig
 from aria_engine.exceptions import SessionError, LLMError
 from aria_engine.llm_gateway import LLMGateway, LLMResponse
+from aria_engine.telemetry import log_model_usage, log_skill_invocation, _parse_skill_from_tool
 from aria_engine.tool_registry import ToolRegistry, ToolResult
 from aria_engine.thinking import extract_thinking_from_response, strip_thinking_from_content
 
@@ -375,6 +376,13 @@ class ChatEngine:
                     )
                 except LLMError as e:
                     logger.error("LLM call failed in session %s: %s", sid, e)
+                    asyncio.ensure_future(log_model_usage(
+                        self._db_factory,
+                        model=session.model or "unknown",
+                        latency_ms=int((time.monotonic() - overall_start) * 1000),
+                        success=False,
+                        error_message=str(e)[:200],
+                    ))
                     raise SessionError(f"LLM call failed: {e}") from e
 
                 total_input_tokens += llm_response.input_tokens
@@ -384,6 +392,18 @@ class ChatEngine:
                 final_thinking = llm_response.thinking or final_thinking
                 final_finish_reason = llm_response.finish_reason
 
+                # Telemetry → aria_data.model_usage
+                iter_latency = int((time.monotonic() - overall_start) * 1000)
+                asyncio.ensure_future(log_model_usage(
+                    self._db_factory,
+                    model=session.model or "unknown",
+                    input_tokens=llm_response.input_tokens,
+                    output_tokens=llm_response.output_tokens,
+                    cost_usd=llm_response.cost_usd,
+                    latency_ms=iter_latency,
+                    success=True,
+                ))
+
                 # No tool calls — done
                 if not llm_response.tool_calls:
                     break
@@ -392,11 +412,16 @@ class ChatEngine:
                 accumulated_tool_calls.extend(llm_response.tool_calls)
 
                 # Append assistant message with tool_calls to conversation
-                messages.append({
+                assistant_entry: dict[str, Any] = {
                     "role": "assistant",
                     "content": llm_response.content or "",
                     "tool_calls": llm_response.tool_calls,
-                })
+                }
+                # Include thinking so models that require reasoning_content
+                # on tool-call messages (e.g. Kimi) don't reject the request
+                if llm_response.thinking:
+                    assistant_entry["reasoning_content"] = llm_response.thinking
+                messages.append(assistant_entry)
 
                 for tc in llm_response.tool_calls:
                     fn_name = tc["function"]["name"]
@@ -437,6 +462,16 @@ class ChatEngine:
                         "success": tool_result.success,
                         "duration_ms": tool_result.duration_ms,
                     })
+
+                    # Telemetry → aria_data.skill_invocations
+                    asyncio.ensure_future(log_skill_invocation(
+                        self._db_factory,
+                        skill_name=_parse_skill_from_tool(fn_name),
+                        tool_name=fn_name,
+                        duration_ms=tool_result.duration_ms,
+                        success=tool_result.success,
+                        model_used=session.model,
+                    ))
 
                     # Append tool result to conversation for next LLM turn
                     messages.append({
@@ -550,12 +585,70 @@ class ChatEngine:
         db_messages = list(reversed(result.scalars().all()))
 
         for msg in db_messages:
-            entry: dict[str, Any] = {"role": msg.role, "content": msg.content}
+            entry: dict[str, Any] = {"role": msg.role, "content": msg.content or ""}
             if msg.tool_calls:
                 entry["tool_calls"] = msg.tool_calls
-            if msg.role == "tool" and msg.tool_results:
-                entry["tool_call_id"] = msg.tool_results.get("tool_call_id", "")
+            # Include thinking as reasoning_content for models that require it
+            # (e.g. Kimi/Moonshot rejects assistant tool-call msgs without it)
+            if msg.role == "assistant" and hasattr(msg, "thinking") and msg.thinking:
+                entry["reasoning_content"] = msg.thinking
+            # Tool messages MUST have a valid tool_call_id or the provider rejects them
+            if msg.role == "tool":
+                tc_id = (msg.tool_results or {}).get("tool_call_id", "") if msg.tool_results else ""
+                if tc_id:
+                    entry["tool_call_id"] = tc_id
+                else:
+                    continue  # Skip orphan / corrupt tool messages
             messages.append(entry)
+
+        # ── Post-process: fix tool-call ordering anomalies ────────────────
+        # DB may store tool results BEFORE the assistant message that triggered
+        # them (race in persistence timing).  We re-order so each assistant
+        # with tool_calls is immediately followed by its tool results, and any
+        # orphaned tool/assistant messages are dropped.
+
+        # 1. Build a set of all tool_call_ids declared by assistant messages
+        declared_tc_ids: set[str] = set()
+        for m in messages:
+            if m.get("tool_calls"):
+                for tc in m["tool_calls"]:
+                    declared_tc_ids.add(tc.get("id", ""))
+
+        # 2. Separate tool messages into a map keyed by tool_call_id
+        tool_msgs_by_id: dict[str, dict] = {}
+        non_tool_msgs: list[dict[str, Any]] = []
+        for m in messages:
+            if m.get("role") == "tool" and m.get("tool_call_id"):
+                tc_id = m["tool_call_id"]
+                if tc_id in declared_tc_ids:
+                    tool_msgs_by_id[tc_id] = m
+                # else: orphan tool message — drop silently
+            else:
+                non_tool_msgs.append(m)
+
+        # 3. Rebuild: after each assistant with tool_calls, inject its tool results
+        cleaned: list[dict[str, Any]] = []
+        for m in non_tool_msgs:
+            if m.get("tool_calls"):
+                # Check which tool results exist for this assistant
+                owned_ids = [tc.get("id", "") for tc in m["tool_calls"]]
+                existing = [tool_msgs_by_id[tid] for tid in owned_ids if tid in tool_msgs_by_id]
+                if existing:
+                    cleaned.append(m)
+                    cleaned.extend(existing)
+                else:
+                    # No tool results found — strip tool_calls, drop if empty
+                    stripped = {k: v for k, v in m.items() if k != "tool_calls"}
+                    if stripped.get("role") == "assistant" and not stripped.get("content"):
+                        continue
+                    cleaned.append(stripped)
+            else:
+                # Drop empty assistant messages (no content, no tool_calls)
+                # — these are often artifacts from failed LLM calls.
+                if m.get("role") == "assistant" and not m.get("content") and not m.get("tool_calls"):
+                    continue
+                cleaned.append(m)
+        messages = cleaned
 
         # Append current user message
         messages.append({"role": "user", "content": current_content})

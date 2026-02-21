@@ -13,7 +13,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from sqlalchemy import text, select, update, func, cast, and_, or_, not_
+from sqlalchemy import select, update, func, cast, and_, or_, not_
 from sqlalchemy.dialects.postgresql import JSONB as PG_JSONB
 from sqlalchemy.ext.asyncio import AsyncEngine
 

@@ -255,6 +255,26 @@ async def record_invocation(request: Request, db: AsyncSession = Depends(get_db)
     return {"recorded": True}
 
 
+@router.delete("/skills/invocations/purge-test-data")
+async def purge_test_invocations(db: AsyncSession = Depends(get_db)):
+    """
+    Remove synthetic test invocations that pollute health scores.
+
+    Deletes invocations whose tool_name matches known test patterns
+    (e.g. embedding-lookup-*, etl-transform-*).
+    """
+    from sqlalchemy import delete as sa_delete, or_
+
+    patterns = [
+        SkillInvocation.tool_name.like("embedding-lookup-%"),
+        SkillInvocation.tool_name.like("etl-transform-%"),
+    ]
+    stmt = sa_delete(SkillInvocation).where(or_(*patterns))
+    result = await db.execute(stmt)
+    await db.commit()
+    return {"purged": result.rowcount, "patterns": ["embedding-lookup-%", "etl-transform-%"]}
+
+
 @router.get("/skills/stats")
 async def skill_stats(hours: int = 24, db: AsyncSession = Depends(get_db)):
     """Skill performance stats for the last N hours."""

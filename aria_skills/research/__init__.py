@@ -135,10 +135,13 @@ class ResearchSkill(BaseSkill):
     async def add_source(
         self,
         project_id: str,
-        url: str,
-        title: str,
+        url: str = "",
+        title: str = "",
         source_type: str = "unknown",
-        notes: str = ""
+        notes: str = "",
+        author: str = "",
+        date: str = "",
+        summary: str = "",
     ) -> SkillResult:
         """
         Add a source to a research project.
@@ -154,6 +157,9 @@ class ResearchSkill(BaseSkill):
             SkillResult confirming source added
         """
         try:
+            # Accept 'summary' as alias for 'notes' — manifest uses 'summary'
+            notes = notes or summary
+
             if project_id not in self._projects:
                 return SkillResult.fail(f"Project not found: {project_id}")
             
@@ -188,8 +194,10 @@ class ResearchSkill(BaseSkill):
     async def add_finding(
         self,
         project_id: str,
-        finding: str,
-        source_ids: list[str] | None = None
+        finding: str = "",
+        content: str = "",
+        source_ids: list[str] | None = None,
+        tags: list[str] | None = None,
     ) -> SkillResult:
         """
         Add a finding to a research project.
@@ -203,6 +211,11 @@ class ResearchSkill(BaseSkill):
             SkillResult confirming finding added
         """
         try:
+            # Accept both 'finding' and 'content' — manifest uses 'content'
+            finding = finding or content
+            if not finding:
+                return SkillResult.fail("Missing 'finding' or 'content' parameter")
+
             if project_id not in self._projects:
                 return SkillResult.fail(f"Project not found: {project_id}")
             

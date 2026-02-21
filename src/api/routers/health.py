@@ -83,16 +83,16 @@ async def api_status():
     import concurrent.futures
     import socket
 
-    _HARD_TIMEOUT = 1.0   # max wall-clock seconds per service
+    _HARD_TIMEOUT = 0.8   # max wall-clock seconds per service
 
     def _check_sync(name: str, url: str) -> tuple[str, dict]:
         try:
             prev = socket.getdefaulttimeout()
-            socket.setdefaulttimeout(1.0)
+            socket.setdefaulttimeout(0.8)
             try:
                 with httpx.Client(
                     timeout=httpx.Timeout(
-                        connect=0.3, read=0.5, write=0.3, pool=0.5,
+                        connect=0.2, read=0.4, write=0.2, pool=0.3,
                     ),
                 ) as client:
                     resp = client.get(url)

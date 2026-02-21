@@ -819,6 +819,10 @@ class EngineChatSession(Base):
 Index("idx_ecs_agent", EngineChatSession.agent_id)
 Index("idx_ecs_status", EngineChatSession.status)
 Index("idx_ecs_created", EngineChatSession.created_at)
+# Performance indexes for session listing (S6-perf)
+Index("idx_ecs_updated_desc", EngineChatSession.updated_at.desc())
+Index("idx_ecs_session_type", EngineChatSession.session_type)
+Index("idx_ecs_status_updated", EngineChatSession.status, EngineChatSession.updated_at.desc())
 
 
 class EngineChatMessage(Base):
@@ -848,6 +852,8 @@ class EngineChatMessage(Base):
 Index("idx_ecm_session", EngineChatMessage.session_id)
 Index("idx_ecm_role", EngineChatMessage.role)
 Index("idx_ecm_created", EngineChatMessage.created_at)
+# Composite index for message retrieval by session (S6-perf)
+Index("idx_ecm_session_created", EngineChatMessage.session_id, EngineChatMessage.created_at)
 
 
 class EngineCronJob(Base):

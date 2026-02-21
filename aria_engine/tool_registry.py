@@ -65,6 +65,7 @@ class ToolRegistry:
     def __init__(self, timeout_seconds: int = 300):
         self._tools: dict[str, ToolDefinition] = {}
         self._skill_instances: dict[str, Any] = {}
+        self._initialized_skills: set[str] = set()
         self._timeout = timeout_seconds
 
     def discover_from_skills(self, skill_registry) -> int:
@@ -405,6 +406,21 @@ class ToolRegistry:
                     content=json.dumps({"error": f"No handler for tool: {function_name}"}),
                     success=False,
                 )
+
+        # Lazy-initialize skill instance on first use
+        skill_name = tool.skill_name
+        if skill_name not in self._initialized_skills:
+            instance = self._skill_instances.get(skill_name)
+            if instance is not None and hasattr(instance, "initialize"):
+                try:
+                    ok = await instance.initialize()
+                    if ok:
+                        logger.info("Lazy-initialized skill: %s", skill_name)
+                    else:
+                        logger.warning("Skill %s initialize() returned False", skill_name)
+                except Exception as init_err:
+                    logger.warning("Skill %s initialize() failed: %s", skill_name, init_err)
+            self._initialized_skills.add(skill_name)
 
         # Parse arguments
         if isinstance(arguments, str):

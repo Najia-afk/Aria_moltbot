@@ -216,8 +216,10 @@ class MemoryBackend:
     async def search(self, query: str, limit: int = 20,
                      category: str | None = None) -> list[SearchResult]:
         try:
+            # get_memories() does not accept a 'search' kwarg;
+            # fetch by category then client-side keyword filter.
             result = await self._api.get_memories(
-                category=category, limit=limit, search=query)
+                category=category, limit=limit)
             if not result.success:
                 return []
 
@@ -225,10 +227,15 @@ class MemoryBackend:
                 result.data.get("items", result.data.get("memories", []))
                 if isinstance(result.data, dict) else [])
 
+            query_lower = query.lower() if query else ""
             results: list[SearchResult] = []
             for item in items:
+                content = item.get("content", "")
+                # Client-side keyword filter
+                if query_lower and query_lower not in content.lower():
+                    continue
                 results.append(SearchResult(
-                    content=item.get("content", ""),
+                    content=content,
                     score=0.5,
                     source="memory",
                     category=item.get("category", ""),
@@ -317,6 +324,13 @@ class UnifiedSearchSkill(BaseSkill):
         """
         import time
 
+        # Guard: ensure initialize() succeeded
+        if self._merger is None:
+            return SkillResult.fail(
+                "unified_search not initialized — call initialize() first "
+                "or check that api_client is reachable"
+            )
+
         query = query or kwargs.get("query", "")
         if not query:
             return SkillResult.fail("No query provided")
@@ -364,6 +378,8 @@ class UnifiedSearchSkill(BaseSkill):
     async def semantic_search(self, query: str = "", limit: int = 20,
                                category: str | None = None, **kwargs) -> SkillResult:
         """Search semantic memories only."""
+        if self._semantic is None:
+            return SkillResult.fail("unified_search not initialized — semantic backend unavailable")
         query = query or kwargs.get("query", "")
         if not query:
             return SkillResult.fail("No query provided")
@@ -379,6 +395,8 @@ class UnifiedSearchSkill(BaseSkill):
     @logged_method()
     async def graph_search(self, query: str = "", limit: int = 20, **kwargs) -> SkillResult:
         """Search knowledge graph only."""
+        if self._graph is None:
+            return SkillResult.fail("unified_search not initialized — graph backend unavailable")
         query = query or kwargs.get("query", "")
         if not query:
             return SkillResult.fail("No query provided")
@@ -395,6 +413,8 @@ class UnifiedSearchSkill(BaseSkill):
     async def memory_search(self, query: str = "", limit: int = 20,
                              category: str | None = None, **kwargs) -> SkillResult:
         """Search traditional memories only."""
+        if self._memory is None:
+            return SkillResult.fail("unified_search not initialized — memory backend unavailable")
         query = query or kwargs.get("query", "")
         if not query:
             return SkillResult.fail("No query provided")

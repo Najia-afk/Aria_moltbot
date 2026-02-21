@@ -17,7 +17,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any
 
-from sqlalchemy import text, select, func
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from aria_engine.config import EngineConfig

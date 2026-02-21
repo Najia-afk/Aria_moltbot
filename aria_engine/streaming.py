@@ -37,6 +37,7 @@ from starlette.websockets import WebSocket, WebSocketDisconnect, WebSocketState
 from aria_engine.config import EngineConfig
 from aria_engine.exceptions import SessionError, LLMError
 from aria_engine.llm_gateway import LLMGateway, StreamChunk
+from aria_engine.telemetry import log_model_usage, log_skill_invocation, _parse_skill_from_tool
 from aria_engine.tool_registry import ToolRegistry, ToolResult
 
 logger = logging.getLogger("aria.engine.stream")
@@ -114,6 +115,13 @@ class StreamManager:
             logger.info("Rejected websocket for malformed session id %s: %s", session_id, e)
             await websocket.close()
             return
+        except Exception as e:
+            # Catch-all: DB import errors, connection issues, etc.
+            # Accept the WS anyway — the first message will fail gracefully.
+            logger.warning(
+                "Session validation failed for %s (non-fatal, accepting WS): %s",
+                session_id, e,
+            )
 
         await websocket.accept()
 
@@ -220,11 +228,9 @@ class StreamManager:
                 return
 
             if session.status == "ended":
-                await self._send_json(websocket, {
-                    "type": "error",
-                    "message": f"Session {session_id} has ended",
-                })
-                return
+                # Auto-reactivate ended sessions (matches _validate_session behaviour)
+                session.status = "active"
+                session.ended_at = None
 
             accumulator.model = session.model or self.config.default_model
 
@@ -318,11 +324,16 @@ class StreamManager:
 
                     # Execute tool calls
                     accumulator.tool_calls.extend(llm_response.tool_calls)
-                    messages.append({
+                    assistant_entry: dict[str, Any] = {
                         "role": "assistant",
                         "content": llm_response.content or "",
                         "tool_calls": llm_response.tool_calls,
-                    })
+                    }
+                    # Include thinking so models that require reasoning_content
+                    # on tool-call messages (e.g. Kimi) don't reject the request
+                    if llm_response.thinking:
+                        assistant_entry["reasoning_content"] = llm_response.thinking
+                    messages.append(assistant_entry)
 
                     for tc in llm_response.tool_calls:
                         # Notify client about tool call
@@ -347,6 +358,16 @@ class StreamManager:
                             "success": tool_result.success,
                             "duration_ms": tool_result.duration_ms,
                         })
+
+                        # Telemetry → aria_data.skill_invocations
+                        asyncio.ensure_future(log_skill_invocation(
+                            self._db_factory,
+                            skill_name=_parse_skill_from_tool(tc["function"]["name"]),
+                            tool_name=tc["function"]["name"],
+                            duration_ms=tool_result.duration_ms,
+                            success=tool_result.success,
+                            model_used=accumulator.model,
+                        ))
 
                         # Notify client about tool result
                         await self._send_json(websocket, {
@@ -427,6 +448,17 @@ class StreamManager:
 
             await db.commit()
 
+            # Telemetry → aria_data.model_usage
+            asyncio.ensure_future(log_model_usage(
+                self._db_factory,
+                model=accumulator.model or "unknown",
+                input_tokens=accumulator.input_tokens,
+                output_tokens=accumulator.output_tokens,
+                cost_usd=accumulator.cost_usd,
+                latency_ms=accumulator.latency_ms,
+                success=True,
+            ))
+
             # ── Send stream_end (combines usage + done for frontend) ────
             await self._send_json(websocket, {
                 "type": "stream_end",
@@ -439,21 +471,34 @@ class StreamManager:
             })
 
     async def _validate_session(self, session_id: str) -> None:
-        """Validate that a session exists and is active."""
+        """Validate that a session exists and is active.
+
+        If the session status is 'ended', it is automatically reactivated so the
+        user can reconnect without creating a new session.
+        """
         from db.models import EngineChatSession
-        from sqlalchemy import select
+        from sqlalchemy import select, update
 
         async with self._db_factory() as db:
+            # Select id+status so a NULL status doesn't look like "row not found"
             result = await db.execute(
-                select(EngineChatSession.status).where(
+                select(EngineChatSession.id, EngineChatSession.status).where(
                     EngineChatSession.id == uuid.UUID(session_id)
                 )
             )
-            row = result.scalar_one_or_none()
+            row = result.one_or_none()
             if row is None:
                 raise SessionError(f"Session {session_id} not found")
-            if row == "ended":
-                raise SessionError(f"Session {session_id} has ended")
+            status = row[1]  # may be None
+            if status == "ended":
+                # Auto-reactivate ended sessions so users can reconnect
+                await db.execute(
+                    update(EngineChatSession)
+                    .where(EngineChatSession.id == uuid.UUID(session_id))
+                    .values(status="active", ended_at=None)
+                )
+                await db.commit()
+                logger.info("Reactivated ended session %s for WS reconnect", session_id)
 
     async def _build_context(
         self,
@@ -480,12 +525,70 @@ class StreamManager:
         db_messages = list(reversed(result.scalars().all()))
 
         for msg in db_messages:
-            entry: dict[str, Any] = {"role": msg.role, "content": msg.content}
+            entry: dict[str, Any] = {"role": msg.role, "content": msg.content or ""}
             if msg.tool_calls:
                 entry["tool_calls"] = msg.tool_calls
-            if msg.role == "tool" and msg.tool_results:
-                entry["tool_call_id"] = msg.tool_results.get("tool_call_id", "")
+            # Include thinking as reasoning_content for models that require it
+            # (e.g. Kimi/Moonshot rejects assistant tool-call msgs without it)
+            if msg.role == "assistant" and hasattr(msg, "thinking") and msg.thinking:
+                entry["reasoning_content"] = msg.thinking
+            # Tool messages MUST have a valid tool_call_id or the provider rejects them
+            if msg.role == "tool":
+                tc_id = (msg.tool_results or {}).get("tool_call_id", "") if msg.tool_results else ""
+                if tc_id:
+                    entry["tool_call_id"] = tc_id
+                else:
+                    continue  # Skip orphan / corrupt tool messages
             messages.append(entry)
+
+        # ── Post-process: fix tool-call ordering anomalies ────────────────
+        # DB may store tool results BEFORE the assistant message that triggered
+        # them (race in persistence timing).  We re-order so each assistant
+        # with tool_calls is immediately followed by its tool results, and any
+        # orphaned tool/assistant messages are dropped.
+
+        # 1. Build a set of all tool_call_ids declared by assistant messages
+        declared_tc_ids: set[str] = set()
+        for m in messages:
+            if m.get("tool_calls"):
+                for tc in m["tool_calls"]:
+                    declared_tc_ids.add(tc.get("id", ""))
+
+        # 2. Separate tool messages into a map keyed by tool_call_id
+        tool_msgs_by_id: dict[str, dict] = {}
+        non_tool_msgs: list[dict[str, Any]] = []
+        for m in messages:
+            if m.get("role") == "tool" and m.get("tool_call_id"):
+                tc_id = m["tool_call_id"]
+                if tc_id in declared_tc_ids:
+                    tool_msgs_by_id[tc_id] = m
+                # else: orphan tool message — drop silently
+            else:
+                non_tool_msgs.append(m)
+
+        # 3. Rebuild: after each assistant with tool_calls, inject its tool results
+        cleaned: list[dict[str, Any]] = []
+        for m in non_tool_msgs:
+            if m.get("tool_calls"):
+                # Check which tool results exist for this assistant
+                owned_ids = [tc.get("id", "") for tc in m["tool_calls"]]
+                existing = [tool_msgs_by_id[tid] for tid in owned_ids if tid in tool_msgs_by_id]
+                if existing:
+                    cleaned.append(m)
+                    cleaned.extend(existing)
+                else:
+                    # No tool results found — strip tool_calls, drop if empty
+                    stripped = {k: v for k, v in m.items() if k != "tool_calls"}
+                    if stripped.get("role") == "assistant" and not stripped.get("content"):
+                        continue
+                    cleaned.append(stripped)
+            else:
+                # Drop empty assistant messages (no content, no tool_calls)
+                # — these are often artifacts from failed LLM calls.
+                if m.get("role") == "assistant" and not m.get("content") and not m.get("tool_calls"):
+                    continue
+                cleaned.append(m)
+        messages = cleaned
 
         messages.append({"role": "user", "content": current_content})
         return messages
