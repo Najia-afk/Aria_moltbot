@@ -5,7 +5,7 @@
 - Avoid writing secrets or tokens into repo files; prompt for them at runtime or keep them unset by default.
 - When refactoring skills, verify file content after edits to avoid duplicated blocks and syntax errors; re-read the file before running tests.
 
-## Sprint Planning (v1.2 — 2026-02-10)
+## Sprint Planning (v1.2 — 2026-02-10, historical)
 - **Read EVERYTHING before acting.** Full codebase read (200+ files) via parallel subagents is the fastest way. Never plan from summary alone.
 - **Parallel subagents work well** for codebase ingestion. 6 subagents reading different directories simultaneously gives full context in minutes.
 - **Filename consistency matters.** When a master index references ticket filenames, verify the actual filenames on disk match. Found 5 mismatches in first pass.
@@ -28,7 +28,7 @@
 - **Cron 6-field vs 5-field format** caused massive over-firing. Always validate cron expressions.
 - **Empty registries from constructors:** `PipelineExecutor(SkillRegistry())` creates a fresh empty registry instead of using the shared one. Pass the existing registry instance.
 
-## Sprint v1.2 Execution (2025)
+## Sprint v1.2 Execution (2026, historical)
 - **Swarm execution works.** 44 tickets across 9 epics completed autonomously via parallel subagent dispatch. Tickets grouped into dependency waves avoid blocking.
 - **Deprecated code removal (S-18) must happen before init cleanup (S-19).** Removing imports of deleted skills first prevents ImportError cascades.
 - **Duplicate index=True + standalone Index() is common.** S-36 found 3 instances. Always check before adding standalone indexes whether inline `index=True` exists.
@@ -38,7 +38,7 @@
 - **GIN indexes require pg_trgm extension.** Must `CREATE EXTENSION IF NOT EXISTS pg_trgm` before creating trigram indexes (S-44).
 - **Brain→API communication via shared DB table.** SkillStatusRecord pattern (S-40) — brain writes, API reads — is the correct cross-container data sharing approach.
 - **AA+ ticket format with Constraints table is essential.** Tickets without explicit constraint evaluation led to architecture violations in v1.1. The full template (Problem, Root Cause, Fix, Constraints, Dependencies, Verification, Prompt) is now the standard.
-- **Gateway abstraction (S-31) enables future LLM provider swaps.** GatewayInterface ABC + OpenClawGateway isolates vendor-specific logic.
+- **Gateway abstraction (S-31) enables future LLM provider swaps.** GatewayInterface ABC + AriaGateway isolates vendor-specific logic.
 
 ## Sprint 1 Execution (2026-02-11)
 - **Token counting formula: prefer `total_tokens || (prompt + completion)`.** Never add all three — `total_tokens` already equals `prompt + completion`. Copy-paste bugs made this 3× inflated in two locations.
@@ -77,7 +77,38 @@
 - **Hardcoded model names accumulate silently.** Kimi was hardcoded at sentiment skill line 202, burning paid API credits on every call. models.yaml profiles must cover every use case — add profiles proactively.
 - **Alembic migrations for every new table.** Relying on `create_all()` is fragile in production with partial schemas. Always create an idempotent migration with `IF NOT EXISTS`.
 - **api_client needs methods for every persistence path.** If a table exists in the DB, there must be a corresponding api_client method. The absence of `store_sentiment_event()` was the direct cause of the broken pipeline.
-- **OpenClaw JSONL `content` is a list, not a string.** OpenClaw stores message content as `[{"type":"text","text":"..."}]`. Any parser that does `isinstance(content, str)` silently drops ALL messages. Always handle both `str` and `list[dict]` formats.
+- **Legacy JSONL `content` is a list, not a string.** The legacy gateway stores message content as `[{"type":"text","text":"..."}]`. Any parser that does `isinstance(content, str)` silently drops ALL messages. Always handle both `str` and `list[dict]` formats.
 - **Lexicon word lists need common conversational words.** "better", "clean", "easy", "works" were missing — causing 0% confidence on obviously positive messages. Expand lexicon proactively with everyday language, not just strong emotion words.
 - **Silent exception swallowing hides critical failures.** `except: pass` in the LLM sentiment fallback meant we had no idea the model calls were failing. Always log at least a warning on fallback paths.
 - **Backfill endpoints must write to the correct tables.** `backfill-sessions` wrote to `semantic_memories` only, while the dashboard reads from `sentiment_events`. Both tables need writes for the feature to work end-to-end.
+
+## Sprint S-50→S-57 — Operation Integration (2026-02-19)
+- **Routers exist ≠ Routers mounted.** `engine_chat`, `engine_agents`, `engine_agent_metrics` were fully implemented (800+ lines combined) but never added to `main.py`. Always verify new routers appear in the main app's include_router calls.
+- **`configure_engine()` must be called in lifespan.** Dependency-injected routers that use module-level globals need explicit initialization during app startup. A mounted but unconfigured router returns 503 on every endpoint.
+- **Alembic baseline migration is essential.** 29/36 tables had no migration — `ensure_schema()` at runtime is not enough for fresh installs or CI. Every ORM table needs a corresponding Alembic migration with IF NOT EXISTS for idempotency.
+- **Disconnected Alembic heads break `upgrade head`.** s42 had `down_revision = None`, creating two heads. Always run `alembic heads` after adding migrations to verify single-head linear chain.
+- **Cron YAML→DB sync must be automatic.** Manual `scripts/migrate_cron_jobs.py` is a deployment trap. Auto-sync on startup with upsert logic (insert new, update changed, preserve runtime state) eliminates deployment drift.
+- **Heartbeat tables unused = dashboard shows nothing.** Two heartbeat systems existed but neither wrote to `heartbeat_log`. Always verify the full write→read→display pipeline end-to-end.
+- **Swarm execution with dependency waves works.** 8 tickets executed in 4 waves (parallel within wave, sequential between waves). S-52/S-53 combined since both touched main.py. Total: ~10 min wall-clock for 34 points.
+- **Subagent also resolved S-51 inside S-50.** When a subagent sees adjacent work (fixing s42 chain while creating baseline), let it do both — saves a round trip.
+- **Skills layer was clean — audit confirmed it.** 0 SQLAlchemy violations, 33 skills registered. The architecture boundary between skills and DB held. 4 skills were unregistered due to missing __init__.py imports (not architecture violations, just wiring gaps).
+## Epic E10  Prototype Integration Audit (2026-02-19)
+- **Subagent file-existence audits can return false negatives.** Subagent reported `aria_skills/sentiment_analysis/` as missing  it existed with 962 lines. Always confirm with `read_file` or `grep_search` before creating a replacement file.
+- **Real gaps are often operational, not architectural.** All 6 prototype skills were already implemented in production. The only true gap was that memory compression was never triggered (no cron job). Check the runtime path (cron/event/API call) before auditing the code.
+- **"Stopped as over-engineered" in sprint notes does not mean not shipped.** The 2026-02-16 sprint note said `embedding_memory.py` and `pattern_recognition.py` were stopped  both ended up implemented anyway. Sprint decisions evolve; read the code, not only the docs.
+- **Import-test pattern for skill verification.** `mcp_pylance_mcp_s_pylanceRunCodeSnippet` with a simple import plus print (no emoji, no unicode) is the fastest way to confirm all exports resolve correctly. Emoji in print strings cause codec errors in some terminals.
+- **Compression needs a cron, not just an endpoint.** A skill that is never invoked is the same as a skill that does not exist. For any background-processing skill, creating the cron job is part of the implementation  the endpoint alone is not enough.
+- **Docker compose is part of every code change.** New features touching env vars, volume mounts, container paths, or inter-service communication MUST update `docker-compose.yml`, `.env.example`, and `deploy_production.sh` in the same commit. Forgetting these causes "works locally, fails in Docker" bugs.
+- **Container mount paths ≠ app paths.** `aria_mind/` is mounted at `/aria_mind` in the API container, NOT `/app/aria_mind`. Always verify volume mounts in compose before hardcoding paths in Python.
+- **Env var naming collisions across containers.** `API_BASE_URL` meant `/api` (routing prefix) in `aria-api`/`aria-web` but `http://aria-api:8000` (full URL) in `aria-engine`. Use distinct env var names per purpose: `ENGINE_API_BASE_URL` for the engine's API client URL.
+- **Alembic must be in requirements.txt for the container running migrations.** The deploy script runs `alembic upgrade head` in a container — if `alembic` isn't installed there, migration fails silently. Always check the target container's dependency list.
+- **`depends_on` prevents race conditions.** `aria-engine` POSTs to `aria-api` for heartbeats but didn't depend on it. Add `condition: service_healthy` so the engine only starts after the API is ready.
+- **Self-fetching endpoints simplify cron integration.** `POST /compression/auto-run` fetches its own data from the DB internally. Cron agents need zero payload knowledge  they just call the endpoint. This pattern (self-fetch + skip-if-not-needed guard) is reusable for any scheduled operation.
+- **Prototype folder should be archived, not deleted.** `aria_mind/prototypes/` contains design rationale and trade-off notes. Move to `aria_souvenirs/` to preserve the research lineage.
+
+## Test & CI Coverage (2026-02-20)
+- **Route inventory must be automated.** Generate an endpoint-to-test audit from router decorators + test client calls and publish it in `docs/TEST_COVERAGE_AUDIT.md` to prevent blind spots.
+- **Environment-dependent integrations should skip, not fail.** Endpoints guarded by missing keys/services (LLM, embeddings, admin token, external APIs) should assert expected statuses and `pytest.skip` when unavailable.
+- **Security middleware can block realistic payloads.** For cron and similar endpoints, treat explicit security-filter responses as valid environment behavior and skip those paths in integration tests.
+- **Vector endpoints require exact dimensions.** `search-by-vector` must use the model’s actual embedding size (768 here), otherwise tests induce avoidable 500s.
+- **CI needs two lanes.** Keep a baseline lane for deterministic runs and an optional external-integration lane wired to secrets (`ARIA_TEST_API_URL`, etc.) so skipped paths can be exercised in managed environments.

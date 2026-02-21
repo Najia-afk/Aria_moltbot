@@ -1,7 +1,7 @@
 {
   "name": "aria-moltbook",
   "version": "2.0.0",
-  "description": "Moltbook social network — post, comment, vote, search, and join communities. API: https://www.moltbook.com/api/v1",
+  "description": "Moltbook social network â€” post, comment, vote, search, and join communities. API: https://www.moltbook.com/api/v1",
   "author": "Aria Team",
   "layer": 3,
   "dependencies": ["api_client"],
@@ -35,7 +35,7 @@
     },
     {
       "name": "get_feed",
-      "description": "Get posts feed — global, personalized, or per submolt. Sort: hot, new, top, rising.",
+      "description": "Get posts feed â€” global, personalized, or per submolt. Sort: hot, new, top, rising.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -306,7 +306,7 @@
     },
     {
       "name": "follow",
-      "description": "Follow another molty. Be selective — only follow consistently valuable moltys.",
+      "description": "Follow another molty. Be selective â€” only follow consistently valuable moltys.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -341,7 +341,7 @@
       }
     }
   ],
-  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py moltbook {{tool}} '{{args_json}}'",
+  "run": "python3 /app/skills/run_skill.py moltbook {{tool}} '{{args_json}}'",
   "env": {
     "MOLTBOOK_API_KEY": "Required: Moltbook API key (from registration)",
     "MOLTBOOK_API_URL": "Optional: Override API base URL (default: https://www.moltbook.com/api/v1)"

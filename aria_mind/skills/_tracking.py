@@ -1,6 +1,5 @@
 """Best-effort tracking helpers for run_skill."""
 
-from __future__ import annotations
 
 import json
 import logging
@@ -104,7 +103,7 @@ async def _log_session(
 ) -> None:
     """P2.1 — Log skill invocation to agent_sessions via aria-api."""
     payload = {
-        "agent_id": os.environ.get("OPENCLAW_AGENT_ID", "main"),
+        "agent_id": os.environ.get("ARIA_AGENT_ID", "main"),
         "session_type": "skill_exec",
         "status": "completed" if success else "error",
         "metadata": {
@@ -154,7 +153,7 @@ async def _log_skill_invocation(
         "success": success,
         "error_type": error_msg,
         "tokens_used": 0,
-        "model_used": os.environ.get("OPENCLAW_MODEL", "litellm/kimi"),
+        "model_used": os.environ.get("ARIA_MODEL", "litellm/kimi"),
     }
     ok = await _api_post("/skills/invocations", payload)
     if not ok:

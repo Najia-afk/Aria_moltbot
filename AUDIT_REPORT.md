@@ -1,5 +1,7 @@
 # Aria Blue — Complete Website & API Audit Report
 
+> **⚠️ HISTORICAL DOCUMENT** — This audit was conducted during v1.1. Current version is v3.0.0. Many findings have been resolved or superseded. See CHANGELOG.md for current state.
+
 ## v1.1 Sprint Remediation Status
 
 > **Updated:** 2026-02-10 — Aria Blue v1.1 Sprint (37 tickets across 7 waves)
@@ -15,7 +17,7 @@ The following audit findings have been **addressed** or **partially addressed** 
 | **MEDIUM-4:** Dashboard double-fetch of `/activities` | ✅ Addressed | TICKET-06 (Critical Bug Fixes) |
 | **LOW-1:** Unused API endpoints | 🟡 Partially | Documented; some cleaned up in TICKET-09 |
 | **LOW-2:** Inconsistent API variable names | 🟡 Partially | Standardization in progress |
-| **Testing:** 11 test failures | ✅ Addressed | TICKET-09, 31 (677+ tests, 0 failures) |
+| **Testing:** 11 test failures | ✅ Addressed | TICKET-09, 31 → v1.3: 462 tests, 0 failures, 9 skipped |
 | **Observability:** No structured logging | ✅ Addressed | TICKET-11, 17 (logging & observability stack) |
 | **Directory:** `experiment/` skill (dead code) | ✅ Resolved | S-18 (deprecated skill removed) |
 | **Directory:** `hooks/` flagged as dead code | ✅ Reclassified | Contains `soul-evil/` (evil mode toggle) — not dead code |
@@ -66,7 +68,7 @@ The following audit findings have been **addressed** or **partially addressed** 
 | **Security** | Rate limiting middleware (120/min, 2000/hr) | `src/api/main.py` |
 
 **Flask Context Variables** (injected via `@app.context_processor`):
-- `service_host`, `api_base_url`, `clawdbot_public_url`, `clawdbot_token`
+- `service_host`, `api_base_url`
 
 **Base Template JS Variables** (`base.html`):
 ```js
@@ -74,8 +76,8 @@ const API_BASE_URL = "{{ api_base_url }}";
 window.ARIA_API_BASE_URL = API_BASE_URL;
 ```
 
-**API Routers** (15 routers + GraphQL):
-`health`, `activities`, `thoughts`, `memories`, `goals`, `sessions`, `model_usage`, `litellm`, `providers`, `security`, `knowledge`, `social`, `operations`, `records`, `admin`
+**API Routers** (28 routers + GraphQL):
+`health`, `activities`, `thoughts`, `memories`, `goals`, `sessions`, `model_usage`, `litellm`, `providers`, `security`, `knowledge`, `social`, `operations`, `records`, `admin`, `agents_crud`, `models_crud`, `models_config`, `analysis`, `lessons`, `proposals`, `skills`, `working_memory`, `engine_chat`, `engine_cron`, `engine_agents`, `engine_agent_metrics`, `engine_sessions`
 
 ---
 
@@ -119,7 +121,7 @@ window.ARIA_API_BASE_URL = API_BASE_URL;
 | **API Endpoints** | `GET /jobs/live` · `GET /litellm/global-spend` · `GET /litellm/spend?limit=50&lite=true` · `GET /status` |
 | **API Calls on Load** | **4** (loadJobs + loadLitellmData[2 calls] + loadServiceStatus) |
 | **Auto-Refresh** | **30s** (all data) |
-| **Data Displayed** | Stats grid (scheduled jobs, API requests, total spend, services online/total), quick links to sub-pages, OpenClaw cron jobs table (name, agent, schedule, status, last/next run, duration), model usage table (aggregated from spend logs), recent API calls table |
+| **Data Displayed** | Stats grid (scheduled jobs, API requests, total spend, services online/total), quick links to sub-pages, cron jobs table (name, agent, schedule, status, last/next run, duration), model usage table (aggregated from spend logs), recent API calls table |
 | **Notes** | Hub page linking to sub-pages. Duplicates LiteLLM spend and service status data from other pages. |
 
 ---
@@ -308,7 +310,7 @@ window.ARIA_API_BASE_URL = API_BASE_URL;
 | **Lines** | 632 |
 | **API Var** | `window.ARIA_API_BASE_URL` |
 | **API Endpoints** | `GET /status/{serviceId}` × 11 services · `POST /admin/services/{serviceId}/{action}` |
-| **API Calls on Load** | **11** (one per service: traefik, openclaw, litellm, aria-web, aria-api, mlx, ollama, openrouter, postgres, grafana, prometheus, pgadmin) |
+| **API Calls on Load** | **11** (one per service: traefik, aria-engine, litellm, aria-web, aria-api, mlx, ollama, openrouter, postgres, grafana, prometheus, pgadmin) |
 | **Auto-Refresh** | None (manual only) |
 | **Data Displayed** | Architecture diagram with live status indicators, control panel with restart/stop buttons, application flow diagram |
 | **Notes** | Sequential status checks (not parallel). Most API-call-heavy page on load. |
@@ -569,7 +571,7 @@ window.ARIA_API_BASE_URL = API_BASE_URL;
 | **Model List** | models, litellm | 🟡 MEDIUM — 2 pages render models |
 | **Service Status** | index, dashboard, operations, services | 🟡 MEDIUM — 4 pages check status |
 | **Activity/Thought Counts** | index, dashboard | 🟢 LOW — same quick stats |
-| **OpenClaw Jobs** | heartbeat, operations | 🟡 MEDIUM — 2 pages render job list |
+| **Cron Jobs** | heartbeat, operations | 🟡 MEDIUM — 2 pages render job list |
 | **Cost Calculation** | models, wallets, litellm | 🔴 HIGH — 3 separate `calculateLogCost()` with different pricing |
 
 ### 4d. Wallet & Cost Consistency Issues — CRITICAL ⚠️
@@ -730,7 +732,7 @@ Sprint v1.2 addressed all critical and high-severity findings from the architect
 | **Agent roles** | Expanded `AgentRole` enum to 8 roles; added pheromone scoring | ✅ Resolved |
 | **Skill catalog** | Created `aria_skills/catalog.py` with `--list-skills` CLI | ✅ Resolved |
 | **Security hardening** | CORS restrictions, admin auth, env-var secrets | ✅ Resolved |
-| **Gateway abstraction** | `aria_mind/gateway.py` created for OpenClaw phase-out | ✅ Resolved |
+| **Gateway abstraction** | `aria_mind/gateway.py` created for native engine transition | ✅ Resolved |
 | **`hooks/` directory** | Reclassified: contains `soul-evil/` (evil mode toggle), not dead code | ✅ Reclassified |
 | **Working memory** | `sync_to_files()` added for session-surviving state | ✅ Resolved |
 | **Model catalog** | `models.yaml` is now single source of truth | ✅ Resolved |

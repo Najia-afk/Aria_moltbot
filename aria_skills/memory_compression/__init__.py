@@ -11,17 +11,27 @@ Reduces token usage by 70%+ while preserving key facts, decisions,
 and user preferences. Uses api_client for LLM summaries and semantic
 storage — fully integrated with existing pgvector infrastructure.
 """
-from __future__ import annotations
 
 import json
 import os
 import re
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
 from aria_skills.registry import SkillRegistry
+
+# Load default compression model from models.yaml (single source of truth)
+try:
+    from aria_models.loader import load_catalog as _load_catalog
+    _cat = _load_catalog()
+    _routing = _cat.get("routing", {})
+    _primary = _routing.get("primary", "litellm/kimi")
+    # Strip "litellm/" prefix to get the bare model name for LiteLLM API
+    _DEFAULT_COMPRESSION_MODEL = _primary.removeprefix("litellm/")
+except Exception:
+    _DEFAULT_COMPRESSION_MODEL = "kimi"
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -36,10 +46,10 @@ class MemoryEntry:
     category: str
     timestamp: datetime
     importance_score: float = 0.5
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "MemoryEntry":
+    def from_dict(cls, d: dict[str, Any]) -> "MemoryEntry":
         ts = d.get("timestamp") or d.get("created_at") or datetime.now(timezone.utc).isoformat()
         if isinstance(ts, str):
             ts = datetime.fromisoformat(ts.replace("Z", "+00:00"))
@@ -60,11 +70,11 @@ class CompressedMemory:
     summary: str
     original_count: int
     compressed_count: int
-    key_entities: List[str]
+    key_entities: list[str]
     timestamp: datetime
-    key_facts: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    original_ids: List[str] = field(default_factory=list)
+    key_facts: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
+    original_ids: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         data = asdict(self)
@@ -79,9 +89,9 @@ class CompressionResult:
     memories_processed: int
     compressed_count: int
     compression_ratio: float
-    tiers_updated: Dict[str, int]
+    tiers_updated: dict[str, int]
     tokens_saved_estimate: int = 0
-    errors: List[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -102,7 +112,7 @@ class ImportanceScorer:
         "social": 0.5, "context": 0.4, "general": 0.5, "system": 0.3,
     }
 
-    def score(self, memory: MemoryEntry, now: Optional[datetime] = None) -> float:
+    def score(self, memory: MemoryEntry, now: datetime | None = None) -> float:
         """Calculate importance score (0.0-1.0)."""
         if now is None:
             now = datetime.now(timezone.utc)
@@ -142,7 +152,7 @@ class MemoryCompressor:
         self,
         raw_limit: int = 20,
         recent_limit: int = 100,
-        compression_ratios: Optional[Dict[str, float]] = None,
+        compression_ratios: dict[str, float] | None = None,
         api_client=None,
     ):
         self.raw_limit = raw_limit
@@ -152,8 +162,8 @@ class MemoryCompressor:
         self.scorer = ImportanceScorer()
 
     async def compress_tier(
-        self, memories: List[MemoryEntry], target_tier: str, target_count: int,
-    ) -> List[CompressedMemory]:
+        self, memories: list[MemoryEntry], target_tier: str, target_count: int,
+    ) -> list[CompressedMemory]:
         if not memories:
             return []
 
@@ -165,7 +175,7 @@ class MemoryCompressor:
         keep_count = max(1, int(target_count / ratio))
         to_compress = scored[:keep_count]
 
-        compressed: List[CompressedMemory] = []
+        compressed: list[CompressedMemory] = []
         batch_size = 20
 
         for i in range(0, len(to_compress), batch_size):
@@ -186,7 +196,7 @@ class MemoryCompressor:
 
         return compressed
 
-    async def _summarize_batch(self, memories: List[MemoryEntry], tier: str) -> Dict[str, Any]:
+    async def _summarize_batch(self, memories: list[MemoryEntry], tier: str) -> dict[str, Any]:
         contents = [m.content for m in memories]
         categories = [m.category for m in memories]
 
@@ -197,7 +207,7 @@ class MemoryCompressor:
                 pass
         return self._rule_based_summary(contents, categories)
 
-    async def _llm_summarize(self, contents: List[str], tier: str) -> Dict[str, Any]:
+    async def _llm_summarize(self, contents: list[str], tier: str) -> dict[str, Any]:
         import httpx
 
         litellm_url = os.environ.get("LITELLM_URL", "http://litellm:4000")
@@ -218,7 +228,7 @@ class MemoryCompressor:
         async with httpx.AsyncClient(timeout=60) as client:
             resp = await client.post(
                 f"{litellm_url}/v1/chat/completions",
-                json={"model": "kimi", "messages": [{"role": "user", "content": prompt}],
+                json={"model": _DEFAULT_COMPRESSION_MODEL, "messages": [{"role": "user", "content": prompt}],
                       "max_tokens": 500, "temperature": 0.3},
                 headers={"Authorization": f"Bearer {litellm_key}"},
             )
@@ -235,8 +245,8 @@ class MemoryCompressor:
 
         return self._rule_based_summary(contents, [])
 
-    def _rule_based_summary(self, contents: List[str], categories: List[str]) -> Dict[str, Any]:
-        first_sentences: List[str] = []
+    def _rule_based_summary(self, contents: list[str], categories: list[str]) -> dict[str, Any]:
+        first_sentences: list[str] = []
         entities: set = set()
 
         for c in contents:
@@ -265,9 +275,9 @@ class CompressionManager:
 
     def __init__(self, compressor: MemoryCompressor):
         self.compressor = compressor
-        self.compressed_store: List[CompressedMemory] = []
+        self.compressed_store: list[CompressedMemory] = []
 
-    async def process_all(self, memories: List[MemoryEntry]) -> CompressionResult:
+    async def process_all(self, memories: list[MemoryEntry]) -> CompressionResult:
         if len(memories) < 10:
             return CompressionResult(
                 success=True, memories_processed=len(memories),
@@ -309,14 +319,14 @@ class CompressionManager:
 
         return result
 
-    def get_active_context(self, raw_memories: List[MemoryEntry]) -> Dict[str, Any]:
+    def get_active_context(self, raw_memories: list[MemoryEntry]) -> dict[str, Any]:
         raw_memories.sort(key=lambda m: m.timestamp, reverse=True)
         active_raw = raw_memories[:self.compressor.raw_limit]
 
         recent_compressed = [c for c in self.compressed_store if c.tier == "recent"]
         archive_compressed = [c for c in self.compressed_store if c.tier == "archive"]
 
-        parts: List[str] = []
+        parts: list[str] = []
         if archive_compressed:
             parts.append("LONG-TERM KNOWLEDGE:\n" + "\n".join(f"- {c.summary}" for c in archive_compressed[-3:]))
         if recent_compressed:
@@ -349,12 +359,12 @@ class MemoryCompressionSkill(BaseSkill):
       get_compression_stats — Stats from last compression run
     """
 
-    def __init__(self, config: Optional[SkillConfig] = None):
+    def __init__(self, config: SkillConfig | None = None):
         super().__init__(config or SkillConfig(name="memory_compression"))
         self._api = None
-        self._compressor: Optional[MemoryCompressor] = None
-        self._manager: Optional[CompressionManager] = None
-        self._last_result: Optional[CompressionResult] = None
+        self._compressor: MemoryCompressor | None = None
+        self._manager: CompressionManager | None = None
+        self._last_result: CompressionResult | None = None
 
     @property
     def name(self) -> str:
@@ -386,7 +396,7 @@ class MemoryCompressionSkill(BaseSkill):
         return self._status
 
     @logged_method()
-    async def compress_memories(self, memories: Optional[List[Dict[str, Any]]] = None,
+    async def compress_memories(self, memories: list[dict[str, Any]] | None = None,
                                  store_semantic: bool = True, **kwargs) -> SkillResult:
         """Compress a list of memories through the 3-tier pipeline."""
         memories = memories or kwargs.get("memories", [])
@@ -399,7 +409,7 @@ class MemoryCompressionSkill(BaseSkill):
         result = await self._manager.process_all(mem_objects)
         self._last_result = result
 
-        stored_ids: List[str] = []
+        stored_ids: list[str] = []
         if store_semantic and self._api and result.success:
             for cm in self._manager.compressed_store:
                 try:
@@ -462,7 +472,7 @@ class MemoryCompressionSkill(BaseSkill):
             if not result.success:
                 return SkillResult.fail(f"Context retrieval failed: {result.error}")
 
-            items: List[Dict[str, Any]] = []
+            items: list[dict[str, Any]] = []
             raw = result.data
             if isinstance(raw, dict):
                 items = raw.get("items", raw.get("context", []))
@@ -470,7 +480,7 @@ class MemoryCompressionSkill(BaseSkill):
                 items = raw
 
             total_chars = 0
-            selected: List[Dict[str, Any]] = []
+            selected: list[dict[str, Any]] = []
             for item in items:
                 val = str(item.get("value", "")) if isinstance(item, dict) else str(item)
                 chars = len(val)

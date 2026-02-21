@@ -8,7 +8,7 @@ ordered steps, cooldown, and retry limits.
 Part of Aria's self-healing system (TICKET-36).
 """
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 
 @dataclass
@@ -20,7 +20,7 @@ class Playbook:
     steps: list[dict[str, Any]] = field(default_factory=list)
     cooldown_seconds: int = 300  # 5 minutes default
     max_retries: int = 3
-    severity_filter: Optional[list[str]] = None  # e.g. ["error", "critical"]
+    severity_filter: list[str] | None = None  # e.g. ["error", "critical"]
 
     def matches(self, component: str, metric: str, severity: str) -> bool:
         """Check if this playbook's trigger matches the given signal."""

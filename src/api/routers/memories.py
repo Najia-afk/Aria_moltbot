@@ -3,6 +3,7 @@ Memories endpoints — CRUD with upsert by key + semantic memory (S5-01).
 """
 
 import json as json_lib
+import math
 import os
 import re
 import uuid
@@ -303,7 +304,7 @@ async def search_memories_by_vector(
     memories = []
     for mem, dist in result.all():
         d = mem.to_dict()
-        d["similarity"] = round(1 - dist, 4)
+        d["similarity"] = 0.0 if (dist is None or math.isnan(dist)) else round(1 - dist, 4)
         memories.append(d)
 
     return {"memories": memories, "count": len(memories)}

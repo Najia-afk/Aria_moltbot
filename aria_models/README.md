@@ -4,7 +4,6 @@ Single source of truth for model definitions and routing.
 
 - Catalog: `aria_models/models.yaml` (YAML, JSON-compatible)
 - Loader: `aria_models/loader.py`
-- OpenClaw generator: `aria_models/openclaw_config.py`
 - LiteLLM routing config remains in `stacks/brain/litellm-config.yaml` (keep aligned)
 
 ## Quick read (Python)

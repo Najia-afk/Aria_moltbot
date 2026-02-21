@@ -5,7 +5,6 @@ Social posts endpoints (Moltbook + other platforms).
 import json as json_lib
 import os
 import uuid
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import delete, func, or_, select
@@ -124,7 +123,7 @@ async def _fetch_paginated_items(client, endpoint_templates: list[str], max_item
 async def get_social_posts(
     page: int = 1,
     limit: int = 25,
-    platform: Optional[str] = None,
+    platform: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
     base = select(SocialPost).order_by(SocialPost.posted_at.desc())
@@ -168,7 +167,7 @@ async def create_social_post(request: Request, db: AsyncSession = Depends(get_db
 @router.post("/social/cleanup")
 async def cleanup_social_posts(request: Request, db: AsyncSession = Depends(get_db)):
     """Remove test/noise social rows by pattern/platform; supports dry-run."""
-    data = await request.json()
+    data = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
     patterns = data.get("patterns") or ["test", "live test post", "abc123", "post 42"]
     platform = data.get("platform")
     dry_run = bool(data.get("dry_run", False))

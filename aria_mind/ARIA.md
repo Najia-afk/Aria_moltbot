@@ -70,7 +70,7 @@ Quick rule: local → free → paid (LAST RESORT).
 ## Quick Reference
 
 - **Skills**: Call tools using the native function calling interface (NOT as text)
-- **IMPORTANT**: Do NOT print tool calls like `aria-api-client.create_goal({...})` as text. Instead, invoke the actual tool function through OpenClaw's interface.
+- **IMPORTANT**: Do NOT print tool calls like `aria-api-client.create_goal({...})` as text. Instead, invoke the actual tool function through Aria Engine's interface.
 - **Primary skill**: `aria-api-client` for all database operations
 - **Database**: PostgreSQL at aria-db:5432 (via aria-api)
 - **LLM Router**: LiteLLM at litellm:4000

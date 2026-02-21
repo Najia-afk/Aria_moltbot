@@ -2,7 +2,7 @@
 ---
 name: aria-pattern-recognition
 description: "🔍 Behavioral pattern detection in memory streams"
-metadata: {"openclaw": {"emoji": "🔍"}}
+metadata: {"aria": {"emoji": "🔍"}}
 ---
 
 # aria-pattern-recognition
@@ -44,19 +44,19 @@ SemanticMemory (category: pattern_detection)
 
 ```bash
 # Run full pattern detection (auto-fetches memories if empty)
-exec python3 /root/.openclaw/workspace/skills/run_skill.py pattern_recognition detect_patterns '{}'
+exec python3 /app/skills/run_skill.py pattern_recognition detect_patterns '{}'
 
 # With explicit memories and confidence threshold
-exec python3 /root/.openclaw/workspace/skills/run_skill.py pattern_recognition detect_patterns '{"min_confidence": 0.5}'
+exec python3 /app/skills/run_skill.py pattern_recognition detect_patterns '{"min_confidence": 0.5}'
 
 # Get recurring topics
-exec python3 /root/.openclaw/workspace/skills/run_skill.py pattern_recognition get_recurring '{"min_frequency": 0.3}'
+exec python3 /app/skills/run_skill.py pattern_recognition get_recurring '{"min_frequency": 0.3}'
 
 # Get emerging interests
-exec python3 /root/.openclaw/workspace/skills/run_skill.py pattern_recognition get_emerging '{"min_growth_rate": 2.0}'
+exec python3 /app/skills/run_skill.py pattern_recognition get_emerging '{"min_growth_rate": 2.0}'
 
 # Check detection stats
-exec python3 /root/.openclaw/workspace/skills/run_skill.py pattern_recognition get_pattern_stats '{}'
+exec python3 /app/skills/run_skill.py pattern_recognition get_pattern_stats '{}'
 ```
 
 ## Functions

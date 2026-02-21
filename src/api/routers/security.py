@@ -4,7 +4,6 @@ Security events endpoints — CRUD + stats.
 
 import json as json_lib
 import uuid
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy import func, select, text
@@ -32,7 +31,7 @@ def _parse_jsonb(val, default):
 async def api_security_events(
     page: int = 1,
     limit: int = 25,
-    threat_level: Optional[str] = None,
+    threat_level: str | None = None,
     blocked_only: bool = False,
     db: AsyncSession = Depends(get_db),
 ):

@@ -18,12 +18,11 @@ Supports:
 
 All retrieval via api_client → FastAPI → PostgreSQL.
 """
-from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
 from aria_skills.registry import SkillRegistry
@@ -41,7 +40,7 @@ class SearchResult:
     source: str           # "semantic", "graph", "memory"
     category: str = ""
     importance: float = 0.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     original_id: str = ""
 
     @property
@@ -63,12 +62,12 @@ class SearchResult:
 @dataclass
 class MergedSearchResult:
     """Result after RRF merge of multiple backends."""
-    results: List[SearchResult]
+    results: list[SearchResult]
     total_results: int
-    backends_used: List[str]
+    backends_used: list[str]
     query: str
     elapsed_ms: float = 0.0
-    backend_counts: Dict[str, int] = field(default_factory=dict)
+    backend_counts: dict[str, int] = field(default_factory=dict)
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -82,12 +81,12 @@ class RRFMerger:
     score(d) = SUM( weight_i / (k + rank_i(d)) ) for each backend i
     """
 
-    def __init__(self, k: int = 60, weights: Optional[Dict[str, float]] = None):
+    def __init__(self, k: int = 60, weights: dict[str, float] | None = None):
         self.k = k
         self.weights = weights or {"semantic": 1.0, "graph": 0.8, "memory": 0.6}
 
-    def merge(self, ranked_lists: Dict[str, List[SearchResult]],
-              limit: int = 20) -> List[SearchResult]:
+    def merge(self, ranked_lists: dict[str, list[SearchResult]],
+              limit: int = 20) -> list[SearchResult]:
         """
         Merge multiple ranked lists using RRF.
 
@@ -98,9 +97,9 @@ class RRFMerger:
         Returns:
             Merged and re-ranked results
         """
-        score_map: Dict[str, float] = {}       # content_hash → rrf_score
-        result_map: Dict[str, SearchResult] = {}  # content_hash → best result
-        source_map: Dict[str, List[str]] = {}   # content_hash → [sources]
+        score_map: dict[str, float] = {}       # content_hash → rrf_score
+        result_map: dict[str, SearchResult] = {}  # content_hash → best result
+        source_map: dict[str, list[str]] = {}   # content_hash → [sources]
 
         for backend, results in ranked_lists.items():
             w = self.weights.get(backend, 0.5)
@@ -119,7 +118,7 @@ class RRFMerger:
                     source_map[h].append(backend)
 
         # Build final results sorted by RRF score
-        merged: List[SearchResult] = []
+        merged: list[SearchResult] = []
         for h, rrf_score in sorted(score_map.items(), key=lambda x: x[1], reverse=True):
             r = result_map[h]
             r.score = rrf_score
@@ -143,8 +142,8 @@ class SemanticBackend:
         self._api = api_client
 
     async def search(self, query: str, limit: int = 20,
-                     category: Optional[str] = None,
-                     min_importance: float = 0.0) -> List[SearchResult]:
+                     category: str | None = None,
+                     min_importance: float = 0.0) -> list[SearchResult]:
         try:
             result = await self._api.search_memories_semantic(
                 query=query, limit=limit, category=category,
@@ -156,7 +155,7 @@ class SemanticBackend:
                 result.data.get("results", result.data.get("items", []))
                 if isinstance(result.data, dict) else [])
 
-            results: List[SearchResult] = []
+            results: list[SearchResult] = []
             for item in items:
                 results.append(SearchResult(
                     content=item.get("content", ""),
@@ -179,7 +178,7 @@ class GraphBackend:
         self._api = api_client
 
     async def search(self, query: str, limit: int = 20,
-                     entity_type: Optional[str] = None) -> List[SearchResult]:
+                     entity_type: str | None = None) -> list[SearchResult]:
         try:
             result = await self._api.graph_search(
                 query=query, limit=limit, entity_type=entity_type)
@@ -190,7 +189,7 @@ class GraphBackend:
                 result.data.get("results", result.data.get("entities", []))
                 if isinstance(result.data, dict) else [])
 
-            results: List[SearchResult] = []
+            results: list[SearchResult] = []
             for item in items:
                 name = item.get("name", item.get("label", ""))
                 desc = item.get("description", item.get("properties", {}).get("description", ""))
@@ -215,10 +214,12 @@ class MemoryBackend:
         self._api = api_client
 
     async def search(self, query: str, limit: int = 20,
-                     category: Optional[str] = None) -> List[SearchResult]:
+                     category: str | None = None) -> list[SearchResult]:
         try:
+            # get_memories() does not accept a 'search' kwarg;
+            # fetch by category then client-side keyword filter.
             result = await self._api.get_memories(
-                category=category, limit=limit, search=query)
+                category=category, limit=limit)
             if not result.success:
                 return []
 
@@ -226,10 +227,15 @@ class MemoryBackend:
                 result.data.get("items", result.data.get("memories", []))
                 if isinstance(result.data, dict) else [])
 
-            results: List[SearchResult] = []
+            query_lower = query.lower() if query else ""
+            results: list[SearchResult] = []
             for item in items:
+                content = item.get("content", "")
+                # Client-side keyword filter
+                if query_lower and query_lower not in content.lower():
+                    continue
                 results.append(SearchResult(
-                    content=item.get("content", ""),
+                    content=content,
                     score=0.5,
                     source="memory",
                     category=item.get("category", ""),
@@ -258,13 +264,13 @@ class UnifiedSearchSkill(BaseSkill):
       memory_search    — Search traditional memories only
     """
 
-    def __init__(self, config: Optional[SkillConfig] = None):
+    def __init__(self, config: SkillConfig | None = None):
         super().__init__(config or SkillConfig(name="unified_search"))
         self._api = None
-        self._semantic: Optional[SemanticBackend] = None
-        self._graph: Optional[GraphBackend] = None
-        self._memory: Optional[MemoryBackend] = None
-        self._merger: Optional[RRFMerger] = None
+        self._semantic: SemanticBackend | None = None
+        self._graph: GraphBackend | None = None
+        self._memory: MemoryBackend | None = None
+        self._merger: RRFMerger | None = None
         self._search_count = 0
 
     @property
@@ -303,8 +309,8 @@ class UnifiedSearchSkill(BaseSkill):
 
     @logged_method()
     async def search(self, query: str = "", limit: int = 20,
-                     backends: Optional[List[str]] = None,
-                     category: Optional[str] = None,
+                     backends: list[str] | None = None,
+                     category: str | None = None,
                      min_importance: float = 0.0, **kwargs) -> SkillResult:
         """
         Unified search across all backends with RRF merge.
@@ -318,6 +324,13 @@ class UnifiedSearchSkill(BaseSkill):
         """
         import time
 
+        # Guard: ensure initialize() succeeded
+        if self._merger is None:
+            return SkillResult.fail(
+                "unified_search not initialized — call initialize() first "
+                "or check that api_client is reachable"
+            )
+
         query = query or kwargs.get("query", "")
         if not query:
             return SkillResult.fail("No query provided")
@@ -325,8 +338,8 @@ class UnifiedSearchSkill(BaseSkill):
         backends = backends or kwargs.get("backends", ["semantic", "graph", "memory"])
         start = time.monotonic()
 
-        ranked_lists: Dict[str, List[SearchResult]] = {}
-        backend_counts: Dict[str, int] = {}
+        ranked_lists: dict[str, list[SearchResult]] = {}
+        backend_counts: dict[str, int] = {}
 
         # Run backends (sequential to avoid overwhelming API)
         if "semantic" in backends and self._semantic:
@@ -363,8 +376,10 @@ class UnifiedSearchSkill(BaseSkill):
 
     @logged_method()
     async def semantic_search(self, query: str = "", limit: int = 20,
-                               category: Optional[str] = None, **kwargs) -> SkillResult:
+                               category: str | None = None, **kwargs) -> SkillResult:
         """Search semantic memories only."""
+        if self._semantic is None:
+            return SkillResult.fail("unified_search not initialized — semantic backend unavailable")
         query = query or kwargs.get("query", "")
         if not query:
             return SkillResult.fail("No query provided")
@@ -380,6 +395,8 @@ class UnifiedSearchSkill(BaseSkill):
     @logged_method()
     async def graph_search(self, query: str = "", limit: int = 20, **kwargs) -> SkillResult:
         """Search knowledge graph only."""
+        if self._graph is None:
+            return SkillResult.fail("unified_search not initialized — graph backend unavailable")
         query = query or kwargs.get("query", "")
         if not query:
             return SkillResult.fail("No query provided")
@@ -394,8 +411,10 @@ class UnifiedSearchSkill(BaseSkill):
 
     @logged_method()
     async def memory_search(self, query: str = "", limit: int = 20,
-                             category: Optional[str] = None, **kwargs) -> SkillResult:
+                             category: str | None = None, **kwargs) -> SkillResult:
         """Search traditional memories only."""
+        if self._memory is None:
+            return SkillResult.fail("unified_search not initialized — memory backend unavailable")
         query = query or kwargs.get("query", "")
         if not query:
             return SkillResult.fail("No query provided")

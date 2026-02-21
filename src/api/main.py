@@ -14,6 +14,8 @@ import asyncio
 import time as _time
 import traceback
 import uuid as _uuid
+import sys
+from pathlib import Path
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -21,15 +23,31 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from prometheus_fastapi_instrumentator import Instrumentator
 
+# Import-path compatibility for mixed absolute/relative imports across src/api.
+_API_DIR = str(Path(__file__).resolve().parent)
+if _API_DIR not in sys.path:
+    sys.path.insert(0, _API_DIR)
+
+if os.name == "nt":
+    try:
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    except Exception:
+        pass
+
 try:
     from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
     HAS_PROMETHEUS = True
 except ImportError:
     HAS_PROMETHEUS = False
 
-from config import API_VERSION, SKILL_BACKFILL_ON_STARTUP
-from db import async_engine, ensure_schema
-from startup_skill_backfill import run_skill_invocation_backfill
+try:
+    from .config import API_VERSION, SKILL_BACKFILL_ON_STARTUP
+    from .db import async_engine, ensure_schema
+    from .startup_skill_backfill import run_skill_invocation_backfill
+except ImportError:
+    from config import API_VERSION, SKILL_BACKFILL_ON_STARTUP
+    from db import async_engine, ensure_schema
+    from startup_skill_backfill import run_skill_invocation_backfill
 
 _logger = logging.getLogger("aria.api")
 
@@ -45,13 +63,120 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"⚠️  Database init failed: {e}")
 
+    # S-52/S-53: Initialize Aria Engine (chat, streaming, agents)
+    try:
+        from aria_engine.config import EngineConfig
+        from aria_engine.llm_gateway import LLMGateway
+        from aria_engine.tool_registry import ToolRegistry
+        from aria_engine.chat_engine import ChatEngine
+        from aria_engine.streaming import StreamManager
+        from aria_engine.context_manager import ContextManager
+        from aria_engine.prompts import PromptAssembler
+        try:
+            from .db import AsyncSessionLocal
+        except ImportError:
+            from db import AsyncSessionLocal
+
+        engine_cfg = EngineConfig()
+        gateway = LLMGateway(engine_cfg)
+        tool_registry = ToolRegistry()
+        # Auto-discover tools from aria_skills/*/skill.json manifests
+        try:
+            tool_count = tool_registry.discover_from_manifests()
+            print(f"✅ Tool registry: {tool_count} tools discovered from skill manifests")
+        except Exception as te:
+            print(f"⚠️  Tool manifest discovery failed (non-fatal): {te}")
+        chat_engine = ChatEngine(engine_cfg, gateway, tool_registry, AsyncSessionLocal)
+        stream_manager = StreamManager(engine_cfg, gateway, tool_registry, AsyncSessionLocal)
+        context_manager = ContextManager(engine_cfg)
+        prompt_assembler = PromptAssembler(engine_cfg)
+
+        configure_engine(
+            config=engine_cfg,
+            chat_engine=chat_engine,
+            stream_manager=stream_manager,
+            context_manager=context_manager,
+            prompt_assembler=prompt_assembler,
+        )
+        # Initialize Roundtable + Swarm engines (multi-agent discussions)
+        try:
+            from aria_engine.roundtable import Roundtable
+            from aria_engine.agent_pool import AgentPool
+            from aria_engine.routing import EngineRouter
+            from aria_engine.swarm import SwarmOrchestrator
+
+            _rt_pool = AgentPool(engine_cfg, async_engine, llm_gateway=gateway)
+            await _rt_pool.load_agents()
+            _rt_router = EngineRouter(async_engine)
+            _roundtable = Roundtable(async_engine, _rt_pool, _rt_router)
+            _swarm = SwarmOrchestrator(async_engine, _rt_pool, _rt_router)
+            configure_roundtable(_roundtable, async_engine)
+            configure_swarm(_swarm)
+            print("✅ Roundtable + Swarm engines initialized")
+
+            # Inject orchestrators into ChatEngine for /roundtable & /swarm commands
+            chat_engine.set_roundtable(_roundtable)
+            chat_engine.set_swarm(_swarm)
+            chat_engine.set_escalation_router(_rt_router)
+            print("✅ Slash commands wired (chat → roundtable/swarm)")
+        except Exception as rte:
+            print(f"⚠️  Roundtable/Swarm init failed (non-fatal): {rte}")
+
+        print("✅ Aria Engine initialized (chat + streaming + agents + roundtable + swarm)")
+    except Exception as e:
+        print(f"⚠️  Engine init failed (chat will be degraded): {e}")
+
+    # Seed LLM models from models.yaml → llm_models DB table
+    try:
+        try:
+            from .models_sync import sync_models_from_yaml
+        except ImportError:
+            from models_sync import sync_models_from_yaml
+        try:
+            from .db import AsyncSessionLocal as _SeedSessionLocal
+        except ImportError:
+            from db import AsyncSessionLocal as _SeedSessionLocal
+        seed_stats = await sync_models_from_yaml(_SeedSessionLocal)
+        print(f"✅ Models synced to DB: {seed_stats['inserted']} new, {seed_stats['updated']} updated ({seed_stats['total']} total)")
+    except Exception as e:
+        print(f"⚠️  Models DB sync failed (non-fatal): {e}")
+
+    # Auto-sync agents from AGENTS.md → agent_state DB table
+    try:
+        try:
+            from .agents_sync import sync_agents_from_markdown
+        except ImportError:
+            from agents_sync import sync_agents_from_markdown
+        try:
+            from .db import AsyncSessionLocal as _AgentSessionLocal
+        except ImportError:
+            from db import AsyncSessionLocal as _AgentSessionLocal
+        agent_stats = await sync_agents_from_markdown(_AgentSessionLocal)
+        print(f"✅ Agents synced to DB: {agent_stats.get('inserted', 0)} new, {agent_stats.get('updated', 0)} updated ({agent_stats.get('total', 0)} total)")
+    except Exception as e:
+        print(f"⚠️  Agents DB sync failed (non-fatal): {e}")
+
     # S4-07: Auto-sync skill graph on startup
     try:
-        from graph_sync import sync_skill_graph
+        try:
+            from .graph_sync import sync_skill_graph
+        except ImportError:
+            from graph_sync import sync_skill_graph
         stats = await sync_skill_graph()
         print(f"✅ Skill graph synced: {stats['entities']} entities, {stats['relations']} relations")
     except Exception as e:
         print(f"⚠️  Skill graph sync failed (non-fatal): {e}")
+
+    # S-54: Auto-sync cron jobs from YAML → DB
+    try:
+        try:
+            from .cron_sync import sync_cron_jobs_from_yaml
+        except ImportError:
+            from cron_sync import sync_cron_jobs_from_yaml
+        cron_summary = await sync_cron_jobs_from_yaml()
+        print(f"✅ Cron jobs synced: {cron_summary}")
+    except Exception as e:
+        print(f"⚠️  Cron job sync failed (non-fatal): {e}")
 
     # Auto-heal skill telemetry gaps on startup (idempotent, toggleable).
     if SKILL_BACKFILL_ON_STARTUP:
@@ -70,19 +195,45 @@ async def lifespan(app: FastAPI):
         print("ℹ️  Skill invocation backfill skipped (SKILL_BACKFILL_ON_STARTUP=false)")
 
     # S-AUTO: Background sentiment auto-scorer (zero LLM tokens)
-    from sentiment_autoscorer import run_autoscorer_loop
+    try:
+        from .sentiment_autoscorer import run_autoscorer_loop
+    except ImportError:
+        from sentiment_autoscorer import run_autoscorer_loop
     scorer_task = asyncio.create_task(run_autoscorer_loop())
     print("🎯 Sentiment auto-scorer background task launched")
 
+    # S-67: Background session auto-cleanup (every 6 hours)
+    async def _session_cleanup_loop():
+        """Prune stale sessions (>30 days) every 6 hours."""
+        from aria_engine.session_manager import NativeSessionManager
+        mgr = NativeSessionManager(async_engine)
+        while True:
+            try:
+                await asyncio.sleep(6 * 3600)  # 6 hours
+                result = await mgr.prune_old_sessions(days=30, dry_run=False)
+                if result["pruned_count"] > 0:
+                    _logger.info(
+                        "Session cleanup: pruned %d sessions (%d messages)",
+                        result["pruned_count"], result["message_count"],
+                    )
+            except asyncio.CancelledError:
+                break
+            except Exception as exc:
+                _logger.warning("Session cleanup error: %s", exc)
+
+    cleanup_task = asyncio.create_task(_session_cleanup_loop())
+    print("🧹 Session auto-cleanup background task launched (every 6h, >30d)")
+
     yield
 
-    # Graceful shutdown of auto-scorer
-    scorer_task.cancel()
-    try:
-        await scorer_task
-    except asyncio.CancelledError:
-        pass
-    print("🛑 Sentiment auto-scorer stopped")
+    # Graceful shutdown
+    for task in (scorer_task, cleanup_task):
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+    print("🛑 Background tasks stopped (auto-scorer + session-cleanup)")
 
     await async_engine.dispose()
     print("🔌 Database engine disposed")
@@ -132,8 +283,8 @@ from security_middleware import SecurityMiddleware, RateLimiter
 app.add_middleware(
     SecurityMiddleware,
     rate_limiter=RateLimiter(
-        requests_per_minute=120,
-        requests_per_hour=2000,
+        requests_per_minute=300,
+        requests_per_hour=5000,
         burst_limit=50,
     ),
     max_body_size=2_000_000,
@@ -234,27 +385,68 @@ async def metrics():
 
 # ── REST routers ─────────────────────────────────────────────────────────────
 
-from routers.health import router as health_router
-from routers.activities import router as activities_router
-from routers.thoughts import router as thoughts_router
-from routers.memories import router as memories_router
-from routers.goals import router as goals_router
-from routers.sessions import router as sessions_router
-from routers.model_usage import router as model_usage_router
-from routers.litellm import router as litellm_router
-from routers.providers import router as providers_router
-from routers.security import router as security_router
-from routers.knowledge import router as knowledge_router
-from routers.social import router as social_router
-from routers.operations import router as operations_router
-from routers.records import router as records_router
-from routers.admin import router as admin_router
-from routers.models_config import router as models_config_router
-from routers.working_memory import router as working_memory_router
-from routers.skills import router as skills_router
-from routers.lessons import router as lessons_router
-from routers.proposals import router as proposals_router
-from routers.analysis import router as analysis_router
+try:
+    from .routers.health import router as health_router
+    from .routers.activities import router as activities_router
+    from .routers.thoughts import router as thoughts_router
+    from .routers.memories import router as memories_router
+    from .routers.goals import router as goals_router
+    from .routers.sessions import router as sessions_router
+    from .routers.model_usage import router as model_usage_router
+    from .routers.litellm import router as litellm_router
+    from .routers.providers import router as providers_router
+    from .routers.security import router as security_router
+    from .routers.knowledge import router as knowledge_router
+    from .routers.social import router as social_router
+    from .routers.operations import router as operations_router
+    from .routers.records import router as records_router
+    from .routers.admin import router as admin_router
+    from .routers.models_config import router as models_config_router
+    from .routers.models_crud import router as models_crud_router
+    from .routers.working_memory import router as working_memory_router
+    from .routers.skills import router as skills_router
+    from .routers.lessons import router as lessons_router
+    from .routers.proposals import router as proposals_router
+    from .routers.analysis import router as analysis_router
+    from .routers.engine_cron import router as engine_cron_router
+    from .routers.engine_sessions import router as engine_sessions_router
+    from .routers.engine_agents import router as engine_agents_router
+    from .routers.engine_agent_metrics import router as engine_agent_metrics_router
+    from .routers.agents_crud import router as agents_crud_router
+    from .routers.engine_roundtable import router as engine_roundtable_router, configure_roundtable, configure_swarm, register_roundtable
+    from .routers.engine_chat import register_engine_chat, configure_engine
+    from .routers.artifacts import router as artifacts_router
+except ImportError:
+    from routers.health import router as health_router
+    from routers.activities import router as activities_router
+    from routers.thoughts import router as thoughts_router
+    from routers.memories import router as memories_router
+    from routers.goals import router as goals_router
+    from routers.sessions import router as sessions_router
+    from routers.model_usage import router as model_usage_router
+    from routers.litellm import router as litellm_router
+    from routers.providers import router as providers_router
+    from routers.security import router as security_router
+    from routers.knowledge import router as knowledge_router
+    from routers.social import router as social_router
+    from routers.operations import router as operations_router
+    from routers.records import router as records_router
+    from routers.admin import router as admin_router
+    from routers.models_config import router as models_config_router
+    from routers.models_crud import router as models_crud_router
+    from routers.working_memory import router as working_memory_router
+    from routers.skills import router as skills_router
+    from routers.lessons import router as lessons_router
+    from routers.proposals import router as proposals_router
+    from routers.analysis import router as analysis_router
+    from routers.engine_cron import router as engine_cron_router
+    from routers.engine_sessions import router as engine_sessions_router
+    from routers.engine_agents import router as engine_agents_router
+    from routers.engine_agent_metrics import router as engine_agent_metrics_router
+    from routers.agents_crud import router as agents_crud_router
+    from routers.engine_roundtable import router as engine_roundtable_router, configure_roundtable, configure_swarm, register_roundtable
+    from routers.engine_chat import register_engine_chat, configure_engine
+    from routers.artifacts import router as artifacts_router
 
 app.include_router(health_router)
 app.include_router(activities_router)
@@ -272,15 +464,31 @@ app.include_router(operations_router)
 app.include_router(records_router)
 app.include_router(admin_router)
 app.include_router(models_config_router)
+app.include_router(models_crud_router)
 app.include_router(working_memory_router)
 app.include_router(skills_router)
 app.include_router(lessons_router)
 app.include_router(proposals_router)
 app.include_router(analysis_router)
+app.include_router(engine_cron_router)
+app.include_router(engine_sessions_router)
+app.include_router(engine_agent_metrics_router)
+app.include_router(engine_agents_router)
+app.include_router(agents_crud_router)
+app.include_router(artifacts_router)
+
+# Engine Roundtable + Swarm — REST + WebSocket
+register_roundtable(app)
+
+# Engine Chat — REST + WebSocket
+register_engine_chat(app)
 
 # ── GraphQL ──────────────────────────────────────────────────────────────────
 
-from gql import graphql_app as gql_router   # noqa: E402
+try:
+    from .gql import graphql_app as gql_router   # noqa: E402
+except ImportError:
+    from gql import graphql_app as gql_router   # noqa: E402
 
 app.include_router(gql_router, prefix="/graphql")
 

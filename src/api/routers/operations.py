@@ -8,16 +8,16 @@ import json as json_lib
 import os
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select, update, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config import OPENCLAW_JOBS_PATH
+from config import ARIA_JOBS_PATH
 from db.models import (
     ApiKeyRotation,
+    EngineCronJob,
     HeartbeatLog,
     PendingComplexTask,
     PerformanceLog,
@@ -125,7 +125,7 @@ async def increment_rate_limit(request: Request, db: AsyncSession = Depends(get_
 @router.get("/api-key-rotations")
 async def get_api_key_rotations(
     limit: int = 50,
-    service: Optional[str] = None,
+    service: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
     stmt = select(ApiKeyRotation).order_by(ApiKeyRotation.rotated_at.desc()).limit(limit)
@@ -235,7 +235,7 @@ async def create_performance_log(request: Request, db: AsyncSession = Depends(ge
 
 @router.get("/tasks")
 async def get_pending_tasks(
-    status: Optional[str] = None, db: AsyncSession = Depends(get_db)
+    status: str | None = None, db: AsyncSession = Depends(get_db)
 ):
     stmt = select(PendingComplexTask).order_by(PendingComplexTask.created_at.desc())
     if status:
@@ -291,33 +291,32 @@ async def get_schedule(db: AsyncSession = Depends(get_db)):
 
 @router.post("/schedule/tick")
 async def manual_tick(db: AsyncSession = Depends(get_db)):
-    jobs_total = jobs_successful = jobs_failed = 0
-    last_job_name = last_job_status = None
-    next_job_at = None
+    """Manual heartbeat tick — updates schedule_tick from engine cron jobs."""
+    # Read stats from engine cron jobs (DB-backed, not legacy jobs.json)
+    result = await db.execute(select(EngineCronJob))
+    jobs = result.scalars().all()
 
-    try:
-        with open(OPENCLAW_JOBS_PATH, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        jobs = data.get("jobs", [])
-        jobs_total = len(jobs)
-        latest_run_ms = 0
-        earliest_next_ms = float("inf")
-        for job in jobs:
-            state = job.get("state", {})
-            if state.get("lastRunAtMs", 0) > latest_run_ms:
-                latest_run_ms = state["lastRunAtMs"]
-                last_job_name = job.get("name")
-                last_job_status = state.get("lastStatus")
-            if 0 < state.get("nextRunAtMs", 0) < earliest_next_ms:
-                earliest_next_ms = state["nextRunAtMs"]
-            if state.get("lastStatus") == "ok":
-                jobs_successful += 1
-            elif state.get("lastStatus") == "error":
-                jobs_failed += 1
-        if earliest_next_ms < float("inf"):
-            next_job_at = datetime.fromtimestamp(earliest_next_ms / 1000)
-    except Exception:
-        pass
+    jobs_total = len(jobs)
+    jobs_successful = 0
+    jobs_failed = 0
+    last_job_name = None
+    last_job_status = None
+    next_job_at = None
+    latest_run = None
+
+    for job in jobs:
+        if job.last_status == "ok":
+            jobs_successful += 1
+        elif job.last_status == "error":
+            jobs_failed += 1
+        if job.last_run_at:
+            if latest_run is None or job.last_run_at > latest_run:
+                latest_run = job.last_run_at
+                last_job_name = job.name
+                last_job_status = job.last_status
+        if job.next_run_at:
+            if next_job_at is None or job.next_run_at < next_job_at:
+                next_job_at = job.next_run_at
 
     now = datetime.now(timezone.utc)
     await db.execute(
@@ -334,121 +333,69 @@ async def manual_tick(db: AsyncSession = Depends(get_db)):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Scheduled Jobs (OpenClaw Sync)
+# Scheduled Jobs — now powered by aria_engine.cron_jobs (EngineCronJob ORM)
 # ──────────────────────────────────────────────────────────────────────────────
+
+def _cron_job_to_dict(job: EngineCronJob) -> dict:
+    """Serialize an EngineCronJob to the format the heartbeat frontend expects."""
+    return {
+        "id": job.id,
+        "agent_id": job.agent_id,
+        "name": job.name,
+        "enabled": job.enabled,
+        "schedule_kind": "cron",
+        "schedule_expr": job.schedule,
+        "session_target": job.session_mode,
+        "wake_mode": None,
+        "payload_kind": job.payload_type,
+        "payload_text": job.payload[:200] + "..." if job.payload and len(job.payload) > 200 else job.payload,
+        "next_run_at": job.next_run_at.isoformat() if job.next_run_at else None,
+        "last_run_at": job.last_run_at.isoformat() if job.last_run_at else None,
+        "last_status": job.last_status,
+        "last_duration_ms": job.last_duration_ms,
+        "run_count": job.run_count,
+        "success_count": job.success_count,
+        "fail_count": job.fail_count,
+        "max_duration_seconds": job.max_duration_seconds,
+    }
+
 
 @router.get("/jobs")
 async def get_scheduled_jobs(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(ScheduledJob).order_by(ScheduledJob.name))
+    """List all engine cron jobs from aria_engine.cron_jobs."""
+    result = await db.execute(select(EngineCronJob).order_by(EngineCronJob.name))
     rows = result.scalars().all()
-    return {"jobs": [j.to_dict() for j in rows], "count": len(rows)}
+    return {"jobs": [_cron_job_to_dict(j) for j in rows], "count": len(rows)}
 
 
 @router.get("/jobs/live")
-async def get_jobs_live():
-    """Read jobs directly from OpenClaw jobs.json (live, no DB)."""
-    try:
-        with open(OPENCLAW_JOBS_PATH, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        jobs = []
-        for job in data.get("jobs", []):
-            schedule = job.get("schedule", {})
-            state = job.get("state", {})
-            payload = job.get("payload", {})
-            jobs.append({
-                "id": job.get("id"),
-                "agent_id": job.get("agentId", "main"),
-                "name": job.get("name"),
-                "enabled": job.get("enabled", True),
-                "schedule_kind": schedule.get("kind", "cron"),
-                "schedule_expr": schedule.get("expr", ""),
-                "session_target": job.get("sessionTarget"),
-                "wake_mode": job.get("wakeMode"),
-                "payload_kind": payload.get("kind"),
-                "payload_text": payload.get("message") or payload.get("text"),
-                "next_run_at": (
-                    datetime.fromtimestamp(state["nextRunAtMs"] / 1000).isoformat()
-                    if state.get("nextRunAtMs") else None
-                ),
-                "last_run_at": (
-                    datetime.fromtimestamp(state["lastRunAtMs"] / 1000).isoformat()
-                    if state.get("lastRunAtMs") else None
-                ),
-                "last_status": state.get("lastStatus"),
-                "last_duration_ms": state.get("lastDurationMs"),
-            })
-        return {"jobs": jobs, "count": len(jobs), "source": "live"}
-    except FileNotFoundError:
-        return {"jobs": [], "count": 0, "source": "live", "error": f"File not found: {OPENCLAW_JOBS_PATH}"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+async def get_jobs_live(db: AsyncSession = Depends(get_db)):
+    """Live cron jobs from DB (replaces legacy jobs.json file read)."""
+    result = await db.execute(select(EngineCronJob).order_by(EngineCronJob.name))
+    rows = result.scalars().all()
+    return {"jobs": [_cron_job_to_dict(j) for j in rows], "count": len(rows), "source": "db"}
 
 
 @router.get("/jobs/{job_id}")
 async def get_scheduled_job(job_id: str, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(ScheduledJob).where(ScheduledJob.id == job_id))
+    """Get a single cron job by ID."""
+    result = await db.execute(select(EngineCronJob).where(EngineCronJob.id == job_id))
     job = result.scalar_one_or_none()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    return job.to_dict()
+    return _cron_job_to_dict(job)
 
 
 @router.post("/jobs/sync")
-async def sync_jobs_from_openclaw(db: AsyncSession = Depends(get_db)):
+async def sync_jobs(db: AsyncSession = Depends(get_db)):
+    """Re-sync cron jobs from cron_jobs.yaml → aria_engine.cron_jobs."""
     try:
-        with open(OPENCLAW_JOBS_PATH, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        jobs = data.get("jobs", [])
-        synced = 0
-        for job in jobs:
-            schedule = job.get("schedule", {})
-            state = job.get("state", {})
-            payload = job.get("payload", {})
-            next_run = (
-                datetime.fromtimestamp(state["nextRunAtMs"] / 1000) if state.get("nextRunAtMs") else None
-            )
-            last_run = (
-                datetime.fromtimestamp(state["lastRunAtMs"] / 1000) if state.get("lastRunAtMs") else None
-            )
-            now_sync = datetime.now(timezone.utc)
-            values = {
-                "id": job.get("id"),
-                "agent_id": job.get("agentId", "main"),
-                "name": job.get("name"),
-                "enabled": job.get("enabled", True),
-                "schedule_kind": schedule.get("kind", "cron"),
-                "schedule_expr": schedule.get("expr", ""),
-                "session_target": job.get("sessionTarget"),
-                "wake_mode": job.get("wakeMode"),
-                "payload_kind": payload.get("kind"),
-                "payload_text": payload.get("text"),
-                "next_run_at": next_run,
-                "last_run_at": last_run,
-                "last_status": state.get("lastStatus"),
-                "last_duration_ms": state.get("lastDurationMs"),
-                "created_at_ms": job.get("createdAtMs"),
-                "updated_at_ms": job.get("updatedAtMs"),
-                "synced_at": now_sync,
-            }
-            stmt = pg_insert(ScheduledJob).values(**values).on_conflict_do_update(
-                index_elements=["id"],
-                set_={
-                    "agent_id": values["agent_id"], "name": values["name"],
-                    "enabled": values["enabled"], "schedule_kind": values["schedule_kind"],
-                    "schedule_expr": values["schedule_expr"],
-                    "session_target": values["session_target"], "wake_mode": values["wake_mode"],
-                    "payload_kind": values["payload_kind"], "payload_text": values["payload_text"],
-                    "next_run_at": values["next_run_at"], "last_run_at": values["last_run_at"],
-                    "last_status": values["last_status"], "last_duration_ms": values["last_duration_ms"],
-                    "updated_at_ms": values["updated_at_ms"], "synced_at": now_sync,
-                },
-            )
-            await db.execute(stmt)
-            synced += 1
-        await db.commit()
-        return {"synced": synced, "source": OPENCLAW_JOBS_PATH, "total_in_file": len(jobs)}
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail=f"Jobs file not found at {OPENCLAW_JOBS_PATH}")
+        from cron_sync import sync_cron_jobs_from_yaml
+        stats = await sync_cron_jobs_from_yaml()
+        total = stats.get("inserted", 0) + stats.get("updated", 0) + stats.get("unchanged", 0)
+        return {"synced": total, "source": "cron_jobs.yaml", **stats}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=500, detail=f"Invalid JSON: {e}")
     except Exception as e:

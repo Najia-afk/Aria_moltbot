@@ -1,6 +1,6 @@
 # aria_skills/moltbook.py
 """
-� Moltbook Social Skill
+📖 Moltbook Social Skill
 
 Moltbook API integration for Aria.
 API docs: https://www.moltbook.com/skill.md
@@ -10,7 +10,7 @@ API docs: https://www.moltbook.com/skill.md
 """
 import os
 from datetime import datetime, timezone
-from typing import Any, List, Optional
+from typing import Any
 from urllib.parse import quote
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
@@ -51,8 +51,8 @@ class MoltbookSkill(BaseSkill):
 
     def __init__(self, config: SkillConfig):
         super().__init__(config)
-        self._client: Optional["httpx.AsyncClient"] = None
-        self._local_client: Optional["httpx.AsyncClient"] = None
+        self._client: "httpx.AsyncClient" | None = None
+        self._local_client: "httpx.AsyncClient" | None = None
         self._api_url = MOLTBOOK_DEFAULT_URL
         self._api_key = ""
         self._local_api_url = os.environ.get("ARIA_API_URL", "http://aria-api:8000/api").split("/api")[0]
@@ -66,7 +66,7 @@ class MoltbookSkill(BaseSkill):
     # safety net in case someone forgets the override.
     POSTING_METHODS = frozenset({"create_post", "add_comment", "delete_post"})
 
-    def _check_posting_allowed(self, agent_role: str = "main") -> Optional[SkillResult]:
+    def _check_posting_allowed(self, agent_role: str = "main") -> SkillResult | None:
         """Reject non-main roles. Callers fake 'main' to avoid Moltbook ban."""
         if agent_role not in ("aria", "main"):
             return SkillResult.fail(
@@ -94,7 +94,7 @@ class MoltbookSkill(BaseSkill):
         self._local_api_url = os.environ.get("ARIA_API_URL", "http://aria-api:8000")
 
         # Moltbook HTTP client
-        self._client: Optional["httpx.AsyncClient"] = None
+        self._client: "httpx.AsyncClient" | None = None
         if HAS_HTTPX and self._api_key:
             self._client = httpx.AsyncClient(
                 base_url=self._api_url,
@@ -106,7 +106,7 @@ class MoltbookSkill(BaseSkill):
             )
 
         # Local backup client (aria-api, no auth needed)
-        self._local_client: Optional["httpx.AsyncClient"] = None
+        self._local_client: "httpx.AsyncClient" | None = None
         if HAS_HTTPX:
             self._local_client = httpx.AsyncClient(
                 base_url=self._local_api_url,
@@ -157,9 +157,9 @@ class MoltbookSkill(BaseSkill):
     async def create_post(
         self,
         content: str,
-        title: Optional[str] = None,
+        title: str | None = None,
         submolt: str = "general",
-        url: Optional[str] = None,
+        url: str | None = None,
         agent_role: str = "main",
     ) -> SkillResult:
         """
@@ -254,7 +254,7 @@ class MoltbookSkill(BaseSkill):
         self,
         sort: str = "hot",
         limit: int = 25,
-        submolt: Optional[str] = None,
+        submolt: str | None = None,
         personalized: bool = False,
     ) -> SkillResult:
         """
@@ -295,7 +295,7 @@ class MoltbookSkill(BaseSkill):
         self,
         post_id: str,
         content: str,
-        parent_id: Optional[str] = None,
+        parent_id: str | None = None,
         agent_role: str = "main",
     ) -> SkillResult:
         """
@@ -534,7 +534,7 @@ class MoltbookSkill(BaseSkill):
             return SkillResult.fail(f"Profile fetch failed: {e}")
 
     @logged_method()
-    async def update_profile(self, description: Optional[str] = None, metadata: Optional[dict] = None) -> SkillResult:
+    async def update_profile(self, description: str | None = None, metadata: dict | None = None) -> SkillResult:
         """Update your agent profile (use PATCH, not PUT)."""
         if not self._client:
             return SkillResult.fail("API client not initialized")
@@ -595,7 +595,7 @@ class MoltbookSkill(BaseSkill):
     # SocialPlatform protocol aliases
     # ------------------------------------------------------------------
 
-    async def post(self, content: str, tags: Optional[List[str]] = None) -> SkillResult:
+    async def post(self, content: str, tags: list[str] | None = None) -> SkillResult:
         """SocialPlatform.post() implementation."""
         return await self.create_post(content=content)
 

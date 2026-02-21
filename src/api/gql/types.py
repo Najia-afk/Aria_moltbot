@@ -2,7 +2,6 @@
 Strawberry GraphQL types for Aria data models.
 """
 
-from typing import Optional
 import strawberry
 from strawberry.scalars import JSON
 
@@ -11,11 +10,11 @@ from strawberry.scalars import JSON
 class ActivityType:
     id: str
     action: str
-    skill: Optional[str]
-    details: Optional[JSON]
+    skill: str | None
+    details: JSON | None
     success: bool
-    error_message: Optional[str]
-    created_at: Optional[str]
+    error_message: str | None
+    created_at: str | None
 
 
 @strawberry.type
@@ -23,18 +22,18 @@ class ThoughtType:
     id: str
     category: str
     content: str
-    metadata: Optional[JSON]
-    created_at: Optional[str]
+    metadata: JSON | None
+    created_at: str | None
 
 
 @strawberry.type
 class MemoryType:
     id: str
     key: str
-    value: Optional[JSON]
+    value: JSON | None
     category: str
-    created_at: Optional[str]
-    updated_at: Optional[str]
+    created_at: str | None
+    updated_at: str | None
 
 
 @strawberry.type
@@ -42,20 +41,20 @@ class GoalType:
     id: str
     goal_id: str
     title: str
-    description: Optional[str]
+    description: str | None
     status: str
     priority: int
     progress: float
-    due_date: Optional[str]
-    created_at: Optional[str]
-    completed_at: Optional[str]
+    due_date: str | None
+    created_at: str | None
+    completed_at: str | None
     # Sprint Board fields (S3-08)
-    sprint: Optional[str] = None
-    board_column: Optional[str] = None
+    sprint: str | None = None
+    board_column: str | None = None
     position: int = 0
-    assigned_to: Optional[str] = None
-    tags: Optional[JSON] = None
-    updated_at: Optional[str] = None
+    assigned_to: str | None = None
+    tags: JSON | None = None
+    updated_at: str | None = None
 
 
 @strawberry.type
@@ -63,9 +62,9 @@ class KnowledgeEntityType:
     id: str
     name: str
     entity_type: str
-    properties: Optional[JSON]
-    created_at: Optional[str]
-    updated_at: Optional[str]
+    properties: JSON | None
+    created_at: str | None
+    updated_at: str | None
 
 
 @strawberry.type
@@ -74,10 +73,10 @@ class KnowledgeRelationType:
     from_entity: str
     to_entity: str
     relation_type: str
-    properties: Optional[JSON]
-    from_name: Optional[str] = None
-    to_name: Optional[str] = None
-    created_at: Optional[str]
+    properties: JSON | None
+    from_name: str | None = None
+    to_name: str | None = None
+    created_at: str | None
 
 
 @strawberry.type
@@ -85,8 +84,8 @@ class SessionType:
     id: str
     agent_id: str
     session_type: str
-    started_at: Optional[str]
-    ended_at: Optional[str]
+    started_at: str | None
+    ended_at: str | None
     messages_count: int
     tokens_used: int
     cost_usd: float
@@ -97,14 +96,14 @@ class SessionType:
 class ModelUsageType:
     id: str
     model: str
-    provider: Optional[str]
+    provider: str | None
     input_tokens: int
     output_tokens: int
     cost_usd: float
-    latency_ms: Optional[int]
+    latency_ms: int | None
     success: bool
     source: str
-    created_at: Optional[str]
+    created_at: str | None
 
 
 @strawberry.type
@@ -113,7 +112,7 @@ class StatsType:
     thoughts_count: int
     memories_count: int
     goals_count: int
-    last_activity: Optional[str]
+    last_activity: str | None
 
 
 @strawberry.input
@@ -125,9 +124,9 @@ class MemoryInput:
 
 @strawberry.input
 class GoalUpdateInput:
-    status: Optional[str] = None
-    progress: Optional[float] = None
-    priority: Optional[int] = None
+    status: str | None = None
+    progress: float | None = None
+    priority: int | None = None
 
 
 # S4-08: Knowledge Graph query types
@@ -137,7 +136,7 @@ class GraphTraversalNodeType:
     id: str
     name: str
     entity_type: str
-    properties: Optional[JSON]
+    properties: JSON | None
 
 
 @strawberry.type
@@ -146,7 +145,7 @@ class GraphTraversalEdgeType:
     from_entity: str
     to_entity: str
     relation_type: str
-    properties: Optional[JSON]
+    properties: JSON | None
 
 
 @strawberry.type 
@@ -163,7 +162,7 @@ class SkillCandidate:
     id: str
     name: str
     entity_type: str
-    properties: Optional[JSON]
+    properties: JSON | None
     match_type: str
     relevance: str
 

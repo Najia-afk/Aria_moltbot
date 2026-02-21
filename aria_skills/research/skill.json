@@ -4,97 +4,160 @@
   "description": "📰 Research and information gathering for Journalist",
   "author": "Aria Blue",
   "layer": 3,
-  "dependencies": ["api_client"],
-  "focus_affinity": ["journalist"],
+  "dependencies": [
+    "api_client"
+  ],
+  "focus_affinity": [
+    "journalist"
+  ],
   "tools": [
     {
-      "name": "create_project",
-      "description": "Create a new research project",
+      "name": "start_project",
+      "description": "Create and start a new research project.",
       "parameters": {
         "type": "object",
         "properties": {
-          "topic": { "type": "string", "description": "The research topic" },
-          "initial_questions": { "type": "array", "description": "Optional initial research questions" }
+          "topic": {
+            "type": "string",
+            "description": "The research topic"
+          },
+          "initial_questions": {
+            "type": "array",
+            "description": "Optional initial research questions"
+          }
         },
-        "required": ["topic"]
+        "required": [
+          "topic"
+        ]
       }
     },
     {
       "name": "add_source",
-      "description": "Add a source to a research project",
+      "description": "Add a source to a research project.",
       "parameters": {
         "type": "object",
         "properties": {
-          "project_id": { "type": "string", "description": "The project ID to add the source to" },
-          "title": { "type": "string", "description": "The title of the source" },
-          "url": { "type": "string", "description": "Optional URL of the source" },
-          "author": { "type": "string", "description": "Optional author of the source" },
-          "date": { "type": "string", "description": "Optional publication date" },
-          "summary": { "type": "string", "description": "Optional summary of the source" }
+          "project_id": {
+            "type": "string",
+            "description": "The project ID to add the source to"
+          },
+          "title": {
+            "type": "string",
+            "description": "The title of the source"
+          },
+          "url": {
+            "type": "string",
+            "description": "Optional URL of the source"
+          },
+          "author": {
+            "type": "string",
+            "description": "Optional author of the source"
+          },
+          "date": {
+            "type": "string",
+            "description": "Optional publication date"
+          },
+          "summary": {
+            "type": "string",
+            "description": "Optional summary of the source"
+          }
         },
-        "required": ["project_id", "title"]
+        "required": [
+          "project_id",
+          "title"
+        ]
       }
     },
     {
-      "name": "add_note",
-      "description": "Add a research note",
+      "name": "add_finding",
+      "description": "Add a research finding or note to a project.",
       "parameters": {
         "type": "object",
         "properties": {
-          "project_id": { "type": "string", "description": "The project ID to add the note to" },
-          "content": { "type": "string", "description": "The content of the note" },
-          "source_ids": { "type": "array", "description": "Optional source IDs the note references" },
-          "tags": { "type": "array", "description": "Optional tags for the note" }
+          "project_id": {
+            "type": "string",
+            "description": "The project ID to add the finding to"
+          },
+          "content": {
+            "type": "string",
+            "description": "The content of the finding"
+          },
+          "source_ids": {
+            "type": "array",
+            "description": "Optional source IDs the finding references"
+          },
+          "tags": {
+            "type": "array",
+            "description": "Optional tags for the finding"
+          }
         },
-        "required": ["project_id", "content"]
+        "required": [
+          "project_id",
+          "content"
+        ]
       }
     },
     {
-      "name": "generate_questions",
-      "description": "Generate research questions",
+      "name": "set_thesis",
+      "description": "Set or refine the research thesis for a project.",
       "parameters": {
         "type": "object",
         "properties": {
-          "project_id": { "type": "string", "description": "The project ID to generate questions for" },
-          "depth": { "type": "string", "description": "The depth of questions (default: medium)", "enum": ["surface", "medium", "deep"] }
+          "project_id": {
+            "type": "string",
+            "description": "The project ID"
+          },
+          "thesis": {
+            "type": "string",
+            "description": "The thesis statement"
+          }
         },
-        "required": ["project_id"]
+        "required": [
+          "project_id",
+          "thesis"
+        ]
       }
     },
     {
-      "name": "assess_sources",
-      "description": "Assess source quality and coverage",
+      "name": "evaluate_sources",
+      "description": "Assess source quality and coverage for a project.",
       "parameters": {
         "type": "object",
         "properties": {
-          "project_id": { "type": "string", "description": "The project ID to assess" }
+          "project_id": {
+            "type": "string",
+            "description": "The project ID to assess"
+          }
         },
-        "required": ["project_id"]
+        "required": [
+          "project_id"
+        ]
       }
     },
     {
       "name": "synthesize",
-      "description": "Synthesize research into a summary",
+      "description": "Synthesize research into a summary.",
       "parameters": {
         "type": "object",
         "properties": {
-          "project_id": { "type": "string", "description": "The project ID to synthesize" }
+          "project_id": {
+            "type": "string",
+            "description": "The project ID to synthesize"
+          }
         },
-        "required": ["project_id"]
+        "required": [
+          "project_id"
+        ]
       }
     },
     {
-      "name": "get_bibliography",
-      "description": "Generate bibliography",
+      "name": "list_projects",
+      "description": "List all research projects.",
       "parameters": {
         "type": "object",
-        "properties": {
-          "project_id": { "type": "string", "description": "The project ID to generate bibliography for" },
-          "style": { "type": "string", "description": "The bibliography style (default: apa)", "enum": ["apa", "mla", "chicago"] }
-        },
-        "required": ["project_id"]
+        "properties": {}
       }
     }
   ],
-  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py research {{tool}} '{{args_json}}'"
+  "run": "python3 /app/skills/run_skill.py research {{tool}} '{{args_json}}'"
 }

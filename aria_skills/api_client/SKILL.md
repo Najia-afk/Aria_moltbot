@@ -1,7 +1,7 @@
 ---
 name: aria-apiclient
 description: Centralized HTTP client for aria-api interactions
-metadata: {"openclaw": {"emoji": "🔌", "requires": {"env": ["ARIA_API_URL"]}}}
+metadata: {"aria": {"emoji": "🔌", "requires": {"env": ["ARIA_API_URL"]}}}
 ---
 
 # Aria API Client 🔌
@@ -11,7 +11,7 @@ Centralized HTTP client for all aria-api interactions. Skills should use this in
 ## Usage
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py api_client <function> '{"param": "value"}'
+exec python3 /app/skills/run_skill.py api_client <function> '{"param": "value"}'
 ```
 
 ## Functions
@@ -69,7 +69,7 @@ exec python3 /root/.openclaw/workspace/skills/run_skill.py api_client <function>
 - `get_schedule` - Get schedule status
 - `trigger_schedule_tick` - Trigger manual tick
 - `get_jobs` - Get scheduled jobs (live: bool)
-- `sync_jobs` - Sync jobs from OpenClaw
+- `sync_jobs` - Sync jobs from aria
 
 ## Configuration
 
@@ -82,14 +82,14 @@ exec python3 /root/.openclaw/workspace/skills/run_skill.py api_client <function>
 
 ```bash
 # Get recent activities
-exec python3 /root/.openclaw/workspace/skills/run_skill.py api_client get_activities '{"limit": 10}'
+exec python3 /app/skills/run_skill.py api_client get_activities '{"limit": 10}'
 
 # Create a thought
-exec python3 /root/.openclaw/workspace/skills/run_skill.py api_client create_thought '{"content": "This is my thought", "category": "reflection"}'
+exec python3 /app/skills/run_skill.py api_client create_thought '{"content": "This is my thought", "category": "reflection"}'
 
 # Set a memory
-exec python3 /root/.openclaw/workspace/skills/run_skill.py api_client set_memory '{"key": "user_preference", "value": "dark_mode", "category": "settings"}'
+exec python3 /app/skills/run_skill.py api_client set_memory '{"key": "user_preference", "value": "dark_mode", "category": "settings"}'
 
 # Create a goal
-exec python3 /root/.openclaw/workspace/skills/run_skill.py api_client create_goal '{"title": "Learn Rust", "priority": 2}'
+exec python3 /app/skills/run_skill.py api_client create_goal '{"title": "Learn Rust", "priority": 2}'
 ```

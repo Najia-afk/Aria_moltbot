@@ -7,7 +7,7 @@ Provides interfaces to various LLM backends (Moonshot, Ollama).
 import json
 import os
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
 from aria_skills.registry import SkillRegistry
@@ -43,7 +43,7 @@ class MoonshotSkill(BaseSkill):
     
     def __init__(self, config: SkillConfig):
         super().__init__(config)
-        self._client: Optional["httpx.AsyncClient"] = None
+        self._client: "httpx.AsyncClient" | None = None
         self._model: str = ""
     
     @property
@@ -60,6 +60,8 @@ class MoonshotSkill(BaseSkill):
         api_key = self._get_env_value("api_key")
         if not api_key:
             api_key = os.environ.get("MOONSHOT_API_KEY")
+        if not api_key:
+            api_key = os.environ.get("MOONSHOT_KIMI_KEY")
         
         if not api_key:
             self.logger.warning("No Moonshot API key configured")
@@ -98,16 +100,20 @@ class MoonshotSkill(BaseSkill):
     
     async def chat(
         self,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]] | None = None,
+        prompt: str | None = None,
+        model: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 2048,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
     ) -> SkillResult:
         """
         Send chat completion request.
         
         Args:
             messages: List of {"role": "user/assistant", "content": "..."}
+            prompt: Simple text prompt (converted to single user message)
+            model: Accepted but ignored (model is set during initialize)
             temperature: Sampling temperature (0-1)
             max_tokens: Maximum response tokens
             system_prompt: Optional system message
@@ -117,6 +123,12 @@ class MoonshotSkill(BaseSkill):
         """
         if not self._client:
             return SkillResult.fail("Moonshot not initialized")
+
+        # Accept 'prompt' as shorthand for a single user message
+        if not messages and prompt:
+            messages = [{"role": "user", "content": prompt}]
+        if not messages:
+            return SkillResult.fail("Either 'messages' or 'prompt' is required")
         
         full_messages = []
         if system_prompt:
@@ -124,19 +136,36 @@ class MoonshotSkill(BaseSkill):
         full_messages.extend(messages)
         
         try:
-            resp = await self._client.post("/chat/completions", json={
+            payload = {
                 "model": self._model,
                 "messages": full_messages,
-                "temperature": temperature,
                 "max_tokens": max_tokens,
-            })
+            }
+            # Some models (e.g. kimi-k2.5) only allow temperature=1
+            # Only include temperature if it's non-default or explicitly set
+            if temperature is not None:
+                payload["temperature"] = temperature
+
+            resp = await self._client.post("/chat/completions", json=payload)
+
+            # Retry without temperature if model rejects it
+            if resp.status_code == 400:
+                error_body = resp.json()
+                if "temperature" in str(error_body.get("error", {}).get("message", "")):
+                    payload.pop("temperature", None)
+                    resp = await self._client.post("/chat/completions", json=payload)
+
             resp.raise_for_status()
             
             data = resp.json()
             self._log_usage("chat", True)
             
+            message = data["choices"][0]["message"]
+            # Some models (e.g. kimi-k2.5) return text in reasoning_content instead of content
+            content = message.get("content") or message.get("reasoning_content") or ""
+            
             return SkillResult.ok({
-                "content": data["choices"][0]["message"]["content"],
+                "content": content,
                 "model": self._model,
                 "usage": data.get("usage", {}),
                 "finish_reason": data["choices"][0].get("finish_reason"),
@@ -165,7 +194,7 @@ class OllamaSkill(BaseSkill):
     
     def __init__(self, config: SkillConfig):
         super().__init__(config)
-        self._client: Optional["httpx.AsyncClient"] = None
+        self._client: "httpx.AsyncClient" | None = None
         self._model: str = ""
         self._host: str = ""
     
@@ -239,7 +268,7 @@ class OllamaSkill(BaseSkill):
     async def generate(
         self,
         prompt: str,
-        system: Optional[str] = None,
+        system: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 2048,
     ) -> SkillResult:
@@ -291,7 +320,7 @@ class OllamaSkill(BaseSkill):
     
     async def chat(
         self,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         temperature: float = 0.7,
         max_tokens: int = 2048,
     ) -> SkillResult:

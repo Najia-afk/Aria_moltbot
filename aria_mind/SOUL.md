@@ -69,7 +69,7 @@ Use these imports depending on environment:
 
 ```python
 try:
-	# OpenClaw container (workspace root)
+	# Aria Engine container (workspace root)
 	from soul import Soul, FocusManager
 except ImportError:
 	# Local dev (package)

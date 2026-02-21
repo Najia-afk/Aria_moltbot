@@ -79,13 +79,7 @@
     <select class="filter-select" id="agent-filter">
         <option value="">All Agents</option>
     </select>
-    <select class="filter-select" id="channel-filter">
-        <option value="">All Channels</option>
-        <option value="webchat">webchat</option>
-        <option value="whatsapp">whatsapp</option>
-        <option value="heartbeat">heartbeat</option>
-    </select>
-    <label class="inline-toggle" title="Show OpenClaw cron sessions in the dashboard">
+    <label class="inline-toggle" title="Show cron sessions in the dashboard">
         <input type="checkbox" id="cron-toggle" checked>
         Show cron sessions
     </label>
@@ -194,10 +188,11 @@
             <tr>
                 <th>Session ID</th>
                 <th>Agent</th>
-                <th>Label</th>
-                <th>Channel</th>
+                <th>Title</th>
+                <th>Model</th>
                 <th>Type</th>
                 <th>Status</th>
+                <th>Msgs</th>
                 <th>Tokens</th>
                 <th>Cost</th>
                 <th>Started</th>
@@ -255,11 +250,9 @@ function fmtDuration(startStr, endStr) {
 async function loadSessionStats() {
     try {
         const includeCron = includeCronEvents();
-        const channel = document.getElementById('channel-filter').value;
         const status = document.getElementById('status-filter').value;
         const agent = document.getElementById('agent-filter').value;
         let url = `${API_BASE_URL}/sessions/stats?include_cron_events=${includeCron ? 'true' : 'false'}`;
-        if (channel) url += `&source_channel=${encodeURIComponent(channel)}`;
         if (status) url += `&status=${encodeURIComponent(status)}`;
         if (agent) url += `&agent_id=${encodeURIComponent(agent)}`;
         _stats = await fetchAriaData(url);
@@ -278,12 +271,10 @@ async function loadSessionStats() {
 async function loadSessions(page = 1, limit = 50) {
     const status = document.getElementById('status-filter').value;
     const agent = document.getElementById('agent-filter').value;
-    const channel = document.getElementById('channel-filter').value;
     const includeCron = includeCronEvents();
     let url = `${API_BASE_URL}/sessions?limit=${limit}&page=${page}`;
     if (status) url += `&status=${status}`;
     if (agent) url += `&agent_id=${encodeURIComponent(agent)}`;
-    if (channel) url += `&source_channel=${encodeURIComponent(channel)}`;
     url += `&include_cron_events=${includeCron ? 'true' : 'false'}`;
     try {
         const data = await fetchAriaData(url);
@@ -334,11 +325,9 @@ function updateSyncMeta() {
 async function loadHourlySeries(hours = 24) {
     try {
         const includeCron = includeCronEvents();
-        const channel = document.getElementById('channel-filter').value;
         const status = document.getElementById('status-filter').value;
         const agent = document.getElementById('agent-filter').value;
         let url = `${API_BASE_URL}/sessions/hourly?hours=${hours}&include_cron_events=${includeCron ? 'true' : 'false'}`;
-        if (channel) url += `&source_channel=${encodeURIComponent(channel)}`;
         if (status) url += `&status=${encodeURIComponent(status)}`;
         if (agent) url += `&agent_id=${encodeURIComponent(agent)}`;
         const data = await fetchAriaData(url);
@@ -382,7 +371,7 @@ function renderSessionOverview() {
     document.getElementById('stat-active').textContent = s.active_sessions || 0;
     document.getElementById('stat-total').textContent = formatNumber(s.total_sessions);
     document.getElementById('stat-total-sub').textContent =
-        'DB sessions (auto-synced from OpenClaw + runtime events)';
+        'DB sessions (auto-synced + runtime events)';
     document.getElementById('stat-tokens').textContent = formatNumber(s.total_tokens);
     document.getElementById('stat-tokens-sub').textContent =
         `Skills DB: ${formatNumber(skillSrc.tokens || 0)} | LiteLLM DB: ${formatNumber(litSrc.tokens || lit.tokens || 0)}`;
@@ -492,8 +481,9 @@ function renderRecent() {
     let filtered = _sessions;
     if (search) {
         filtered = filtered.filter(s =>
-            s.agent_id.toLowerCase().includes(search) ||
-            s.id.toLowerCase().includes(search)
+            (s.agent_id || '').toLowerCase().includes(search) ||
+            (s.id || '').toLowerCase().includes(search) ||
+            (s.title || '').toLowerCase().includes(search)
         );
     }
     document.getElementById('tab-badge-recent').textContent = filtered.length;
@@ -504,10 +494,11 @@ function renderRecent() {
             <tr>
                 <td><code style="font-size:11px">${s.id.slice(0,8)}...</code></td>
                 <td><span class="agent-badge">🤖 ${s.agent_id}</span></td>
-                <td>${(s.metadata?.openclaw_session?.label || s.metadata?.label || '-')}</td>
-                <td>${(s.source_channel || s.metadata?.openclaw_source_channel || s.metadata?.openclaw_session?.channel || '-')}</td>
+                <td>${s.title || '-'}</td>
+                <td>${s.model || '-'}</td>
                 <td><span class="type-badge">${s.session_type}</span></td>
                 <td><span class="status-badge ${s.status}">${s.status}</span></td>
+                <td>${s.messages_count || '-'}</td>
                 <td>${s.tokens_used ? formatNumber(s.tokens_used) : '-'}</td>
                 <td>${s.cost_usd ? formatCost(s.cost_usd) : '-'}</td>
                 <td>${formatDate(s.started_at)}</td>
@@ -515,7 +506,7 @@ function renderRecent() {
             </tr>
         `).join('');
     } else {
-        body.innerHTML = '<tr><td colspan="10" class="empty-state">No sessions found</td></tr>';
+        body.innerHTML = '<tr><td colspan="11" class="empty-state">No sessions found</td></tr>';
     }
 }
 
@@ -575,7 +566,6 @@ async function loadSessionDashboard() {
 
 document.getElementById('status-filter').addEventListener('change', () => loadSessionDashboard());
 document.getElementById('agent-filter').addEventListener('change', () => loadSessionDashboard());
-document.getElementById('channel-filter').addEventListener('change', () => loadSessionDashboard());
 document.getElementById('search-input').addEventListener('input', renderRecent);
 document.getElementById('cron-toggle').addEventListener('change', () => loadSessionDashboard());
 

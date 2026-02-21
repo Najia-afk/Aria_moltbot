@@ -1,29 +1,15 @@
 #!/bin/sh
-# Traefik entrypoint with envsubst for secure token injection
-# This script generates traefik-dynamic.yaml from template before starting Traefik
+# Traefik entrypoint — copies dynamic config template into place before starting
 
 set -e
 
-echo "=== Traefik Secure Entrypoint ==="
+echo "=== Traefik Entrypoint ==="
 
-# Install gettext (provides envsubst) if not present
-if ! command -v envsubst >/dev/null 2>&1; then
-    echo "Installing gettext for envsubst..."
-    apk add --no-cache gettext >/dev/null 2>&1
-fi
+# Copy template as-is (no token substitution needed)
+echo "Copying traefik-dynamic.yaml from template..."
+cp /etc/traefik/dynamic.template.yaml /etc/traefik/dynamic.yaml
 
-# Use default token if not provided
-if [ -z "$CLAWDBOT_TOKEN" ]; then
-    echo "WARNING: CLAWDBOT_TOKEN not set, using default-clawdbot-token"
-    export CLAWDBOT_TOKEN="default-clawdbot-token"
-fi
-
-# Generate dynamic config from template using envsubst
-# Only substitute CLAWDBOT_TOKEN to avoid breaking other $variables in YAML
-echo "Generating traefik-dynamic.yaml from template..."
-envsubst '${CLAWDBOT_TOKEN}' < /etc/traefik/dynamic.template.yaml > /etc/traefik/dynamic.yaml
-
-echo "Token injected successfully (token length: ${#CLAWDBOT_TOKEN} chars)"
+echo "Dynamic config ready."
 
 # Start Traefik with all original arguments
 echo "Starting Traefik..."

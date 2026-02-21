@@ -14,7 +14,7 @@ import json as json_lib
 import re
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config import OPENCLAW_AGENTS_ROOT
+from config import ARIA_AGENTS_ROOT
 from db.models import (
     ActivityLog,
     AgentSession,
@@ -30,6 +30,7 @@ from db.models import (
     SentimentEvent,
     SessionMessage,
     Thought,
+    WorkingMemory,
 )
 from deps import get_db
 
@@ -77,7 +78,7 @@ def _sentiment_label_from_valence(valence: float) -> str:
     return "neutral"
 
 
-# Attribution prefix injected by OpenClaw gateway:
+# Attribution prefix injected by gateway:
 # [Telegram Test Toust (@TestToust) id:1643801012 2026-02-16 16:10 UTC] ...
 # [Mon 2026-02-16 21:21 UTC] You said ...
 # System: [2026-02-16 20:05:34 UTC] Cron: ...
@@ -95,7 +96,7 @@ _ATTRIBUTION_PREFIX_RE = re.compile(
 
 
 def _strip_attribution(text: str) -> str:
-    """Remove OpenClaw gateway attribution prefix(es) from user text."""
+    """Remove gateway attribution prefix(es) from user text."""
     t = text.strip()
     for _ in range(5):  # up to 5 nested prefixes
         m = _ATTRIBUTION_PREFIX_RE.match(t)
@@ -164,7 +165,7 @@ def _looks_like_transcript(text: str) -> bool:
 
 
 def _extract_line_message(payload: dict[str, Any]) -> tuple[str, str, str | None]:
-    """Extract (role, content, timestamp) from various OpenClaw JSONL shapes."""
+    """Extract (role, content, timestamp) from various JSONL shapes."""
     role = ""
     content = ""
     timestamp: str | None = None
@@ -190,7 +191,7 @@ def _extract_line_message(payload: dict[str, Any]) -> tuple[str, str, str | None
             if isinstance(raw_content, str):
                 content = raw_content
             elif isinstance(raw_content, list):
-                # OpenClaw stores content as [{"type":"text","text":"..."},...]
+                # Content may be stored as [{"type":"text","text":"..."},...]
                 parts = []
                 for item in raw_content:
                     if isinstance(item, dict):
@@ -207,16 +208,16 @@ def _extract_line_message(payload: dict[str, Any]) -> tuple[str, str, str | None
     return role, content, timestamp
 
 
-def _extract_user_messages_from_openclaw_jsonl(
+def _extract_user_messages_from_jsonl(
     session_ids: set[str],
     max_messages: int,
     min_chars: int,
 ) -> list[dict[str, Any]]:
     extracted: list[dict[str, Any]] = []
-    if not OPENCLAW_AGENTS_ROOT or not os.path.exists(OPENCLAW_AGENTS_ROOT):
+    if not ARIA_AGENTS_ROOT or not os.path.exists(ARIA_AGENTS_ROOT):
         return extracted
 
-    pattern = os.path.join(OPENCLAW_AGENTS_ROOT, "*", "sessions", "*.jsonl")
+    pattern = os.path.join(ARIA_AGENTS_ROOT, "*", "sessions", "*.jsonl")
     for path in glob.glob(pattern):
         if len(extracted) >= max_messages:
             break
@@ -263,7 +264,7 @@ def _extract_user_messages_from_openclaw_jsonl(
                             "role": role,
                             "text": text,
                             "timestamp": timestamp,
-                            "origin": "openclaw_jsonl",
+                            "origin": "legacy_jsonl",
                         }
                     )
         except Exception:
@@ -338,23 +339,23 @@ def _is_placeholder_sentiment_row(content: str, importance: float | None, metada
 
 class SentimentRequest(BaseModel):
     text: str = Field(..., min_length=1, max_length=10_000)
-    context: Optional[List[str]] = None
+    context: list[str] | None = None
     store: bool = True
 
 
 class ConversationSentimentRequest(BaseModel):
-    messages: List[Dict[str, Any]] = Field(..., min_items=1)
+    messages: list[dict[str, Any]] = Field(..., min_items=1)
     store: bool = True
 
 
 class PatternDetectionRequest(BaseModel):
-    memories: Optional[List[Dict[str, Any]]] = None
+    memories: list[dict[str, Any]] | None = None
     min_confidence: float = Field(0.3, ge=0, le=1)
     store: bool = True
 
 
 class CompressionRequest(BaseModel):
-    memories: List[Dict[str, Any]] = Field(..., min_items=5)
+    memories: list[dict[str, Any]] = Field(..., min_items=5)
     store_semantic: bool = True
 
 
@@ -372,12 +373,12 @@ class SentimentBackfillRequest(BaseModel):
 
 class RealtimeSentimentRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=10_000)
-    session_id: Optional[str] = None
-    conversation_id: Optional[str] = None
-    external_session_id: Optional[str] = None
-    agent_id: Optional[str] = None
-    source_channel: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
+    session_id: str | None = None
+    conversation_id: str | None = None
+    external_session_id: str | None = None
+    agent_id: str | None = None
+    source_channel: str | None = None
+    metadata: dict[str, Any] | None = None
     store_semantic: bool = True
 
 
@@ -449,7 +450,7 @@ async def backfill_sentiment_from_sessions(
     req: SentimentBackfillRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    """Retro-populate sentiment memories from real user messages in OpenClaw session JSONL."""
+    """Retro-populate sentiment memories from real user messages in session JSONL."""
     try:
         from aria_skills.sentiment_analysis import (
             SentimentAnalyzer, LLMSentimentClassifier, EmbeddingSentimentClassifier,
@@ -457,8 +458,8 @@ async def backfill_sentiment_from_sessions(
 
         session_stmt = (
             select(AgentSession)
-            .where(AgentSession.session_type.like("openclaw%"))
-            .where(AgentSession.session_type != "openclaw_heartbeat")
+            .where(AgentSession.session_type.like("legacy%"))
+            .where(AgentSession.session_type != "legacy_heartbeat")
             .order_by(AgentSession.started_at.desc())
             .limit(req.max_sessions)
         )
@@ -467,11 +468,11 @@ async def backfill_sentiment_from_sessions(
         session_ids: set[str] = set()
         for sess in sessions:
             meta = sess.metadata_json or {}
-            sid = str(meta.get("openclaw_session_id") or "").strip()
+            sid = str(meta.get("aria_session_id") or meta.get("session_id") or "").strip()
             if sid:
                 session_ids.add(sid)
 
-        messages = _extract_user_messages_from_openclaw_jsonl(
+        messages = _extract_user_messages_from_jsonl(
             session_ids=session_ids,
             max_messages=req.max_messages,
             min_chars=req.min_chars,
@@ -485,7 +486,7 @@ async def backfill_sentiment_from_sessions(
                 "messages_found": 0,
                 "stored": 0,
                 "skipped": 0,
-                "note": "No user messages found in OpenClaw JSONL (check OPENCLAW_AGENTS_ROOT mount and session files).",
+                "note": "No user messages found in session JSONL (check ARIA_AGENTS_ROOT mount and session files).",
             }
 
         classifier = LLMSentimentClassifier()
@@ -543,13 +544,13 @@ async def backfill_sentiment_from_sessions(
                 stored += 1
                 continue
 
-            # Resolve internal session_id from external openclaw session id
+            # Resolve internal session_id from external session id
             parsed_session_id: uuid.UUID | None = None
             if session_id:
                 session_match = (await db.execute(
                     select(AgentSession.id)
                     .where(
-                        (AgentSession.metadata_json["openclaw_session_id"].astext == session_id)
+                        (AgentSession.metadata_json["aria_session_id"].astext == session_id)
                         | (AgentSession.metadata_json["external_session_id"].astext == session_id)
                     )
                     .order_by(AgentSession.started_at.desc())
@@ -577,8 +578,8 @@ async def backfill_sentiment_from_sessions(
                     role=msg_role,
                     content=text,
                     content_hash=text_sha1,
-                    source_channel="openclaw_backfill",
-                    metadata_json={"origin": "openclaw_jsonl", "timestamp": msg.get("timestamp")},
+                    source_channel="legacy_backfill",
+                    metadata_json={"origin": "legacy_jsonl", "timestamp": msg.get("timestamp")},
                 )
                 if original_ts:
                     existing_msg.created_at = original_ts
@@ -704,7 +705,7 @@ async def analyze_realtime_user_reply_sentiment(
                 select(AgentSession.id)
                 .where(
                     (AgentSession.metadata_json["external_session_id"].astext == conversation_id)
-                    | (AgentSession.metadata_json["openclaw_session_id"].astext == conversation_id)
+                    | (AgentSession.metadata_json["aria_session_id"].astext == conversation_id)
                 )
                 .order_by(AgentSession.started_at.desc())
                 .limit(1)
@@ -1614,6 +1615,92 @@ async def get_compression_history(limit: int = 50, db: AsyncSession = Depends(ge
             for m in items
         ],
         "total": len(items),
+    }
+
+
+# ── Compression Auto-Run (self-fetching, designed for cron calls) ────────────
+
+
+class AutoCompressionRequest(BaseModel):
+    raw_limit: int = Field(20, ge=5, le=100)
+    store_semantic: bool = True
+    dry_run: bool = False
+
+
+@router.post("/compression/auto-run")
+async def run_auto_compression(
+    req: AutoCompressionRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Auto-compress working memory when count exceeds raw_limit.
+    Self-fetches working memory — no memories payload needed.
+    Designed for cron job invocation (every 6 hours).
+    """
+    from aria_skills.memory_compression import MemoryEntry, MemoryCompressor, CompressionManager
+
+    stmt = select(WorkingMemory).order_by(WorkingMemory.updated_at.desc()).limit(200)
+    rows = (await db.execute(stmt)).scalars().all()
+
+    if len(rows) <= req.raw_limit:
+        return {
+            "skipped": True,
+            "reason": f"Only {len(rows)} items (raw_limit={req.raw_limit}), no compression needed",
+            "count": len(rows),
+        }
+
+    mem_objects = [
+        MemoryEntry(
+            id=str(r.id),
+            content=str(r.value or r.key),
+            category=r.category or "general",
+            timestamp=r.updated_at or r.created_at,
+            importance_score=float(r.importance if r.importance is not None else 0.5),
+        )
+        for r in rows
+    ]
+
+    if req.dry_run:
+        return {
+            "dry_run": True,
+            "would_compress": len(mem_objects),
+            "raw_limit": req.raw_limit,
+        }
+
+    compressor = MemoryCompressor(raw_limit=req.raw_limit)
+    manager = CompressionManager(compressor)
+    result = await manager.process_all(mem_objects)
+
+    if req.store_semantic and manager.compressed_store:
+        for cm in manager.compressed_store:
+            try:
+                embedding = await _generate_embedding(cm.summary)
+            except Exception:
+                embedding = [0.0] * 768
+            db.add(SemanticMemory(
+                content=cm.summary,
+                summary=cm.summary[:100],
+                category=f"compressed_{cm.tier}",
+                embedding=embedding,
+                importance=0.7 if cm.tier == "archive" else 0.5,
+                source="compression_auto",
+                metadata_json={
+                    "tier": cm.tier,
+                    "original_count": cm.original_count,
+                    "key_entities": cm.key_entities,
+                    "key_facts": cm.key_facts,
+                },
+            ))
+        await db.commit()
+
+    return {
+        "skipped": False,
+        "compressed": result.success,
+        "memories_processed": result.memories_processed,
+        "compression_ratio": round(result.compression_ratio, 3),
+        "tokens_saved_estimate": getattr(result, "tokens_saved_estimate", 0),
+        "tiers_updated": result.tiers_updated,
+        "summaries_stored": len(manager.compressed_store),
     }
 
 

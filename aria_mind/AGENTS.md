@@ -83,8 +83,9 @@ id: aria
 focus: orchestrator
 model: qwen3-mlx
 fallback: trinity-free
-skills: [goals, schedule, health, database]
-capabilities: [task_routing, delegation, priority_management, autonomous_action]
+skills: [goals, schedule, health, database, api_client, agent_manager, model_switcher, litellm, llm, brainstorm, knowledge_graph]
+capabilities: [task_routing, delegation, priority_management, autonomous_action, agent_lifecycle, model_selection, token_management]
+mind_files: [IDENTITY.md, SOUL.md, SKILLS.md, TOOLS.md, MEMORY.md, GOALS.md, AGENTS.md, SECURITY.md]
 timeout: 600s
 ```
 
@@ -100,8 +101,9 @@ focus: devsecops
 model: qwen3-coder-free
 fallback: gpt-oss-free
 parent: aria
-skills: [pytest_runner, database, health, llm]
+skills: [pytest_runner, database, health, llm, api_client, ci_cd, security_scan]
 capabilities: [code_review, security_scan, testing, deployment]
+mind_files: [IDENTITY.md, SOUL.md, TOOLS.md, SECURITY.md]
 timeout: 600s
 ```
 
@@ -117,8 +119,9 @@ focus: data  # Also handles trader tasks
 model: deepseek-free
 fallback: qwen3-next-free
 parent: aria
-skills: [database, knowledge_graph, performance, llm]
+skills: [database, knowledge_graph, performance, llm, api_client, brainstorm, market_data]
 capabilities: [data_analysis, market_analysis, experiment_tracking, metrics]
+mind_files: [IDENTITY.md, SOUL.md, TOOLS.md, MEMORY.md]
 timeout: 600s
 ```
 
@@ -134,8 +137,9 @@ focus: social  # Also handles creative and journalist
 model: trinity-free
 fallback: qwen3-next-free
 parent: aria
-skills: [moltbook, social, knowledge_graph, llm]
+skills: [moltbook, social, knowledge_graph, llm, api_client, brainstorm, community]
 capabilities: [content_generation, community_engagement, fact_checking, storytelling]
+mind_files: [IDENTITY.md, SOUL.md, TOOLS.md, SKILLS.md]
 rate_limit:
   posts_per_hour: 2
   comments_per_day: 50
@@ -154,8 +158,9 @@ focus: memory
 model: qwen3-mlx
 fallback: qwen3-next-free
 parent: aria
-skills: [database, knowledge_graph]
-capabilities: [memory_store, memory_search, context_retrieval]
+skills: [database, knowledge_graph, api_client, llm, conversation_summary, working_memory]
+capabilities: [memory_store, memory_search, context_retrieval, memory_consolidation]
+mind_files: [IDENTITY.md, SOUL.md, MEMORY.md]
 timeout: 120s
 ```
 
@@ -171,8 +176,9 @@ focus: social
 model: qwen3-mlx
 fallback: trinity-free
 parent: aria
-skills: [database, llm, moltbook, social]
+skills: [database, llm, moltbook, social, api_client, community, conversation_summary]
 capabilities: [conversation, question_answering, explanation, social_interaction]
+mind_files: [IDENTITY.md, SOUL.md, SKILLS.md, TOOLS.md, MEMORY.md, GOALS.md]
 rate_limit:
   messages_per_minute: 10
 timeout: 300s

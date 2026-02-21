@@ -110,7 +110,7 @@ _ACTIVITY_LOG_SQL = text(
         created_at
       FROM activity_log
       WHERE COALESCE(skill, '') <> ''
-        AND (action = 'skill_used' OR action ILIKE '%skill%')
+        AND skill <> 'pytest'
     ), ins AS (
       INSERT INTO skill_invocations (
         skill_name,

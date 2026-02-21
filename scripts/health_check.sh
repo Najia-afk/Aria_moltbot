@@ -16,7 +16,7 @@ done
 # NOTE: /api/knowledge-graph is the correct path (not /api/knowledge)
 
 echo "=== CRON JOBS ==="
-docker exec clawdbot openclaw cron list 2>/dev/null | head -20
+docker exec aria-engine aria-engine cron list 2>/dev/null | head -20
 
 echo "=== MLX INFERENCE TEST ==="
 python3 /tmp/test_mlx.py 2>&1

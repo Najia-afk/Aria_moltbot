@@ -1,6 +1,5 @@
 """Kernel-friendly skill introspection utilities."""
 
-from __future__ import annotations
 
 import importlib
 import json

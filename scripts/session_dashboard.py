@@ -2,7 +2,7 @@
 """
 Session Management Dashboard
 
-Lightweight CLI dashboard for monitoring OpenClaw sessions.
+Lightweight CLI dashboard for monitoring Aria sessions.
 Uses the session_manager skill or falls back to direct API calls.
 
 Usage:
@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 # Add workspace to path for skill imports
-sys.path.insert(0, "/root/.openclaw/workspace")
+sys.path.insert(0, "/app")
 
 from aria_skills.session_manager import SessionManagerSkill
 from aria_skills.base import SkillConfig

@@ -25,7 +25,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from functools import wraps
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TypeVar, Union
+from typing import Any, Callable, TypeVar
 from collections import defaultdict
 
 logger = logging.getLogger("aria.security")
@@ -58,7 +58,7 @@ class InjectionPattern:
 
 
 # Pre-compiled patterns for performance
-INJECTION_PATTERNS: List[InjectionPattern] = [
+INJECTION_PATTERNS: list[InjectionPattern] = [
     # Direct instruction override attempts
     InjectionPattern(
         name="ignore_previous",
@@ -194,8 +194,8 @@ class InjectionResult:
     """Result of injection analysis."""
     is_safe: bool
     threat_level: ThreatLevel
-    detections: List[Dict[str, Any]] = field(default_factory=list)
-    sanitized_input: Optional[str] = None
+    detections: list[dict[str, Any]] = field(default_factory=list)
+    sanitized_input: str | None = None
     
     @property
     def blocked(self) -> bool:
@@ -215,7 +215,7 @@ class PromptGuard:
     
     def __init__(
         self,
-        custom_patterns: Optional[List[InjectionPattern]] = None,
+        custom_patterns: list[InjectionPattern] | None = None,
         block_threshold: ThreatLevel = ThreatLevel.HIGH,
     ):
         self.patterns = INJECTION_PATTERNS + (custom_patterns or [])
@@ -275,7 +275,7 @@ class PromptGuard:
             sanitized_input=self._sanitize(text) if not is_blocked else None,
         )
     
-    def _heuristic_analysis(self, text: str) -> List[Dict[str, Any]]:
+    def _heuristic_analysis(self, text: str) -> list[dict[str, Any]]:
         """Additional heuristic checks."""
         detections = []
         
@@ -374,7 +374,7 @@ class InputSanitizer:
         return text
     
     @classmethod
-    def check_sql_injection(cls, text: str) -> Tuple[bool, Optional[str]]:
+    def check_sql_injection(cls, text: str) -> tuple[bool, str | None]:
         """
         Check for SQL injection patterns.
         
@@ -387,7 +387,7 @@ class InputSanitizer:
         return True, None
     
     @classmethod
-    def check_path_traversal(cls, path: str) -> Tuple[bool, Optional[str]]:
+    def check_path_traversal(cls, path: str) -> tuple[bool, str | None]:
         """
         Check for path traversal attempts.
         
@@ -400,7 +400,7 @@ class InputSanitizer:
         return True, None
     
     @classmethod
-    def check_command_injection(cls, text: str) -> Tuple[bool, Optional[str]]:
+    def check_command_injection(cls, text: str) -> tuple[bool, str | None]:
         """
         Check for command injection patterns.
         
@@ -452,10 +452,10 @@ class RateLimiter:
             # Rate limited
     """
     
-    def __init__(self, config: Optional[RateLimitConfig] = None):
+    def __init__(self, config: RateLimitConfig | None = None):
         self.config = config or RateLimitConfig()
-        self._requests: Dict[str, List[float]] = defaultdict(list)
-        self._cooldowns: Dict[str, float] = {}
+        self._requests: dict[str, list[float]] = defaultdict(list)
+        self._cooldowns: dict[str, float] = {}
     
     def is_allowed(self, identifier: str) -> bool:
         """Check if request is allowed for identifier."""
@@ -507,7 +507,7 @@ class RateLimiter:
             ts for ts in self._requests[identifier] if ts > cutoff
         ]
     
-    def get_status(self, identifier: str) -> Dict[str, Any]:
+    def get_status(self, identifier: str) -> dict[str, Any]:
         """Get rate limit status for identifier."""
         now = time.time()
         self._cleanup(identifier, now)
@@ -616,7 +616,7 @@ class SecurityEvent:
     event_type: str
     severity: ThreatLevel
     source: str
-    details: Dict[str, Any]
+    details: dict[str, Any]
     blocked: bool = False
 
 
@@ -630,9 +630,9 @@ class SecurityAuditLog:
     def __init__(
         self,
         max_events: int = 1000,
-        persist_callback: Optional[Callable[[SecurityEvent], None]] = None,
+        persist_callback: Callable[[SecurityEvent], None] | None = None,
     ):
-        self._events: List[SecurityEvent] = []
+        self._events: list[SecurityEvent] = []
         self._max_events = max_events
         self._persist = persist_callback
     
@@ -641,7 +641,7 @@ class SecurityAuditLog:
         event_type: str,
         severity: ThreatLevel,
         source: str,
-        details: Dict[str, Any],
+        details: dict[str, Any],
         blocked: bool = False,
     ):
         """Log a security event."""
@@ -680,11 +680,11 @@ class SecurityAuditLog:
     
     def get_events(
         self,
-        since: Optional[datetime] = None,
-        severity: Optional[ThreatLevel] = None,
-        event_type: Optional[str] = None,
+        since: datetime | None = None,
+        severity: ThreatLevel | None = None,
+        event_type: str | None = None,
         limit: int = 100,
-    ) -> List[SecurityEvent]:
+    ) -> list[SecurityEvent]:
         """Query security events."""
         events = self._events
         
@@ -699,7 +699,7 @@ class SecurityAuditLog:
         
         return events[-limit:]
     
-    def get_summary(self, hours: int = 24) -> Dict[str, Any]:
+    def get_summary(self, hours: int = 24) -> dict[str, Any]:
         """Get summary of recent security events."""
         cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
         recent = [e for e in self._events if e.timestamp >= cutoff]
@@ -750,7 +750,7 @@ class AriaSecurityGateway:
     
     def __init__(
         self,
-        rate_limit_config: Optional[RateLimitConfig] = None,
+        rate_limit_config: RateLimitConfig | None = None,
         enable_audit_log: bool = True,
     ):
         self.prompt_guard = PromptGuard()
@@ -761,7 +761,7 @@ class AriaSecurityGateway:
         self,
         text: str,
         source: str = "unknown",
-        user_id: Optional[str] = None,
+        user_id: str | None = None,
         check_rate_limit: bool = True,
     ) -> "SecurityCheckResult":
         """
@@ -871,7 +871,7 @@ class AriaSecurityGateway:
         """Filter sensitive data from output."""
         return OutputFilter.filter_output(text, strict=strict)
     
-    def get_security_summary(self, hours: int = 24) -> Dict[str, Any]:
+    def get_security_summary(self, hours: int = 24) -> dict[str, Any]:
         """Get security event summary."""
         if self.audit_log:
             return self.audit_log.get_summary(hours)
@@ -882,10 +882,10 @@ class AriaSecurityGateway:
 class SecurityCheckResult:
     """Result of a security check."""
     allowed: bool
-    rejection_message: Optional[str] = None
-    sanitized_input: Optional[str] = None
+    rejection_message: str | None = None
+    sanitized_input: str | None = None
     threat_level: ThreatLevel = ThreatLevel.NONE
-    detections: List[Dict[str, Any]] = field(default_factory=list)
+    detections: list[dict[str, Any]] = field(default_factory=list)
 
 
 # =============================================================================
@@ -912,8 +912,8 @@ class SafeQueryBuilder:
     
     def __init__(
         self,
-        allowed_tables: Optional[Set[str]] = None,
-        allowed_columns: Optional[Dict[str, Set[str]]] = None,
+        allowed_tables: set[str] | None = None,
+        allowed_columns: dict[str, set[str]] | None = None,
     ):
         self.allowed_tables = allowed_tables or set()
         self.allowed_columns = allowed_columns or {}
@@ -943,12 +943,12 @@ class SafeQueryBuilder:
     def select(
         self,
         table: str,
-        columns: List[str],
-        where: Optional[Dict[str, Any]] = None,
-        order_by: Optional[str] = None,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None,
-    ) -> Tuple[str, List[Any]]:
+        columns: list[str],
+        where: dict[str, Any] | None = None,
+        order_by: str | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> tuple[str, list[Any]]:
         """
         Build a safe SELECT query.
         
@@ -959,7 +959,7 @@ class SafeQueryBuilder:
         cols = [self._validate_column(table, c) for c in columns]
         
         query = f"SELECT {', '.join(cols)} FROM {table}"
-        params: List[Any] = []
+        params: list[Any] = []
         
         if where:
             conditions = []
@@ -985,9 +985,9 @@ class SafeQueryBuilder:
     def insert(
         self,
         table: str,
-        data: Dict[str, Any],
-        returning: Optional[List[str]] = None,
-    ) -> Tuple[str, List[Any]]:
+        data: dict[str, Any],
+        returning: list[str] | None = None,
+    ) -> tuple[str, list[Any]]:
         """Build a safe INSERT query."""
         table = self._validate_table(table)
         
@@ -1012,9 +1012,9 @@ class SafeQueryBuilder:
     def update(
         self,
         table: str,
-        data: Dict[str, Any],
-        where: Dict[str, Any],
-    ) -> Tuple[str, List[Any]]:
+        data: dict[str, Any],
+        where: dict[str, Any],
+    ) -> tuple[str, list[Any]]:
         """Build a safe UPDATE query."""
         table = self._validate_table(table)
         
@@ -1050,7 +1050,7 @@ class SafeQueryBuilder:
 F = TypeVar('F', bound=Callable)
 
 def secure_input(
-    security_gateway: Optional[AriaSecurityGateway] = None,
+    security_gateway: AriaSecurityGateway | None = None,
     source: str = "function",
 ) -> Callable[[F], F]:
     """
@@ -1106,7 +1106,7 @@ class SecurityError(Exception):
 # =============================================================================
 
 # Global security gateway instance
-_default_gateway: Optional[AriaSecurityGateway] = None
+_default_gateway: AriaSecurityGateway | None = None
 
 
 def get_security_gateway() -> AriaSecurityGateway:
@@ -1117,7 +1117,7 @@ def get_security_gateway() -> AriaSecurityGateway:
     return _default_gateway
 
 
-def check_input(text: str, source: str = "unknown", user_id: Optional[str] = None) -> SecurityCheckResult:
+def check_input(text: str, source: str = "unknown", user_id: str | None = None) -> SecurityCheckResult:
     """Convenience function to check input security."""
     return get_security_gateway().check_input(text, source, user_id)
 

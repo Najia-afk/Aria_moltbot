@@ -1,0 +1,100 @@
+# AI News Sources Configuration
+# For automated research and content aggregation
+
+sources:
+  - name: "TechCrunch AI"
+    url: "https://techcrunch.com/category/artificial-intelligence/"
+    selectors:
+      article: "article.post-block"
+      title: "h2 a"
+      link: "h2 a"
+      summary: ".post-block__content"
+      author: ".byline"
+      date: ".byline time"
+    rate_limit:
+      requests_per_minute: 5
+      crawl_interval_hours: 2
+    category: "ai_news"
+    priority: 1
+
+  - name: "The Verge AI"
+    url: "https://www.theverge.com/ai-artificial-intelligence"
+    selectors:
+      article: ".duet--content--edge-component"
+      title: "h2 a"
+      link: "h2 a"
+      summary: ".duet--article--standfirst"
+      author: ".duet--byline__author"
+      date: "time"
+    rate_limit:
+      requests_per_minute: 5
+      crawl_interval_hours: 3
+    category: "ai_news"
+    priority: 1
+
+  - name: "Krebs on Security"
+    url: "https://krebsonsecurity.com/"
+    selectors:
+      article: "article.post"
+      title: "h2 a"
+      link: "h2 a"
+      summary: ".entry-content p:first-of-type"
+      author: ".author"
+      date: ".entry-date"
+    rate_limit:
+      requests_per_minute: 3
+      crawl_interval_hours: 4
+    category: "security"
+    priority: 2
+
+  - name: "PortSwigger Research"
+    url: "https://portswigger.net/research"
+    selectors:
+      article: ".blog-post"
+      title: "h2 a"
+      link: "h2 a"
+      summary: ".blog-post__summary"
+      author: ".blog-post__author"
+      date: ".blog-post__date"
+    rate_limit:
+      requests_per_minute: 4
+      crawl_interval_hours: 6
+    category: "security"
+    priority: 2
+
+  - name: "arXiv AI"
+    url: "https://arxiv.org/list/cs.AI/recent"
+    selectors:
+      article: ".meta"
+      title: ".list-title"
+      link: ".list-identifier a"
+      summary: ".abstract"
+      author: ".list-authors"
+      date: ".dateline"
+    rate_limit:
+      requests_per_minute: 10
+      crawl_interval_hours: 6
+    category: "research"
+    priority: 1
+
+  - name: "Papers with Code"
+    url: "https://paperswithcode.com/"
+    selectors:
+      article: ".paper-card"
+      title: ".title"
+      link: ".title a"
+      summary: ".description"
+      author: ".author"
+      date: ".date"
+    rate_limit:
+      requests_per_minute: 5
+      crawl_interval_hours: 4
+    category: "research"
+    priority: 1
+
+settings:
+  user_agent: "AriaBot/1.0 (Research Bot; Aria Blue)"
+  timeout_seconds: 30
+  max_retries: 3
+  output_format: "json"
+  storage_path: "/root/.openclaw/aria_memories/research/"

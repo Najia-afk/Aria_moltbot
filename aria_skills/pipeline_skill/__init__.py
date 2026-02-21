@@ -11,7 +11,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import yaml
 
@@ -29,7 +29,7 @@ _PIPELINES_DIR = Path(__file__).resolve().parent.parent / "pipelines"
 def _load_pipeline_from_yaml(path: Path) -> Pipeline:
     """Parse a YAML file into a :class:`Pipeline`."""
     data = yaml.safe_load(path.read_text())
-    steps: List[PipelineStep] = []
+    steps: list[PipelineStep] = []
     for s in data.get("steps", []):
         steps.append(
             PipelineStep(
@@ -57,15 +57,15 @@ class PipelineSkill(BaseSkill):
     def __init__(self, config: SkillConfig):
         super().__init__(config)
         self._pipelines_dir: Path = _PIPELINES_DIR
-        self._history: Dict[str, PipelineResult] = {}
-        self._executor: Optional[PipelineExecutor] = None
-        self._registry: Optional[SkillRegistry] = None
+        self._history: dict[str, PipelineResult] = {}
+        self._executor: PipelineExecutor | None = None
+        self._registry: SkillRegistry | None = None
 
     @property
     def name(self) -> str:
         return "pipeline"
 
-    async def initialize(self, registry: Optional[SkillRegistry] = None) -> bool:
+    async def initialize(self, registry: SkillRegistry | None = None) -> bool:
         """Initialize the pipeline skill and its executor.
 
         Args:
@@ -98,7 +98,7 @@ class PipelineSkill(BaseSkill):
 
     @logged_method()
     async def run_pipeline(
-        self, name: str, context: Optional[dict] = None
+        self, name: str, context: dict | None = None
     ) -> SkillResult:
         """
         Execute a named pipeline.

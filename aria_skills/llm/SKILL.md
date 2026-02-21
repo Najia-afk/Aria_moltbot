@@ -1,7 +1,7 @@
 ---
 name: aria-llm
 description: Access LLM providers via LiteLLM routing (MLX local, OpenRouter FREE, Kimi paid).
-metadata: {"openclaw": {"emoji": "🧠", "requires": {"anyEnv": ["MOONSHOT_KIMI_KEY", "OLLAMA_URL", "OPEN_ROUTER_KEY"]}}}
+metadata: {"aria": {"emoji": "🧠", "requires": {"anyEnv": ["MOONSHOT_KIMI_KEY", "OLLAMA_URL", "OPEN_ROUTER_KEY"]}}}
 ---
 
 # aria-llm
@@ -17,7 +17,7 @@ Order: **Local → Free Cloud → Paid**. Never hardcode model names outside `mo
 ## Usage
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py llm <function> '<json_args>'
+exec python3 /app/skills/run_skill.py llm <function> '<json_args>'
 ```
 
 ## Functions
@@ -26,21 +26,21 @@ exec python3 /root/.openclaw/workspace/skills/run_skill.py llm <function> '<json
 Generate text from a prompt using specified model.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py llm generate '{"prompt": "Explain quantum computing simply", "model": "qwen3-mlx", "temperature": 0.7}'
+exec python3 /app/skills/run_skill.py llm generate '{"prompt": "Explain quantum computing simply", "model": "qwen3-mlx", "temperature": 0.7}'
 ```
 
 ### chat
 Multi-turn conversation with message history.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py llm chat '{"messages": [{"role": "user", "content": "Hello!"}], "model": "qwen3-mlx"}'
+exec python3 /app/skills/run_skill.py llm chat '{"messages": [{"role": "user", "content": "Hello!"}], "model": "qwen3-mlx"}'
 ```
 
 ### analyze
 Analyze text for sentiment, topics, or custom analysis.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py llm analyze '{"text": "I had a great day today!", "analysis_type": "sentiment"}'
+exec python3 /app/skills/run_skill.py llm analyze '{"text": "I had a great day today!", "analysis_type": "sentiment"}'
 ```
 
 ## Model Selection
@@ -58,4 +58,4 @@ Required environment variables:
 
 ## Python Module
 
-This skill wraps `/root/.openclaw/workspace/skills/aria_skills/llm.py`
+This skill wraps `/app/skills/aria_skills/llm.py`

@@ -2,23 +2,23 @@
 ---
 name: aria-sessionmanager
 description: Two-layer session management — filesystem delete (live) + PG mark ended (history).
-metadata: {"openclaw": {"emoji": "🧹", "always": true}}
+metadata: {"aria": {"emoji": "🧹", "always": true}}
 ---
 
 # aria-sessionmanager
 
-Two-layer session management for OpenClaw:
-1. **Filesystem** (clawdbot volume): reads sessions.json, removes keys, archives .jsonl transcripts
+Two-layer session management for aria:
+1. **Filesystem** (aria-api volume): reads sessions.json, removes keys, archives .jsonl transcripts
 2. **aria-api PG**: PATCHes session status to ended (keeps history on /sessions dashboard)
 
-Sessions live on the filesystem at /root/.openclaw/agents/{agent}/sessions/sessions.json.
+Sessions live on the filesystem at /app/agents/{agent}/sessions/sessions.json.
 The skill operates directly on these files — no WebSocket or REST API needed for the live delete.
 
 ## Architecture
 
 ```
-clawdbot (Node.js)
-  └─ /root/.openclaw/agents/
+aria-api (Node.js)
+  └─ /app/agents/
        ├─ main/sessions/sessions.json    ← index (key→session map)
        │                 abc123.jsonl     ← transcript
        │                 abc123.jsonl.deleted.2026-02-15T... ← archived
@@ -28,7 +28,7 @@ clawdbot (Node.js)
 
 aria-api (FastAPI)
   └─ PG: agent_sessions table
-       ├─ metadata->>'openclaw_session_id' ← maps to filesystem session UUID
+       ├─ metadata->>'aria_session_id' ← maps to filesystem session UUID
        ├─ status: active → ended           ← PATCH /api/sessions/{id}
        └─ syncs from shared volume every 30s
 ```
@@ -36,7 +36,7 @@ aria-api (FastAPI)
 ## Usage
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py session_manager <function> '<json_args>'
+exec python3 /app/skills/run_skill.py session_manager <function> '<json_args>'
 ```
 
 ## Functions
@@ -46,10 +46,10 @@ List all active sessions from the filesystem. Scans all agent dirs by default.
 
 ```bash
 # All agents
-exec python3 /root/.openclaw/workspace/skills/run_skill.py session_manager list_sessions '{}'
+exec python3 /app/skills/run_skill.py session_manager list_sessions '{}'
 
 # Specific agent
-exec python3 /root/.openclaw/workspace/skills/run_skill.py session_manager list_sessions '{"agent": "main"}'
+exec python3 /app/skills/run_skill.py session_manager list_sessions '{"agent": "main"}'
 ```
 
 **Returns:**
@@ -72,12 +72,12 @@ exec python3 /root/.openclaw/workspace/skills/run_skill.py session_manager list_
 Two-layer delete: removes from filesystem + marks ended in PG.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py session_manager delete_session '{"session_id": "abc123"}'
+exec python3 /app/skills/run_skill.py session_manager delete_session '{"session_id": "abc123"}'
 ```
 
 **What happens:**
 1. Removes all keys matching sessionId from sessions.json
-2. Renames abc123.jsonl → abc123.jsonl.deleted.<timestamp> (matches clawdbot pattern)
+2. Renames abc123.jsonl → abc123.jsonl.deleted.<timestamp> (matches aria-api pattern)
 3. Best-effort PATCH to aria-api: {"status": "ended"} (keeps history)
 
 **Returns:**
@@ -87,7 +87,7 @@ exec python3 /root/.openclaw/workspace/skills/run_skill.py session_manager delet
   "removed_keys": ["agent:main:cron:abc123"],
   "transcript_archived": true,
   "pg_status_updated": true,
-  "message": "Session abc123 removed from clawdbot (1 keys, transcript=archived), PG marked ended"
+  "message": "Session abc123 removed from aria-api (1 keys, transcript=archived), PG marked ended"
 }
 ```
 
@@ -96,10 +96,10 @@ Prune stale sessions older than a threshold. Each pruned session gets the full t
 
 ```bash
 # Dry run — preview what would be deleted
-exec python3 /root/.openclaw/workspace/skills/run_skill.py session_manager prune_sessions '{"max_age_minutes": 60, "dry_run": true}'
+exec python3 /app/skills/run_skill.py session_manager prune_sessions '{"max_age_minutes": 60, "dry_run": true}'
 
 # Actually prune
-exec python3 /root/.openclaw/workspace/skills/run_skill.py session_manager prune_sessions '{"max_age_minutes": 60}'
+exec python3 /app/skills/run_skill.py session_manager prune_sessions '{"max_age_minutes": 60}'
 ```
 
 **Returns:**
@@ -119,7 +119,7 @@ exec python3 /root/.openclaw/workspace/skills/run_skill.py session_manager prune
 Get summary statistics about current sessions.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py session_manager get_session_stats '{}'
+exec python3 /app/skills/run_skill.py session_manager get_session_stats '{}'
 ```
 
 **Returns:**
@@ -137,7 +137,7 @@ exec python3 /root/.openclaw/workspace/skills/run_skill.py session_manager get_s
 Clean up a session after a sub-agent delegation completes. Wrapper around delete_session.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py session_manager cleanup_after_delegation '{"session_id": "delegation-xyz"}'
+exec python3 /app/skills/run_skill.py session_manager cleanup_after_delegation '{"session_id": "delegation-xyz"}'
 ```
 
 ## Automatic Cleanup Rules
@@ -152,8 +152,8 @@ Aria MUST follow these session hygiene rules:
 
 The agent_sessions table in aria-api PG stores history:
 - status: active → ended (PATCH sets ended_at automatically)
-- metadata->>'openclaw_session_id': maps to the filesystem session UUID
-- Indexed: idx_agent_sessions_openclaw_sid, idx_agent_sessions_status
+- metadata->>'aria_session_id': maps to the filesystem session UUID
+- Indexed: idx_agent_sessions_aria_sid, idx_agent_sessions_status
 - Auto-synced from shared volume every 30s by aria-api
 
 Aria can query /api/sessions on the dashboard to see historical data.

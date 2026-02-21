@@ -6,7 +6,7 @@ Pipelines let Aria compose multi-step skill workflows with
 dependency tracking, failure handling, and shared context.
 """
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 from enum import Enum
 
 
@@ -43,12 +43,12 @@ class PipelineStep:
     method: str
     params: dict = field(default_factory=dict)
     depends_on: list[str] = field(default_factory=list)
-    condition: Optional[str] = None
+    condition: str | None = None
     on_failure: str = "stop"  # "stop" | "skip" | "retry:N" | "fallback:skill.method"
     timeout_seconds: int = 120
     status: StepStatus = StepStatus.PENDING
     result: Any = None
-    error: Optional[str] = None
+    error: str | None = None
     duration_ms: int = 0
 
 

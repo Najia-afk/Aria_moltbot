@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from functools import wraps
-from typing import Any, Callable, Optional, TypeVar
+from typing import Any, Callable, TypeVar
 
 # Optional imports for enhanced features
 try:
@@ -77,7 +77,7 @@ class SkillConfig:
     name: str
     enabled: bool = True
     config: dict = field(default_factory=dict)
-    rate_limit: Optional[dict] = None
+    rate_limit: dict | None = None
     
     @classmethod
     def from_dict(cls, data: dict) -> "SkillConfig":
@@ -94,7 +94,7 @@ class SkillResult:
     """Result from a skill operation."""
     success: bool
     data: Any = None
-    error: Optional[str] = None
+    error: str | None = None
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     
     @classmethod
@@ -123,7 +123,7 @@ class BaseSkill(ABC):
         self.config = config
         self.logger = logging.getLogger(f"aria.skills.{self.name}")
         self._status = SkillStatus.UNAVAILABLE
-        self._last_used: Optional[datetime] = None
+        self._last_used: datetime | None = None
         self._use_count = 0
         self._error_count = 0
     
@@ -190,7 +190,7 @@ class BaseSkill(ABC):
         else:
             self.logger.warning(f"Skill {self.name}.{operation} failed", extra=log_data)
     
-    def _get_env_value(self, key: str) -> Optional[str]:
+    def _get_env_value(self, key: str) -> str | None:
         """
         Get value from config, resolving env: prefix.
         
@@ -456,19 +456,14 @@ class BaseSkill(ABC):
     async def _write_activity_log(self, action: str, details: str, success: bool):
         """Actually write to activity log. Called as background task."""
         try:
-            from aria_skills.registry import SkillRegistry
-            registry = SkillRegistry()
-            api_client = registry.get("api_client")
-            if api_client:
-                await api_client.execute(action="post", params={
-                    "endpoint": "/activities",
-                    "data": {
-                        "action": action,
-                        "details": details,
-                        "success": success,
-                        "skill": self.name,
-                    }
-                })
+            from aria_skills.api_client import get_api_client
+            client = await get_api_client()
+            await client.create_activity(
+                action=action,
+                skill=self.name,
+                details={"message": details} if details else {},
+                success=success,
+            )
         except Exception as e:
             self.logger.debug(f"Activity log write failed (non-critical): {e}")
 

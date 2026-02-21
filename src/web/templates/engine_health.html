@@ -1,0 +1,509 @@
+{% extends "base.html" %}
+{% block title %}Aria — System Health{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── Health Dashboard Layout ─────────────────────────────────── */
+.health-page {
+    padding: 24px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.health-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+}
+
+.health-header h1 {
+    font-size: 1.3rem;
+    margin: 0;
+    color: var(--text-primary, #e0e0e0);
+}
+
+.health-header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.auto-refresh-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    color: var(--text-muted, #888);
+}
+
+.auto-refresh-toggle input[type="checkbox"] {
+    accent-color: var(--accent-primary, #6c5ce7);
+}
+
+.last-updated {
+    font-size: 0.75rem;
+    color: var(--text-muted, #888);
+}
+
+.btn-refresh {
+    background: var(--accent-primary, #6c5ce7);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: inherit;
+}
+
+.btn-refresh:hover { background: #5a4bd6; }
+.btn-refresh.loading { opacity: 0.6; pointer-events: none; }
+
+/* ── Overall Status Bar ──────────────────────────────────────── */
+.overall-status {
+    border-radius: 10px;
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.overall-status.healthy { background: rgba(0,210,106,0.1); border: 1px solid rgba(0,210,106,0.3); }
+.overall-status.degraded { background: rgba(255,193,7,0.1); border: 1px solid rgba(255,193,7,0.3); }
+.overall-status.down { background: rgba(255,68,68,0.1); border: 1px solid rgba(255,68,68,0.3); }
+.overall-status.unknown { background: var(--bg-secondary, #1a1a2e); border: 1px solid var(--border-color, #2a2a3e); }
+
+.overall-icon {
+    font-size: 2rem;
+}
+
+.overall-text h2 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: var(--text-primary, #e0e0e0);
+}
+
+.overall-text p {
+    margin: 4px 0 0;
+    font-size: 0.8rem;
+    color: var(--text-muted, #888);
+}
+
+/* ── Subsystem Cards ─────────────────────────────────────────── */
+.subsystem-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.subsystem-card {
+    background: var(--bg-secondary, #1a1a2e);
+    border: 1px solid var(--border-color, #2a2a3e);
+    border-radius: 10px;
+    padding: 20px;
+}
+
+.subsystem-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.subsystem-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary, #e0e0e0);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.status-badge {
+    font-size: 0.65rem;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.status-badge.up { background: rgba(0,210,106,0.15); color: #00d26a; }
+.status-badge.warn { background: rgba(255,193,7,0.15); color: #ffc107; }
+.status-badge.err { background: rgba(255,68,68,0.15); color: #ff4444; }
+.status-badge.off { background: rgba(136,136,136,0.15); color: #888; }
+
+.subsystem-metrics {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.metric-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+}
+
+.metric-label { color: var(--text-muted, #888); }
+.metric-value { color: var(--text-primary, #e0e0e0); font-weight: 500; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; }
+
+/* ── System Metrics ──────────────────────────────────────────── */
+.metrics-section {
+    margin-bottom: 24px;
+}
+
+.metrics-section h3 {
+    font-size: 0.9rem;
+    color: var(--text-primary, #e0e0e0);
+    margin: 0 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-color, #2a2a3e);
+}
+
+.metrics-bar-container {
+    margin-bottom: 12px;
+}
+
+.metrics-bar-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    margin-bottom: 4px;
+}
+
+.metrics-bar-label span:first-child { color: var(--text-muted, #888); }
+.metrics-bar-label span:last-child { color: var(--text-primary, #e0e0e0); font-family: 'JetBrains Mono', monospace; }
+
+.metrics-bar-track {
+    height: 6px;
+    background: var(--bg-tertiary, #2a2a3e);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.metrics-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.5s ease;
+}
+
+.metrics-bar-fill.ok { background: #00d26a; }
+.metrics-bar-fill.warn { background: #ffc107; }
+.metrics-bar-fill.crit { background: #ff4444; }
+
+/* ── Recent Errors ───────────────────────────────────────────── */
+.errors-section h3 {
+    font-size: 0.9rem;
+    color: var(--text-primary, #e0e0e0);
+    margin: 0 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-color, #2a2a3e);
+}
+
+.error-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.error-item {
+    background: var(--bg-secondary, #1a1a2e);
+    border: 1px solid var(--border-color, #2a2a3e);
+    border-left: 3px solid #ff4444;
+    border-radius: 6px;
+    padding: 12px 16px;
+}
+
+.error-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.error-item-source {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #ff4444;
+}
+
+.error-item-time {
+    font-size: 0.7rem;
+    color: var(--text-muted, #888);
+}
+
+.error-item-msg {
+    font-size: 0.8rem;
+    color: var(--text-primary, #e0e0e0);
+    font-family: 'JetBrains Mono', monospace;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.no-errors {
+    text-align: center;
+    padding: 24px;
+    color: var(--text-muted, #888);
+    font-size: 0.85rem;
+}
+
+@media (max-width: 768px) {
+    .subsystem-grid { grid-template-columns: 1fr; }
+    .health-header { flex-direction: column; gap: 8px; align-items: flex-start; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="health-page">
+    <!-- Header -->
+    <div class="health-header">
+        <h1>System Health</h1>
+        <div class="health-header-right">
+            <label class="auto-refresh-toggle">
+                <input type="checkbox" id="autoRefreshToggle" checked>
+                Auto-refresh (30s)
+            </label>
+            <span class="last-updated" id="lastUpdated">—</span>
+            <button class="btn-refresh" id="refreshBtn" onclick="refreshHealth()">↻ Refresh</button>
+        </div>
+    </div>
+
+    <!-- Overall Status -->
+    <div class="overall-status unknown" id="overallStatus">
+        <span class="overall-icon" id="overallIcon">⏳</span>
+        <div class="overall-text">
+            <h2 id="overallTitle">Checking…</h2>
+            <p id="overallDesc">Connecting to engine health endpoint</p>
+        </div>
+    </div>
+
+    <!-- Subsystem Cards -->
+    <div class="subsystem-grid" id="subsystemGrid">
+        <!-- Populated by JS -->
+    </div>
+
+    <!-- System Metrics (CPU, Memory, Disk) -->
+    <div class="metrics-section">
+        <h3>System Metrics</h3>
+        <div id="metricsContainer">
+            <div class="metrics-bar-container">
+                <div class="metrics-bar-label"><span>Memory Usage</span><span id="memValue">—</span></div>
+                <div class="metrics-bar-track"><div class="metrics-bar-fill ok" id="memBar" style="width:0%"></div></div>
+            </div>
+            <div class="metrics-bar-container">
+                <div class="metrics-bar-label"><span>CPU Usage</span><span id="cpuValue">—</span></div>
+                <div class="metrics-bar-track"><div class="metrics-bar-fill ok" id="cpuBar" style="width:0%"></div></div>
+            </div>
+            <div class="metrics-bar-container">
+                <div class="metrics-bar-label"><span>Disk Usage</span><span id="diskValue">—</span></div>
+                <div class="metrics-bar-track"><div class="metrics-bar-fill ok" id="diskBar" style="width:0%"></div></div>
+            </div>
+            <div class="metrics-bar-container">
+                <div class="metrics-bar-label"><span>DB Connections</span><span id="dbConnValue">—</span></div>
+                <div class="metrics-bar-track"><div class="metrics-bar-fill ok" id="dbConnBar" style="width:0%"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Errors -->
+    <div class="errors-section">
+        <h3>Recent Errors (last 24h)</h3>
+        <div class="error-list" id="errorList">
+            <div class="no-errors">Loading…</div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    'use strict';
+
+    const API = '/api/engine';
+    let refreshInterval = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        refreshHealth();
+        setupAutoRefresh();
+    });
+
+    function setupAutoRefresh() {
+        const toggle = document.getElementById('autoRefreshToggle');
+        toggle.addEventListener('change', () => {
+            if (toggle.checked) {
+                refreshInterval = setInterval(refreshHealth, 30000);
+            } else {
+                clearInterval(refreshInterval);
+                refreshInterval = null;
+            }
+        });
+        refreshInterval = setInterval(refreshHealth, 30000);
+    }
+
+    async function refreshHealth() {
+        const btn = document.getElementById('refreshBtn');
+        btn.classList.add('loading');
+
+        try {
+            const [healthResp, errorsResp, metricsResp] = await Promise.allSettled([
+                fetch(`${API}/health`),
+                fetch(`${API}/health/errors?limit=20`),
+                fetch(`${API}/health/metrics`),
+            ]);
+
+            if (healthResp.status === 'fulfilled' && healthResp.value.ok) {
+                const health = await healthResp.value.json();
+                renderOverallStatus(health);
+                renderSubsystems(health.subsystems || {});
+            } else {
+                renderDown();
+            }
+
+            if (errorsResp.status === 'fulfilled' && errorsResp.value.ok) {
+                const errors = await errorsResp.value.json();
+                renderErrors(errors.errors || []);
+            }
+
+            if (metricsResp.status === 'fulfilled' && metricsResp.value.ok) {
+                const metrics = await metricsResp.value.json();
+                renderMetrics(metrics);
+            }
+        } catch(e) {
+            renderDown();
+        }
+
+        btn.classList.remove('loading');
+        document.getElementById('lastUpdated').textContent =
+            `Updated: ${new Date().toLocaleTimeString()}`;
+    }
+
+    function renderOverallStatus(health) {
+        const el = document.getElementById('overallStatus');
+        const icon = document.getElementById('overallIcon');
+        const title = document.getElementById('overallTitle');
+        const desc = document.getElementById('overallDesc');
+
+        if (health.status === 'healthy') {
+            el.className = 'overall-status healthy';
+            icon.textContent = '✅';
+            title.textContent = 'All Systems Operational';
+            desc.textContent = `Uptime: ${health.uptime || '—'} · Version: ${health.version || '—'}`;
+        } else if (health.status === 'degraded') {
+            el.className = 'overall-status degraded';
+            icon.textContent = '⚠️';
+            title.textContent = 'Degraded Performance';
+            desc.textContent = health.message || 'Some subsystems are reporting issues.';
+        } else {
+            renderDown();
+        }
+    }
+
+    function renderDown() {
+        const el = document.getElementById('overallStatus');
+        el.className = 'overall-status down';
+        document.getElementById('overallIcon').textContent = '🔴';
+        document.getElementById('overallTitle').textContent = 'Engine Unreachable';
+        document.getElementById('overallDesc').textContent = 'Cannot connect to the engine health endpoint.';
+    }
+
+    function renderSubsystems(subsystems) {
+        const grid = document.getElementById('subsystemGrid');
+        const configs = {
+            engine:    { icon: '⚙️', label: 'Engine Core' },
+            database:  { icon: '🗄️', label: 'PostgreSQL' },
+            scheduler: { icon: '⏰', label: 'APScheduler' },
+            agent_pool:{ icon: '🤖', label: 'Agent Pool' },
+            litellm:   { icon: '🧠', label: 'LiteLLM Gateway' },
+            redis:     { icon: '📦', label: 'Redis Cache' },
+        };
+
+        grid.innerHTML = Object.entries(subsystems).map(([key, sub]) => {
+            const cfg = configs[key] || { icon: '📋', label: key };
+            const statusClass = sub.status === 'up' ? 'up' : sub.status === 'degraded' ? 'warn' : sub.status === 'down' ? 'err' : 'off';
+            const statusText = sub.status || 'unknown';
+
+            const metricsHtml = Object.entries(sub.metrics || {}).map(([mk, mv]) => `
+                <div class="metric-row">
+                    <span class="metric-label">${esc(mk)}</span>
+                    <span class="metric-value">${esc(String(mv))}</span>
+                </div>
+            `).join('');
+
+            return `
+                <div class="subsystem-card">
+                    <div class="subsystem-card-header">
+                        <span class="subsystem-name">${cfg.icon} ${cfg.label}</span>
+                        <span class="status-badge ${statusClass}">${statusText}</span>
+                    </div>
+                    <div class="subsystem-metrics">${metricsHtml || '<div class="metric-row"><span class="metric-label">No metrics</span><span class="metric-value">—</span></div>'}</div>
+                </div>
+            `;
+        }).join('');
+
+        if (grid.innerHTML === '') {
+            grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--text-muted);padding:20px;">No subsystem data available.</div>';
+        }
+    }
+
+    function renderMetrics(metrics) {
+        const bars = [
+            { id: 'mem', pct: metrics.memory_percent, label: `${metrics.memory_used_mb || '?'} / ${metrics.memory_total_mb || '?'} MB` },
+            { id: 'cpu', pct: metrics.cpu_percent, label: `${metrics.cpu_percent || 0}%` },
+            { id: 'disk', pct: metrics.disk_percent, label: `${metrics.disk_used_gb || '?'} / ${metrics.disk_total_gb || '?'} GB` },
+            { id: 'dbConn', pct: metrics.db_connections_percent, label: `${metrics.db_connections_active || '?'} / ${metrics.db_connections_max || '?'}` },
+        ];
+
+        for (const bar of bars) {
+            const pct = bar.pct || 0;
+            const valueEl = document.getElementById(`${bar.id}Value`);
+            const barEl = document.getElementById(`${bar.id}Bar`);
+
+            if (valueEl) valueEl.textContent = bar.label;
+            if (barEl) {
+                barEl.style.width = `${Math.min(pct, 100)}%`;
+                barEl.className = `metrics-bar-fill ${pct > 90 ? 'crit' : pct > 70 ? 'warn' : 'ok'}`;
+            }
+        }
+    }
+
+    function renderErrors(errors) {
+        const container = document.getElementById('errorList');
+
+        if (errors.length === 0) {
+            container.innerHTML = '<div class="no-errors">✅ No errors in the last 24 hours.</div>';
+            return;
+        }
+
+        container.innerHTML = errors.map(err => `
+            <div class="error-item">
+                <div class="error-item-header">
+                    <span class="error-item-source">${esc(err.source || 'unknown')}</span>
+                    <span class="error-item-time">${formatTime(err.timestamp)}</span>
+                </div>
+                <div class="error-item-msg">${esc(err.message || '')}</div>
+            </div>
+        `).join('');
+    }
+
+    function formatTime(ts) {
+        if (!ts) return '—';
+        const d = new Date(ts);
+        return d.toLocaleString();
+    }
+
+    function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+    window.refreshHealth = refreshHealth;
+})();
+</script>
+{% endblock %}

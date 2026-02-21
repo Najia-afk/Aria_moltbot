@@ -16,20 +16,20 @@ def create_app():
 
     service_host = os.environ['SERVICE_HOST']
     api_base_url = os.environ['API_BASE_URL']
-    clawdbot_public_url = os.environ['CLAWDBOT_PUBLIC_URL']
-    # Extract token from clawdbot URL for dynamic URL generation
-    clawdbot_token = os.environ.get('CLAWDBOT_TOKEN', '')
+    # REMOVED: legacy bot proxy config (Operation Independence)
 
     # Internal API service URL (Docker network or localhost fallback)
     _api_internal_url = os.environ.get('API_INTERNAL_URL', 'http://aria-api:8000')
+    # WebSocket base URL (browser-accessible) — used for WS chat connections
+    _ws_base_url = os.environ.get('WS_BASE_URL', '')
 
     @app.context_processor
     def inject_config():
         return {
             'service_host': service_host,
             'api_base_url': api_base_url,
-            'clawdbot_public_url': clawdbot_public_url,
-            'clawdbot_token': clawdbot_token,
+            'ws_base_url': _ws_base_url,
+            # REMOVED: legacy bot proxy config
         }
     
     @app.after_request
@@ -70,31 +70,16 @@ def create_app():
         headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded_headers}
         return Response(resp.content, status=resp.status_code, headers=headers)
 
-    # =========================================================================
-    # Clawdbot Reverse Proxy - forwards /clawdbot/* to clawdbot service
-    # Injects auth token like Traefik does
-    # =========================================================================
-    _clawdbot_internal_url = os.environ.get('CLAWDBOT_URL', 'http://clawdbot:18789')
+    # REMOVED: legacy bot proxy route (Operation Independence)
+    # Previously: forwarded to legacy bot service with Bearer token injection
+    # Replaced by: native /chat/ route (S6-01) connecting to engine WebSocket
 
-    @app.route('/clawdbot/', defaults={'path': ''}, methods=['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'])
-    @app.route('/clawdbot/<path:path>', methods=['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'])
-    def clawdbot_proxy(path):
-        url = f"{_clawdbot_internal_url}/clawdbot/{path}"
-        fwd_headers = {k: v for k, v in request.headers if k.lower() not in ('host', 'transfer-encoding')}
-        # Inject Bearer token (same as Traefik clawdbot-auth middleware)
-        if clawdbot_token:
-            fwd_headers['Authorization'] = f'Bearer {clawdbot_token}'
-        resp = http_requests.request(
-            method=request.method,
-            url=url,
-            params=request.args,
-            headers=fwd_headers,
-            data=request.get_data(),
-            timeout=30,
-        )
-        excluded_headers = {'content-encoding', 'transfer-encoding', 'connection', 'content-length'}
-        headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded_headers}
-        return Response(resp.content, status=resp.status_code, headers=headers)
+    # Legacy redirect: anyone bookmarking /clawdbot/ gets redirected to /chat/
+    @app.route('/clawdbot/')
+    @app.route('/clawdbot/<path:path>')
+    def legacy_bot_redirect(path=''):
+        from flask import redirect
+        return redirect('/chat/', code=301)
 
     # =========================================================================
     # Routes - Pages
@@ -156,12 +141,23 @@ def create_app():
     def models():
         return render_template('models.html')
 
+    @app.route('/models/manager')
+    @app.route('/model-manager')
+    def models_manager():
+        return render_template('models_manager.html')
+
+    @app.route('/agents/manager')
+    @app.route('/agent-manager')
+    def agent_manager():
+        return render_template('agent_manager.html')
+
     @app.route('/wallets')
     def wallets():
         from flask import redirect
         return redirect('/models', code=301)
 
     @app.route('/sprint-board')
+    @app.route('/goals')
     def sprint_board():
         return render_template('sprint_board.html')
 
@@ -224,6 +220,24 @@ def create_app():
     def model_usage():
         return render_template('model_usage.html')
 
+    @app.route('/cron')
+    @app.route('/cron/')
+    def cron_page():
+        """Cron job management page."""
+        return render_template('engine_cron.html')
+
+    @app.route('/agents')
+    @app.route('/agents/')
+    def agents_page():
+        """Agent management page."""
+        return render_template('engine_agents.html')
+
+    @app.route('/agent-dashboard')
+    @app.route('/agent-dashboard/')
+    def agent_dashboard_page():
+        """Agent performance dashboard."""
+        return render_template('engine_agent_dashboard.html')
+
     @app.route('/rate-limits')
     def rate_limits():
         return render_template('rate_limits.html')
@@ -231,6 +245,45 @@ def create_app():
     @app.route('/api-key-rotations')
     def api_key_rotations():
         return render_template('api_key_rotations.html')
+
+    # ============================================
+    # Operations Hub Routes (Sprint 7)
+    # ============================================
+    @app.route('/operations')
+    @app.route('/operations/')
+    def operations():
+        return render_template('operations.html')
+
+    @app.route('/operations/cron/')
+    def operations_cron():
+        return render_template('engine_operations.html')
+
+    @app.route('/operations/agents/')
+    def operations_agents():
+        return render_template('engine_agents_mgmt.html')
+
+    @app.route('/operations/agents/<agent_id>/prompt')
+    def operations_agent_prompt(agent_id):
+        return render_template('engine_prompt_editor.html', agent_id=agent_id)
+
+    @app.route('/operations/health/')
+    def operations_health():
+        return render_template('engine_health.html')
+
+    # ============================================
+    # Engine Routes (native chat UI)
+    # ============================================
+    @app.route('/roundtable')
+    @app.route('/roundtable/')
+    @app.route('/roundtable/<session_id>')
+    def roundtable(session_id=None):
+        """Roundtable — multi-agent discussion visualization."""
+        return render_template('engine_roundtable.html', session_id=session_id)
+
+    @app.route('/chat/')
+    @app.route('/chat/<session_id>')
+    def chat(session_id=None):
+        return render_template('engine_chat.html', session_id=session_id)
 
     # Flask remains UI-only. All data access goes through the FastAPI service.
 

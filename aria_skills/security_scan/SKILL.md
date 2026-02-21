@@ -1,7 +1,7 @@
 ---
 name: aria-securityscan
 description: "🔒 Security scanning and vulnerability detection for DevSecOps"
-metadata: {"openclaw": {"emoji": "🔒"}}
+metadata: {"aria": {"emoji": "🔒"}}
 ---
 
 # aria-securityscan
@@ -11,7 +11,7 @@ Security scanning and vulnerability detection. Scan files/directories for securi
 ## Usage
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py security_scan <function> '<json_args>'
+exec python3 /app/skills/run_skill.py security_scan <function> '<json_args>'
 ```
 
 ## Functions
@@ -20,26 +20,26 @@ exec python3 /root/.openclaw/workspace/skills/run_skill.py security_scan <functi
 Scan a single file for security issues.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py security_scan scan_file '{"path": "/root/.openclaw/workspace/app.py"}'
+exec python3 /app/skills/run_skill.py security_scan scan_file '{"path": "/app/app.py"}'
 ```
 
 ### scan_directory
 Scan a directory recursively for security issues.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py security_scan scan_directory '{"path": "/root/.openclaw/workspace"}'
+exec python3 /app/skills/run_skill.py security_scan scan_directory '{"path": "/app/workspace"}'
 ```
 
 ### check_dependencies
 Check Python dependencies for known vulnerabilities.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py security_scan check_dependencies '{"requirements_path": "/root/.openclaw/workspace/requirements.txt"}'
+exec python3 /app/skills/run_skill.py security_scan check_dependencies '{"requirements_path": "/app/requirements.txt"}'
 ```
 
 ### audit_docker
 Audit a Dockerfile for security best practices.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py security_scan audit_docker '{"path": "/root/.openclaw/workspace/Dockerfile"}'
+exec python3 /app/skills/run_skill.py security_scan audit_docker '{"path": "/app/Dockerfile"}'
 ```

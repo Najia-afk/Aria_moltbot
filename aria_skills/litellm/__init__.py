@@ -5,7 +5,7 @@ LiteLLM proxy management skill.
 Manages connection to LiteLLM proxy for multi-model support.
 """
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
 from aria_skills.registry import SkillRegistry
@@ -29,7 +29,7 @@ class LiteLLMSkill(BaseSkill):
     
     def __init__(self, config: SkillConfig):
         super().__init__(config)
-        self._client: Optional["httpx.AsyncClient"] = None
+        self._client: "httpx.AsyncClient" | None = None
         self._proxy_url: str = ""
     
     @property
@@ -94,7 +94,7 @@ class LiteLLMSkill(BaseSkill):
     async def chat_completion(
         self,
         model: str,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         temperature: float = 0.7,
         max_tokens: int = 1024,
     ) -> SkillResult:
@@ -111,33 +111,31 @@ class LiteLLMSkill(BaseSkill):
             SkillResult with completion
         """
         try:
-            metadata: Dict[str, Any] = {
+            metadata: dict[str, Any] = {
                 "source": "aria_skills.litellm",
             }
             agent_id = (
-                os.environ.get("OPENCLAW_AGENT_ID")
-                or os.environ.get("ARIA_AGENT_ID")
+                os.environ.get("ARIA_AGENT_ID")
                 or os.environ.get("AGENT_ID")
             )
-            openclaw_session_id = (
-                os.environ.get("OPENCLAW_SESSION_ID")
+            aria_session_id = (
+                os.environ.get("ARIA_SESSION_ID")
                 or os.environ.get("SESSION_ID")
-                or os.environ.get("ARIA_SESSION_ID")
             )
             if agent_id:
                 metadata["agent_id"] = agent_id
-            if openclaw_session_id:
-                metadata["openclaw_session_id"] = openclaw_session_id
+            if aria_session_id:
+                metadata["aria_session_id"] = aria_session_id
 
-            payload: Dict[str, Any] = {
+            payload: dict[str, Any] = {
                 "model": model,
                 "messages": messages,
                 "temperature": temperature,
                 "max_tokens": max_tokens,
                 "metadata": metadata,
             }
-            if openclaw_session_id:
-                payload["session_id"] = openclaw_session_id
+            if aria_session_id:
+                payload["session_id"] = aria_session_id
 
             resp = await self._client.post("/chat/completions", json=payload)
             resp.raise_for_status()

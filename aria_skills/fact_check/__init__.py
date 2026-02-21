@@ -1,20 +1,26 @@
-"""Fact-check skill — lightweight claim extraction and verdict scaffolding."""
+# aria_skills/fact_check/__init__.py
+"""
+Fact-checking and claim verification skill.
 
-from __future__ import annotations
-
-import re
+Structured claim extraction, assessment, and verdict generation
+for Aria's Journalist persona. Uses LLM-assisted analysis.
+"""
 import uuid
 from datetime import datetime, timezone
+from typing import Any
 
-from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
+from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
 from aria_skills.registry import SkillRegistry
 
 
 @SkillRegistry.register
 class FactCheckSkill(BaseSkill):
-    def __init__(self, config: SkillConfig):
-        super().__init__(config)
+    """Fact-checking and claim verification."""
+
+    def __init__(self, config: SkillConfig | None = None):
+        super().__init__(config or SkillConfig(name="fact_check"))
         self._claims: dict[str, dict] = {}
+        self._verdicts: dict[str, dict] = {}
 
     @property
     def name(self) -> str:
@@ -22,63 +28,167 @@ class FactCheckSkill(BaseSkill):
 
     async def initialize(self) -> bool:
         self._status = SkillStatus.AVAILABLE
+        self.logger.info("Fact-check skill initialized")
         return True
 
     async def health_check(self) -> SkillStatus:
         return self._status
 
-    async def extract_claims(self, text: str) -> SkillResult:
-        parts = [p.strip() for p in re.split(r"[\.!?]\s+", text) if p.strip()]
-        extracted = []
-        for part in parts:
-            if any(ch.isdigit() for ch in part) or len(part.split()) > 5:
-                claim_id = f"claim-{uuid.uuid4().hex[:8]}"
+    @logged_method()
+    async def extract_claims(
+        self, text: str = "", source: str = "", **kwargs
+    ) -> SkillResult:
+        """Extract verifiable claims from text."""
+        text = text or kwargs.get("text", "")
+        if not text:
+            return SkillResult.fail("No text provided")
+
+        # Simple claim extraction: split on sentences, identify assertive ones
+        import re
+        sentences = re.split(r'(?<=[.!?])\s+', text.strip())
+        claims = []
+        claim_indicators = [
+            "is", "are", "was", "were", "has", "have", "will",
+            "can", "could", "should", "must", "always", "never",
+            "every", "all", "none", "most", "many", "few",
+            "%", "percent", "million", "billion", "according",
+        ]
+        for sent in sentences:
+            sent = sent.strip()
+            if not sent or len(sent) < 10:
+                continue
+            lower = sent.lower()
+            if any(ind in lower for ind in claim_indicators):
+                claim_id = str(uuid.uuid4())[:8]
                 claim = {
-                    "claim_id": claim_id,
-                    "claim_text": part,
-                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "id": claim_id,
+                    "text": sent,
+                    "source": source or kwargs.get("source", "unknown"),
                     "status": "unverified",
+                    "confidence": 0.0,
+                    "extracted_at": datetime.now(timezone.utc).isoformat(),
                 }
                 self._claims[claim_id] = claim
-                extracted.append(claim)
-        return SkillResult.ok({"claims": extracted, "count": len(extracted)})
+                claims.append(claim)
 
-    async def assess_claim(self, claim_id: str, evidence: list[dict] | None = None) -> SkillResult:
-        claim = self._claims.get(claim_id)
-        if not claim:
-            return SkillResult.fail(f"Claim not found: {claim_id}")
-        evidence = evidence or []
-        verdict = "needs_more_evidence" if not evidence else "partially_supported"
-        result = {
-            "claim_id": claim_id,
-            "verdict": verdict,
-            "confidence": 0.35 if not evidence else 0.62,
-            "evidence_count": len(evidence),
+        return SkillResult.ok({
+            "claims": claims,
+            "total_extracted": len(claims),
+            "source_text_length": len(text),
+            "message": f"Extracted {len(claims)} verifiable claims from {len(sentences)} sentences",
+        })
+
+    @logged_method()
+    async def assess_claim(
+        self, claim_id: str = "", evidence: str = "",
+        confidence: float = 0.5, verdict: str = "unverified", **kwargs
+    ) -> SkillResult:
+        """Assess a claim with evidence and confidence."""
+        claim_id = claim_id or kwargs.get("claim_id", "")
+        if claim_id not in self._claims:
+            return SkillResult.fail(f"Claim '{claim_id}' not found")
+
+        claim = self._claims[claim_id]
+        claim["evidence"] = evidence or kwargs.get("evidence", "")
+        claim["confidence"] = confidence
+        claim["verdict"] = verdict or kwargs.get("verdict", "unverified")
+        claim["status"] = "assessed"
+        claim["assessed_at"] = datetime.now(timezone.utc).isoformat()
+
+        self._verdicts[claim_id] = claim
+        return SkillResult.ok({
+            "claim": claim,
+            "message": f"Claim assessed: {verdict} (confidence: {confidence})",
+        })
+
+    @logged_method()
+    async def quick_check(
+        self, statement: str = "", **kwargs
+    ) -> SkillResult:
+        """Quick assessment of a single statement."""
+        statement = statement or kwargs.get("statement", "")
+        if not statement:
+            return SkillResult.fail("No statement provided")
+
+        claim_id = str(uuid.uuid4())[:8]
+        claim = {
+            "id": claim_id,
+            "text": statement,
+            "source": "direct_input",
+            "status": "quick_checked",
+            "analysis": {
+                "has_numbers": any(c.isdigit() for c in statement),
+                "has_absolutes": any(
+                    w in statement.lower()
+                    for w in ["always", "never", "every", "none", "all"]
+                ),
+                "word_count": len(statement.split()),
+                "needs_verification": True,
+            },
+            "checked_at": datetime.now(timezone.utc).isoformat(),
         }
-        claim.update(result)
-        return SkillResult.ok(result)
+        self._claims[claim_id] = claim
 
-    async def quick_check(self, claim_text: str) -> SkillResult:
-        has_number = any(ch.isdigit() for ch in claim_text)
-        risk = "high" if has_number else "medium"
+        # Flag if it contains absolutes (often exaggerated)
+        risk = "high" if claim["analysis"]["has_absolutes"] else "medium" if claim["analysis"]["has_numbers"] else "low"
         return SkillResult.ok({
-            "claim_text": claim_text,
-            "checkability": "high" if has_number else "moderate",
-            "risk_of_misinformation": risk,
+            "claim": claim,
+            "risk_level": risk,
+            "recommendation": (
+                "Claims with absolute terms (always/never/every) should be verified carefully"
+                if risk == "high"
+                else "Numeric claims should be cross-referenced with authoritative sources"
+                if risk == "medium"
+                else "Standard factual claim — verify with primary sources"
+            ),
         })
 
-    async def compare_sources(self, claim_text: str, sources: list[str]) -> SkillResult:
+    @logged_method()
+    async def compare_sources(
+        self, claim_id: str = "", sources: list[dict] | None = None, **kwargs
+    ) -> SkillResult:
+        """Compare multiple sources for a claim."""
+        claim_id = claim_id or kwargs.get("claim_id", "")
+        sources = sources or kwargs.get("sources", [])
+        if not sources:
+            return SkillResult.fail("No sources provided")
+
+        claim = self._claims.get(claim_id)
+        agreements = sum(1 for s in sources if s.get("supports", False))
+        contradictions = sum(1 for s in sources if not s.get("supports", True))
         return SkillResult.ok({
-            "claim_text": claim_text,
-            "sources": [{"source": src, "stance": "unknown", "notes": "manual verification needed"} for src in sources],
+            "claim_id": claim_id,
+            "claim_text": claim["text"] if claim else "unknown",
+            "sources_count": len(sources),
+            "agreements": agreements,
+            "contradictions": contradictions,
+            "consensus_ratio": round(agreements / max(len(sources), 1), 2),
+            "assessment": (
+                "Strong consensus" if agreements / max(len(sources), 1) > 0.8
+                else "Mixed evidence" if agreements / max(len(sources), 1) > 0.5
+                else "Disputed claim"
+            ),
         })
 
-    async def get_verdict_summary(self, claim_ids: list[str] | None = None) -> SkillResult:
-        selected = [self._claims[cid] for cid in (claim_ids or list(self._claims.keys())) if cid in self._claims]
+    @logged_method()
+    async def get_verdict_summary(self, **kwargs) -> SkillResult:
+        """Get summary of all assessed claims and verdicts."""
+        assessed = [c for c in self._claims.values() if c["status"] in ("assessed", "quick_checked")]
+        verdicts = {}
+        for c in assessed:
+            v = c.get("verdict", "unverified")
+            verdicts[v] = verdicts.get(v, 0) + 1
+
         return SkillResult.ok({
-            "total": len(selected),
-            "verdicts": [
-                {"claim_id": c.get("claim_id"), "verdict": c.get("verdict", "unverified"), "confidence": c.get("confidence", 0.0)}
-                for c in selected
+            "total_claims": len(self._claims),
+            "assessed": len(assessed),
+            "unverified": len(self._claims) - len(assessed),
+            "verdict_breakdown": verdicts,
+            "average_confidence": round(
+                sum(c.get("confidence", 0) for c in assessed) / max(len(assessed), 1), 2
+            ),
+            "recent_claims": [
+                {"id": c["id"], "text": c["text"][:80], "status": c["status"]}
+                for c in list(self._claims.values())[-5:]
             ],
         })

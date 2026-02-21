@@ -13,7 +13,6 @@ import logging
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Optional
 
 from aria_skills.health.diagnostics import HealthLedger, HealthSignal, Severity
 from aria_skills.health.playbooks import Playbook, ALL_PLAYBOOKS
@@ -30,7 +29,7 @@ class RecoveryAction:
     steps_executed: int
     success: bool
     timestamp: str = ""
-    error: Optional[str] = None
+    error: str | None = None
 
     def __post_init__(self):
         if not self.timestamp:
@@ -48,7 +47,7 @@ class RecoveryExecutor:
     def __init__(
         self,
         ledger: HealthLedger,
-        playbooks: Optional[list[Playbook]] = None,
+        playbooks: list[Playbook] | None = None,
     ):
         self.ledger = ledger
         self.playbooks = playbooks or list(ALL_PLAYBOOKS)
@@ -85,7 +84,7 @@ class RecoveryExecutor:
 
         return actions
 
-    def _match_playbook(self, signal: HealthSignal) -> Optional[Playbook]:
+    def _match_playbook(self, signal: HealthSignal) -> Playbook | None:
         """Find the first playbook whose trigger matches the signal."""
         for pb in self.playbooks:
             if pb.matches(signal.component, signal.metric, signal.severity.value):

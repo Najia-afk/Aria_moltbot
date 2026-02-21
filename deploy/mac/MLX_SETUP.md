@@ -190,7 +190,7 @@ launchctl unload ~/Library/LaunchAgents/com.aria.mlx-server.plist
 | **14B (4-bit)** | **~8 GB** | M2 Pro / M3 Pro 36 GB+ recommended |
 | **32B (4-bit)** | **~18 GB** | M3 Max 64 GB+ only |
 
-The Aria Docker stack (LiteLLM + Supabase + OpenClaw) typically uses 4-8 GB.
+The Aria Docker stack (LiteLLM + Supabase + Aria Engine) typically uses 4-8 GB.
 Plan total = Docker overhead + model size + 2 GB system headroom.
 
 ---
@@ -238,9 +238,11 @@ In `litellm-config.yaml` (auto-generated from `models.yaml`):
 
 ---
 
-## 8. Disabling Ollama
+## 8. Disabling Ollama (Legacy)
 
-Ollama should be disabled when using MLX to free up RAM:
+> **Note:** As of v3.0.0, Ollama is no longer part of the standard stack. LiteLLM handles all model routing. This section is retained only for legacy reference.
+
+If Ollama was previously installed, disable it to free up RAM:
 
 ```bash
 # Stop Ollama
@@ -251,17 +253,7 @@ killall Ollama
 launchctl unload ~/Library/LaunchAgents/com.ollama.ollama.plist
 ```
 
-If MLX is unavailable (e.g., Intel Mac or server down), the stack falls back to
-`qwen-cpu-fallback` via Ollama:
-
-```bash
-brew install ollama
-ollama pull qwen2.5:3b
-ollama serve
-```
-
-The `qwen-cpu-fallback` entry in `models.yaml` is pre-configured for
-`http://host.docker.internal:11434`.
+All model routing is now handled by LiteLLM. Local models run via MLX and are accessed through LiteLLM's proxy configuration.
 
 ---
 

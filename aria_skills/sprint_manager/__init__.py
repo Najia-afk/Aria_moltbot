@@ -1,5 +1,4 @@
 """Sprint Manager Skill — Aria as Product Owner."""
-from typing import Optional
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
 from aria_skills.registry import SkillRegistry
 

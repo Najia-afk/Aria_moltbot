@@ -1,7 +1,7 @@
 ---
 name: aria-hourlygoals
 description: Manage Aria's hourly goals and micro-tasks for short-term focus.
-metadata: {"openclaw": {"emoji": "⏰", "requires": {"env": ["DATABASE_URL"]}}}
+metadata: {"aria": {"emoji": "â°", "requires": {"env": ["DATABASE_URL"]}}}
 ---
 
 # aria-hourlygoals
@@ -11,7 +11,7 @@ Manage hourly goals for focused, short-term work. Links to main goals for progre
 ## Usage
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py hourly_goals <function> '<json_args>'
+exec python3 /app/skills/run_skill.py hourly_goals <function> '<json_args>'
 ```
 
 ## Functions
@@ -20,21 +20,21 @@ exec python3 /root/.openclaw/workspace/skills/run_skill.py hourly_goals <functio
 Create an hourly goal.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py hourly_goals hourly_create '{"title": "Review PR #123", "priority": "high"}'
+exec python3 /app/skills/run_skill.py hourly_goals hourly_create '{"title": "Review PR #123", "priority": "high"}'
 ```
 
 ### hourly_list
 List hourly goals.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py hourly_goals hourly_list '{"status": "pending"}'
+exec python3 /app/skills/run_skill.py hourly_goals hourly_list '{"status": "pending"}'
 ```
 
 ### hourly_update
 Update goal status.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py hourly_goals hourly_update '{"goal_id": 5, "status": "completed", "notes": "Merged successfully"}'
+exec python3 /app/skills/run_skill.py hourly_goals hourly_update '{"goal_id": 5, "status": "completed", "notes": "Merged successfully"}'
 ```
 
 ## API Endpoints

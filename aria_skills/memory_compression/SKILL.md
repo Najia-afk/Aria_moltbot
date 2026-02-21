@@ -2,7 +2,7 @@
 ---
 name: aria-memory-compression
 description: "🗜️ 3-tier hierarchical memory compression"
-metadata: {"openclaw": {"emoji": "🗜️"}}
+metadata: {"aria": {"emoji": "🗜️"}}
 ---
 
 # aria-memory-compression
@@ -28,16 +28,16 @@ SemanticMemory (category: compressed_recent / compressed_archive)
 
 ```bash
 # Compress a batch of memories through the pipeline
-exec python3 /root/.openclaw/workspace/skills/run_skill.py memory_compression compress_memories '{"memories": [{"content": "...", "category": "task", "timestamp": "2026-02-16T10:00:00Z"}]}'
+exec python3 /app/skills/run_skill.py memory_compression compress_memories '{"memories": [{"content": "...", "category": "task", "timestamp": "2026-02-16T10:00:00Z"}]}'
 
 # Compress recent session (last N hours)
-exec python3 /root/.openclaw/workspace/skills/run_skill.py memory_compression compress_session '{"hours_back": 6}'
+exec python3 /app/skills/run_skill.py memory_compression compress_session '{"hours_back": 6}'
 
 # Get working context within token budget
-exec python3 /root/.openclaw/workspace/skills/run_skill.py memory_compression get_context_budget '{"max_tokens": 2000}'
+exec python3 /app/skills/run_skill.py memory_compression get_context_budget '{"max_tokens": 2000}'
 
 # Check compression statistics
-exec python3 /root/.openclaw/workspace/skills/run_skill.py memory_compression get_compression_stats '{}'
+exec python3 /app/skills/run_skill.py memory_compression get_compression_stats '{}'
 ```
 
 ## Functions

@@ -1,6 +1,6 @@
 # TOOLS.md - Skill Quick Reference
 
-**Full documentation: See SKILLS.md for complete skill reference (30 active skills)**
+**Full documentation: See SKILLS.md for complete skill reference (35+ active skills)**
 
 Skills are auto-discovered from `aria_skills/*/skill.json`.
 
@@ -118,7 +118,7 @@ aria-api-client.mark_proposal_implemented({"proposal_id": "UUID", "reviewed_by":
 - Never propose modifications under `soul/` paths.
 - After implementation, mark proposal status to `implemented` and log execution outcome via activity.
 
-## All 30 Active Skills
+## All 35+ Active Skills
 
 | Category | Skills |
 |----------|--------|
@@ -196,7 +196,7 @@ aria-unified-search.search({"query": "security"})
 ## Low-Token Runner Patterns
 
 > **⚠️ PATH RULE:** In the container, `aria_mind/` IS the workspace root.
-> Use `skills/run_skill.py` (relative) or `/root/.openclaw/workspace/skills/run_skill.py` (absolute).
+> Use `skills/run_skill.py` (relative) or `/app/skills/run_skill.py` (absolute).
 > **NEVER** use `aria_mind/skills/run_skill.py` — that path does not exist at runtime.
 
 Prefer compact discovery before execution:

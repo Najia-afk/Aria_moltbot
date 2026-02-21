@@ -4,11 +4,15 @@
   "description": "Manage LiteLLM proxy, models, and API spend tracking.",
   "author": "Aria Team",
   "layer": 2,
-  "dependencies": ["api_client"],
-  "focus_affinity": ["orchestrator"],
+  "dependencies": [
+    "api_client"
+  ],
+  "focus_affinity": [
+    "orchestrator"
+  ],
   "tools": [
     {
-      "name": "litellm_models",
+      "name": "list_models",
       "description": "List available models from LiteLLM proxy.",
       "parameters": {
         "type": "object",
@@ -16,7 +20,7 @@
       }
     },
     {
-      "name": "litellm_health",
+      "name": "health_check",
       "description": "Check LiteLLM proxy health status.",
       "parameters": {
         "type": "object",
@@ -24,8 +28,8 @@
       }
     },
     {
-      "name": "litellm_spend",
-      "description": "Get API spend logs and usage data.",
+      "name": "get_metrics",
+      "description": "Get API spend logs, usage data, and metrics.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -41,21 +45,25 @@
       }
     },
     {
-      "name": "litellm_global_spend",
-      "description": "Get global spend summary across all models.",
+      "name": "chat_completion",
+      "description": "Send a chat completion request through LiteLLM proxy.",
       "parameters": {
         "type": "object",
-        "properties": {}
-      }
-    },
-    {
-      "name": "provider_balances",
-      "description": "Get wallet balances from all configured providers (Kimi, OpenRouter).",
-      "parameters": {
-        "type": "object",
-        "properties": {}
+        "properties": {
+          "messages": {
+            "type": "array",
+            "description": "Array of chat messages with role and content"
+          },
+          "model": {
+            "type": "string",
+            "description": "Model to use"
+          }
+        },
+        "required": [
+          "messages"
+        ]
       }
     }
   ],
-  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py litellm {{tool}} '{{args_json}}'"
+  "run": "python3 /app/skills/run_skill.py litellm {{tool}} '{{args_json}}'"
 }

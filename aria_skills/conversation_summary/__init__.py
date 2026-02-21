@@ -9,7 +9,7 @@ Architecture: Skill (Layer 3) → api_client (Layer 2) → API (Layer 1)
 Depends on S5-01 (pgvector semantic memory).
 """
 import json
-from typing import Any, Optional
+from typing import Any
 
 from aria_skills.api_client import get_api_client
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
@@ -80,7 +80,7 @@ class ConversationSummarySkill(BaseSkill):
     async def summarize_session(
         self,
         hours_back: int = 24,
-        session_id: Optional[str] = None,
+        session_id: str | None = None,
     ) -> SkillResult:
         """
         Summarize a recent work session.
@@ -151,15 +151,13 @@ class ConversationSummarySkill(BaseSkill):
             litellm_url = os.getenv("LITELLM_API_BASE", "http://aria-litellm:18793")
             litellm_key = os.getenv("LITELLM_API_KEY", "sk-aria-internal")
             agent_id = (
-                os.getenv("OPENCLAW_AGENT_ID")
-                or os.getenv("ARIA_AGENT_ID")
+                os.getenv("ARIA_AGENT_ID")
                 or os.getenv("AGENT_ID")
                 or "main"
             )
-            openclaw_session_id = (
-                os.getenv("OPENCLAW_SESSION_ID")
+            aria_session_id = (
+                os.getenv("ARIA_SESSION_ID")
                 or os.getenv("SESSION_ID")
-                or os.getenv("ARIA_SESSION_ID")
                 or ""
             )
 
@@ -171,11 +169,11 @@ class ConversationSummarySkill(BaseSkill):
                 "metadata": {
                     "source": "aria_skills.conversation_summary",
                     "agent_id": agent_id,
-                    "openclaw_session_id": openclaw_session_id,
+                    "aria_session_id": aria_session_id,
                 },
             }
-            if openclaw_session_id:
-                payload["session_id"] = openclaw_session_id
+            if aria_session_id:
+                payload["session_id"] = aria_session_id
 
             async with httpx.AsyncClient(timeout=60) as client:
                 resp = await client.post(

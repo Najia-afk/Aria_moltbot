@@ -1,6 +1,5 @@
 """Skill coherence and reporting helpers for run_skill."""
 
-from __future__ import annotations
 
 import json
 import subprocess

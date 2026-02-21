@@ -1,221 +1,112 @@
-# tests/conftest.py
 """
-Pytest fixtures for Aria tests.
+Aria Test Suite — Shared Fixtures
+
+Auto-detects Docker vs local environment.
+All tests hit the live API via synchronous httpx (no asyncio issues).
+No mocks, no SQLAlchemy imports.
 """
-import asyncio
 import os
-from typing import AsyncGenerator, Generator
-from unittest.mock import AsyncMock, MagicMock
+import time
+import uuid
 
+import httpx
 import pytest
-import pytest_asyncio
 
-# Ensure API URL resolves when running tests outside Docker
-os.environ.setdefault("ARIA_API_URL", "http://localhost:8000/api")
-os.environ.setdefault("ARIA_API_BASE", "http://aria-api:8000/api")
-os.environ.setdefault("ARIA_WEB_BASE", "http://aria-web:5000")
+# ── Environment Detection ─────────────────────────────────────────────────────
 
-from aria_skills.base import SkillConfig, SkillStatus
-from aria_skills.registry import SkillRegistry
-from aria_agents.base import AgentConfig, AgentRole
+def _detect_api_base() -> str:
+    if url := os.getenv("ARIA_TEST_API_URL"):
+        return url.rstrip("/")
+    if os.path.exists("/.dockerenv"):
+        return "http://aria-api:8000"
+    return "http://localhost:8000"
 
 
-# ============================================================================
-# Event loop fixture
-# ============================================================================
+def _detect_web_base() -> str:
+    if url := os.getenv("ARIA_TEST_WEB_URL"):
+        return url.rstrip("/")
+    if os.path.exists("/.dockerenv"):
+        return "http://aria-web:5000"
+    return "http://localhost:5000"
+
+
+API_BASE = _detect_api_base()
+WEB_BASE = _detect_web_base()
+
+
+# ── Pytest Configuration ──────────────────────────────────────────────────────
+
+def pytest_configure(config):
+    config.addinivalue_line("markers", "web: tests that require the web UI")
+    config.addinivalue_line("markers", "engine: tests that require the engine")
+    config.addinivalue_line("markers", "slow: slow tests")
+    config.addinivalue_line("markers", "websocket: WebSocket tests")
+    config.addinivalue_line("markers", "graphql: GraphQL tests")
+
+
+# ── HTTP Clients (synchronous) ────────────────────────────────────────────────
+
+class _RetryTransport(httpx.HTTPTransport):
+    """Transparent retry on 429 (rate-limit) with back-off.
+
+    The server blocks for 15s on burst and 30s on RPM exceed,
+    so we need retries that span at least 30s total.
+    """
+
+    MAX_RETRIES = 4
+    BACKOFF = (2.0, 5.0, 10.0, 20.0)
+
+    def handle_request(self, request):
+        for attempt in range(self.MAX_RETRIES + 1):
+            response = super().handle_request(request)
+            if response.status_code != 429 or attempt == self.MAX_RETRIES:
+                return response
+            wait = self.BACKOFF[attempt] if attempt < len(self.BACKOFF) else 20.0
+            time.sleep(wait)
+        return response  # pragma: no cover
+
 
 @pytest.fixture(scope="session")
-def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
-    """Create event loop for async tests."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
+def api():
+    """Session-scoped synchronous HTTP client for the API."""
+    with httpx.Client(
+        base_url=API_BASE,
+        timeout=httpx.Timeout(30.0),
+        follow_redirects=True,
+        transport=_RetryTransport(),
+    ) as client:
+        yield client
 
 
-# ============================================================================
-# Skill fixtures
-# ============================================================================
-
-@pytest.fixture
-def mock_skill_config() -> SkillConfig:
-    """Create a mock skill config."""
-    return SkillConfig(
-        name="test_skill",
-        enabled=True,
-        config={
-            "api_key": "test-key",
-            "rate_limit": {"requests_per_minute": 60},
-        },
-    )
+@pytest.fixture(scope="session")
+def web():
+    """Session-scoped synchronous HTTP client for the Web UI."""
+    with httpx.Client(
+        base_url=WEB_BASE,
+        timeout=httpx.Timeout(30.0),
+        follow_redirects=True,
+        transport=_RetryTransport(),
+    ) as client:
+        yield client
 
 
-@pytest.fixture
-def skill_registry() -> SkillRegistry:
-    """Create an empty skill registry."""
-    return SkillRegistry()
+# ── Health Gate ───────────────────────────────────────────────────────────────
+
+@pytest.fixture(scope="session", autouse=True)
+def _check_api_health():
+    """Skip entire session if API is not reachable."""
+    try:
+        with httpx.Client(timeout=5.0) as c:
+            r = c.get(f"{API_BASE}/health")
+            ok = r.status_code == 200
+    except Exception:
+        ok = False
+    if not ok:
+        pytest.skip(f"API not reachable at {API_BASE}", allow_module_level=True)
 
 
-@pytest.fixture
-def mock_registry() -> SkillRegistry:
-    """Create a SkillRegistry with a test skill registered."""
-    registry = SkillRegistry()
-
-    class _TestSkill:
-        name = "test_skill"
-        is_available = True
-        async def health_check(self):
-            return SkillStatus.AVAILABLE
-        async def initialize(self):
-            return True
-
-    registry._skills["test_skill"] = _TestSkill()
-    return registry
-
-
-@pytest_asyncio.fixture
-async def mock_moltbook_skill() -> AsyncMock:
-    """Create a mock Moltbook skill."""
-    skill = AsyncMock()
-    skill.name = "moltbook"
-    skill.is_available = True
-    skill.health_check = AsyncMock(return_value=SkillStatus.AVAILABLE)
-    skill.post_status = AsyncMock(return_value=MagicMock(success=True, data={"post_id": "123"}))
-    skill.get_timeline = AsyncMock(return_value=MagicMock(success=True, data=[]))
-    return skill
-
-
-@pytest_asyncio.fixture
-async def mock_database_skill() -> AsyncMock:
-    """Create a mock database skill."""
-    skill = AsyncMock()
-    skill.name = "database"
-    skill.is_available = True
-    skill.health_check = AsyncMock(return_value=SkillStatus.AVAILABLE)
-    skill.execute = AsyncMock(return_value=MagicMock(success=True, data={"affected_rows": 1}))
-    skill.fetch_one = AsyncMock(return_value=MagicMock(success=True, data=None))
-    skill.fetch_all = AsyncMock(return_value=MagicMock(success=True, data=[]))
-    return skill
-
-
-@pytest_asyncio.fixture
-async def mock_llm_skill() -> AsyncMock:
-    """Create a mock LLM skill."""
-    skill = AsyncMock()
-    skill.name = "llm"
-    skill.is_available = True
-    skill.health_check = AsyncMock(return_value=SkillStatus.AVAILABLE)
-    skill.generate = AsyncMock(return_value=MagicMock(
-        success=True,
-        data={"text": "Test response", "model": "qwen3-mlx"},
-    ))
-    skill.chat = AsyncMock(return_value=MagicMock(
-        success=True,
-        data={"text": "Test chat response", "model": "qwen3-mlx"},
-    ))
-    return skill
-
-
-# ============================================================================
-# Agent fixtures
-# ============================================================================
+# ── Unique ID Helper ─────────────────────────────────────────────────────────
 
 @pytest.fixture
-def mock_agent_config() -> AgentConfig:
-    """Create a mock agent config."""
-    return AgentConfig(
-        id="test_agent",
-        name="Test Agent",
-        role=AgentRole.COORDINATOR,
-        model="qwen3-mlx",
-        capabilities=["chat", "analyze"],
-        skills=["llm", "database"],
-    )
-
-
-@pytest.fixture
-def aria_agent_config() -> AgentConfig:
-    """Create Aria's agent config."""
-    return AgentConfig(
-        id="aria",
-        name="Aria Blue",
-        role=AgentRole.COORDINATOR,
-        model="qwen3-mlx",
-        capabilities=["orchestrate", "delegate", "synthesize"],
-        skills=["llm", "moltbook", "database"],
-        temperature=0.7,
-    )
-
-
-# ============================================================================
-# Environment fixtures
-# ============================================================================
-
-@pytest.fixture
-def mock_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Set up mock environment variables."""
-    monkeypatch.setenv("LITELLM_API_BASE", "http://localhost:18793")
-    monkeypatch.setenv("OPENROUTER_API_KEY", "test-openrouter-key")
-    monkeypatch.setenv("MOONSHOT_API_KEY", "test-moonshot-key")
-    monkeypatch.setenv("MOLTBOOK_TOKEN", "test-moltbook-token")
-    monkeypatch.setenv("DATABASE_URL", "postgresql://test:test@localhost/test")
-    monkeypatch.setenv("ARIA_API_URL", "http://localhost:8000/api")
-
-
-# ============================================================================
-# HTTP fixtures
-# ============================================================================
-
-@pytest.fixture
-def mock_httpx_response() -> MagicMock:
-    """Create a mock httpx response."""
-    response = MagicMock()
-    response.status_code = 200
-    response.json.return_value = {}
-    response.text = ""
-    return response
-
-
-# ============================================================================
-# Path fixtures
-# ============================================================================
-
-@pytest.fixture
-def aria_mind_path(tmp_path) -> str:
-    """Create a temporary aria_mind directory with test files."""
-    mind_dir = tmp_path / "aria_mind"
-    mind_dir.mkdir()
-    
-    # Create minimal TOOLS.md
-    tools_md = mind_dir / "TOOLS.md"
-    tools_md.write_text("""# Tools
-
-## Available Skills
-
-```yaml
-moltbook:
-  enabled: true
-  api_url: https://test.moltbook.social/api
-
-database:
-  enabled: true
-  dsn: env:DATABASE_URL
-```
-""")
-    
-    # Create minimal AGENTS.md
-    agents_md = mind_dir / "AGENTS.md"
-    agents_md.write_text("""# Agents
-
-## Aria
-- model: qwen3-mlx
-- role: coordinator
-- skills: [llm, moltbook, database]
-
-## Researcher
-- model: chimera-free
-- parent: aria
-- role: researcher
-- skills: [llm]
-""")
-    
-    return str(mind_dir)
+def uid() -> str:
+    return uuid.uuid4().hex[:8]

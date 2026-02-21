@@ -13,16 +13,18 @@ Enhanced with:
 - Importance-weighted recall
 - Session checkpointing for continuity across restarts
 """
+from __future__ import annotations
+
 import json
 import logging
 import os
 from collections import deque, Counter
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 # File-based storage paths (inside container)
-ARIA_MEMORIES_PATH = os.environ.get("ARIA_MEMORIES_PATH", "/root/.openclaw/aria_memories")
+ARIA_MEMORIES_PATH = os.environ.get("ARIA_MEMORIES_PATH", "/app/aria_memories")
 ARIA_REPO_PATH = os.environ.get("ARIA_REPO_PATH", "/root/repo/aria_memories")
 
 
@@ -39,7 +41,7 @@ class MemoryManager:
     - Session checkpointing for restart continuity
     """
 
-    def __init__(self, db_skill: Optional["DatabaseSkill"] = None):
+    def __init__(self, db_skill: "DatabaseSkill" | None = None):
         self._db = db_skill
         self._max_short_term = 200  # Increased from 100 - she deserves more context
         self._short_term: deque = deque(maxlen=self._max_short_term)
@@ -48,9 +50,9 @@ class MemoryManager:
 
         # Consolidation tracking
         self._consolidation_count = 0
-        self._last_consolidation: Optional[str] = None
+        self._last_consolidation: str | None = None
         self._category_frequency: Counter = Counter()
-        self._important_memories: List[Dict[str, Any]] = []  # High-value memories flagged for review
+        self._important_memories: list[dict[str, Any]] = []  # High-value memories flagged for review
 
     def set_database(self, db_skill: "DatabaseSkill"):
         """Inject database skill."""
@@ -97,7 +99,7 @@ class MemoryManager:
         limit: int = 10,
         sort_by: str = "time",  # "time" | "importance"
         min_importance: float = 0.0,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Get short-term memories with optional importance-based retrieval.
         
@@ -144,7 +146,7 @@ class MemoryManager:
         result = await self._db.store_memory(key, value, category)
         return result.success
 
-    async def recall(self, key: str) -> Optional[Any]:
+    async def recall(self, key: str) -> Any | None:
         """Recall from long-term memory."""
         if not self._db:
             return None
@@ -157,9 +159,9 @@ class MemoryManager:
     async def search(
         self,
         pattern: str,
-        category: Optional[str] = None,
+        category: str | None = None,
         limit: int = 20,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Search long-term memories."""
         if not self._db:
             return []
@@ -187,7 +189,7 @@ class MemoryManager:
 
         return True
 
-    async def get_recent_thoughts(self, limit: int = 10) -> List[Dict[str, Any]]:
+    async def get_recent_thoughts(self, limit: int = 10) -> list[dict[str, Any]]:
         """Get recent thoughts."""
         if self._db:
             result = await self._db.get_recent_thoughts(limit)
@@ -203,7 +205,7 @@ class MemoryManager:
     # Memory Consolidation - Transform experiences into wisdom
     # -------------------------------------------------------------------------
 
-    async def consolidate(self, llm_skill=None) -> Dict[str, Any]:
+    async def consolidate(self, llm_skill=None) -> dict[str, Any]:
         """
         Consolidate short-term memories into long-term knowledge.
 
@@ -222,7 +224,7 @@ class MemoryManager:
             return {"consolidated": False, "reason": "Not enough memories to consolidate"}
 
         # Group by category
-        by_category: Dict[str, List[Dict]] = {}
+        by_category: dict[str, list[Dict]] = {}
         for entry in entries:
             cat = entry.get("category", "general")
             if cat not in by_category:
@@ -316,7 +318,7 @@ class MemoryManager:
             "consolidation_number": self._consolidation_count,
         }
 
-    def get_patterns(self) -> Dict[str, Any]:
+    def get_patterns(self) -> dict[str, Any]:
         """
         Analyze memory patterns - what does Aria think about most?
 
@@ -446,7 +448,7 @@ class MemoryManager:
         content: str,
         category: str = "general",
         auto_flag_threshold: float = 0.7,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Add to short-term memory with automatic importance scoring.
         
@@ -482,7 +484,7 @@ class MemoryManager:
         self,
         threshold: float = 0.6,
         limit: int = 20,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get memories with importance score >= threshold."""
         scored = [
             m for m in self._short_term
@@ -506,11 +508,95 @@ class MemoryManager:
         if len(self._important_memories) > 50:
             self._important_memories = self._important_memories[-50:]
 
-    def get_important_memories(self) -> List[Dict[str, Any]]:
+    def get_important_memories(self) -> list[dict[str, Any]]:
         """Get flagged important memories."""
         return list(self._important_memories)
 
-    async def checkpoint_short_term(self) -> Dict[str, Any]:
+    # -------------------------------------------------------------------------
+    # 3-Tier Memory: surface → medium → deep
+    #
+    # Surface: transient heartbeat state (1-beat TTL, auto-cleared)
+    # Medium:  daily context & activity summaries (24h TTL)
+    # Deep:    synthesized insights & patterns (permanent)
+    # -------------------------------------------------------------------------
+
+    def write_surface(self, beat_data: dict[str, Any]) -> dict[str, Any]:
+        """
+        Write transient state to surface memory.
+
+        Called every heartbeat. Overwrites previous surface state.
+        Surface memory is ephemeral — it captures the *current* beat snapshot.
+        """
+        filename = f"beat_{beat_data.get('beat_number', 0):06d}.json"
+        return self.save_json_artifact(beat_data, filename, "surface")
+
+    def clear_stale_surface(self, max_files: int = 20) -> int:
+        """Remove old surface files, keeping only the most recent ones."""
+        files = self.list_artifacts("surface", pattern="beat_*.json")
+        removed = 0
+        if len(files) > max_files:
+            # files are sorted by modified desc — remove oldest
+            for f in files[max_files:]:
+                try:
+                    Path(f["path"]).unlink()
+                    removed += 1
+                except Exception:
+                    pass
+        return removed
+
+    def promote_to_medium(
+        self,
+        summary: dict[str, Any],
+        date_key: str | None = None,
+    ) -> dict[str, Any]:
+        """
+        Promote aggregated surface data to medium-term memory.
+
+        Called every 6 heartbeats (6-hour consolidation). Aggregates recent
+        surface snapshots into a daily activity summary.
+        """
+        if not date_key:
+            date_key = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        subfolder = date_key
+        filename = f"summary_{datetime.now(timezone.utc).strftime('%H%M')}.json"
+        return self.save_json_artifact(summary, filename, "medium", subfolder)
+
+    def promote_to_deep(
+        self,
+        insight: dict[str, Any],
+        category: str = "patterns",
+    ) -> dict[str, Any]:
+        """
+        Promote validated insights to deep (permanent) memory.
+
+        Called when patterns are detected across multiple medium summaries
+        or when goals complete. Deep memory is append-only and permanent.
+        """
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M")
+        filename = f"{category}_{ts}.json"
+        return self.save_json_artifact(insight, filename, "deep", category)
+
+    def get_surface_state(self) -> dict[str, Any] | None:
+        """Get the most recent surface memory snapshot."""
+        files = self.list_artifacts("surface", pattern="beat_*.json")
+        if not files:
+            return None
+        result = self.load_json_artifact(files[0]["name"], "surface")
+        return result.get("data") if result.get("success") else None
+
+    def get_medium_summaries(self, date_key: str | None = None) -> list[dict]:
+        """Get medium-term summaries for a given date."""
+        if not date_key:
+            date_key = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        files = self.list_artifacts("medium", subfolder=date_key, pattern="summary_*.json")
+        summaries = []
+        for f in files:
+            result = self.load_json_artifact(f["name"], "medium", date_key)
+            if result.get("success") and result.get("data"):
+                summaries.append(result["data"])
+        return summaries
+
+    async def checkpoint_short_term(self) -> dict[str, Any]:
         """
         Save short-term memory to disk for restart survival.
         Called during graceful shutdown.
@@ -564,8 +650,9 @@ class MemoryManager:
     # -------------------------------------------------------------------------
 
     ALLOWED_CATEGORIES = frozenset({
-        "archive", "drafts", "exports", "income_ops", "knowledge",
-        "logs", "memory", "moltbook", "plans", "research", "skills",
+        "archive", "deep", "drafts", "exports", "income_ops", "knowledge",
+        "logs", "medium", "memory", "moltbook", "plans", "research",
+        "skills", "surface",
     })
 
     def _get_memories_path(self) -> Path:
@@ -587,8 +674,8 @@ class MemoryManager:
         content: str,
         filename: str,
         category: str = "general",
-        subfolder: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        subfolder: str | None = None,
+    ) -> dict[str, Any]:
         """
         Save a file artifact to aria_memories.
 
@@ -640,8 +727,8 @@ class MemoryManager:
         self,
         filename: str,
         category: str = "general",
-        subfolder: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        subfolder: str | None = None,
+    ) -> dict[str, Any]:
         """
         Load a file artifact from aria_memories.
 
@@ -671,9 +758,9 @@ class MemoryManager:
     def list_artifacts(
         self,
         category: str = "general",
-        subfolder: Optional[str] = None,
+        subfolder: str | None = None,
         pattern: str = "*",
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         List artifacts in a category folder.
 
@@ -707,8 +794,8 @@ class MemoryManager:
         data: Any,
         filename: str,
         category: str = "exports",
-        subfolder: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        subfolder: str | None = None,
+    ) -> dict[str, Any]:
         """Save structured data as JSON."""
         content = json.dumps(data, indent=2, default=str)
         if not filename.endswith(".json"):
@@ -719,8 +806,8 @@ class MemoryManager:
         self,
         filename: str,
         category: str = "exports",
-        subfolder: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        subfolder: str | None = None,
+    ) -> dict[str, Any]:
         """Load JSON artifact."""
         result = self.load_artifact(filename, category, subfolder)
         if result.get("success") and result.get("content"):
@@ -731,7 +818,7 @@ class MemoryManager:
                 result["error"] = f"Invalid JSON: {e}"
         return result
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get memory system status with pattern awareness."""
         memories_path = self._get_memories_path()
         

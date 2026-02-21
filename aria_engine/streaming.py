@@ -1,0 +1,627 @@
+"""
+Stream Manager — WebSocket streaming for chat responses.
+
+Bridges LLMGateway.stream() to FastAPI WebSocket connections with:
+- Structured JSON protocol (token, thinking, tool_call, tool_result, done, error)
+- Full response accumulation for DB persistence after stream completes
+- Graceful disconnection handling (saves partial response)
+- Ping/pong keepalive every 30 seconds
+- Connection lifecycle management
+
+Protocol:
+  Client → Server:
+    {"type": "message", "content": "Hello!", "enable_thinking": false}
+    {"type": "ping"}
+
+  Server → Client:
+    {"type": "token", "content": "Hello"}
+    {"type": "thinking", "content": "Let me consider..."}
+    {"type": "tool_call", "name": "search", "arguments": {"q": "..."}, "id": "tc_1"}
+    {"type": "tool_result", "name": "search", "content": "...", "id": "tc_1", "success": true}
+    {"type": "usage", "input_tokens": 100, "output_tokens": 50, "cost": 0.001}
+    {"type": "done", "message_id": "uuid", "finish_reason": "stop"}
+    {"type": "error", "message": "..."}
+    {"type": "pong"}
+"""
+import asyncio
+import json
+import logging
+import time
+import uuid
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Any
+
+from starlette.websockets import WebSocket, WebSocketDisconnect, WebSocketState
+
+from aria_engine.config import EngineConfig
+from aria_engine.exceptions import SessionError, LLMError
+from aria_engine.llm_gateway import LLMGateway, StreamChunk
+from aria_engine.telemetry import log_model_usage, log_skill_invocation, _parse_skill_from_tool
+from aria_engine.tool_registry import ToolRegistry, ToolResult
+
+logger = logging.getLogger("aria.engine.stream")
+
+
+@dataclass
+class StreamAccumulator:
+    """Accumulates a full response from stream chunks for DB persistence."""
+    content: str = ""
+    thinking: str = ""
+    tool_calls: list[dict[str, Any]] = field(default_factory=list)
+    tool_results: list[dict[str, Any]] = field(default_factory=list)
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cost_usd: float = 0.0
+    finish_reason: str = ""
+    started_at: float = 0.0
+    model: str = ""
+
+    @property
+    def latency_ms(self) -> int:
+        if self.started_at:
+            return int((time.monotonic() - self.started_at) * 1000)
+        return 0
+
+
+class StreamManager:
+    """
+    Manages WebSocket streaming chat sessions.
+
+    Usage:
+        manager = StreamManager(config, gateway, tool_registry, db_factory)
+
+        # In a FastAPI WebSocket endpoint:
+        @app.websocket("/ws/chat/{session_id}")
+        async def chat_ws(websocket: WebSocket, session_id: str):
+            await manager.handle_connection(websocket, session_id)
+    """
+
+    def __init__(
+        self,
+        config: EngineConfig,
+        gateway: LLMGateway,
+        tool_registry: ToolRegistry,
+        db_session_factory,
+    ):
+        self.config = config
+        self.gateway = gateway
+        self.tools = tool_registry
+        self._db_factory = db_session_factory
+        self._active_connections: dict[str, WebSocket] = {}
+
+    async def handle_connection(
+        self,
+        websocket: WebSocket,
+        session_id: str,
+    ) -> None:
+        """
+        Handle a WebSocket connection for a chat session.
+
+        Lifecycle:
+        1. Accept connection
+        2. Validate session exists and is active
+        3. Start keepalive task
+        4. Listen for messages and stream responses
+        5. Clean up on disconnect
+        """
+        try:
+            await self._validate_session(session_id)
+        except SessionError as e:
+            logger.info("Rejected websocket for invalid session %s: %s", session_id, e)
+            await websocket.close()
+            return
+        except (ValueError, TypeError) as e:
+            logger.info("Rejected websocket for malformed session id %s: %s", session_id, e)
+            await websocket.close()
+            return
+        except Exception as e:
+            # Catch-all: DB import errors, connection issues, etc.
+            # Accept the WS anyway — the first message will fail gracefully.
+            logger.warning(
+                "Session validation failed for %s (non-fatal, accepting WS): %s",
+                session_id, e,
+            )
+
+        await websocket.accept()
+
+        connection_id = f"{session_id}:{uuid.uuid4().hex[:8]}"
+        self._active_connections[connection_id] = websocket
+
+        logger.info("WebSocket connected: %s", connection_id)
+
+        # Start keepalive task
+        keepalive_task = asyncio.create_task(
+            self._keepalive(websocket, connection_id)
+        )
+
+        try:
+            # Listen for messages
+            while True:
+                try:
+                    raw = await websocket.receive_text()
+                    data = json.loads(raw)
+
+                    msg_type = data.get("type", "")
+
+                    if msg_type == "ping":
+                        await self._send_json(websocket, {"type": "pong"})
+
+                    elif msg_type == "message":
+                        content = data.get("content", "").strip()
+                        if not content:
+                            await self._send_json(websocket, {
+                                "type": "error",
+                                "message": "Empty message content",
+                            })
+                            continue
+
+                        enable_thinking = data.get("enable_thinking", False)
+                        enable_tools = data.get("enable_tools", True)
+
+                        await self._handle_message(
+                            websocket=websocket,
+                            session_id=session_id,
+                            content=content,
+                            enable_thinking=enable_thinking,
+                            enable_tools=enable_tools,
+                        )
+
+                    else:
+                        await self._send_json(websocket, {
+                            "type": "error",
+                            "message": f"Unknown message type: {msg_type}",
+                        })
+
+                except json.JSONDecodeError:
+                    await self._send_json(websocket, {
+                        "type": "error",
+                        "message": "Invalid JSON",
+                    })
+
+        except WebSocketDisconnect:
+            logger.info("WebSocket disconnected: %s", connection_id)
+        except Exception as e:
+            logger.error("WebSocket error in %s: %s", connection_id, e)
+            try:
+                await self._send_json(websocket, {
+                    "type": "error",
+                    "message": str(e),
+                })
+            except Exception:
+                pass
+        finally:
+            keepalive_task.cancel()
+            self._active_connections.pop(connection_id, None)
+            logger.info("WebSocket cleaned up: %s", connection_id)
+
+    async def _handle_message(
+        self,
+        websocket: WebSocket,
+        session_id: str,
+        content: str,
+        enable_thinking: bool = False,
+        enable_tools: bool = True,
+    ) -> None:
+        """
+        Handle a single chat message: persist user msg, stream LLM response,
+        handle tool calls, persist assistant msg.
+        """
+        from db.models import EngineChatSession, EngineChatMessage
+
+        accumulator = StreamAccumulator(started_at=time.monotonic())
+
+        async with self._db_factory() as db:
+            # Load session
+            from sqlalchemy import select
+            result = await db.execute(
+                select(EngineChatSession).where(
+                    EngineChatSession.id == uuid.UUID(session_id)
+                )
+            )
+            session = result.scalar_one_or_none()
+            if session is None:
+                await self._send_json(websocket, {
+                    "type": "error",
+                    "message": f"Session {session_id} not found",
+                })
+                return
+
+            if session.status == "ended":
+                # Auto-reactivate ended sessions (matches _validate_session behaviour)
+                session.status = "active"
+                session.ended_at = None
+
+            accumulator.model = session.model or self.config.default_model
+
+            # Signal frontend to create streaming message bubble
+            await self._send_json(websocket, {"type": "stream_start"})
+
+            # Persist user message
+            user_msg_id = uuid.uuid4()
+            user_msg = EngineChatMessage(
+                id=user_msg_id,
+                session_id=uuid.UUID(session_id),
+                role="user",
+                content=content,
+                created_at=datetime.now(timezone.utc),
+            )
+            db.add(user_msg)
+            await db.flush()
+
+            # Build conversation context
+            messages = await self._build_context(db, session, content)
+            tools_for_llm = self.tools.get_tools_for_llm() if enable_tools else None
+
+            # ── Stream LLM response ───────────────────────────────────────
+            max_tool_iterations = 10
+            for iteration in range(max_tool_iterations):
+                try:
+                    async for chunk in self.gateway.stream(
+                        messages=messages,
+                        model=session.model,
+                        temperature=session.temperature,
+                        max_tokens=session.max_tokens,
+                        tools=tools_for_llm,
+                        enable_thinking=enable_thinking,
+                    ):
+                        if not await self._is_connected(websocket):
+                            logger.warning("Client disconnected during stream")
+                            break
+
+                        # Stream thinking tokens
+                        if chunk.thinking:
+                            accumulator.thinking += chunk.thinking
+                            await self._send_json(websocket, {
+                                "type": "thinking",
+                                "content": chunk.thinking,
+                            })
+
+                        # Stream content tokens
+                        if chunk.content:
+                            accumulator.content += chunk.content
+                            await self._send_json(websocket, {
+                                "type": "content",
+                                "content": chunk.content,
+                            })
+
+                        # Capture finish reason
+                        if chunk.finish_reason:
+                            accumulator.finish_reason = chunk.finish_reason
+
+                except LLMError as e:
+                    await self._send_json(websocket, {
+                        "type": "error",
+                        "message": f"LLM error: {e}",
+                    })
+                    break
+
+                # Check for tool calls in accumulated content
+                # If the model requested tool calls, we re-call non-streaming
+                if accumulator.finish_reason == "tool_calls":
+                    # Fall back to non-streaming for tool call execution
+                    try:
+                        llm_response = await self.gateway.complete(
+                            messages=messages,
+                            model=session.model,
+                            temperature=session.temperature,
+                            max_tokens=session.max_tokens,
+                            tools=tools_for_llm,
+                            enable_thinking=enable_thinking,
+                        )
+                    except LLMError as e:
+                        await self._send_json(websocket, {
+                            "type": "error",
+                            "message": f"Tool call LLM error: {e}",
+                        })
+                        break
+
+                    if not llm_response.tool_calls:
+                        # No tool calls after all — use the response content
+                        accumulator.content = llm_response.content
+                        accumulator.thinking = llm_response.thinking or accumulator.thinking
+                        break
+
+                    # Execute tool calls
+                    accumulator.tool_calls.extend(llm_response.tool_calls)
+                    assistant_entry: dict[str, Any] = {
+                        "role": "assistant",
+                        "content": llm_response.content or "",
+                        "tool_calls": llm_response.tool_calls,
+                    }
+                    # Include thinking so models that require reasoning_content
+                    # on tool-call messages (e.g. Kimi) don't reject the request
+                    if llm_response.thinking:
+                        assistant_entry["reasoning_content"] = llm_response.thinking
+                    messages.append(assistant_entry)
+
+                    for tc in llm_response.tool_calls:
+                        # Notify client about tool call
+                        await self._send_json(websocket, {
+                            "type": "tool_call",
+                            "name": tc["function"]["name"],
+                            "arguments": tc["function"]["arguments"],
+                            "id": tc["id"],
+                        })
+
+                        # Execute tool
+                        tool_result: ToolResult = await self.tools.execute(
+                            tool_call_id=tc["id"],
+                            function_name=tc["function"]["name"],
+                            arguments=tc["function"]["arguments"],
+                        )
+
+                        accumulator.tool_results.append({
+                            "tool_call_id": tool_result.tool_call_id,
+                            "name": tool_result.name,
+                            "content": tool_result.content,
+                            "success": tool_result.success,
+                            "duration_ms": tool_result.duration_ms,
+                        })
+
+                        # Telemetry → aria_data.skill_invocations
+                        asyncio.ensure_future(log_skill_invocation(
+                            self._db_factory,
+                            skill_name=_parse_skill_from_tool(tc["function"]["name"]),
+                            tool_name=tc["function"]["name"],
+                            duration_ms=tool_result.duration_ms,
+                            success=tool_result.success,
+                            model_used=accumulator.model,
+                        ))
+
+                        # Notify client about tool result
+                        await self._send_json(websocket, {
+                            "type": "tool_result",
+                            "name": tool_result.name,
+                            "content": tool_result.content,
+                            "id": tool_result.tool_call_id,
+                            "success": tool_result.success,
+                        })
+
+                        # Add to messages for next LLM turn
+                        messages.append({
+                            "role": "tool",
+                            "tool_call_id": tool_result.tool_call_id,
+                            "content": tool_result.content,
+                        })
+
+                        # Persist tool message
+                        tool_msg = EngineChatMessage(
+                            id=uuid.uuid4(),
+                            session_id=uuid.UUID(session_id),
+                            role="tool",
+                            content=tool_result.content,
+                            tool_results={
+                                "tool_call_id": tc["id"],
+                                "name": tc["function"]["name"],
+                            },
+                            latency_ms=tool_result.duration_ms,
+                            created_at=datetime.now(timezone.utc),
+                        )
+                        db.add(tool_msg)
+
+                    # Reset accumulator content for next stream
+                    accumulator.content = ""
+                    accumulator.finish_reason = ""
+                    continue  # Re-stream with tool results
+
+                # No tool calls — done
+                break
+
+            # ── Persist assistant message ─────────────────────────────────
+            assistant_msg_id = uuid.uuid4()
+            assistant_msg = EngineChatMessage(
+                id=assistant_msg_id,
+                session_id=uuid.UUID(session_id),
+                role="assistant",
+                content=accumulator.content,
+                thinking=accumulator.thinking or None,
+                tool_calls=accumulator.tool_calls if accumulator.tool_calls else None,
+                tool_results=accumulator.tool_results if accumulator.tool_results else None,
+                model=accumulator.model,
+                tokens_input=accumulator.input_tokens,
+                tokens_output=accumulator.output_tokens,
+                cost=accumulator.cost_usd,
+                latency_ms=accumulator.latency_ms,
+                created_at=datetime.now(timezone.utc),
+            )
+            db.add(assistant_msg)
+
+            # ── Update session counters ───────────────────────────────────
+            msg_count = 2 + len(accumulator.tool_results)
+            session.message_count = (session.message_count or 0) + msg_count
+            session.total_tokens = (
+                (session.total_tokens or 0)
+                + accumulator.input_tokens
+                + accumulator.output_tokens
+            )
+            session.total_cost = float(session.total_cost or 0) + accumulator.cost_usd
+            session.updated_at = datetime.now(timezone.utc)
+
+            # Auto-title on first message
+            if not session.title and (session.message_count or 0) <= msg_count:
+                title = content.strip().replace("\n", " ")
+                title = " ".join(title.split())
+                if len(title) > 80:
+                    title = title[:77] + "..."
+                session.title = title
+
+            await db.commit()
+
+            # Telemetry → aria_data.model_usage
+            asyncio.ensure_future(log_model_usage(
+                self._db_factory,
+                model=accumulator.model or "unknown",
+                input_tokens=accumulator.input_tokens,
+                output_tokens=accumulator.output_tokens,
+                cost_usd=accumulator.cost_usd,
+                latency_ms=accumulator.latency_ms,
+                success=True,
+            ))
+
+            # ── Send stream_end (combines usage + done for frontend) ────
+            await self._send_json(websocket, {
+                "type": "stream_end",
+                "message_id": str(assistant_msg_id),
+                "finish_reason": accumulator.finish_reason,
+                "model": accumulator.model,
+                "tokens_input": accumulator.input_tokens,
+                "tokens_output": accumulator.output_tokens,
+                "cost": accumulator.cost_usd,
+            })
+
+    async def _validate_session(self, session_id: str) -> None:
+        """Validate that a session exists and is active.
+
+        If the session status is 'ended', it is automatically reactivated so the
+        user can reconnect without creating a new session.
+        """
+        from db.models import EngineChatSession
+        from sqlalchemy import select, update
+
+        async with self._db_factory() as db:
+            # Select id+status so a NULL status doesn't look like "row not found"
+            result = await db.execute(
+                select(EngineChatSession.id, EngineChatSession.status).where(
+                    EngineChatSession.id == uuid.UUID(session_id)
+                )
+            )
+            row = result.one_or_none()
+            if row is None:
+                raise SessionError(f"Session {session_id} not found")
+            status = row[1]  # may be None
+            if status == "ended":
+                # Auto-reactivate ended sessions so users can reconnect
+                await db.execute(
+                    update(EngineChatSession)
+                    .where(EngineChatSession.id == uuid.UUID(session_id))
+                    .values(status="active", ended_at=None)
+                )
+                await db.commit()
+                logger.info("Reactivated ended session %s for WS reconnect", session_id)
+
+    async def _build_context(
+        self,
+        db,
+        session,
+        current_content: str,
+    ) -> list[dict[str, Any]]:
+        """Build conversation context from DB messages (same as ChatEngine)."""
+        from db.models import EngineChatMessage
+        from sqlalchemy import select
+
+        messages: list[dict[str, Any]] = []
+
+        if session.system_prompt:
+            messages.append({"role": "system", "content": session.system_prompt})
+
+        window = session.context_window or 50
+        result = await db.execute(
+            select(EngineChatMessage)
+            .where(EngineChatMessage.session_id == session.id)
+            .order_by(EngineChatMessage.created_at.desc())
+            .limit(window)
+        )
+        db_messages = list(reversed(result.scalars().all()))
+
+        for msg in db_messages:
+            entry: dict[str, Any] = {"role": msg.role, "content": msg.content or ""}
+            if msg.tool_calls:
+                entry["tool_calls"] = msg.tool_calls
+            # Include thinking as reasoning_content for models that require it
+            # (e.g. Kimi/Moonshot rejects assistant tool-call msgs without it)
+            if msg.role == "assistant" and hasattr(msg, "thinking") and msg.thinking:
+                entry["reasoning_content"] = msg.thinking
+            # Tool messages MUST have a valid tool_call_id or the provider rejects them
+            if msg.role == "tool":
+                tc_id = (msg.tool_results or {}).get("tool_call_id", "") if msg.tool_results else ""
+                if tc_id:
+                    entry["tool_call_id"] = tc_id
+                else:
+                    continue  # Skip orphan / corrupt tool messages
+            messages.append(entry)
+
+        # ── Post-process: fix tool-call ordering anomalies ────────────────
+        # DB may store tool results BEFORE the assistant message that triggered
+        # them (race in persistence timing).  We re-order so each assistant
+        # with tool_calls is immediately followed by its tool results, and any
+        # orphaned tool/assistant messages are dropped.
+
+        # 1. Build a set of all tool_call_ids declared by assistant messages
+        declared_tc_ids: set[str] = set()
+        for m in messages:
+            if m.get("tool_calls"):
+                for tc in m["tool_calls"]:
+                    declared_tc_ids.add(tc.get("id", ""))
+
+        # 2. Separate tool messages into a map keyed by tool_call_id
+        tool_msgs_by_id: dict[str, dict] = {}
+        non_tool_msgs: list[dict[str, Any]] = []
+        for m in messages:
+            if m.get("role") == "tool" and m.get("tool_call_id"):
+                tc_id = m["tool_call_id"]
+                if tc_id in declared_tc_ids:
+                    tool_msgs_by_id[tc_id] = m
+                # else: orphan tool message — drop silently
+            else:
+                non_tool_msgs.append(m)
+
+        # 3. Rebuild: after each assistant with tool_calls, inject its tool results
+        cleaned: list[dict[str, Any]] = []
+        for m in non_tool_msgs:
+            if m.get("tool_calls"):
+                # Check which tool results exist for this assistant
+                owned_ids = [tc.get("id", "") for tc in m["tool_calls"]]
+                existing = [tool_msgs_by_id[tid] for tid in owned_ids if tid in tool_msgs_by_id]
+                if existing:
+                    cleaned.append(m)
+                    cleaned.extend(existing)
+                else:
+                    # No tool results found — strip tool_calls, drop if empty
+                    stripped = {k: v for k, v in m.items() if k != "tool_calls"}
+                    if stripped.get("role") == "assistant" and not stripped.get("content"):
+                        continue
+                    cleaned.append(stripped)
+            else:
+                # Drop empty assistant messages (no content, no tool_calls)
+                # — these are often artifacts from failed LLM calls.
+                if m.get("role") == "assistant" and not m.get("content") and not m.get("tool_calls"):
+                    continue
+                cleaned.append(m)
+        messages = cleaned
+
+        messages.append({"role": "user", "content": current_content})
+        return messages
+
+    async def _keepalive(self, websocket: WebSocket, connection_id: str) -> None:
+        """Send ping every ws_ping_interval seconds to keep connection alive."""
+        try:
+            while True:
+                await asyncio.sleep(self.config.ws_ping_interval)
+                if await self._is_connected(websocket):
+                    await self._send_json(websocket, {"type": "pong"})
+                else:
+                    break
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            pass
+
+    @staticmethod
+    async def _is_connected(websocket: WebSocket) -> bool:
+        """Check if WebSocket is still connected."""
+        return websocket.client_state == WebSocketState.CONNECTED
+
+    @staticmethod
+    async def _send_json(websocket: WebSocket, data: dict[str, Any]) -> None:
+        """Send JSON data over WebSocket, silently catching disconnection."""
+        try:
+            if websocket.client_state == WebSocketState.CONNECTED:
+                await websocket.send_text(json.dumps(data))
+        except Exception:
+            pass  # Client disconnected — swallow
+
+    @property
+    def active_connections(self) -> int:
+        """Number of active WebSocket connections."""
+        return len(self._active_connections)

@@ -348,7 +348,7 @@
     flex-shrink: 0;
 }
 
-.service-icon.clawdbot { background: linear-gradient(135deg, #ef4444, #f97316); }
+.service-icon.aria-engine { background: linear-gradient(135deg, #ef4444, #f97316); }
 .service-icon.grafana { background: linear-gradient(135deg, #f97316, #eab308); }
 .service-icon.prometheus { background: linear-gradient(135deg, #ef4444, #dc2626); }
 .service-icon.pgadmin { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }

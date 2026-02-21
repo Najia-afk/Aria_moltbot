@@ -1,7 +1,7 @@
 ---
 name: aria-cicd
 description: "🔄 CI/CD pipeline management and automation for DevSecOps"
-metadata: {"openclaw": {"emoji": "🔄"}}
+metadata: {"aria": {"emoji": "🔄"}}
 ---
 
 # aria-cicd
@@ -11,7 +11,7 @@ CI/CD pipeline management. Generate GitHub Actions workflows, validate configs, 
 ## Usage
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py ci_cd <function> '<json_args>'
+exec python3 /app/skills/run_skill.py ci_cd <function> '<json_args>'
 ```
 
 ## Functions
@@ -20,26 +20,26 @@ exec python3 /root/.openclaw/workspace/skills/run_skill.py ci_cd <function> '<js
 Generate a GitHub Actions workflow file.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py ci_cd generate_workflow '{"name": "deploy", "triggers": ["push"]}'
+exec python3 /app/skills/run_skill.py ci_cd generate_workflow '{"name": "deploy", "triggers": ["push"]}'
 ```
 
 ### validate_workflow
 Validate a GitHub Actions workflow file.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py ci_cd validate_workflow '{"workflow_yaml": "..."}'
+exec python3 /app/skills/run_skill.py ci_cd validate_workflow '{"workflow_yaml": "..."}'
 ```
 
 ### generate_dockerfile
 Generate a secure Dockerfile.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py ci_cd generate_dockerfile '{"base_image": "python:3.12-slim"}'
+exec python3 /app/skills/run_skill.py ci_cd generate_dockerfile '{"base_image": "python:3.12-slim"}'
 ```
 
 ### analyze_deployment
 Analyze a docker-compose deployment configuration.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py ci_cd analyze_deployment '{"compose_path": "docker-compose.yml"}'
+exec python3 /app/skills/run_skill.py ci_cd analyze_deployment '{"compose_path": "docker-compose.yml"}'
 ```

@@ -2,7 +2,7 @@
 ---
 name: aria-sentiment-analysis
 description: "💭 Multi-dimensional sentiment analysis with adaptive tone"
-metadata: {"openclaw": {"emoji": "💭"}}
+metadata: {"aria": {"emoji": "💭"}}
 ---
 
 # aria-sentiment-analysis
@@ -39,16 +39,16 @@ are injected into the context dict for downstream agent use.
 
 ```bash
 # Analyze a single message
-exec python3 /root/.openclaw/workspace/skills/run_skill.py sentiment_analysis analyze_message '{"text": "This is really frustrating, nothing works!"}'
+exec python3 /app/skills/run_skill.py sentiment_analysis analyze_message '{"text": "This is really frustrating, nothing works!"}'
 
 # Analyze full conversation trajectory
-exec python3 /root/.openclaw/workspace/skills/run_skill.py sentiment_analysis analyze_conversation '{"messages": [{"role": "user", "content": "help me"}, {"role": "assistant", "content": "sure!"}]}'
+exec python3 /app/skills/run_skill.py sentiment_analysis analyze_conversation '{"messages": [{"role": "user", "content": "help me"}, {"role": "assistant", "content": "sure!"}]}'
 
 # Get tone recommendation for response tuning
-exec python3 /root/.openclaw/workspace/skills/run_skill.py sentiment_analysis get_tone_recommendation '{"text": "I keep getting errors"}'
+exec python3 /app/skills/run_skill.py sentiment_analysis get_tone_recommendation '{"text": "I keep getting errors"}'
 
 # View sentiment history
-exec python3 /root/.openclaw/workspace/skills/run_skill.py sentiment_analysis get_sentiment_history '{"limit": 20}'
+exec python3 /app/skills/run_skill.py sentiment_analysis get_sentiment_history '{"limit": 20}'
 ```
 
 ## Functions

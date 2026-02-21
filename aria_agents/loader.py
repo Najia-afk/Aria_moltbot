@@ -7,7 +7,7 @@ Loads agent definitions from AGENTS.md.
 import logging
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Any
 
 try:
     import yaml  # type: ignore
@@ -37,7 +37,7 @@ class AgentLoader:
     """
     
     @staticmethod
-    def load_from_file(filepath: str) -> Dict[str, AgentConfig]:
+    def load_from_file(filepath: str) -> dict[str, AgentConfig]:
         """
         Load agent configs from a markdown file.
         
@@ -55,7 +55,7 @@ class AgentLoader:
         return AgentLoader.parse_agents_md(content)
     
     @staticmethod
-    def parse_agents_md(content: str) -> Dict[str, AgentConfig]:
+    def parse_agents_md(content: str) -> dict[str, AgentConfig]:
         """
         Parse AGENTS.md content into AgentConfig objects.
         
@@ -79,7 +79,7 @@ class AgentLoader:
             agent_id = lines[0].strip().lower().replace(' ', '_')
             
             # Parse properties
-            props: Dict[str, Any] = {
+            props: dict[str, Any] = {
                 "id": agent_id,
                 "name": lines[0].strip(),
             }
@@ -142,6 +142,14 @@ class AgentLoader:
             if not isinstance(capabilities, list):
                 capabilities = [str(capabilities)] if capabilities else []
 
+            # Parse mind_files list (explicit per-agent aria_mind file selection)
+            mind_files_raw = props.get("mind_files", [])
+            if isinstance(mind_files_raw, str):
+                mind_files_raw = [f.strip() for f in mind_files_raw.split(",") if f.strip()]
+            elif not isinstance(mind_files_raw, list):
+                mind_files_raw = []
+            mind_files = [str(f) for f in mind_files_raw]
+
             config = AgentConfig(
                 id=agent_id,
                 name=props.get("name", agent_id),
@@ -152,6 +160,7 @@ class AgentLoader:
                 skills=skills,
                 temperature=float(props.get("temperature", 0.7)),
                 max_tokens=int(props.get("max_tokens", 2048)),
+                mind_files=mind_files,
             )
             
             agents[agent_id] = config
@@ -159,7 +168,7 @@ class AgentLoader:
         return agents
 
     @staticmethod
-    def _safe_yaml_dict(raw: str) -> Dict[str, Any]:
+    def _safe_yaml_dict(raw: str) -> dict[str, Any]:
         """Parse a YAML block to a dictionary with safe fallbacks."""
         if yaml is not None:
             try:
@@ -171,7 +180,7 @@ class AgentLoader:
                 logger.warning(f"Failed to parse agent YAML block with PyYAML: {exc}")
 
         # Fallback parser for simple key/value and [list, values] forms used in AGENTS.md
-        data: Dict[str, Any] = {}
+        data: dict[str, Any] = {}
         for line in raw.splitlines():
             stripped = line.strip()
             if not stripped or stripped.startswith("#") or ":" not in stripped:
@@ -221,15 +230,15 @@ class AgentLoader:
 
     @staticmethod
     def missing_expected_agents(
-        agents: Dict[str, AgentConfig],
-        expected: List[str],
-    ) -> List[str]:
+        agents: dict[str, AgentConfig],
+        expected: list[str],
+    ) -> list[str]:
         """Return expected agent IDs that are missing from loaded configs."""
         loaded = set(agents.keys())
         return [agent_id for agent_id in expected if agent_id not in loaded]
     
     @staticmethod
-    def get_agent_hierarchy(agents: Dict[str, AgentConfig]) -> Dict[str, List[str]]:
+    def get_agent_hierarchy(agents: dict[str, AgentConfig]) -> dict[str, list[str]]:
         """
         Build parent -> children hierarchy.
         
@@ -239,7 +248,7 @@ class AgentLoader:
         Returns:
             Dict mapping parent_id -> list of child_ids
         """
-        hierarchy: Dict[str, List[str]] = {}
+        hierarchy: dict[str, list[str]] = {}
         
         for agent_id, config in agents.items():
             if config.parent:

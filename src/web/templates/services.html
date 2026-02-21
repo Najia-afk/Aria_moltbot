@@ -308,11 +308,11 @@
                     <div class="arch-service-name">Traefik</div>
                     <div class="arch-service-port">:80/:443</div>
                 </a>
-                <a href="/clawdbot/?session=main&token={{ clawdbot_token }}" target="_blank" class="arch-service checking clawdbot-link" data-service="clawdbot">
+                <a href="/chat/" class="arch-service checking" data-service="aria-engine">
                     <span class="arch-service-status"></span>
-                    <div class="arch-service-icon">🦞</div>
-                    <div class="arch-service-name">OpenClaw</div>
-                    <div class="arch-service-port">:18789</div>
+                    <div class="arch-service-icon">💬</div>
+                    <div class="arch-service-name">Aria Chat</div>
+                    <div class="arch-service-port">Native</div>
                 </a>
                 <a href="/models" class="arch-service checking" data-service="litellm">
                     <span class="arch-service-status"></span>
@@ -455,13 +455,13 @@
                     </div>
                     <div class="control-note">Flask UI</div>
                 </div>
-                <div class="control-card checking" data-service="clawdbot">
-                    <div class="control-header">OpenClaw<span class="control-status"></span></div>
+                <div class="control-card checking" data-service="aria-engine">
+                    <div class="control-header">Aria Engine<span class="control-status"></span></div>
                     <div class="control-actions">
                         <button class="control-btn" data-action="restart">Restart</button>
                         <button class="control-btn danger" data-action="stop">Kill</button>
                     </div>
-                    <div class="control-note">Gateway</div>
+                    <div class="control-note">Chat Engine</div>
                 </div>
                 <div class="control-card checking" data-service="grafana">
                     <div class="control-header">Grafana<span class="control-status"></span></div>
@@ -506,7 +506,7 @@
 {% block extra_js %}
 <script data-page-script>
 const services = [
-    'traefik', 'clawdbot', 'litellm',
+    'traefik', 'aria-engine', 'litellm',
     'aria-web', 'aria-api',
     'mlx', 'ollama',
     'postgres', 'grafana', 'prometheus', 'pgadmin'

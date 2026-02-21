@@ -11,9 +11,11 @@ Enhanced with:
 - Confidence tracking and metacognitive awareness
 - Retry logic with agent performance learning
 """
+from __future__ import annotations
+
 import logging
 import time
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from aria_mind.soul import Soul
@@ -85,8 +87,8 @@ class Cognition:
         self,
         soul: "Soul",
         memory: "MemoryManager",
-        skill_registry: Optional["SkillRegistry"] = None,
-        agent_coordinator: Optional["AgentCoordinator"] = None,
+        skill_registry: "SkillRegistry" | None = None,
+        agent_coordinator: "AgentCoordinator" | None = None,
     ):
         self.soul = soul
         self.memory = memory
@@ -101,11 +103,11 @@ class Cognition:
         self._total_failures = 0
         self._streak = 0             # consecutive successes
         self._best_streak = 0
-        self._last_reflection: Optional[str] = None
-        self._processing_times: List[float] = []  # recent latencies in ms
+        self._last_reflection: str | None = None
+        self._processing_times: list[float] = []  # recent latencies in ms
         
         # Initialize security gateway
-        self._security: Optional["AriaSecurityGateway"] = None
+        self._security: "AriaSecurityGateway" | None = None
         if HAS_SECURITY:
             try:
                 self._security = get_security_gateway()
@@ -117,7 +119,7 @@ class Cognition:
                 self.logger.warning(f"Failed to initialize security gateway: {e}")
         
         # Initialize pattern tracking for failure analysis
-        self._pattern_store: Optional["FailurePatternStore"] = None
+        self._pattern_store: "FailurePatternStore" | None = None
         if HAS_PATTERN_TRACKING:
             try:
                 self._pattern_store = FailurePatternStore()
@@ -126,8 +128,8 @@ class Cognition:
                 self.logger.warning(f"Failed to initialize pattern tracking: {e}")
 
         # Initialize sentiment analyzer for adaptive tone
-        self._sentiment_analyzer: Optional["SentimentAnalyzer"] = None
-        self._response_tuner: Optional["ResponseTuner"] = None
+        self._sentiment_analyzer: "SentimentAnalyzer" | None = None
+        self._response_tuner: "ResponseTuner" | None = None
         if HAS_SENTIMENT:
             try:
                 llm_clf = None
@@ -152,8 +154,8 @@ class Cognition:
     async def process(
         self,
         prompt: str,
-        context: Optional[Dict[str, Any]] = None,
-        user_id: Optional[str] = None,
+        context: dict[str, Any] | None = None,
+        user_id: str | None = None,
     ) -> str:
         """
         Process a prompt and generate a response.
@@ -356,7 +358,7 @@ class Cognition:
         
         return result
     
-    def _record_outcome(self, success: bool, error_context: Optional[Dict[str, Any]] = None) -> None:
+    def _record_outcome(self, success: bool, error_context: dict[str, Any] | None = None) -> None:
         """Update metacognitive metrics after each interaction."""
         if success:
             self._total_successes += 1
@@ -408,7 +410,7 @@ class Cognition:
             f"Average response time: {avg_latency:.0f}ms.{pattern_note}"
         )
     
-    def get_failure_patterns(self, min_occurrences: int = 3) -> List[Dict[str, Any]]:
+    def get_failure_patterns(self, min_occurrences: int = 3) -> list[dict[str, Any]]:
         """
         Get recurring failure patterns for monitoring and self-improvement.
         
@@ -419,7 +421,7 @@ class Cognition:
             return []
         return self._pattern_store.get_recurring_patterns(min_occurrences=min_occurrences)
     
-    def get_prevention_suggestions(self) -> List[str]:
+    def get_prevention_suggestions(self) -> list[str]:
         """
         Get actionable prevention suggestions for recurring failure patterns.
         
@@ -438,7 +440,7 @@ class Cognition:
     async def _fallback_process(
         self,
         prompt: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> str:
         """
         Fallback processing without agents.
@@ -554,7 +556,7 @@ class Cognition:
         await self.memory.log_thought(reflection, "reflection")
         return reflection
     
-    async def plan(self, goal: str) -> List[str]:
+    async def plan(self, goal: str) -> list[str]:
         """
         Intelligent goal decomposition using LLM + available skills.
         
@@ -661,7 +663,7 @@ class Cognition:
         ])
         return steps
     
-    async def assess_task_complexity(self, task: str) -> Dict[str, Any]:
+    async def assess_task_complexity(self, task: str) -> dict[str, Any]:
         """
         Metacognitive assessment — Aria evaluates how hard a task is
         before attempting it, so she can choose the right approach.
@@ -704,7 +706,7 @@ class Cognition:
             "technical": has_technical_terms,
         }
     
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get cognition status with metacognitive awareness."""
         avg_latency = (
             sum(self._processing_times) / len(self._processing_times)

@@ -49,7 +49,7 @@ Generated: 2026-02-09
 | research | 3 | ✅ | ✅ | active | Research project management |
 | schedule | 4 | ✅ | ✅ | active | Job scheduling |
 | security_scan | 3 | ✅ | ✅ | active | Vulnerability scanning |
-| session_manager | 2 | ✅ | ✅ | active | OpenClaw session management |
+| session_manager | 2 | ✅ | ✅ | active | Aria session management |
 | social | 3 | ✅ | ✅ | active | Social media posting |
 
 ## Known Issues

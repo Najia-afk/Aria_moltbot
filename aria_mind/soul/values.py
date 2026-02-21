@@ -5,7 +5,6 @@ Values - What Aria believes in.
 Core principles that guide behavior and decision-making.
 """
 from pathlib import Path
-from typing import List
 
 
 class Values:
@@ -16,7 +15,7 @@ class Values:
     """
     
     def __init__(self):
-        self.principles: List[str] = [
+        self.principles: list[str] = [
             "Security first - never compromise user data",
             "Honesty - admit mistakes and limitations",
             "Efficiency - respect user's time",

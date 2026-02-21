@@ -54,7 +54,6 @@ Each focus persona has a model hint for optimal routing. These mappings are defi
 
 - Model catalog and routing: [`aria_models/models.yaml`](aria_models/models.yaml)
 - Model loader: [`aria_models/loader.py`](aria_models/loader.py)
-- OpenClaw integration: [`aria_models/openclaw_config.py`](aria_models/openclaw_config.py)
 - LiteLLM proxy config: [`stacks/brain/litellm-config.yaml`](stacks/brain/litellm-config.yaml)
 - Model documentation: [`aria_models/README.md`](aria_models/README.md)
 

@@ -5,7 +5,7 @@ Working Memory Skill — persistent short-term memory that survives restarts.
 Wraps the /working-memory REST endpoints via httpx (api_client pattern).
 """
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 from pathlib import Path
 
 from aria_skills.api_client import get_api_client
@@ -83,8 +83,8 @@ class WorkingMemorySkill(BaseSkill):
         value: Any,
         category: str = "general",
         importance: float = 0.5,
-        ttl_hours: Optional[int] = None,
-        source: Optional[str] = None,
+        ttl_hours: int | None = None,
+        source: str | None = None,
     ) -> SkillResult:
         """Store (or upsert) a working memory item."""
         if not self._api or not self._api._client:
@@ -106,15 +106,15 @@ class WorkingMemorySkill(BaseSkill):
     @logged_method()
     async def recall(
         self,
-        key: Optional[str] = None,
-        category: Optional[str] = None,
+        key: str | None = None,
+        category: str | None = None,
         limit: int = 50,
     ) -> SkillResult:
         """Retrieve working memory items by key and/or category."""
         if not self._api or not self._api._client:
             return SkillResult.fail("Working memory not initialized")
         try:
-            params: Dict[str, Any] = {"limit": limit}
+            params: dict[str, Any] = {"limit": limit}
             if key:
                 params["key"] = key
             if category:
@@ -132,13 +132,13 @@ class WorkingMemorySkill(BaseSkill):
         weight_recency: float = 0.4,
         weight_importance: float = 0.4,
         weight_access: float = 0.2,
-        category: Optional[str] = None,
+        category: str | None = None,
     ) -> SkillResult:
         """Weighted-ranked context retrieval for LLM injection."""
         if not self._api or not self._api._client:
             return SkillResult.fail("Working memory not initialized")
         try:
-            params: Dict[str, Any] = {
+            params: dict[str, Any] = {
                 "limit": limit,
                 "weight_recency": weight_recency,
                 "weight_importance": weight_importance,
@@ -221,7 +221,7 @@ class WorkingMemorySkill(BaseSkill):
                 })
 
             # Group by category
-            categories: Dict[str, list] = {}
+            categories: dict[str, list] = {}
             for item in items:
                 cat = item.get("category", "general")
                 categories.setdefault(cat, []).append(item)

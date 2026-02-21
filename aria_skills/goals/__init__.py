@@ -6,7 +6,7 @@ Handles goal creation, scheduling, and tracking.
 Persists via REST API (TICKET-12: eliminate in-memory stubs).
 """
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from aria_skills.api_client import get_api_client
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
@@ -25,7 +25,7 @@ class GoalSchedulerSkill(BaseSkill):
     
     def __init__(self, config: SkillConfig):
         super().__init__(config)
-        self._goals: Dict[str, Dict] = {}  # fallback cache
+        self._goals: dict[str, Dict] = {}  # fallback cache
         self._goal_counter = 0
         self._api = None
     
@@ -55,10 +55,10 @@ class GoalSchedulerSkill(BaseSkill):
         self,
         title: str,
         description: str = "",
-        priority: Optional[int] = None,
-        due_date: Optional[datetime] = None,
-        parent_id: Optional[str] = None,
-        tags: Optional[List[str]] = None,
+        priority: int | None = None,
+        due_date: datetime | None = None,
+        parent_id: str | None = None,
+        tags: list[str] | None = None,
     ) -> SkillResult:
         """
         Create a new goal.
@@ -117,10 +117,10 @@ class GoalSchedulerSkill(BaseSkill):
     async def update_goal(
         self,
         goal_id: str,
-        status: Optional[str] = None,
-        progress: Optional[int] = None,
-        priority: Optional[int] = None,
-        notes: Optional[str] = None,
+        status: str | None = None,
+        progress: int | None = None,
+        priority: int | None = None,
+        notes: str | None = None,
     ) -> SkillResult:
         """
         Update a goal.
@@ -135,7 +135,7 @@ class GoalSchedulerSkill(BaseSkill):
         Returns:
             SkillResult with updated goal
         """
-        update_data: Dict[str, Any] = {}
+        update_data: dict[str, Any] = {}
         if status:
             update_data["status"] = status
             if status == "completed":
@@ -203,9 +203,9 @@ class GoalSchedulerSkill(BaseSkill):
     
     async def list_goals(
         self,
-        status: Optional[str] = None,
-        priority: Optional[int] = None,
-        tag: Optional[str] = None,
+        status: str | None = None,
+        priority: int | None = None,
+        tag: str | None = None,
         limit: int = 20,
     ) -> SkillResult:
         """
@@ -221,7 +221,7 @@ class GoalSchedulerSkill(BaseSkill):
             SkillResult with goal list
         """
         try:
-            params: Dict[str, Any] = {"limit": limit}
+            params: dict[str, Any] = {"limit": limit}
             if status:
                 params["status"] = status
             if priority:

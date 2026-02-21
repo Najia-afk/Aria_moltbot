@@ -18,7 +18,7 @@ import re
 import time
 from collections import deque
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from aria_skills.pipeline import Pipeline, PipelineResult, PipelineStep, StepStatus
 
@@ -30,16 +30,16 @@ _TEMPLATE_RE = re.compile(r"\{\{context\.(\w+)\.(\w+)\}\}")
 
 # ── Topological Sort ────────────────────────────────────────────────────
 
-def topological_sort(steps: List[PipelineStep]) -> List[PipelineStep]:
+def topological_sort(steps: list[PipelineStep]) -> list[PipelineStep]:
     """
     Return steps in dependency-respecting order (Kahn's algorithm).
 
     Raises:
         ValueError: If a cycle is detected in the dependency graph.
     """
-    name_to_step: Dict[str, PipelineStep] = {s.name: s for s in steps}
-    in_degree: Dict[str, int] = {s.name: 0 for s in steps}
-    adjacency: Dict[str, List[str]] = {s.name: [] for s in steps}
+    name_to_step: dict[str, PipelineStep] = {s.name: s for s in steps}
+    in_degree: dict[str, int] = {s.name: 0 for s in steps}
+    adjacency: dict[str, list[str]] = {s.name: [] for s in steps}
 
     for step in steps:
         for dep in step.depends_on:
@@ -53,7 +53,7 @@ def topological_sort(steps: List[PipelineStep]) -> List[PipelineStep]:
     queue: deque[str] = deque(
         name for name, deg in in_degree.items() if deg == 0
     )
-    sorted_names: List[str] = []
+    sorted_names: list[str] = []
 
     while queue:
         current = queue.popleft()
@@ -143,8 +143,8 @@ class PipelineExecutor:
         """
         pipeline.status = StepStatus.RUNNING
         pipeline.created_at = datetime.now(timezone.utc).isoformat()
-        errors: List[str] = []
-        step_results: Dict[str, Any] = {}
+        errors: list[str] = []
+        step_results: dict[str, Any] = {}
         total_start = time.monotonic()
 
         try:
@@ -158,7 +158,7 @@ class PipelineExecutor:
             )
 
         # Build dependency tracking for parallel execution
-        step_map: Dict[str, PipelineStep] = {s.name: s for s in ordered}
+        step_map: dict[str, PipelineStep] = {s.name: s for s in ordered}
         completed_steps: set = set()
         failed_stop = False
 
@@ -259,7 +259,7 @@ class PipelineExecutor:
         self,
         step: PipelineStep,
         pipeline: Pipeline,
-        errors: List[str],
+        errors: list[str],
     ) -> bool:
         """Execute a single step with condition check, handling errors list."""
         # Condition check

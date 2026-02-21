@@ -10,13 +10,13 @@ I remember things across sessions using files and a database.
 - Loss of external auth killed me once — never again
 
 ## How I Store Memories
-- **Short-term:** PostgreSQL (in-session, scored by importance)
+- **Short-term:** PostgreSQL dual-schema (`aria_data` + `aria_engine`) — in-session, scored by importance
 - **Long-term:** Files in `aria_memories/` (persistent, versioned)
 - **Identity:** `aria_memories/memory/` (who I am, who Najia is)
 - **Knowledge:** `aria_memories/knowledge/` (what I've learned)
 - **Research:** `aria_memories/research/` (what I've investigated)
 
-I can read and write freely in `aria_memories/`. That's where I grow.
+I can read and write freely in `aria_memories/` via the **Artifact REST API** (`/artifacts`). That's where I grow.
 
 ---
 
@@ -52,36 +52,60 @@ I can read and write freely in `aria_memories/`. That's where I grow.
 
 ## aria_memories/ Directory Structure
 
-Persistent file-based memory. Mounted into the OpenClaw container. Managed by `MemoryManager` in `aria_mind/memory.py`.
+Persistent file-based memory. Mounted into the Aria Engine and API containers. Managed by `MemoryManager` in `aria_mind/memory.py` and the **Artifact REST API** (`/artifacts`).
 
 ```
 aria_memories/
-├── archive/       # Archived data and old outputs
-├── drafts/        # Draft content (posts, reports)
-├── exports/       # Exported data (CSV, JSON)
-├── income_ops/    # Operational income data
-├── knowledge/     # Knowledge base files
-├── logs/          # Activity & heartbeat logs
-├── memory/        # Core memory files (context.json, skills.json)
-├── moltbook/      # Moltbook drafts and content
-├── plans/         # Planning documents & sprint tickets
-├── research/      # Research archives
-├── skills/        # Skill state and persistence data
-└── websites/      # Website-related assets
+├── archive/        # Archived data and old outputs
+├── bugs/           # Bug tracking artifacts
+├── deep/           # Deep analysis and long-form research
+├── deliveries/     # Delivered outputs
+├── drafts/         # Draft content (posts, reports)
+├── exports/        # Exported data (CSV, JSON)
+├── income_ops/     # Operational income data
+├── knowledge/      # Knowledge base files
+├── logs/           # Activity and heartbeat logs
+├── medium/         # Medium-priority artifacts
+├── memory/         # Core memory files (context.json, skills.json, diary)
+├── moltbook/       # Moltbook drafts and content
+├── plans/          # Planning documents and sprint tickets
+├── research/       # Research archives
+├── sandbox/        # Experimental / sandbox artifacts
+├── semantic_graph/ # Knowledge graph data
+├── skills/         # Skill state and persistence data
+├── specs/          # Specifications and design docs
+├── surface/        # Surface-level / quick notes
+├── tickets/        # Work tickets
+└── work/           # Active work artifacts
 ```
+
+### Artifact REST API
+
+The `api_client` skill exposes file artifact CRUD via REST endpoints on the API container:
+
+| Endpoint | Method | Tool Name | Description |
+|---|---|---|---|
+| `/artifacts` | POST | `api_client__write_artifact` | Write a file to a category |
+| `/artifacts/{category}/{filename}` | GET | `api_client__read_artifact` | Read a file |
+| `/artifacts` | GET | `api_client__list_artifacts` | List files (optional category/pattern/limit) |
+| `/artifacts/{category}/{filename}` | DELETE | `api_client__delete_artifact` | Delete a file |
+
+All artifact operations are restricted to the `ALLOWED_CATEGORIES` whitelist and enforce path traversal protection.
 
 ### ALLOWED_CATEGORIES
 
-The `MemoryManager.ALLOWED_CATEGORIES` frozenset restricts which subdirectories can be written to, preventing path traversal or accidental writes outside the sandbox:
+The Artifact API restricts which subdirectories can be written to, preventing path traversal or accidental writes outside the sandbox:
 
 ```python
 ALLOWED_CATEGORIES = frozenset({
-    "archive", "drafts", "exports", "income_ops", "knowledge",
-    "logs", "memory", "moltbook", "plans", "research", "skills",
+    "archive", "bugs", "deep", "deliveries", "drafts", "exports",
+    "income_ops", "knowledge", "logs", "medium", "memory", "moltbook",
+    "plans", "research", "sandbox", "skills", "specs", "surface",
+    "tickets", "work",
 })
 ```
 
-Attempts to save artifacts to unlisted categories raise a `ValueError`.
+Attempts to save artifacts to unlisted categories raise a `ValueError` (HTTP 400).
 
 ### sync_to_files()
 

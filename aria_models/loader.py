@@ -1,20 +1,19 @@
-from __future__ import annotations
 
 import json
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 CATALOG_PATH = Path(__file__).resolve().parent / "models.yaml"
 
 # TTL-based cache (replaces @lru_cache to avoid staleness)
 _CACHE_TTL_SECONDS = 300  # 5 minutes
-_cache: Dict[str, Any] = {}
+_cache: dict[str, Any] = {}
 _cache_timestamp: float = 0.0
 
 
-def _load_yaml_or_json(path: Path) -> Dict[str, Any]:
+def _load_yaml_or_json(path: Path) -> dict[str, Any]:
     content = path.read_text(encoding="utf-8")
     # JSON is valid YAML; parse JSON first for zero dependencies.
     try:
@@ -27,7 +26,7 @@ def _load_yaml_or_json(path: Path) -> Dict[str, Any]:
         return yaml.safe_load(content) or {}
 
 
-def load_catalog(path: Optional[Path] = None) -> Dict[str, Any]:
+def load_catalog(path: Path | None = None) -> dict[str, Any]:
     """Load the model catalog with 5-minute TTL cache.
 
     The cache is invalidated after ``_CACHE_TTL_SECONDS`` or when
@@ -51,7 +50,7 @@ def load_catalog(path: Optional[Path] = None) -> Dict[str, Any]:
     return result
 
 
-def reload_models() -> Dict[str, Any]:
+def reload_models() -> dict[str, Any]:
     """Clear the TTL cache and reload models.yaml from disk."""
     global _cache, _cache_timestamp
     _cache = {}
@@ -59,7 +58,7 @@ def reload_models() -> Dict[str, Any]:
     return load_catalog()
 
 
-def validate_models(path: Optional[Path] = None) -> List[str]:
+def validate_models(path: Path | None = None) -> list[str]:
     """Validate models.yaml structure. Returns list of error strings (empty = valid).
 
     Checks:
@@ -68,7 +67,7 @@ def validate_models(path: Optional[Path] = None) -> List[str]:
     - Each model entry has required fields (provider, litellm, contextWindow)
     - litellm sub-dict has ``model`` key
     """
-    errors: List[str] = []
+    errors: list[str] = []
     catalog_path = path or CATALOG_PATH
 
     if not catalog_path.exists():
@@ -121,37 +120,36 @@ def normalize_model_id(model_id: str) -> str:
     return model_id
 
 
-def get_model_entry(model_id: str, catalog: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+def get_model_entry(model_id: str, catalog: dict[str, Any] | None = None) -> dict[str, Any] | None:
     catalog = catalog or load_catalog()
     models = catalog.get("models", {}) if catalog else {}
     normalized = normalize_model_id(model_id)
     return models.get(normalized)
 
 
-def get_route_skill(model_id: str, catalog: Optional[Dict[str, Any]] = None) -> Optional[str]:
+def get_route_skill(model_id: str, catalog: dict[str, Any] | None = None) -> str | None:
     entry = get_model_entry(model_id, catalog=catalog)
     if not entry:
         return None
     return entry.get("routeSkill")
 
 
-def get_focus_default(focus_type: str, catalog: Optional[Dict[str, Any]] = None) -> Optional[str]:
+def get_focus_default(focus_type: str, catalog: dict[str, Any] | None = None) -> str | None:
     catalog = catalog or load_catalog()
     criteria = catalog.get("criteria", {}) if catalog else {}
     focus_defaults = criteria.get("focus_defaults", {}) if criteria else {}
     return focus_defaults.get(focus_type)
 
 
-def build_litellm_models(catalog: Optional[Dict[str, Any]] = None) -> list[dict[str, Any]]:
+def build_litellm_models(catalog: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     catalog = catalog or load_catalog()
     models = catalog.get("models", {}) if catalog else {}
     result: list[dict[str, Any]] = []
     for model_id, entry in models.items():
         if entry.get("provider") != "litellm":
             continue
-        # maxTokens MUST be a positive integer — OpenClaw UI sends NaN for
-        # empty fields, and Zod's z.coerce.number().positive() rejects NaN
-        # which blocks config.set entirely (breaking cron display + model save).
+        # maxTokens MUST be a positive integer — UI may send NaN for
+        # empty fields, so we provide an explicit value to prevent issues.
         # Providing an explicit value prevents NaN round-trips.
         ctx = entry.get("contextWindow", 8192)
         max_tok = entry.get("maxTokens") or min(8192, ctx)
@@ -167,16 +165,16 @@ def build_litellm_models(catalog: Optional[Dict[str, Any]] = None) -> list[dict[
     return result
 
 
-def build_agent_aliases(catalog: Optional[Dict[str, Any]] = None) -> Dict[str, Dict[str, str]]:
+def build_agent_aliases(catalog: dict[str, Any] | None = None) -> dict[str, dict[str, str]]:
     catalog = catalog or load_catalog()
     aliases = catalog.get("agent_aliases", {}) if catalog else {}
     return {key: {"alias": value} for key, value in aliases.items()}
 
 
-def build_agent_routing(catalog: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def build_agent_routing(catalog: dict[str, Any] | None = None) -> dict[str, Any]:
     """Build agent model routing (primary + fallbacks only).
     
-    Note: OpenClaw expects model object to contain ONLY primary and fallbacks.
+    Note: Model object must contain ONLY primary and fallbacks.
     Timeout should be set at agents.defaults.timeoutSeconds level, not in model object.
     """
     catalog = catalog or load_catalog()
@@ -187,7 +185,7 @@ def build_agent_routing(catalog: Optional[Dict[str, Any]] = None) -> Dict[str, A
     }
 
 
-def get_routing_config(catalog: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def get_routing_config(catalog: dict[str, Any] | None = None) -> dict[str, Any]:
     """Return normalized routing config from models.yaml."""
     catalog = catalog or load_catalog()
     routing = catalog.get("routing", {}) if catalog else {}
@@ -205,10 +203,10 @@ def get_routing_config(catalog: Optional[Dict[str, Any]] = None) -> Dict[str, An
 
 
 def get_model_for_task(
-    task: Optional[str] = None,
-    preferred_tier: Optional[str] = None,
-    catalog: Optional[Dict[str, Any]] = None,
-) -> Optional[str]:
+    task: str | None = None,
+    preferred_tier: str | None = None,
+    catalog: dict[str, Any] | None = None,
+) -> str | None:
     """Resolve the best model ID for a task from YAML routing + criteria.
 
     If `routing.bypass` is true, this returns `routing.primary` directly.
@@ -240,7 +238,7 @@ def get_model_for_task(
     return routing.get("primary")
 
 
-def list_all_model_ids(catalog: Optional[Dict[str, Any]] = None) -> list[str]:
+def list_all_model_ids(catalog: dict[str, Any] | None = None) -> list[str]:
     """Return sorted list of all model IDs from the catalog (including aliases)."""
     catalog = catalog or load_catalog()
     models = catalog.get("models", {}) if catalog else {}
@@ -252,14 +250,14 @@ def list_all_model_ids(catalog: Optional[Dict[str, Any]] = None) -> list[str]:
     return sorted(ids)
 
 
-def list_models_with_reasoning(catalog: Optional[Dict[str, Any]] = None) -> list[str]:
+def list_models_with_reasoning(catalog: dict[str, Any] | None = None) -> list[str]:
     """Return model IDs that support reasoning/thinking mode."""
     catalog = catalog or load_catalog()
     models = catalog.get("models", {}) if catalog else {}
     return [mid for mid, entry in models.items() if entry.get("reasoning")]
 
 
-def build_litellm_config_entries(catalog: Optional[Dict[str, Any]] = None) -> list[dict[str, Any]]:
+def build_litellm_config_entries(catalog: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     """Generate litellm model_list entries from models.yaml.
     
     Each model with a 'litellm' key produces one entry (plus one per alias).
@@ -300,14 +298,14 @@ def build_litellm_config_entries(catalog: Optional[Dict[str, Any]] = None) -> li
     return entries
 
 
-def get_timeout_seconds(catalog: Optional[Dict[str, Any]] = None) -> int:
+def get_timeout_seconds(catalog: dict[str, Any] | None = None) -> int:
     """Get timeout from routing config (for agents.defaults.timeoutSeconds)."""
     catalog = catalog or load_catalog()
     routing = catalog.get("routing", {}) if catalog else {}
-    return routing.get("timeout", 600)  # Default 600s per OpenClaw docs
+    return routing.get("timeout", 600)  # Default 600s
 
 
-def validate_catalog(path: Optional[Path] = None) -> list[str]:
+def validate_catalog(path: Path | None = None) -> list[str]:
     """Validate models.yaml against its own validation.required_fields.
 
     Returns a list of error strings (empty list = valid catalog).
@@ -363,7 +361,7 @@ def validate_catalog(path: Optional[Path] = None) -> list[str]:
     return errors
 
 
-def build_litellm_config_yaml(catalog: Optional[Dict[str, Any]] = None) -> str:
+def build_litellm_config_yaml(catalog: dict[str, Any] | None = None) -> str:
     """Generate a complete litellm-config.yaml from models.yaml.
 
     Returns a YAML-formatted string (actually JSON written as YAML-compatible)
@@ -378,7 +376,7 @@ def build_litellm_config_yaml(catalog: Optional[Dict[str, Any]] = None) -> str:
 
     entries = build_litellm_config_entries(catalog)
 
-    config: Dict[str, Any] = {
+    config: dict[str, Any] = {
         "model_list": entries,
         "litellm_settings": {
             "drop_params": True,

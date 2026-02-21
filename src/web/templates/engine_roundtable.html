@@ -1,0 +1,1155 @@
+{% extends "base.html" %}
+{% block title %}Roundtable{% endblock %}
+
+{% block extra_css %}
+<style>
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+    .page-header h1 {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        font-size: 1.5rem;
+    }
+    .rt-stats {
+        display: flex;
+        gap: 1rem;
+    }
+    .stat-box {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        padding: 0.5rem 1rem;
+        text-align: center;
+    }
+    .stat-box .value {
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: var(--accent-primary);
+    }
+    .stat-box .label {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+    }
+
+    /* Tabs */
+    .tabs {
+        display: flex;
+        gap: 0;
+        margin-bottom: 1.25rem;
+        border-bottom: 2px solid var(--border-color);
+        overflow-x: auto;
+    }
+    .tab-btn {
+        padding: 12px 20px;
+        background: none;
+        border: none;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -2px;
+        color: var(--text-secondary);
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        white-space: nowrap;
+    }
+    .tab-btn.active {
+        color: var(--accent-primary);
+        border-bottom-color: var(--accent-primary);
+    }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* Start Form */
+    .start-form {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+    }
+    .start-form h3 {
+        margin-bottom: 1rem;
+        font-size: 1rem;
+    }
+    .form-row {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1rem;
+        flex-wrap: wrap;
+        align-items: flex-end;
+    }
+    .form-group {
+        flex: 1;
+        min-width: 200px;
+    }
+    .form-group label {
+        display: block;
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+        margin-bottom: 0.3rem;
+        font-weight: 600;
+    }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+        background: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        color: var(--text-primary);
+        font-size: 0.85rem;
+    }
+    .form-group textarea {
+        min-height: 60px;
+        resize: vertical;
+    }
+
+    /* Agent Picker */
+    .agent-picker {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.3rem;
+    }
+    .agent-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.35rem 0.75rem;
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        border-radius: 20px;
+        font-size: 0.8rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        user-select: none;
+    }
+    .agent-chip:hover {
+        border-color: var(--accent-primary);
+    }
+    .agent-chip.selected {
+        background: rgba(139, 92, 246, 0.2);
+        border-color: #8b5cf6;
+        color: #a78bfa;
+    }
+    .agent-chip .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+    }
+
+    /* Graph */
+    .graph-container {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        overflow: hidden;
+        margin-bottom: 1.5rem;
+    }
+    #roundtable-graph {
+        width: 100%;
+        height: 450px;
+    }
+
+    /* Turn Timeline */
+    .timeline {
+        position: relative;
+        padding-left: 2.5rem;
+    }
+    .timeline::before {
+        content: '';
+        position: absolute;
+        left: 1rem;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: var(--border-color);
+    }
+    .turn-card {
+        position: relative;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        padding: 1rem 1.25rem;
+        margin-bottom: 0.75rem;
+        transition: border-color 0.2s;
+    }
+    .turn-card:hover {
+        border-color: var(--accent-primary);
+    }
+    .turn-card::before {
+        content: '';
+        position: absolute;
+        left: -1.875rem;
+        top: 1.2rem;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        border: 2px solid var(--border-color);
+        background: var(--bg-primary);
+    }
+    .turn-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+    }
+    .turn-agent {
+        font-weight: 600;
+        font-size: 0.9rem;
+    }
+    .turn-meta {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        display: flex;
+        gap: 0.75rem;
+    }
+    .turn-content {
+        font-size: 0.85rem;
+        line-height: 1.6;
+        color: var(--text-secondary);
+        white-space: pre-wrap;
+    }
+    .turn-card.synthesis {
+        border-color: #22c55e40;
+        background: rgba(34, 197, 94, 0.05);
+    }
+    .turn-card.synthesis::before {
+        border-color: #22c55e;
+        background: #22c55e;
+    }
+
+    /* Round Divider */
+    .round-divider {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin: 1rem 0;
+        color: var(--text-muted);
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    .round-divider::before,
+    .round-divider::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: var(--border-color);
+    }
+
+    /* History Table */
+    .data-table {
+        width: 100%;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        overflow: hidden;
+        border-collapse: collapse;
+    }
+    .data-table th,
+    .data-table td {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--border-color);
+        font-size: 13px;
+        text-align: left;
+    }
+    .data-table th {
+        font-size: 11px;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        background: rgba(0,0,0,0.2);
+    }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr:hover { background: rgba(255,255,255,0.02); }
+    .data-table .clickable { cursor: pointer; }
+
+    /* Status badges */
+    .status-badge {
+        display: inline-block;
+        font-size: 11px;
+        border-radius: 10px;
+        padding: 2px 8px;
+        font-weight: 700;
+    }
+    .status-badge.running { background: rgba(59,130,246,0.2); color: #60a5fa; }
+    .status-badge.completed { background: rgba(34,197,94,0.2); color: #22c55e; }
+    .status-badge.failed { background: rgba(239,68,68,0.2); color: #ef4444; }
+
+    .btn-primary {
+        padding: 0.5rem 1.25rem;
+        background: var(--accent-primary);
+        color: white;
+        border: none;
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+    .btn-primary:hover { opacity: 0.85; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-secondary {
+        padding: 0.5rem 1.25rem;
+        background: var(--bg-tertiary);
+        color: var(--text-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        font-size: 0.85rem;
+    }
+    .btn-secondary:hover { border-color: var(--accent-primary); }
+
+    .empty-state {
+        text-align: center;
+        color: var(--text-muted);
+        padding: 2rem;
+        font-size: 0.9rem;
+    }
+
+    .charts-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    @media (max-width: 900px) {
+        .charts-row { grid-template-columns: 1fr; }
+    }
+    .content-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 1.25rem;
+    }
+    .content-card h4 {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        margin-bottom: 0.75rem;
+    }
+
+    /* Synthesis box */
+    .synthesis-box {
+        background: var(--bg-secondary);
+        border: 1px solid #22c55e40;
+        border-radius: 12px;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+    }
+    .synthesis-box h4 {
+        color: #22c55e;
+        margin-bottom: 0.75rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .synthesis-box .content {
+        font-size: 0.9rem;
+        line-height: 1.7;
+        color: var(--text-secondary);
+        white-space: pre-wrap;
+    }
+
+    .legend {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        margin-bottom: 0.75rem;
+        padding: 0.5rem;
+    }
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+    }
+    .legend-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>🔄 Roundtable & Swarm</h1>
+    <div class="rt-stats">
+        <div class="stat-box">
+            <div class="value" id="stat-total">0</div>
+            <div class="label">Roundtables</div>
+        </div>
+        <div class="stat-box">
+            <div class="value" id="stat-swarms">0</div>
+            <div class="label">Swarms</div>
+        </div>
+        <div class="stat-box">
+            <div class="value" id="stat-agents">0</div>
+            <div class="label">Agents</div>
+        </div>
+        <div class="stat-box">
+            <div class="value" id="stat-turns">0</div>
+            <div class="label">Total Turns</div>
+        </div>
+    </div>
+</div>
+
+<div class="tabs">
+    <button class="tab-btn active" data-tab="start">🚀 Start</button>
+    <button class="tab-btn" data-tab="view">📊 Visualize</button>
+    <button class="tab-btn" data-tab="history">📋 History</button>
+</div>
+
+<!-- ===== TAB: START ===== -->
+<div class="tab-panel active" id="panel-start">
+    <div class="start-form">
+        <h3>🎯 Launch Multi-Agent Discussion</h3>
+
+        <!-- Mode Toggle -->
+        <div class="form-row" style="margin-bottom: 1.25rem;">
+            <div class="form-group" style="flex: 0; min-width: auto;">
+                <label>Mode</label>
+                <div style="display:flex;gap:0;border:1px solid var(--border-color);border-radius:var(--radius-md);overflow:hidden;">
+                    <button type="button" class="mode-btn active" data-mode="roundtable" onclick="setMode('roundtable')"
+                        style="padding:0.5rem 1rem;background:rgba(139,92,246,0.2);border:none;color:#a78bfa;font-weight:600;font-size:0.85rem;cursor:pointer;">
+                        🔄 Roundtable
+                    </button>
+                    <button type="button" class="mode-btn" data-mode="swarm" onclick="setMode('swarm')"
+                        style="padding:0.5rem 1rem;background:var(--bg-tertiary);border:none;border-left:1px solid var(--border-color);color:var(--text-secondary);font-size:0.85rem;cursor:pointer;">
+                        🐝 Swarm
+                    </button>
+                </div>
+            </div>
+            <div class="form-group" style="flex:1;">
+                <label id="mode-hint" style="color:var(--text-muted);font-weight:normal;font-size:0.8rem;padding-top:1.5rem;">
+                    Multi-round collaborative discussion with synthesis
+                </label>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group" style="flex: 3;">
+                <label>Discussion Topic</label>
+                <textarea id="rt-topic" placeholder="e.g., Design the caching strategy for session isolation…"></textarea>
+            </div>
+            <div class="form-group roundtable-only" style="flex: 1; min-width: 120px;">
+                <label>Rounds</label>
+                <select id="rt-rounds">
+                    <option value="2">2 rounds</option>
+                    <option value="3" selected>3 rounds</option>
+                    <option value="4">4 rounds</option>
+                    <option value="5">5 rounds</option>
+                </select>
+            </div>
+            <div class="form-group swarm-only" style="flex: 1; min-width: 120px; display:none;">
+                <label>Max Iterations</label>
+                <select id="sw-iterations">
+                    <option value="3">3 iterations</option>
+                    <option value="5" selected>5 iterations</option>
+                    <option value="7">7 iterations</option>
+                    <option value="10">10 iterations</option>
+                </select>
+            </div>
+            <div class="form-group swarm-only" style="flex: 1; min-width: 140px; display:none;">
+                <label>Consensus Threshold</label>
+                <select id="sw-threshold">
+                    <option value="0.5">50% (loose)</option>
+                    <option value="0.6">60%</option>
+                    <option value="0.7" selected>70% (default)</option>
+                    <option value="0.8">80% (strict)</option>
+                    <option value="0.9">90% (very strict)</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Select Agents (min 2)</label>
+            <div class="agent-picker" id="agent-picker">
+                <div class="empty-state" style="padding: 0.5rem;">Loading agents…</div>
+            </div>
+        </div>
+        <div class="form-row" style="margin-top: 1rem;">
+            <div class="form-group roundtable-only" style="flex: 1; min-width: 180px;">
+                <label>Synthesizer</label>
+                <select id="rt-synthesizer">
+                    <option value="main">main (default)</option>
+                </select>
+            </div>
+            <div class="form-group" style="flex: 0; min-width: auto;">
+                <button class="btn-primary" id="btn-start" onclick="startDiscussion()" disabled>
+                    ▶ Start Discussion
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="running-status" style="display: none;">
+        <div class="content-card">
+            <h4 id="running-label">⏳ Discussion in Progress…</h4>
+            <div id="running-details" class="empty-state">Waiting for agents…</div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== TAB: VISUALIZE ===== -->
+<div class="tab-panel" id="panel-view">
+    <div id="no-roundtable" class="empty-state">
+        <p>No roundtable selected. Start a new one or pick from history.</p>
+    </div>
+
+    <div id="roundtable-detail" style="display: none;">
+        <!-- Swarm Consensus Gauge (shown only for swarm results) -->
+        <div id="swarm-consensus-box" style="display:none;margin-bottom:1.5rem;">
+            <div class="content-card" style="border-color:#f59e0b40;">
+                <h4 style="color:#f59e0b;display:flex;align-items:center;gap:0.5rem;">🐝 Swarm Consensus</h4>
+                <div style="display:flex;align-items:center;gap:1.5rem;margin-top:0.5rem;">
+                    <div style="flex:1;">
+                        <div style="background:var(--bg-primary);border-radius:8px;height:24px;overflow:hidden;position:relative;">
+                            <div id="consensus-bar" style="height:100%;background:linear-gradient(90deg,#ef4444,#f59e0b,#22c55e);border-radius:8px;transition:width 0.5s;width:0%;"></div>
+                        </div>
+                    </div>
+                    <div id="consensus-score" style="font-size:1.5rem;font-weight:700;color:#f59e0b;min-width:60px;text-align:center;">—</div>
+                </div>
+                <div style="display:flex;gap:1.5rem;margin-top:0.75rem;font-size:0.8rem;color:var(--text-muted);">
+                    <span>Iterations: <strong id="swarm-iters">—</strong></span>
+                    <span>Converged: <strong id="swarm-converged">—</strong></span>
+                    <span>Dominant: <strong id="swarm-dominant">—</strong></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Graph Visualization -->
+        <div class="legend" id="agent-legend"></div>
+        <div class="graph-container">
+            <div id="roundtable-graph"></div>
+        </div>
+
+        <!-- Synthesis -->
+        <div class="synthesis-box" id="synthesis-box" style="display: none;">
+            <h4>🧬 Synthesis</h4>
+            <div class="content" id="synthesis-content"></div>
+        </div>
+
+        <!-- Turn-by-turn Timeline -->
+        <div class="charts-row">
+            <div class="content-card">
+                <h4>📊 Participation</h4>
+                <canvas id="chart-participation" height="200"></canvas>
+            </div>
+            <div class="content-card">
+                <h4>⏱️ Response Time (ms)</h4>
+                <canvas id="chart-duration" height="200"></canvas>
+            </div>
+        </div>
+
+        <h4 style="margin: 0 0 0.75rem 0;">🕐 Turn-by-Turn Timeline</h4>
+        <div class="timeline" id="turn-timeline"></div>
+    </div>
+</div>
+
+<!-- ===== TAB: HISTORY ===== -->
+<div class="tab-panel" id="panel-history">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Type</th>
+                <th>Topic</th>
+                <th>Agents</th>
+                <th>Turns</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="history-body">
+            <tr><td colspan="6" class="empty-state">Loading…</td></tr>
+        </tbody>
+    </table>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+<script>
+const API_BASE = '{{ api_base_url }}';
+let availableAgents = [];
+let selectedAgents = new Set();
+let currentRoundtable = null;
+let rtNetwork = null;
+let charts = {};
+let currentMode = 'roundtable';  // 'roundtable' or 'swarm'
+
+// ── Mode Toggle ──────────────────────────────────────────────────────────
+
+function setMode(mode) {
+    currentMode = mode;
+    document.querySelectorAll('.mode-btn').forEach(b => {
+        const isActive = b.dataset.mode === mode;
+        b.classList.toggle('active', isActive);
+        b.style.background = isActive ? 'rgba(139,92,246,0.2)' : 'var(--bg-tertiary)';
+        b.style.color = isActive ? '#a78bfa' : 'var(--text-secondary)';
+    });
+    // Toggle form fields
+    document.querySelectorAll('.roundtable-only').forEach(el => el.style.display = mode === 'roundtable' ? '' : 'none');
+    document.querySelectorAll('.swarm-only').forEach(el => el.style.display = mode === 'swarm' ? '' : 'none');
+    // Update hint
+    document.getElementById('mode-hint').textContent = mode === 'roundtable'
+        ? 'Multi-round collaborative discussion with synthesis'
+        : 'Pheromone-weighted voting with emergent consensus';
+    // Update button label
+    document.getElementById('btn-start').textContent = mode === 'roundtable'
+        ? '▶ Start Roundtable' : '▶ Start Swarm';
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────
+
+function esc(str) {
+    if (!str) return '';
+    const d = document.createElement('div');
+    d.textContent = String(str);
+    return d.innerHTML;
+}
+
+function fmtDate(iso) {
+    if (!iso) return '—';
+    const dt = new Date(iso);
+    return isNaN(dt) ? '—' : dt.toLocaleString();
+}
+
+const AGENT_COLORS = [
+    '#8b5cf6', '#3b82f6', '#22c55e', '#f59e0b', '#ef4444',
+    '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16'
+];
+function agentColor(agentId) {
+    const idx = availableAgents.findIndex(a => a.agent_id === agentId);
+    return AGENT_COLORS[(idx >= 0 ? idx : agentId.length) % AGENT_COLORS.length];
+}
+
+// ── Tabs ─────────────────────────────────────────────────────────────────
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+    });
+});
+
+// ── Load agents ──────────────────────────────────────────────────────────
+
+async function loadAgents() {
+    try {
+        const r = await fetch(`${API_BASE}/engine/roundtable/agents/available`);
+        const data = await r.json();
+        availableAgents = data.agents || [];
+        document.getElementById('stat-agents').textContent = availableAgents.length;
+        renderAgentPicker();
+    } catch (err) {
+        console.error('Load agents failed:', err);
+        document.getElementById('agent-picker').innerHTML =
+            '<div class="empty-state" style="padding:0.5rem;">Failed to load agents</div>';
+    }
+}
+
+function renderAgentPicker() {
+    const container = document.getElementById('agent-picker');
+    const synthSelect = document.getElementById('rt-synthesizer');
+
+    container.innerHTML = availableAgents.map(a => {
+        const color = agentColor(a.agent_id);
+        return `<div class="agent-chip" data-id="${esc(a.agent_id)}" onclick="toggleAgent('${esc(a.agent_id)}')">
+            <span class="dot" style="background: ${color}"></span>
+            ${esc(a.display_name || a.agent_id)}
+            <span style="font-size:0.7rem;color:var(--text-muted);">${esc(a.agent_type)}</span>
+        </div>`;
+    }).join('');
+
+    synthSelect.innerHTML = availableAgents.map(a =>
+        `<option value="${esc(a.agent_id)}" ${a.agent_id === 'main' ? 'selected' : ''}>${esc(a.display_name || a.agent_id)}</option>`
+    ).join('');
+}
+
+function toggleAgent(agentId) {
+    if (selectedAgents.has(agentId)) {
+        selectedAgents.delete(agentId);
+    } else {
+        selectedAgents.add(agentId);
+    }
+    // Update chip visuals
+    document.querySelectorAll('.agent-chip').forEach(chip => {
+        const id = chip.dataset.id;
+        chip.classList.toggle('selected', selectedAgents.has(id));
+    });
+    // Enable/disable start button
+    document.getElementById('btn-start').disabled = selectedAgents.size < 2;
+}
+
+// ── Start Discussion (Roundtable or Swarm) ───────────────────────────────
+
+async function startDiscussion() {
+    const topic = document.getElementById('rt-topic').value.trim();
+    if (!topic) { alert('Enter a discussion topic.'); return; }
+    if (selectedAgents.size < 2) { alert('Select at least 2 agents.'); return; }
+
+    const btn = document.getElementById('btn-start');
+    btn.disabled = true;
+    btn.textContent = '⏳ Running…';
+
+    const statusDiv = document.getElementById('running-status');
+    statusDiv.style.display = 'block';
+    const modeLabel = currentMode === 'swarm' ? 'Swarm' : 'Roundtable';
+    document.getElementById('running-label').textContent = `⏳ ${modeLabel} in Progress…`;
+    document.getElementById('running-details').textContent =
+        `Topic: "${topic}" | Agents: ${[...selectedAgents].join(', ')} | Mode: ${modeLabel}`;
+
+    try {
+        let resp;
+        if (currentMode === 'swarm') {
+            resp = await fetch(`${API_BASE}/engine/roundtable/swarm`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    topic,
+                    agent_ids: [...selectedAgents],
+                    max_iterations: parseInt(document.getElementById('sw-iterations').value),
+                    consensus_threshold: parseFloat(document.getElementById('sw-threshold').value),
+                }),
+            });
+        } else {
+            resp = await fetch(`${API_BASE}/engine/roundtable`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    topic,
+                    agent_ids: [...selectedAgents],
+                    rounds: parseInt(document.getElementById('rt-rounds').value),
+                    synthesizer_id: document.getElementById('rt-synthesizer').value,
+                }),
+            });
+        }
+
+        if (!resp.ok) {
+            const errText = await resp.text();
+            throw new Error(`${resp.status}: ${errText}`);
+        }
+
+        const result = await resp.json();
+        currentRoundtable = result;
+        currentRoundtable._mode = currentMode;
+
+        // Switch to Visualize tab
+        document.querySelector('[data-tab="view"]').click();
+        renderRoundtableDetail(result);
+        loadHistory();
+
+    } catch (err) {
+        alert(`${modeLabel} failed: ` + err.message);
+        console.error(err);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = currentMode === 'swarm' ? '▶ Start Swarm' : '▶ Start Roundtable';
+        statusDiv.style.display = 'none';
+    }
+}
+
+// ── Render Roundtable Detail ─────────────────────────────────────────────
+
+function renderRoundtableDetail(rt) {
+    document.getElementById('no-roundtable').style.display = 'none';
+    document.getElementById('roundtable-detail').style.display = 'block';
+
+    // Stats
+    document.getElementById('stat-turns').textContent = rt.turn_count || rt.turns?.length || 0;
+
+    // Swarm consensus gauge
+    const isSwarm = rt._mode === 'swarm' || rt.consensus_score != null;
+    const consensusBox = document.getElementById('swarm-consensus-box');
+    if (isSwarm && rt.consensus_score != null) {
+        consensusBox.style.display = 'block';
+        const pct = Math.round(rt.consensus_score * 100);
+        document.getElementById('consensus-bar').style.width = pct + '%';
+        document.getElementById('consensus-score').textContent = pct + '%';
+        document.getElementById('consensus-score').style.color =
+            pct >= 70 ? '#22c55e' : pct >= 50 ? '#f59e0b' : '#ef4444';
+        document.getElementById('swarm-iters').textContent = rt.iterations || '—';
+        document.getElementById('swarm-converged').textContent = rt.converged ? 'Yes ✓' : 'No';
+        document.getElementById('swarm-dominant').textContent = rt.dominant_vote || '—';
+    } else {
+        consensusBox.style.display = 'none';
+    }
+
+    // Legend
+    const legendDiv = document.getElementById('agent-legend');
+    const participants = rt.participants || [];
+    legendDiv.innerHTML = participants.map(a => {
+        const c = agentColor(a);
+        return `<div class="legend-item"><span class="legend-dot" style="background:${c}"></span> ${esc(a)}</div>`;
+    }).join('');
+
+    // Synthesis
+    if (rt.synthesis) {
+        document.getElementById('synthesis-box').style.display = 'block';
+        document.getElementById('synthesis-content').textContent = rt.synthesis;
+    } else {
+        document.getElementById('synthesis-box').style.display = 'none';
+    }
+
+    // Graph
+    renderRoundtableGraph(rt);
+
+    // Charts
+    renderParticipationChart(rt);
+    renderDurationChart(rt);
+
+    // Timeline
+    renderTimeline(rt);
+}
+
+// ── Vis.js Agent-Round Force Graph ───────────────────────────────────────
+
+function renderRoundtableGraph(rt) {
+    const container = document.getElementById('roundtable-graph');
+    const turns = rt.turns || [];
+    const participants = rt.participants || [];
+    const maxRound = rt.rounds || Math.max(...turns.map(t => t.round), 1);
+
+    const nodes = [];
+    const edges = [];
+
+    // Central topic node
+    nodes.push({
+        id: 'topic',
+        label: rt.topic?.substring(0, 40) + (rt.topic?.length > 40 ? '…' : ''),
+        shape: 'box',
+        color: { background: '#1e293b', border: '#8b5cf6' },
+        font: { color: '#e2e8f0', size: 14 },
+        size: 30,
+        fixed: { x: true, y: true },
+        x: 0, y: 0,
+    });
+
+    // Agent nodes (arranged in a circle around center)
+    const agentRadius = 200;
+    participants.forEach((a, i) => {
+        const angle = (2 * Math.PI * i) / participants.length - Math.PI / 2;
+        const x = agentRadius * Math.cos(angle);
+        const y = agentRadius * Math.sin(angle);
+        const color = agentColor(a);
+
+        nodes.push({
+            id: `agent-${a}`,
+            label: a,
+            shape: 'dot',
+            color: { background: color, border: `${color}88` },
+            font: { color: '#e2e8f0', size: 12 },
+            size: 22,
+            fixed: { x: true, y: true },
+            x, y,
+        });
+
+        // Edge from topic to agent
+        edges.push({
+            from: 'topic',
+            to: `agent-${a}`,
+            color: { color: `${color}44` },
+            width: 1.5,
+            dashes: true,
+        });
+    });
+
+    // Round nodes (small, show interaction flow)
+    for (let r = 1; r <= maxRound; r++) {
+        const roundTurns = turns.filter(t => t.round === r);
+        const roundRadius = agentRadius + 60 + (r * 50);
+
+        roundTurns.forEach((t, ti) => {
+            const agentIdx = participants.indexOf(t.agent_id);
+            if (agentIdx < 0) return;
+            const angle = (2 * Math.PI * agentIdx) / participants.length - Math.PI / 2;
+            const x = roundRadius * Math.cos(angle) + (ti * 5);
+            const y = roundRadius * Math.sin(angle) + (ti * 5);
+            const c = agentColor(t.agent_id);
+
+            const nodeId = `turn-r${r}-${t.agent_id}`;
+            nodes.push({
+                id: nodeId,
+                label: `R${r}`,
+                shape: 'diamond',
+                color: { background: `${c}33`, border: c },
+                font: { color: '#d1d5db', size: 9 },
+                size: 10,
+                title: `Round ${r} · ${t.agent_id}\n${t.content?.substring(0, 200)}`,
+            });
+
+            edges.push({
+                from: `agent-${t.agent_id}`,
+                to: nodeId,
+                color: { color: `${c}66` },
+                width: 2,
+                arrows: 'to',
+            });
+        });
+
+        // Inter-turn edges (shows discussion flow between agents within a round)
+        for (let i = 1; i < roundTurns.length; i++) {
+            edges.push({
+                from: `turn-r${r}-${roundTurns[i - 1].agent_id}`,
+                to: `turn-r${r}-${roundTurns[i].agent_id}`,
+                color: { color: '#55555555' },
+                width: 1,
+                arrows: 'to',
+                dashes: [3, 5],
+            });
+        }
+    }
+
+    // Synthesis node
+    if (rt.synthesis) {
+        nodes.push({
+            id: 'synthesis',
+            label: '🧬 Synthesis',
+            shape: 'star',
+            color: { background: '#14532d', border: '#22c55e' },
+            font: { color: '#dcfce7', size: 12 },
+            size: 25,
+            title: rt.synthesis?.substring(0, 300),
+        });
+        edges.push({
+            from: 'topic',
+            to: 'synthesis',
+            color: { color: '#22c55e66' },
+            width: 2.5,
+            arrows: 'to',
+        });
+        // Connect last round turns to synthesis
+        const lastRound = maxRound;
+        turns.filter(t => t.round === lastRound).forEach(t => {
+            edges.push({
+                from: `turn-r${lastRound}-${t.agent_id}`,
+                to: 'synthesis',
+                color: { color: '#22c55e33' },
+                width: 1,
+                dashes: true,
+                arrows: 'to',
+            });
+        });
+    }
+
+    const data = {
+        nodes: new vis.DataSet(nodes),
+        edges: new vis.DataSet(edges),
+    };
+    const options = {
+        physics: {
+            enabled: true,
+            solver: 'forceAtlas2Based',
+            forceAtlas2Based: { gravitationalConstant: -30, centralGravity: 0.005, springLength: 100 },
+            stabilization: { iterations: 80 },
+        },
+        interaction: { hover: true, tooltipDelay: 200 },
+        nodes: { borderWidth: 1.5, shadow: { enabled: true, size: 4 } },
+        edges: { smooth: { type: 'curvedCW', roundness: 0.15 }, shadow: false },
+    };
+
+    if (rtNetwork) rtNetwork.destroy();
+    rtNetwork = new vis.Network(container, data, options);
+}
+
+// ── Charts ───────────────────────────────────────────────────────────────
+
+function renderChart(key, type, data, extraOpts = {}) {
+    const canvas = document.getElementById(key);
+    if (!canvas) return;
+    if (charts[key]) charts[key].destroy();
+    charts[key] = new Chart(canvas.getContext('2d'), {
+        type,
+        data,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { labels: { color: '#9ca3af', font: { size: 11 } } } },
+            scales: {
+                x: { ticks: { color: '#6b7280', font: { size: 10 } }, grid: { color: '#ffffff08' } },
+                y: { ticks: { color: '#6b7280', font: { size: 10 } }, grid: { color: '#ffffff08' }, beginAtZero: true },
+            },
+            ...extraOpts,
+        },
+    });
+}
+
+function renderParticipationChart(rt) {
+    const turns = rt.turns || [];
+    const agents = rt.participants || [];
+    const counts = agents.map(a => turns.filter(t => t.agent_id === a).length);
+    renderChart('chart-participation', 'bar', {
+        labels: agents,
+        datasets: [{
+            label: 'Turns',
+            data: counts,
+            backgroundColor: agents.map(a => agentColor(a) + '88'),
+            borderColor: agents.map(a => agentColor(a)),
+            borderWidth: 1,
+            borderRadius: 6,
+        }],
+    });
+}
+
+function renderDurationChart(rt) {
+    const turns = rt.turns || [];
+    const agents = rt.participants || [];
+    const maxRound = rt.rounds || Math.max(...turns.map(t => t.round), 1);
+
+    const datasets = agents.map(a => ({
+        label: a,
+        data: Array.from({ length: maxRound }, (_, r) => {
+            const t = turns.find(t => t.agent_id === a && t.round === r + 1);
+            return t ? t.duration_ms : 0;
+        }),
+        borderColor: agentColor(a),
+        backgroundColor: agentColor(a) + '22',
+        tension: 0.3,
+    }));
+
+    renderChart('chart-duration', 'line', {
+        labels: Array.from({ length: maxRound }, (_, r) => `Round ${r + 1}`),
+        datasets,
+    });
+}
+
+// ── Turn Timeline ────────────────────────────────────────────────────────
+
+function renderTimeline(rt) {
+    const container = document.getElementById('turn-timeline');
+    const turns = rt.turns || [];
+    const maxRound = rt.rounds || Math.max(...turns.map(t => t.round), 1);
+
+    let html = '';
+    const phases = { 1: 'EXPLORE', 2: 'WORK' };
+
+    for (let r = 1; r <= maxRound; r++) {
+        const phase = r <= 2 ? phases[r] : 'VALIDATE';
+        html += `<div class="round-divider">Round ${r} — ${phase}</div>`;
+
+        const roundTurns = turns.filter(t => t.round === r);
+        for (const t of roundTurns) {
+            const color = agentColor(t.agent_id);
+            html += `
+                <div class="turn-card" style="border-left: 3px solid ${color};">
+                    <div class="turn-header">
+                        <span class="turn-agent" style="color: ${color};">${esc(t.agent_id)}</span>
+                        <div class="turn-meta">
+                            <span>Round ${t.round}</span>
+                            ${t.duration_ms ? `<span>${t.duration_ms}ms</span>` : ''}
+                        </div>
+                    </div>
+                    <div class="turn-content">${esc(t.content)}</div>
+                </div>
+            `;
+        }
+    }
+
+    // Synthesis at the end
+    if (rt.synthesis) {
+        html += `<div class="round-divider">Synthesis</div>`;
+        html += `
+            <div class="turn-card synthesis">
+                <div class="turn-header">
+                    <span class="turn-agent" style="color: #22c55e;">🧬 ${esc(rt.synthesizer_id || 'main')}</span>
+                    <div class="turn-meta"><span>Final Synthesis</span></div>
+                </div>
+                <div class="turn-content">${esc(rt.synthesis)}</div>
+            </div>
+        `;
+    }
+
+    container.innerHTML = html || '<div class="empty-state">No turns recorded</div>';
+}
+
+// ── History ──────────────────────────────────────────────────────────────
+
+async function loadHistory() {
+    try {
+        const r = await fetch(`${API_BASE}/engine/roundtable?page=1&page_size=50`);
+        const data = await r.json();
+        const items = data.items || [];
+
+        document.getElementById('stat-total').textContent = data.total || items.length;
+
+        const body = document.getElementById('history-body');
+        if (!items.length) {
+            body.innerHTML = '<tr><td colspan="6" class="empty-state">No roundtables yet. Start one!</td></tr>';
+            return;
+        }
+
+        // Count swarms for stat box
+        const swarmCount = items.filter(i => (i.session_type || '').includes('swarm')).length;
+        document.getElementById('stat-swarms').textContent = swarmCount;
+
+        body.innerHTML = items.map(item => {
+            const isSwarm = (item.session_type || '').includes('swarm');
+            const typeBadge = isSwarm
+                ? '<span class="status-badge" style="background:rgba(245,158,11,0.2);color:#f59e0b;">🐝 Swarm</span>'
+                : '<span class="status-badge" style="background:rgba(139,92,246,0.2);color:#a78bfa;">🔄 Roundtable</span>';
+            return `
+            <tr class="clickable" onclick="viewRoundtable('${esc(item.session_id)}')">
+                <td>${typeBadge}</td>
+                <td>${esc(item.title || '(untitled)')}</td>
+                <td>${(item.participants || []).map(a =>
+                    `<span style="color:${agentColor(a)}">${esc(a)}</span>`
+                ).join(', ')}</td>
+                <td>${item.message_count || 0}</td>
+                <td>${fmtDate(item.created_at)}</td>
+                <td>
+                    <button class="btn-secondary" onclick="event.stopPropagation(); deleteRoundtable('${esc(item.session_id)}')">
+                        🗑
+                    </button>
+                </td>
+            </tr>
+        `}).join('');
+
+    } catch (err) {
+        console.error('Load history failed:', err);
+        document.getElementById('history-body').innerHTML =
+            '<tr><td colspan="5" class="empty-state">Failed to load history</td></tr>';
+    }
+}
+
+async function viewRoundtable(sessionId) {
+    try {
+        const r = await fetch(`${API_BASE}/engine/roundtable/${sessionId}`);
+        if (!r.ok) throw new Error(`${r.status}`);
+        const data = await r.json();
+        currentRoundtable = data;
+        document.querySelector('[data-tab="view"]').click();
+        renderRoundtableDetail(data);
+    } catch (err) {
+        alert('Failed to load roundtable: ' + err.message);
+    }
+}
+
+async function deleteRoundtable(sessionId) {
+    if (!confirm('End this roundtable?')) return;
+    try {
+        await fetch(`${API_BASE}/engine/roundtable/${sessionId}`, { method: 'DELETE' });
+        loadHistory();
+    } catch (err) {
+        alert('Delete failed: ' + err.message);
+    }
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadAgents();
+    loadHistory();
+});
+</script>
+{% endblock %}

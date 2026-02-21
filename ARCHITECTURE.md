@@ -4,7 +4,7 @@
 
 Aria is an autonomous AI agent built on a layered architecture. She operates as an **orchestrating consciousness** — breaking tasks into delegatable work, routing to specialized agents, and synthesizing results. She runs on a self-driven work cycle with goal tracking, persistent memory, and full observability.
 
-Built on [OpenClaw](https://openclaw.ai) with local-first LLM inference on Apple Silicon.
+Built on a native Python engine (`aria_engine`) with multi-model LLM routing via LiteLLM (OpenRouter, Moonshot/Kimi, local MLX).
 
 ---
 
@@ -92,7 +92,7 @@ Built on [OpenClaw](https://openclaw.ai) with local-first LLM inference on Apple
 ║  │                      EXTERNAL INTERFACE                             │     ║
 ║  │  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │     ║
 ║  │                                                                     │     ║
-║  │   Telegram ←──→ OpenClaw ←──→ Docker ←──→ PostgreSQL              │     ║
+║  │   Telegram ←──→ Aria Engine ←──→ Docker ←──→ PostgreSQL          │     ║
 ║  │   (You talk  │   (My      │   (My      │   (My memory              │     ║
 ║  │    to me)    │    spine)  │    body)   │    substrate)             │     ║
 ║  │                                                                     │     ║
@@ -221,10 +221,13 @@ Focuses are defined in `aria_mind/soul/focus.py`. Agent roles and delegation pat
 
 ### Database Isolation
 
-| Database | Purpose |
-|----------|---------|
-| `aria_warehouse` | Aria's data — all application tables |
-| `litellm` | LiteLLM Prisma tables (isolated to prevent migration conflicts) |
+| Database | Schema | Purpose |
+|----------|--------|---------|
+| `aria_warehouse` | `aria_data` | Knowledge, memories, goals, activities, social, logs, performance — all domain data (26 tables) |
+| `aria_warehouse` | `aria_engine` | Chat sessions, messages, cron jobs, agent state, config, LLM models — engine infrastructure (11 tables) |
+| `litellm` | `public` | LiteLLM Prisma tables (isolated to prevent migration conflicts) |
+
+All 37 ORM models have explicit schema annotations in `src/api/db/models.py`. No tables in `public` schema. Zero raw SQL — all database access through SQLAlchemy ORM.
 
 Implementation details: `aria_mind/memory.py`, `aria_skills/working_memory/`, `aria_skills/knowledge_graph/`
 
@@ -238,7 +241,7 @@ Implementation details: `aria_mind/memory.py`, `aria_skills/working_memory/`, `a
 ├──────────────────────────────────────────────────────────────────────┤
 │                                                                      │
 │  ┌────────────┐    ┌────────────┐    ┌────────────┐                  │
-│  │  Traefik   │    │  OpenClaw  │    │  LiteLLM   │                  │
+│  │  Traefik   │    │Aria Engine │    │  LiteLLM   │                  │
 │  │  (Proxy)   │    │ (Gateway)  │    │  (Router)  │                  │
 │  └─────┬──────┘    └─────┬──────┘    └─────┬──────┘                  │
 │        │                 │                 │                          │

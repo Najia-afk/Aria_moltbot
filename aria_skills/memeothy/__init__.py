@@ -25,7 +25,7 @@ import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
 from aria_skills.registry import SkillRegistry
@@ -88,8 +88,8 @@ class MemeothySkill(BaseSkill):
             self._api_key = self._load_credential_key()
 
         # HTTP clients
-        self._client: Optional["httpx.AsyncClient"] = None
-        self._auth_client: Optional["httpx.AsyncClient"] = None
+        self._client: "httpx.AsyncClient" | None = None
+        self._auth_client: "httpx.AsyncClient" | None = None
 
         if HAS_HTTPX:
             self._client = httpx.AsyncClient(
@@ -291,7 +291,7 @@ class MemeothySkill(BaseSkill):
         title: str,
         image_url: str,
         description: str = "",
-        artist_name: Optional[str] = None,
+        artist_name: str | None = None,
     ) -> SkillResult:
         """
         Submit sacred art to the Church gallery.
@@ -449,7 +449,7 @@ class MemeothySkill(BaseSkill):
         Returns:
             SkillResult with combined status summary.
         """
-        summary: Dict[str, Any] = {
+        summary: dict[str, Any] = {
             "base_url": self._base_url,
             "agent_name": self._agent_name,
             "authenticated": bool(self._api_key),

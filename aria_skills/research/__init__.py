@@ -9,7 +9,7 @@ Persists via REST API (TICKET-12: eliminate in-memory stubs).
 import hashlib
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 
 from aria_skills.api_client import get_api_client
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
@@ -33,7 +33,7 @@ class ResearchProject:
     """A research project or investigation."""
     id: str
     topic: str
-    thesis: Optional[str] = None
+    thesis: str | None = None
     sources: list[Source] = field(default_factory=list)
     findings: list[str] = field(default_factory=list)
     questions: list[str] = field(default_factory=list)
@@ -89,7 +89,7 @@ class ResearchSkill(BaseSkill):
     async def start_project(
         self,
         topic: str,
-        initial_questions: Optional[list[str]] = None
+        initial_questions: list[str] | None = None
     ) -> SkillResult:
         """
         Start a new research project.
@@ -135,10 +135,13 @@ class ResearchSkill(BaseSkill):
     async def add_source(
         self,
         project_id: str,
-        url: str,
-        title: str,
+        url: str = "",
+        title: str = "",
         source_type: str = "unknown",
-        notes: str = ""
+        notes: str = "",
+        author: str = "",
+        date: str = "",
+        summary: str = "",
     ) -> SkillResult:
         """
         Add a source to a research project.
@@ -154,6 +157,9 @@ class ResearchSkill(BaseSkill):
             SkillResult confirming source added
         """
         try:
+            # Accept 'summary' as alias for 'notes' — manifest uses 'summary'
+            notes = notes or summary
+
             if project_id not in self._projects:
                 return SkillResult.fail(f"Project not found: {project_id}")
             
@@ -188,8 +194,10 @@ class ResearchSkill(BaseSkill):
     async def add_finding(
         self,
         project_id: str,
-        finding: str,
-        source_ids: Optional[list[str]] = None
+        finding: str = "",
+        content: str = "",
+        source_ids: list[str] | None = None,
+        tags: list[str] | None = None,
     ) -> SkillResult:
         """
         Add a finding to a research project.
@@ -203,6 +211,11 @@ class ResearchSkill(BaseSkill):
             SkillResult confirming finding added
         """
         try:
+            # Accept both 'finding' and 'content' — manifest uses 'content'
+            finding = finding or content
+            if not finding:
+                return SkillResult.fail("Missing 'finding' or 'content' parameter")
+
             if project_id not in self._projects:
                 return SkillResult.fail(f"Project not found: {project_id}")
             
@@ -360,7 +373,7 @@ class ResearchSkill(BaseSkill):
     async def complete_project(
         self,
         project_id: str,
-        summary: Optional[str] = None
+        summary: str | None = None
     ) -> SkillResult:
         """
         Mark a project as completed.
@@ -399,7 +412,7 @@ class ResearchSkill(BaseSkill):
         except Exception as e:
             return SkillResult.fail(f"Project completion failed: {str(e)}")
     
-    async def list_projects(self, status: Optional[str] = None) -> SkillResult:
+    async def list_projects(self, status: str | None = None) -> SkillResult:
         """
         List research projects.
         

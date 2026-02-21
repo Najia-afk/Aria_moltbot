@@ -1,0 +1,79 @@
+{
+  "python": "3.14.2",
+  "jit": false,
+  "timestamp": "2026-02-19T00:32:00",
+  "results": [
+    {
+      "name": "bench_toml_parsing",
+      "iterations": 100,
+      "mean_ms": 0.888,
+      "median_ms": 0.886,
+      "p95_ms": 0.906,
+      "p99_ms": 0.935,
+      "min_ms": 0.87,
+      "max_ms": 0.935,
+      "std_ms": 0.011,
+      "jit": false
+    },
+    {
+      "name": "bench_context_assembly",
+      "iterations": 100,
+      "mean_ms": 0.144,
+      "median_ms": 0.142,
+      "p95_ms": 0.152,
+      "p99_ms": 0.216,
+      "min_ms": 0.139,
+      "max_ms": 0.216,
+      "std_ms": 0.008,
+      "jit": false
+    },
+    {
+      "name": "bench_pheromone_scoring",
+      "iterations": 100,
+      "mean_ms": 0.006,
+      "median_ms": 0.006,
+      "p95_ms": 0.006,
+      "p99_ms": 0.006,
+      "min_ms": 0.006,
+      "max_ms": 0.006,
+      "std_ms": 0.0,
+      "jit": false
+    },
+    {
+      "name": "bench_json_serialization",
+      "iterations": 100,
+      "mean_ms": 0.526,
+      "median_ms": 0.521,
+      "p95_ms": 0.547,
+      "p99_ms": 0.611,
+      "min_ms": 0.511,
+      "max_ms": 0.611,
+      "std_ms": 0.015,
+      "jit": false
+    },
+    {
+      "name": "bench_async_context_switch",
+      "iterations": 100,
+      "mean_ms": 0.0,
+      "median_ms": 0.001,
+      "p95_ms": 0.001,
+      "p99_ms": 0.001,
+      "min_ms": 0.0,
+      "max_ms": 0.001,
+      "std_ms": 0.0,
+      "jit": false
+    },
+    {
+      "name": "bench_semaphore_acquire",
+      "iterations": 100,
+      "mean_ms": 0.002,
+      "median_ms": 0.002,
+      "p95_ms": 0.002,
+      "p99_ms": 0.006,
+      "min_ms": 0.001,
+      "max_ms": 0.006,
+      "std_ms": 0.001,
+      "jit": false
+    }
+  ]
+}

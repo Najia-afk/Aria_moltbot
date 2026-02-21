@@ -97,4 +97,4 @@ settings:
   timeout_seconds: 30
   max_retries: 3
   output_format: "json"
-  storage_path: "/root/.openclaw/aria_memories/research/"
+  storage_path: "/app/aria_memories/research/"

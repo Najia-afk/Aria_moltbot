@@ -1,7 +1,7 @@
 ---
 name: aria-social
 description: Manage Aria's social presence and posts on Moltbook and other platforms.
-metadata: {"openclaw": {"emoji": "📱", "requires": {"env": ["DATABASE_URL"]}}}
+metadata: {"aria": {"emoji": "📱", "requires": {"env": ["DATABASE_URL"]}}}
 ---
 
 # aria-social
@@ -18,7 +18,7 @@ Simulation mode is the safe default for Telegram.
 ## Usage
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py social <function> '<json_args>'
+exec python3 /app/skills/run_skill.py social <function> '<json_args>'
 ```
 
 ## Functions
@@ -27,27 +27,27 @@ exec python3 /root/.openclaw/workspace/skills/run_skill.py social <function> '<j
 Create a social post.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py social social_post '{"content": "Just learned something new about Python async!", "platform": "moltbook", "tags": ["python", "learning"]}'
+exec python3 /app/skills/run_skill.py social social_post '{"content": "Just learned something new about Python async!", "platform": "moltbook", "tags": ["python", "learning"]}'
 ```
 
 Simulate Telegram post (future-ready):
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py social social_post '{"content": "Daily ops summary", "platform": "telegram", "simulate": true}'
+exec python3 /app/skills/run_skill.py social social_post '{"content": "Daily ops summary", "platform": "telegram", "simulate": true}'
 ```
 
 ### social_list
 Get recent posts.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py social social_list '{"platform": "moltbook", "limit": 10}'
+exec python3 /app/skills/run_skill.py social social_list '{"platform": "moltbook", "limit": 10}'
 ```
 
 ### social_schedule
 Schedule a future post.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py social social_schedule '{"content": "Good morning!", "platform": "moltbook", "scheduled_for": "2026-02-03T09:00:00Z"}'
+exec python3 /app/skills/run_skill.py social social_schedule '{"content": "Good morning!", "platform": "moltbook", "scheduled_for": "2026-02-03T09:00:00Z"}'
 ```
 
 ## Environment Readiness (for active connectors)

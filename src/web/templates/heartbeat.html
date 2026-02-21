@@ -5,6 +5,9 @@
 {% block page_subtitle %}Scheduled jobs and system pulse{% endblock %}
 
 {% block header_actions %}
+<button class="btn btn-primary" onclick="openAddJobModal()">
+    ➕ Add Job
+</button>
 <button class="btn btn-secondary" onclick="syncJobs()">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M23 4v6h-6M1 20v-6h6M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
@@ -122,6 +125,74 @@
 
 <!-- Toast Notification -->
 <div class="toast" id="toast"></div>
+
+<!-- Add / Edit Job Modal -->
+<div id="cronJobModal" class="cron-modal-overlay" onclick="if(event.target===this)closeJobModal()">
+<div class="cron-modal-card" style="max-width:640px;max-height:90vh;overflow-y:auto;">
+    <div class="cron-modal-header">
+        <h3 id="cronModalTitle">Add Cron Job</h3>
+        <button class="cron-btn-icon" onclick="closeJobModal()">&times;</button>
+    </div>
+    <form id="cronJobForm" onsubmit="return saveCronJob(event)">
+        <div class="cron-form-grid">
+            <div class="cron-form-group">
+                <label for="jId">Job ID</label>
+                <input id="jId" name="id" maxlength="100" placeholder="auto-generated if blank" class="cron-form-input" autocomplete="off">
+            </div>
+            <div class="cron-form-group">
+                <label for="jName">Name *</label>
+                <input id="jName" name="name" required maxlength="200" placeholder="work_cycle" class="cron-form-input">
+            </div>
+            <div class="cron-form-group">
+                <label for="jSchedule">Schedule (cron) *</label>
+                <input id="jSchedule" name="schedule" required maxlength="100" placeholder="*/5 * * * *" class="cron-form-input" style="font-family:var(--font-mono);">
+            </div>
+            <div class="cron-form-group">
+                <label for="jAgent">Agent ID</label>
+                <input id="jAgent" name="agent_id" maxlength="100" value="main" class="cron-form-input">
+            </div>
+            <div class="cron-form-group">
+                <label for="jType">Payload Type</label>
+                <select id="jType" name="payload_type" class="cron-form-input">
+                    <option value="prompt">Prompt</option>
+                    <option value="skill">Skill</option>
+                    <option value="pipeline">Pipeline</option>
+                </select>
+            </div>
+            <div class="cron-form-group">
+                <label for="jSession">Session Mode</label>
+                <select id="jSession" name="session_mode" class="cron-form-input">
+                    <option value="isolated">Isolated</option>
+                    <option value="shared">Shared</option>
+                    <option value="persistent">Persistent</option>
+                </select>
+            </div>
+            <div class="cron-form-group" style="grid-column:1/-1;">
+                <label for="jPayload">Payload *</label>
+                <textarea id="jPayload" name="payload" required rows="3" class="cron-form-input" style="resize:vertical;font-family:var(--font-mono);font-size:12px;"
+                          placeholder="Describe the task for this cron job..."></textarea>
+            </div>
+            <div class="cron-form-group">
+                <label for="jMaxDuration">Max Duration (sec)</label>
+                <input id="jMaxDuration" name="max_duration_seconds" type="number" min="10" max="3600" value="300" class="cron-form-input">
+            </div>
+            <div class="cron-form-group">
+                <label for="jRetry">Retry Count</label>
+                <input id="jRetry" name="retry_count" type="number" min="0" max="5" value="0" class="cron-form-input">
+            </div>
+            <div class="cron-form-group" style="grid-column:1/-1;">
+                <label style="display:flex;align-items:center;gap:8px;">
+                    <input type="checkbox" id="jEnabled" name="enabled" checked> ✅ Enabled
+                </label>
+            </div>
+        </div>
+        <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end;">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="closeJobModal()">Cancel</button>
+            <button type="submit" class="btn btn-primary btn-sm">💾 Save</button>
+        </div>
+    </form>
+</div>
+</div>
 {% endblock %}
 
 {% block extra_css %}
@@ -459,6 +530,38 @@
     border-color: var(--danger);
 }
 
+/* Cron Job Modal */
+.cron-modal-overlay {
+    position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,.6);
+    display: none; align-items: center; justify-content: center; padding: 16px;
+}
+.cron-modal-overlay.active {
+    display: flex;
+}
+.cron-modal-card {
+    background: var(--bg-secondary, #1e1e2e); border: 1px solid var(--border-subtle, #333);
+    border-radius: 12px; padding: 24px; width: 100%;
+}
+.cron-modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.cron-modal-header h3 { margin: 0; font-size: 18px; color: var(--text-primary, #fff); }
+.cron-btn-icon { background: none; border: none; font-size: 22px; cursor: pointer; color: var(--text-secondary); }
+.cron-btn-icon:hover { color: var(--text-primary); }
+.cron-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.cron-form-group label { display: block; font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-bottom: 4px; }
+.cron-form-input {
+    width: 100%; padding: 7px 10px; border: 1px solid var(--border-subtle, #444);
+    border-radius: 6px; background: var(--bg-tertiary, #111); color: var(--text-primary, #fff);
+    font-size: 13px; box-sizing: border-box;
+}
+.cron-form-input:focus { outline: none; border-color: var(--accent-primary, #7c3aed); }
+
+/* Job Card Actions */
+.job-card-actions {
+    display: flex; gap: 6px; margin-top: 10px; padding-top: 10px;
+    border-top: 1px solid var(--border-subtle, #333);
+}
+.job-card.disabled { opacity: .55; }
+
 /* Loading */
 .loading {
     text-align: center;
@@ -481,9 +584,31 @@
 
 {% block extra_js %}
 <script data-page-script>
-// Scheduled Jobs - fetched from API (synced from OpenClaw)
+// Scheduled Jobs - fetched from API
 let scheduledJobs = [];
 let allLogs = [];
+
+// Utility: relative time formatting
+function formatRelativeTime(date) {
+    if (!date || isNaN(date.getTime())) return '-';
+    const now = new Date();
+    const diffMs = now - date;
+    const absDiff = Math.abs(diffMs);
+    const isFuture = diffMs < 0;
+
+    const seconds = Math.floor(absDiff / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    let text;
+    if (seconds < 60) text = `${seconds}s`;
+    else if (minutes < 60) text = `${minutes}m`;
+    else if (hours < 24) text = `${hours}h ${minutes % 60}m`;
+    else text = `${days}d ${hours % 24}h`;
+
+    return isFuture ? `in ${text}` : `${text} ago`;
+}
 
 // Icon mapping for job names
 const jobIcons = {
@@ -534,9 +659,16 @@ async function loadHeartbeatData() {
 
 const API_BASE = window.ARIA_API_BASE_URL || '/api';
 
+function escapeHtml(str) {
+    if (!str) return '';
+    const d = document.createElement('div');
+    d.textContent = String(str);
+    return d.innerHTML;
+}
+
 async function loadScheduledJobs() {
     try {
-        // Try live endpoint first (direct from OpenClaw file), fallback to DB
+        // Try live endpoint first (direct from cron_jobs.yaml), fallback to DB
         let response = await fetch(`${API_BASE}/jobs/live`);
         let data = await response.json();
         let jobs = Array.isArray(data?.jobs) ? data.jobs : (Array.isArray(data) ? data : []);
@@ -613,7 +745,7 @@ async function loadScheduledJobs() {
         document.getElementById('jobsGrid').innerHTML = `
             <div class="empty-state">
                 <p>⚠️ Failed to load jobs from API</p>
-                <button class="btn btn-primary" onclick="syncJobs()">Sync from OpenClaw</button>
+                <button class="btn btn-primary" onclick="syncJobs()">Sync Jobs</button>
             </div>
         `;
     }
@@ -621,12 +753,12 @@ async function loadScheduledJobs() {
 
 async function syncJobs() {
     try {
-        showToast('Syncing jobs from OpenClaw...', 'info');
+        showToast('Syncing jobs...', 'info');
         const response = await fetch(`${API_BASE}/jobs/sync`, { method: 'POST' });
         const data = await response.json();
         
         if (response.ok) {
-            showToast(`✅ Synced ${data.synced} jobs from OpenClaw`, 'success');
+            showToast(`✅ Synced ${data.synced} jobs`, 'success');
             await loadScheduledJobs();
         } else {
             showToast(`❌ Sync failed: ${data.detail}`, 'error');
@@ -713,9 +845,9 @@ function renderJobsGrid() {
         container.innerHTML = `
             <div class="empty-state" style="grid-column: 1 / -1; text-align: center; padding: 3rem;">
                 <h3>📋 No Scheduled Jobs Found</h3>
-                <p>Jobs haven't been synced from OpenClaw yet.</p>
+                <p>Jobs haven't been synced yet.</p>
                 <button class="btn btn-primary" onclick="syncJobs()" style="margin-top: 1rem;">
-                    🔄 Sync Jobs from OpenClaw
+                    🔄 Sync Jobs
                 </button>
             </div>
         `;
@@ -732,18 +864,19 @@ function renderJobsGrid() {
         const statusLabel = !job.enabled ? 'Disabled' : 
                            job.lastStatus === 'ok' ? 'Active' : 
                            job.lastStatus || 'Idle';
+        const escapedId = escapeHtml(job.id || job.name);
         
         return `
             <div class="job-card ${!job.enabled ? 'disabled' : ''}">
                 <div class="job-header">
                     <div class="job-icon">${job.icon}</div>
                     <div class="job-info">
-                        <div class="job-name">${job.name}</div>
-                        <div class="job-schedule">${job.schedule}</div>
+                        <div class="job-name">${escapeHtml(job.name)}</div>
+                        <div class="job-schedule">${escapeHtml(job.schedule)}</div>
                     </div>
                     <span class="job-status ${status}">${statusLabel}</span>
                 </div>
-                <p class="job-description">${job.description}</p>
+                <p class="job-description">${escapeHtml(job.description)}</p>
                 <div class="job-meta">
                     <div class="job-meta-item">
                         <span class="job-meta-label">Frequency</span>
@@ -763,6 +896,14 @@ function renderJobsGrid() {
                         <span class="job-meta-value">${formatDuration(job.lastDurationMs)}</span>
                     </div>
                     ` : ''}
+                </div>
+                <div class="job-card-actions">
+                    <button class="btn btn-secondary btn-sm" onclick="openEditJobModal('${escapedId}')" style="font-size:12px;">✏️ Edit</button>
+                    <button class="btn btn-secondary btn-sm" onclick="triggerSingleJob('${escapedId}')" style="font-size:12px;">▶️ Run</button>
+                    <button class="btn btn-secondary btn-sm" onclick="toggleJobEnabled('${escapedId}', ${!job.enabled})" style="font-size:12px;">
+                        ${job.enabled ? '🚫 Disable' : '✅ Enable'}
+                    </button>
+                    <button class="btn btn-secondary btn-sm" style="font-size:12px;color:var(--danger,#ef4444);" onclick="deleteCronJob('${escapedId}')">🗑️</button>
                 </div>
             </div>
         `;
@@ -848,6 +989,135 @@ function formatDuration(ms) {
     if (hours > 0) return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
     if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
     return `${seconds}s`;
+}
+
+// ── Cron Job CRUD ──────────────────────────────────────────────────
+
+let editingJobId = null;
+
+function openAddJobModal() {
+    editingJobId = null;
+    document.getElementById('cronModalTitle').textContent = '➕ Add Cron Job';
+    document.getElementById('cronJobForm').reset();
+    document.getElementById('jId').value = '';
+    document.getElementById('jId').disabled = false;
+    document.getElementById('jEnabled').checked = true;
+    document.getElementById('cronJobModal').classList.add('active');
+}
+
+function openEditJobModal(jobId) {
+    const job = scheduledJobs.find(j => (j.id || j.name) === jobId);
+    if (!job) { showToast('Job not found', 'error'); return; }
+    editingJobId = job.id || job.name;
+    document.getElementById('cronModalTitle').textContent = '✏️ Edit Cron Job';
+    document.getElementById('jId').value = editingJobId;
+    document.getElementById('jId').disabled = true;
+    document.getElementById('jName').value = job.name || '';
+    document.getElementById('jSchedule').value = job.schedule || '';
+    document.getElementById('jAgent').value = job.agent_id || 'main';
+    document.getElementById('jType').value = job.payload_type || 'prompt';
+    document.getElementById('jSession').value = job.session_mode || 'isolated';
+    document.getElementById('jPayload').value = job.payload || '';
+    document.getElementById('jMaxDuration').value = job.max_duration_seconds || 300;
+    document.getElementById('jRetry').value = job.retry_count || 0;
+    document.getElementById('jEnabled').checked = job.enabled !== false;
+    document.getElementById('cronJobModal').classList.add('active');
+}
+
+function closeJobModal() {
+    document.getElementById('cronJobModal').classList.remove('active');
+    editingJobId = null;
+}
+
+async function saveCronJob(e) {
+    e.preventDefault();
+    const body = {
+        name: document.getElementById('jName').value.trim(),
+        schedule: document.getElementById('jSchedule').value.trim(),
+        agent_id: document.getElementById('jAgent').value.trim() || 'main',
+        payload_type: document.getElementById('jType').value,
+        session_mode: document.getElementById('jSession').value,
+        payload: document.getElementById('jPayload').value.trim(),
+        max_duration_seconds: parseInt(document.getElementById('jMaxDuration').value) || 300,
+        retry_count: parseInt(document.getElementById('jRetry').value) || 0,
+        enabled: document.getElementById('jEnabled').checked,
+    };
+    if (!body.name || !body.schedule || !body.payload) {
+        showToast('Name, schedule and payload are required', 'error'); return;
+    }
+
+    try {
+        let url, method;
+        if (editingJobId) {
+            url = `${API_BASE}/engine/cron/${encodeURIComponent(editingJobId)}`;
+            method = 'PUT';
+        } else {
+            url = `${API_BASE}/engine/cron`;
+            method = 'POST';
+            const jId = document.getElementById('jId').value.trim();
+            if (jId) body.id = jId;
+        }
+        const resp = await fetch(url, {
+            method, headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.detail || `HTTP ${resp.status}`);
+        }
+        showToast(editingJobId ? '✅ Job updated' : '✅ Job created', 'success');
+        closeJobModal();
+        setTimeout(loadHeartbeatData, 1000);
+    } catch (err) {
+        showToast(`Error: ${err.message}`, 'error');
+    }
+}
+
+async function deleteCronJob(jobId) {
+    if (!confirm(`Delete cron job "${jobId}"?`)) return;
+    try {
+        const resp = await fetch(`${API_BASE}/engine/cron/${encodeURIComponent(jobId)}`, { method: 'DELETE' });
+        if (!resp.ok && resp.status !== 204) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.detail || `HTTP ${resp.status}`);
+        }
+        showToast('🗑️ Job deleted', 'success');
+        setTimeout(loadHeartbeatData, 1000);
+    } catch (err) {
+        showToast(`Error: ${err.message}`, 'error');
+    }
+}
+
+async function toggleJobEnabled(jobId, newEnabled) {
+    try {
+        const resp = await fetch(`${API_BASE}/engine/cron/${encodeURIComponent(jobId)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: newEnabled }),
+        });
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.detail || `HTTP ${resp.status}`);
+        }
+        showToast(newEnabled ? '✅ Job enabled' : '🚫 Job disabled', 'success');
+        setTimeout(loadHeartbeatData, 1000);
+    } catch (err) {
+        showToast(`Error: ${err.message}`, 'error');
+    }
+}
+
+async function triggerSingleJob(jobId) {
+    try {
+        const resp = await fetch(`${API_BASE}/engine/cron/${encodeURIComponent(jobId)}/trigger`, { method: 'POST' });
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.detail || `HTTP ${resp.status}`);
+        }
+        showToast('▶️ Job triggered', 'success');
+        setTimeout(loadHeartbeatData, 2000);
+    } catch (err) {
+        showToast(`Error: ${err.message}`, 'error');
+    }
 }
 
 // Auto-refresh every 60 seconds

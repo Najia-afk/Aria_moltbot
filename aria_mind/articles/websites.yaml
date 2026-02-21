@@ -84,11 +84,11 @@ sources:
     priority: medium
     tags: [research, papers, ai, ml]
 
-  # ── OpenClaw / Community ────────────────────────────────────────
+  # ── Community ────────────────────────────────────────────────────────────
 
-  openclaw_blog:
-    name: "OpenClaw Blog"
-    url: "https://blog.openclaw.ai"
+  aria_blog:
+    name: "Aria Blog"
+    url: "https://blog.aria.ai"
     selectors:
       article_links: "article a[href^='/blog']"
       title: "h1"
@@ -97,7 +97,7 @@ sources:
       max_visits_per_day: 1
       cooldown_hours: 24
     priority: high
-    tags: [openclaw, community, updates]
+    tags: [aria, community, updates]
 
 # ── Research Budget ───────────────────────────────────────────────
 # Strict token management for autonomous mode
@@ -118,8 +118,8 @@ output:
   save_raw_html: false  # Save space, extract text only
   save_screenshots: false  # Tokens > images for now
   summary_format: markdown
-  storage_path: "/root/.openclaw/aria_memories/research/articles/"
-  index_file: "/root/.openclaw/aria_memories/research/article_index.json"
+  storage_path: "/app/aria_memories/research/articles/"
+  index_file: "/app/aria_memories/research/article_index.json"
 
 # ── Autonomous Mode Rules ─────────────────────────────────────────
 

@@ -23,6 +23,12 @@ Key endpoints:
 | `/knowledge-graph` | Knowledge graph entities + relations |
 | `/model-usage` | LLM usage metrics + cost tracking |
 | `/security-events` | Security audit log + threat detection |
+| `/agents/db` | Agent CRUD — create, update, enable/disable, delete, sync from AGENTS.md |
+| `/models/db` | LLM model CRUD — create, update, delete, sync from models.yaml |
+| `/models/available` | Active models for chat UI model selector |
+| `/engine/chat` | Engine chat sessions — create, message, export, history |
+| `/engine/cron` | Cron job management — CRUD + trigger + history |
+| `/engine/agents` | Engine agent state + performance metrics |
 
 Full interactive docs are served at `/api/docs` (Swagger) when the stack is running.
 
@@ -45,8 +51,8 @@ Source: `src/api/security_middleware.py`
 
 SQLAlchemy 2.0 async models and session management:
 
-- Models: `src/api/db/models.py`
-- Session: `src/api/db/session.py`
+- Models: `src/api/db/models.py` — 37 ORM models across two schemas (`aria_data`, `aria_engine`)
+- Session: `src/api/db/session.py` — auto-creates both schemas on startup
 - Documentation: `src/api/db/MODELS.md`
 - Migrations: `src/api/alembic/`
 
@@ -56,7 +62,7 @@ SQLAlchemy 2.0 async models and session management:
 
 A Flask application with Jinja2 templates, Chart.js visualizations, tabbed layouts, and auto-refresh.
 
-The Flask app includes a reverse proxy for seamless `/api/*` and `/clawdbot/*` forwarding.
+The Flask app includes a reverse proxy for seamless `/api/*` forwarding.
 
 ### Source
 

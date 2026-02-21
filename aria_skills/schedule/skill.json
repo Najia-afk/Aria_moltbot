@@ -4,116 +4,158 @@
   "description": "Manage Aria's scheduled jobs, tasks, and background operations.",
   "author": "Aria Team",
   "layer": 4,
-  "dependencies": ["api_client"],
-  "focus_affinity": ["orchestrator"],
+  "dependencies": [
+    "api_client"
+  ],
+  "focus_affinity": [
+    "orchestrator"
+  ],
   "tools": [
     {
-      "name": "schedule_list",
+      "name": "list_jobs",
       "description": "List all scheduled jobs.",
       "parameters": {
         "type": "object",
         "properties": {
           "status": {
             "type": "string",
-            "enum": ["active", "paused", "all"],
+            "enum": [
+              "active",
+              "paused",
+              "all"
+            ],
             "description": "Filter by job status"
           }
         }
       }
     },
     {
-      "name": "schedule_tick",
-      "description": "Get current schedule tick status.",
+      "name": "get_due_jobs",
+      "description": "Get jobs that are currently due for execution.",
       "parameters": {
         "type": "object",
         "properties": {}
       }
     },
     {
-      "name": "schedule_trigger",
-      "description": "Manually trigger a schedule tick.",
+      "name": "mark_job_run",
+      "description": "Mark a job as having been run / manually trigger execution.",
       "parameters": {
         "type": "object",
         "properties": {
+          "job_id": {
+            "type": "integer",
+            "description": "Job ID to mark as run"
+          },
           "force": {
             "type": "boolean",
             "description": "Force execution even if not due"
           }
-        }
+        },
+        "required": [
+          "job_id"
+        ]
       }
     },
     {
-      "name": "schedule_sync",
-      "description": "Sync jobs from OpenClaw configuration.",
-      "parameters": {
-        "type": "object",
-        "properties": {}
-      }
-    },
-    {
-      "name": "task_create",
-      "description": "Create a pending complex task for later execution.",
+      "name": "create_job",
+      "description": "Create a new scheduled job.",
       "parameters": {
         "type": "object",
         "properties": {
           "type": {
             "type": "string",
-            "description": "Task type (research, code, analysis, etc.)"
+            "description": "Job type (research, code, analysis, etc.)"
           },
           "prompt": {
             "type": "string",
-            "description": "Task description/prompt"
+            "description": "Job description/prompt"
           },
           "priority": {
             "type": "string",
-            "enum": ["low", "medium", "high", "critical"],
-            "description": "Task priority"
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "critical"
+            ],
+            "description": "Job priority"
           },
           "context": {
             "type": "object",
-            "description": "Additional context for the task"
+            "description": "Additional context for the job"
           }
         },
-        "required": ["type", "prompt"]
+        "required": [
+          "type",
+          "prompt"
+        ]
       }
     },
     {
-      "name": "task_list",
-      "description": "List pending tasks.",
+      "name": "get_job",
+      "description": "Get details of a specific scheduled job.",
       "parameters": {
         "type": "object",
         "properties": {
-          "status": {
-            "type": "string",
-            "enum": ["pending", "in_progress", "completed", "failed", "all"],
-            "description": "Filter by status"
-          }
-        }
-      }
-    },
-    {
-      "name": "task_update",
-      "description": "Update a pending task.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "task_id": {
+          "job_id": {
             "type": "integer",
-            "description": "Task ID"
-          },
-          "status": {
-            "type": "string",
-            "enum": ["pending", "in_progress", "completed", "failed"],
-            "description": "New status"
-          },
-          "result": {
-            "type": "string",
-            "description": "Task result/output"
+            "description": "Job ID"
           }
         },
-        "required": ["task_id"]
+        "required": [
+          "job_id"
+        ]
+      }
+    },
+    {
+      "name": "delete_job",
+      "description": "Delete a scheduled job.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "integer",
+            "description": "Job ID to delete"
+          }
+        },
+        "required": [
+          "job_id"
+        ]
+      }
+    },
+    {
+      "name": "enable_job",
+      "description": "Enable a paused scheduled job.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "integer",
+            "description": "Job ID to enable"
+          }
+        },
+        "required": [
+          "job_id"
+        ]
+      }
+    },
+    {
+      "name": "disable_job",
+      "description": "Disable/pause a scheduled job.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "integer",
+            "description": "Job ID to disable"
+          }
+        },
+        "required": [
+          "job_id"
+        ]
       }
     }
   ],
-  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py schedule {{tool}} '{{args_json}}'"
+  "run": "python3 /app/skills/run_skill.py schedule {{tool}} '{{args_json}}'"
 }

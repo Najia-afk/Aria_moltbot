@@ -25,7 +25,7 @@ __version__ = "1.1.0"
 __author__ = "Aria Blue"
 
 # Use try/except for import compatibility between local dev and container
-# In container: workspace is /root/.openclaw/workspace (aria_mind contents at root)
+# In container: workspace is /app (aria_mind contents at root)
 # Locally: aria_mind is a package
 try:
     # Try relative imports first (works in container where aria_mind is workspace root)

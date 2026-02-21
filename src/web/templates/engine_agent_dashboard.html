@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Agent Dashboard — Aria Engine{% endblock %}
+
+{% block content %}
+<style>
+  .dash-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; }
+  .dash-header h1 { font-size:1.6rem; margin:0; color:var(--text); }
+  .summary-cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:1rem; margin-bottom:2rem; }
+  .summary-card { background:var(--bg-card,#1e1e2e); border-radius:12px; padding:1.2rem; text-align:center; }
+  .summary-card .label { font-size:0.75rem; text-transform:uppercase; color:var(--muted,#888); margin-bottom:.4rem; }
+  .summary-card .value { font-size:1.8rem; font-weight:700; color:var(--text,#cdd6f4); }
+  .agent-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:1rem; }
+  .agent-card { background:var(--bg-card,#1e1e2e); border-radius:12px; padding:1.2rem; border-left:4px solid var(--card-accent,#888); }
+  .agent-card.green  { --card-accent:#a6e3a1; }
+  .agent-card.yellow { --card-accent:#f9e2af; }
+  .agent-card.red    { --card-accent:#f38ba8; }
+  .agent-card .agent-name { font-size:1.1rem; font-weight:600; display:flex; align-items:center; gap:.5rem; }
+  .agent-card .agent-name .dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
+  .agent-card .dot.green  { background:#a6e3a1; }
+  .agent-card .dot.yellow { background:#f9e2af; }
+  .agent-card .dot.red    { background:#f38ba8; }
+  .agent-card .dot.gray   { background:#585b70; }
+  .agent-card .meta { font-size:0.8rem; color:var(--muted,#888); margin-top:.3rem; }
+  .agent-card .stats { display:grid; grid-template-columns:1fr 1fr; gap:.6rem; margin-top:.8rem; }
+  .agent-card .stat-label { font-size:0.7rem; text-transform:uppercase; color:var(--muted,#888); }
+  .agent-card .stat-value { font-size:1rem; font-weight:600; }
+  .refresh-info { font-size:0.75rem; color:var(--muted,#888); }
+  #loading { text-align:center; padding:3rem; color:var(--muted,#888); }
+</style>
+
+<div class="dash-header">
+  <h1>Agent Performance Dashboard</h1>
+  <span class="refresh-info">Auto-refresh every 30 s</span>
+</div>
+
+<!-- summary row -->
+<div class="summary-cards" id="summaryCards">
+  <div class="summary-card"><div class="label">Active Agents</div><div class="value" id="sActive">—</div></div>
+  <div class="summary-card"><div class="label">Total Messages</div><div class="value" id="sMessages">—</div></div>
+  <div class="summary-card"><div class="label">Error Rate</div><div class="value" id="sErrorRate">—</div></div>
+  <div class="summary-card"><div class="label">Avg Pheromone</div><div class="value" id="sPheromone">—</div></div>
+</div>
+
+<div id="loading">Loading metrics…</div>
+<div class="agent-grid" id="agentGrid" style="display:none;"></div>
+
+<script>
+function scoreClass(s){ return s>=0.7?'green':s>=0.4?'yellow':'red'; }
+function statusDot(st){
+  const m={'idle':'green','busy':'yellow','error':'red','disabled':'gray'};
+  return m[st]||'gray';
+}
+function fmt(n){ return n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(1)+'K':n; }
+
+async function loadMetrics(){
+  try{
+    const r=await fetch('/api/engine/agents/metrics');
+    const d=await r.json();
+    document.getElementById('sActive').textContent=d.agents.filter(a=>a.status==='idle'||a.status==='busy').length;
+    document.getElementById('sMessages').textContent=fmt(d.total_messages);
+    const errRate=d.total_messages>0?((d.total_errors/d.total_messages)*100).toFixed(1)+'%':'0%';
+    document.getElementById('sErrorRate').textContent=errRate;
+    document.getElementById('sPheromone').textContent=d.avg_pheromone.toFixed(3);
+
+    const grid=document.getElementById('agentGrid');
+    grid.innerHTML='';
+    d.agents.forEach(a=>{
+      const cls=scoreClass(a.pheromone_score);
+      const dotCls=statusDot(a.status);
+      grid.innerHTML+=`
+        <div class="agent-card ${cls}">
+          <div class="agent-name"><span class="dot ${dotCls}"></span>${a.display_name}</div>
+          <div class="meta">${a.focus_type||'general'} · ${a.status}</div>
+          <div class="stats">
+            <div><div class="stat-label">Pheromone</div><div class="stat-value">${a.pheromone_score.toFixed(3)}</div></div>
+            <div><div class="stat-label">Messages</div><div class="stat-value">${fmt(a.messages_processed)}</div></div>
+            <div><div class="stat-label">Avg Latency</div><div class="stat-value">${a.avg_latency_ms} ms</div></div>
+            <div><div class="stat-label">Errors</div><div class="stat-value">${a.error_count}</div></div>
+          </div>
+        </div>`;
+    });
+    document.getElementById('loading').style.display='none';
+    grid.style.display='grid';
+  }catch(e){
+    document.getElementById('loading').textContent='Failed to load metrics.';
+    console.error(e);
+  }
+}
+loadMetrics();
+setInterval(loadMetrics,30000);
+</script>
+{% endblock %}

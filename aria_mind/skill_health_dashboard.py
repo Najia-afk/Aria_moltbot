@@ -4,7 +4,7 @@ Stored in working memory for fast access and periodic persistence.
 """
 
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any
+from typing import Any
 from dataclasses import dataclass, asdict
 import json
 
@@ -14,14 +14,14 @@ class SkillMetric:
     skill_name: str
     execution_time_ms: float
     success: bool
-    error_type: Optional[str] = None
+    error_type: str | None = None
     timestamp: datetime = None
     
     def __post_init__(self):
         if self.timestamp is None:
             self.timestamp = datetime.utcnow()
     
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "skill_name": self.skill_name,
             "execution_time_ms": self.execution_time_ms,
@@ -42,9 +42,9 @@ class SkillHealthSnapshot:
     min_execution_time_ms: float
     error_rate: float
     last_updated: datetime
-    recent_errors: List[str]
+    recent_errors: list[str]
     
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "skill_name": self.skill_name,
             "total_calls": self.total_calls,
@@ -65,12 +65,12 @@ class SkillHealthDashboard:
     """
     
     def __init__(self, max_history: int = 1000):
-        self.metrics: List[SkillMetric] = []
+        self.metrics: list[SkillMetric] = []
         self.max_history = max_history
-        self._snapshots: Dict[str, SkillHealthSnapshot] = {}
+        self._snapshots: dict[str, SkillHealthSnapshot] = {}
     
     def record_execution(self, skill_name: str, execution_time_ms: float, 
-                        success: bool, error_type: Optional[str] = None) -> None:
+                        success: bool, error_type: str | None = None) -> None:
         """Record a skill execution metric."""
         metric = SkillMetric(
             skill_name=skill_name,
@@ -117,29 +117,29 @@ class SkillHealthDashboard:
             recent_errors=recent_errors
         )
     
-    def get_snapshot(self, skill_name: str) -> Optional[SkillHealthSnapshot]:
+    def get_snapshot(self, skill_name: str) -> SkillHealthSnapshot | None:
         """Get health snapshot for a specific skill."""
         return self._snapshots.get(skill_name)
     
-    def get_all_snapshots(self) -> Dict[str, SkillHealthSnapshot]:
+    def get_all_snapshots(self) -> dict[str, SkillHealthSnapshot]:
         """Get health snapshots for all skills."""
         return self._snapshots.copy()
     
-    def get_unhealthy_skills(self, error_threshold: float = 0.1) -> List[SkillHealthSnapshot]:
+    def get_unhealthy_skills(self, error_threshold: float = 0.1) -> list[SkillHealthSnapshot]:
         """Get skills with error rate above threshold."""
         return [
             snap for snap in self._snapshots.values()
             if snap.error_rate >= error_threshold
         ]
     
-    def get_slow_skills(self, time_threshold_ms: float = 5000) -> List[SkillHealthSnapshot]:
+    def get_slow_skills(self, time_threshold_ms: float = 5000) -> list[SkillHealthSnapshot]:
         """Get skills with avg execution time above threshold."""
         return [
             snap for snap in self._snapshots.values()
             if snap.avg_execution_time_ms >= time_threshold_ms
         ]
     
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Export dashboard state for working memory storage."""
         return {
             "snapshots": {
@@ -175,7 +175,7 @@ class SkillHealthDashboard:
 
 
 # Singleton instance for global access
-_dashboard_instance: Optional[SkillHealthDashboard] = None
+_dashboard_instance: SkillHealthDashboard | None = None
 
 def get_dashboard() -> SkillHealthDashboard:
     """Get or create the global dashboard instance."""
@@ -185,11 +185,11 @@ def get_dashboard() -> SkillHealthDashboard:
     return _dashboard_instance
 
 def record_skill_execution(skill_name: str, execution_time_ms: float,
-                          success: bool, error_type: Optional[str] = None) -> None:
+                          success: bool, error_type: str | None = None) -> None:
     """Convenience function to record execution via global dashboard."""
     get_dashboard().record_execution(skill_name, execution_time_ms, success, error_type)
 
-def get_skill_health(skill_name: str) -> Optional[SkillHealthSnapshot]:
+def get_skill_health(skill_name: str) -> SkillHealthSnapshot | None:
     """Get health snapshot for a skill."""
     return get_dashboard().get_snapshot(skill_name)
 

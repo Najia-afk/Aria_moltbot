@@ -1,0 +1,637 @@
+"""
+Native Session Manager — PostgreSQL-backed session lifecycle (ORM).
+
+Uses SQLAlchemy ORM models (EngineChatSession, EngineChatMessage) instead of
+raw SQL.  All schema-awareness comes from the model __table_args__.
+
+Replaces aria_skills/session_manager with direct DB access:
+- No sessions.json, no JSONL files
+- Full CRUD via ORM on chat_sessions + chat_messages
+- Native pagination, search, and filtering
+- Backward-compatible method signatures
+- Agent-scoped queries via agent_id parameter
+"""
+import logging
+from datetime import datetime, timezone
+from typing import Any
+from uuid import uuid4
+
+from sqlalchemy import select, insert, update, delete, func, and_, or_, cast, literal
+from sqlalchemy.dialects.postgresql import JSONB as PG_JSONB
+from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
+
+from aria_engine.config import EngineConfig
+from aria_engine.exceptions import EngineError
+from db.models import EngineChatSession, EngineChatMessage
+
+logger = logging.getLogger("aria.engine.session_manager")
+
+# Defaults
+DEFAULT_PAGE_SIZE = 20
+MAX_PAGE_SIZE = 100
+MAX_TITLE_LENGTH = 200
+MAX_MESSAGE_LENGTH = 100_000  # 100KB per message
+
+
+class NativeSessionManager:
+    """
+    PostgreSQL-backed session manager (ORM).
+
+    Manages the full lifecycle of chat sessions and messages
+    using aria_engine.chat_sessions and aria_engine.chat_messages.
+
+    Usage:
+        mgr = NativeSessionManager(db_engine)
+
+        # Create session
+        session = await mgr.create_session(
+            agent_id="aria-talk",
+            title="Morning chat",
+        )
+
+        # Add messages
+        await mgr.add_message(
+            session_id=session["session_id"],
+            role="user",
+            content="Hello!",
+        )
+
+        # Get full conversation
+        messages = await mgr.get_messages(session["session_id"])
+
+        # List sessions with search
+        sessions = await mgr.list_sessions(
+            agent_id="aria-talk",
+            search="morning",
+            limit=10,
+        )
+    """
+
+    def __init__(self, db_engine: AsyncEngine):
+        self._db = db_engine
+        self._async_session = async_sessionmaker(
+            db_engine, expire_on_commit=False,
+        )
+
+    # ── Session CRUD ──────────────────────────────────────────
+
+    async def create_session(
+        self,
+        agent_id: str = "main",
+        title: str | None = None,
+        session_type: str = "chat",
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """
+        Create a new chat session.
+
+        Args:
+            agent_id: Owning agent ID.
+            title: Session title (auto-generated if None).
+            session_type: Type ('chat', 'roundtable', 'cron').
+            metadata: Optional JSON metadata.
+
+        Returns:
+            Session dict with session_id, title, agent_id, etc.
+        """
+        session_id = str(uuid4())
+        if not title:
+            title = f"Session {session_id[:8]}"
+        title = title[:MAX_TITLE_LENGTH]
+
+        async with self._async_session() as session:
+            async with session.begin():
+                obj = EngineChatSession(
+                    id=session_id,
+                    title=title,
+                    agent_id=agent_id,
+                    session_type=session_type,
+                    metadata_json=metadata or {},
+                )
+                session.add(obj)
+                await session.flush()
+
+                logger.info(
+                    "Created session %s for %s: %s",
+                    session_id, agent_id, title,
+                )
+
+                return {
+                    "session_id": str(obj.id),
+                    "title": obj.title,
+                    "agent_id": obj.agent_id,
+                    "session_type": obj.session_type,
+                    "created_at": obj.created_at.isoformat(),
+                    "message_count": 0,
+                }
+
+    async def get_session(
+        self,
+        session_id: str,
+    ) -> dict[str, Any] | None:
+        """
+        Get session details by ID.
+
+        Returns:
+            Session dict or None if not found.
+        """
+        stmt = (
+            select(
+                EngineChatSession,
+                func.count(EngineChatMessage.id).label("message_count"),
+                func.max(EngineChatMessage.created_at).label("last_message_at"),
+            )
+            .outerjoin(
+                EngineChatMessage,
+                EngineChatMessage.session_id == EngineChatSession.id,
+            )
+            .where(EngineChatSession.id == session_id)
+            .group_by(EngineChatSession.id)
+        )
+
+        async with self._async_session() as session:
+            result = await session.execute(stmt)
+            row = result.first()
+
+        if not row:
+            return None
+
+        s = row[0]
+        return {
+            "session_id": str(s.id),
+            "title": s.title or "Untitled",
+            "agent_id": s.agent_id or "unknown",
+            "session_type": s.session_type,
+            "metadata": dict(s.metadata_json) if s.metadata_json else None,
+            "message_count": row.message_count,
+            "created_at": s.created_at.isoformat(),
+            "updated_at": s.updated_at.isoformat() if s.updated_at else None,
+            "last_message_at": (
+                row.last_message_at.isoformat()
+                if row.last_message_at
+                else None
+            ),
+        }
+
+    async def list_sessions(
+        self,
+        agent_id: str | None = None,
+        session_type: str | None = None,
+        search: str | None = None,
+        limit: int = DEFAULT_PAGE_SIZE,
+        offset: int = 0,
+        sort: str = "updated_at",
+        order: str = "desc",
+    ) -> dict[str, Any]:
+        """
+        List sessions with filtering, search, and pagination.
+
+        Args:
+            agent_id: Filter by agent.
+            session_type: Filter by type ('chat', 'roundtable', 'cron').
+            search: Full-text search in title and messages.
+            limit: Page size (max 100).
+            offset: Offset for pagination.
+            sort: Sort field ('created_at', 'updated_at', 'title').
+            order: Sort order ('asc', 'desc').
+
+        Returns:
+            Dict with 'sessions' list, 'total' count, pagination info.
+        """
+        limit = min(max(limit, 1), MAX_PAGE_SIZE)
+
+        # Validate sort
+        allowed_sorts = {"created_at", "updated_at", "title"}
+        if sort not in allowed_sorts:
+            sort = "updated_at"
+        if order not in ("asc", "desc"):
+            order = "desc"
+
+        # Build WHERE filters
+        filters = []
+        if agent_id:
+            filters.append(EngineChatSession.agent_id == agent_id)
+        if session_type:
+            filters.append(EngineChatSession.session_type == session_type)
+        if search:
+            pattern = f"%{search}%"
+            search_in_messages = (
+                select(literal(1))
+                .where(
+                    and_(
+                        EngineChatMessage.session_id == EngineChatSession.id,
+                        EngineChatMessage.content.ilike(pattern),
+                    )
+                )
+                .correlate(EngineChatSession)
+                .exists()
+            )
+            filters.append(
+                or_(
+                    EngineChatSession.title.ilike(pattern),
+                    search_in_messages,
+                )
+            )
+
+        where = and_(*filters) if filters else True
+
+        # Sort column
+        sort_col = getattr(EngineChatSession, sort, EngineChatSession.updated_at)
+        order_clause = sort_col.desc() if order == "desc" else sort_col.asc()
+
+        async with self._async_session() as session:
+            # Count total
+            count_stmt = (
+                select(func.count())
+                .select_from(EngineChatSession)
+                .where(where)
+            )
+            total = (await session.execute(count_stmt)).scalar() or 0
+
+            # Fetch page
+            data_stmt = (
+                select(
+                    EngineChatSession,
+                    func.count(EngineChatMessage.id).label("message_count"),
+                    func.max(EngineChatMessage.created_at).label("last_message_at"),
+                )
+                .outerjoin(
+                    EngineChatMessage,
+                    EngineChatMessage.session_id == EngineChatSession.id,
+                )
+                .where(where)
+                .group_by(EngineChatSession.id)
+                .order_by(order_clause)
+                .limit(limit)
+                .offset(offset)
+            )
+            rows = (await session.execute(data_stmt)).all()
+
+        sessions_list = []
+        for row in rows:
+            s = row[0]
+            sessions_list.append({
+                "session_id": str(s.id),
+                "title": s.title or "Untitled",
+                "agent_id": s.agent_id or "unknown",
+                "session_type": s.session_type,
+                "metadata": dict(s.metadata_json) if s.metadata_json else None,
+                "message_count": row.message_count,
+                "created_at": s.created_at.isoformat(),
+                "updated_at": s.updated_at.isoformat() if s.updated_at else None,
+                "last_message_at": (
+                    row.last_message_at.isoformat()
+                    if row.last_message_at
+                    else None
+                ),
+            })
+
+        return {
+            "sessions": sessions_list,
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "has_more": (offset + limit) < total,
+        }
+
+    async def update_session(
+        self,
+        session_id: str,
+        title: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
+        """Update session title and/or metadata."""
+        values: dict[str, Any] = {"updated_at": func.now()}
+
+        if title is not None:
+            values["title"] = title[:MAX_TITLE_LENGTH]
+        if metadata is not None:
+            values["metadata_json"] = metadata
+
+        stmt = (
+            update(EngineChatSession)
+            .where(EngineChatSession.id == session_id)
+            .values(**values)
+            .returning(EngineChatSession.id)
+        )
+
+        async with self._async_session() as session:
+            async with session.begin():
+                result = await session.execute(stmt)
+                if not result.first():
+                    return None
+
+        return await self.get_session(session_id)
+
+    async def delete_session(
+        self,
+        session_id: str,
+    ) -> bool:
+        """
+        Delete a session and all its messages.
+
+        Uses CASCADE from chat_messages FK, but explicit delete
+        handles cases where FK constraints don't exist yet.
+
+        Returns:
+            True if session existed and was deleted.
+        """
+        async with self._async_session() as session:
+            async with session.begin():
+                # Delete messages first (safe even with CASCADE)
+                await session.execute(
+                    delete(EngineChatMessage)
+                    .where(EngineChatMessage.session_id == session_id)
+                )
+
+                result = await session.execute(
+                    delete(EngineChatSession)
+                    .where(EngineChatSession.id == session_id)
+                    .returning(EngineChatSession.id)
+                )
+                deleted = result.first() is not None
+
+        if deleted:
+            logger.info("Deleted session %s", session_id)
+
+        return deleted
+
+    async def end_session(
+        self,
+        session_id: str,
+    ) -> bool:
+        """
+        Mark a session as ended (set updated_at, add end marker).
+
+        Does not delete — just marks as inactive.
+
+        Returns:
+            True if session exists.
+        """
+        stmt = (
+            update(EngineChatSession)
+            .where(EngineChatSession.id == session_id)
+            .values(
+                updated_at=func.now(),
+                metadata_json=func.coalesce(
+                    EngineChatSession.metadata_json,
+                    cast("{}", PG_JSONB),
+                ).op("||")(cast({"ended": True}, PG_JSONB)),
+            )
+            .returning(EngineChatSession.id)
+        )
+
+        async with self._async_session() as session:
+            async with session.begin():
+                result = await session.execute(stmt)
+                return result.first() is not None
+
+    # ── Message Operations ────────────────────────────────────
+
+    async def add_message(
+        self,
+        session_id: str,
+        role: str,
+        content: str,
+        agent_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """
+        Add a message to a session.
+
+        Args:
+            session_id: Session to add to.
+            role: Message role ('user', 'assistant', 'system').
+            content: Message content (max 100KB).
+            agent_id: Agent that created the message.
+            metadata: Optional JSON metadata (token_count, latency, etc).
+
+        Returns:
+            Message dict.
+
+        Raises:
+            EngineError: If session not found.
+        """
+        content = content[:MAX_MESSAGE_LENGTH]
+
+        async with self._async_session() as session:
+            async with session.begin():
+                # Verify session exists
+                check = await session.execute(
+                    select(EngineChatSession.id)
+                    .where(EngineChatSession.id == session_id)
+                )
+                if not check.first():
+                    raise EngineError(f"Session {session_id} not found")
+
+                # Build metadata with agent_id
+                meta = dict(metadata) if metadata else {}
+                if agent_id:
+                    meta["agent_id"] = agent_id
+
+                # Insert message
+                msg = EngineChatMessage(
+                    session_id=session_id,
+                    role=role,
+                    content=content,
+                    metadata_json=meta,
+                )
+                session.add(msg)
+                await session.flush()
+
+                # Touch session updated_at
+                await session.execute(
+                    update(EngineChatSession)
+                    .where(EngineChatSession.id == session_id)
+                    .values(updated_at=func.now())
+                )
+
+                return {
+                    "id": str(msg.id),
+                    "session_id": str(msg.session_id),
+                    "role": msg.role,
+                    "content": msg.content,
+                    "agent_id": agent_id,
+                    "created_at": msg.created_at.isoformat(),
+                }
+
+    async def get_messages(
+        self,
+        session_id: str,
+        limit: int = 100,
+        offset: int = 0,
+        since: datetime | None = None,
+    ) -> list[dict[str, Any]]:
+        """
+        Get messages for a session, ordered chronologically.
+
+        Args:
+            session_id: Session ID.
+            limit: Max messages to return.
+            offset: Offset for pagination.
+            since: Only return messages after this datetime.
+
+        Returns:
+            List of message dicts.
+        """
+        filters = [EngineChatMessage.session_id == session_id]
+        if since:
+            filters.append(EngineChatMessage.created_at > since)
+
+        stmt = (
+            select(EngineChatMessage)
+            .where(and_(*filters))
+            .order_by(EngineChatMessage.created_at.asc())
+            .limit(min(limit, 500))
+            .offset(offset)
+        )
+
+        async with self._async_session() as session:
+            result = await session.execute(stmt)
+            messages = result.scalars().all()
+
+        return [
+            {
+                "id": str(m.id),
+                "session_id": str(m.session_id),
+                "role": m.role,
+                "content": m.content or "",
+                "thinking": m.thinking if hasattr(m, "thinking") else None,
+                "tool_calls": m.tool_calls if hasattr(m, "tool_calls") else None,
+                "model": m.model if hasattr(m, "model") else None,
+                "agent_id": (m.metadata_json or {}).get("agent_id"),
+                "metadata": dict(m.metadata_json) if m.metadata_json else None,
+                "created_at": m.created_at.isoformat(),
+            }
+            for m in messages
+        ]
+
+    async def delete_message(
+        self,
+        message_id: int,
+        session_id: str,
+    ) -> bool:
+        """Delete a single message (must match session_id for safety)."""
+        stmt = (
+            delete(EngineChatMessage)
+            .where(
+                and_(
+                    EngineChatMessage.id == message_id,
+                    EngineChatMessage.session_id == session_id,
+                )
+            )
+            .returning(EngineChatMessage.id)
+        )
+
+        async with self._async_session() as session:
+            async with session.begin():
+                result = await session.execute(stmt)
+                return result.first() is not None
+
+    # ── Maintenance ───────────────────────────────────────────
+
+    async def prune_old_sessions(
+        self,
+        days: int = 30,
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        """
+        Delete sessions older than N days with no recent messages.
+
+        Args:
+            days: Sessions inactive for this many days are pruned.
+            dry_run: If True, only count without deleting.
+
+        Returns:
+            Dict with 'pruned_count' and 'message_count'.
+        """
+        cutoff = func.now() - func.make_interval(0, 0, 0, days)
+
+        # Find stale sessions
+        stale_stmt = (
+            select(
+                EngineChatSession.id,
+                func.count(EngineChatMessage.id).label("msg_count"),
+            )
+            .outerjoin(
+                EngineChatMessage,
+                EngineChatMessage.session_id == EngineChatSession.id,
+            )
+            .where(EngineChatSession.updated_at < cutoff)
+            .group_by(EngineChatSession.id)
+        )
+
+        async with self._async_session() as session:
+            async with session.begin():
+                result = await session.execute(stale_stmt)
+                stale = result.all()
+
+                if dry_run or not stale:
+                    return {
+                        "pruned_count": len(stale),
+                        "message_count": sum(r.msg_count for r in stale),
+                        "dry_run": dry_run,
+                    }
+
+                stale_ids = [r.id for r in stale]
+
+                # Delete messages
+                msg_result = await session.execute(
+                    delete(EngineChatMessage)
+                    .where(EngineChatMessage.session_id.in_(stale_ids))
+                )
+                msg_count = msg_result.rowcount
+
+                # Delete sessions
+                await session.execute(
+                    delete(EngineChatSession)
+                    .where(EngineChatSession.id.in_(stale_ids))
+                )
+
+        logger.info(
+            "Pruned %d sessions (%d messages, >%d days old)",
+            len(stale_ids), msg_count, days,
+        )
+
+        return {
+            "pruned_count": len(stale_ids),
+            "message_count": msg_count,
+            "dry_run": False,
+        }
+
+    async def get_stats(self) -> dict[str, Any]:
+        """Get session statistics."""
+        stmt = (
+            select(
+                func.count(func.distinct(EngineChatSession.id)).label("total_sessions"),
+                func.count(EngineChatMessage.id).label("total_messages"),
+                func.count(func.distinct(EngineChatSession.agent_id)).label("active_agents"),
+                func.min(EngineChatSession.created_at).label("oldest_session"),
+                func.max(EngineChatSession.updated_at).label("newest_activity"),
+            )
+            .select_from(EngineChatSession)
+            .outerjoin(
+                EngineChatMessage,
+                EngineChatMessage.session_id == EngineChatSession.id,
+            )
+        )
+
+        async with self._async_session() as session:
+            result = await session.execute(stmt)
+            row = result.first()
+
+        return {
+            "total_sessions": row.total_sessions,
+            "total_messages": row.total_messages,
+            "active_agents": row.active_agents,
+            "oldest_session": (
+                row.oldest_session.isoformat()
+                if row.oldest_session
+                else None
+            ),
+            "newest_activity": (
+                row.newest_activity.isoformat()
+                if row.newest_activity
+                else None
+            ),
+        }

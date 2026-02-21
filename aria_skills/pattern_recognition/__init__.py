@@ -18,7 +18,6 @@ Pipeline:
 
 All DB access via api_client → FastAPI → PostgreSQL.
 """
-from __future__ import annotations
 
 import json
 import os
@@ -27,7 +26,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
 from aria_skills.registry import SkillRegistry
@@ -52,11 +51,11 @@ class Pattern:
     type: PatternType
     subject: str
     confidence: float
-    evidence: List[Any] = field(default_factory=list)
+    evidence: list[Any] = field(default_factory=list)
     first_seen: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     last_seen: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     frequency_per_day: float = 0.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -72,7 +71,7 @@ class TopicMention:
     topic: str
     timestamp: datetime
     memory_id: str
-    sentiment: Optional[float] = None
+    sentiment: float | None = None
     category: str = "general"
 
 
@@ -83,10 +82,10 @@ class MemoryItem:
     content: str
     category: str
     timestamp: datetime
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "MemoryItem":
+    def from_dict(cls, d: dict[str, Any]) -> "MemoryItem":
         ts = d.get("timestamp") or d.get("created_at") or datetime.now(timezone.utc).isoformat()
         if isinstance(ts, str):
             ts = datetime.fromisoformat(ts.replace("Z", "+00:00"))
@@ -102,12 +101,12 @@ class MemoryItem:
 @dataclass
 class PatternDetectionResult:
     """Result of a pattern detection run."""
-    patterns_found: List[Pattern]
+    patterns_found: list[Pattern]
     total_memories_analyzed: int
     analysis_window_days: int
     new_patterns: int
     persistent_patterns: int
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -117,7 +116,7 @@ class PatternDetectionResult:
 class TopicExtractor:
     """Extract topics from memory content using keywords, entities, categories."""
 
-    TOPIC_KEYWORDS: Dict[str, List[str]] = {
+    TOPIC_KEYWORDS: dict[str, list[str]] = {
         "quantum_mechanics": ["quantum", "photon", "entanglement", "qubit", "superposition"],
         "coding": ["code", "python", "function", "class", "debug", "api", "javascript", "typescript"],
         "memory_system": ["memory", "compress", "embedding", "pattern", "recall", "vector"],
@@ -129,7 +128,7 @@ class TopicExtractor:
         "data": ["database", "postgres", "sql", "migration", "schema", "table"],
     }
 
-    CATEGORY_MAP: Dict[str, str] = {
+    CATEGORY_MAP: dict[str, str] = {
         "user_command": "interaction", "goal": "goals", "decision": "decision_making",
         "error": "errors", "reflection": "reflection", "social": "social",
         "context": "context", "system": "system", "technical": "coding",
@@ -158,8 +157,8 @@ class TopicExtractor:
         "input", "check", "set", "get", "post", "init", "start", "stop",
     })
 
-    def extract(self, memories: List[MemoryItem]) -> List[TopicMention]:
-        mentions: List[TopicMention] = []
+    def extract(self, memories: list[MemoryItem]) -> list[TopicMention]:
+        mentions: list[TopicMention] = []
         for mem in memories:
             # 1. Category-based
             cat_topic = self.CATEGORY_MAP.get(mem.category)
@@ -203,21 +202,21 @@ class FrequencyTracker:
 
     def __init__(self, window_days: int = 30):
         self.window_days = window_days
-        self.topic_history: Dict[str, List[TopicMention]] = defaultdict(list)
+        self.topic_history: dict[str, list[TopicMention]] = defaultdict(list)
 
-    def add_mentions(self, mentions: List[TopicMention]) -> None:
+    def add_mentions(self, mentions: list[TopicMention]) -> None:
         for m in mentions:
             self.topic_history[m.topic].append(m)
 
-    def get_frequency(self, topic: str, window_days: Optional[int] = None) -> float:
+    def get_frequency(self, topic: str, window_days: int | None = None) -> float:
         window = window_days or self.window_days
         cutoff = datetime.now(timezone.utc) - timedelta(days=window)
         recent = [m for m in self.topic_history.get(topic, []) if m.timestamp >= cutoff]
         return len(recent) / max(window, 1)
 
-    def find_recurring(self, topics: List[str], min_frequency: float = 0.3,
-                       min_mentions: int = 5) -> List[Dict[str, Any]]:
-        recurring: List[Dict[str, Any]] = []
+    def find_recurring(self, topics: list[str], min_frequency: float = 0.3,
+                       min_mentions: int = 5) -> list[dict[str, Any]]:
+        recurring: list[dict[str, Any]] = []
         for topic in set(topics):
             freq = self.get_frequency(topic)
             total = len(self.topic_history.get(topic, []))
@@ -233,8 +232,8 @@ class FrequencyTracker:
         return recurring
 
     def find_emerging(self, min_growth_rate: float = 2.0,
-                      min_recent_mentions: int = 3) -> List[Dict[str, Any]]:
-        emerging: List[Dict[str, Any]] = []
+                      min_recent_mentions: int = 3) -> list[dict[str, Any]]:
+        emerging: list[dict[str, Any]] = []
         for topic, mentions in self.topic_history.items():
             if len(mentions) < min_recent_mentions:
                 continue
@@ -281,9 +280,9 @@ class PatternRecognizer:
         self.window_days = window_days
         self.topic_extractor = TopicExtractor()
         self.frequency_tracker = FrequencyTracker(window_days)
-        self.pattern_history: List[Pattern] = []
+        self.pattern_history: list[Pattern] = []
 
-    async def analyze(self, memories: List[MemoryItem],
+    async def analyze(self, memories: list[MemoryItem],
                       min_confidence: float = 0.3) -> PatternDetectionResult:
         if len(memories) < 10:
             return PatternDetectionResult(
@@ -294,7 +293,7 @@ class PatternRecognizer:
         mentions = self.topic_extractor.extract(memories)
         self.frequency_tracker.add_mentions(mentions)
 
-        patterns: List[Pattern] = []
+        patterns: list[Pattern] = []
 
         # 2. Topic recurrence
         recurring = self.frequency_tracker.find_recurring([m.topic for m in mentions])
@@ -343,8 +342,8 @@ class PatternRecognizer:
             new_patterns=new_count, persistent_patterns=persistent_count,
         )
 
-    def _detect_temporal(self, memories: List[MemoryItem]) -> List[Pattern]:
-        patterns: List[Pattern] = []
+    def _detect_temporal(self, memories: list[MemoryItem]) -> list[Pattern]:
+        patterns: list[Pattern] = []
         if len(memories) < 10:
             return patterns
 
@@ -372,8 +371,8 @@ class PatternRecognizer:
                 ))
         return patterns
 
-    def _detect_sentiment_drift(self, memories: List[MemoryItem]) -> List[Pattern]:
-        scored: List[tuple] = []
+    def _detect_sentiment_drift(self, memories: list[MemoryItem]) -> list[Pattern]:
+        scored: list[tuple] = []
         for m in memories:
             val = m.metadata.get("valence")  # prefer valence from sentiment analysis
             if val is None:
@@ -403,18 +402,18 @@ class PatternRecognizer:
             )]
         return []
 
-    def _detect_knowledge_gaps(self, memories: List[MemoryItem]) -> List[Pattern]:
+    def _detect_knowledge_gaps(self, memories: list[MemoryItem]) -> list[Pattern]:
         questions = [m for m in memories if m.content.strip().endswith("?")]
         if len(questions) < 2:
             return []
 
-        topics: Dict[str, List[MemoryItem]] = defaultdict(list)
+        topics: dict[str, list[MemoryItem]] = defaultdict(list)
         for q in questions:
             words = q.content.lower().split()[:3]
             key = " ".join(words)
             topics[key].append(q)
 
-        patterns: List[Pattern] = []
+        patterns: list[Pattern] = []
         for topic, qs in topics.items():
             if len(qs) >= 2:
                 span_h = (qs[-1].timestamp - qs[0].timestamp).total_seconds() / 3600
@@ -427,9 +426,9 @@ class PatternRecognizer:
                     ))
         return patterns
 
-    def _deduplicate(self, patterns: List[Pattern]) -> List[Pattern]:
+    def _deduplicate(self, patterns: list[Pattern]) -> list[Pattern]:
         seen: set = set()
-        unique: List[Pattern] = []
+        unique: list[Pattern] = []
         for p in patterns:
             key = (p.type, p.subject)
             if key not in seen:
@@ -455,11 +454,11 @@ class PatternRecognitionSkill(BaseSkill):
       get_pattern_stats — Stats from last detection run
     """
 
-    def __init__(self, config: Optional[SkillConfig] = None):
+    def __init__(self, config: SkillConfig | None = None):
         super().__init__(config or SkillConfig(name="pattern_recognition"))
         self._api = None
-        self._recognizer: Optional[PatternRecognizer] = None
-        self._last_result: Optional[PatternDetectionResult] = None
+        self._recognizer: PatternRecognizer | None = None
+        self._last_result: PatternDetectionResult | None = None
 
     @property
     def name(self) -> str:
@@ -486,7 +485,7 @@ class PatternRecognitionSkill(BaseSkill):
         return self._status
 
     @logged_method()
-    async def detect_patterns(self, memories: Optional[List[Dict[str, Any]]] = None,
+    async def detect_patterns(self, memories: list[dict[str, Any]] | None = None,
                                min_confidence: float = 0.3,
                                store: bool = True, **kwargs) -> SkillResult:
         """Run full pattern detection on a list of memories."""
@@ -504,7 +503,7 @@ class PatternRecognitionSkill(BaseSkill):
 
             # ── DB fallback: pull from activities + thoughts when semantic_memories empty ──
             if (not memories or len(memories) < 10) and self._api:
-                fallback_items: List[Dict[str, Any]] = []
+                fallback_items: list[dict[str, Any]] = []
                 try:
                     r = await self._api.get_activities(limit=150)
                     if r.success:
@@ -554,7 +553,7 @@ class PatternRecognitionSkill(BaseSkill):
         self._last_result = result
 
         # Store patterns in semantic memory
-        stored_ids: List[str] = []
+        stored_ids: list[str] = []
         if store and self._api:
             for p in result.patterns_found[:20]:  # Top 20 patterns
                 try:
@@ -619,7 +618,7 @@ class PatternRecognitionSkill(BaseSkill):
             return SkillResult.ok({"has_data": False, "message": "No detection run yet."})
 
         r = self._last_result
-        by_type: Dict[str, int] = {}
+        by_type: dict[str, int] = {}
         for p in r.patterns_found:
             by_type[p.type.value] = by_type.get(p.type.value, 0) + 1
 

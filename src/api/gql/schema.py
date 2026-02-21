@@ -2,7 +2,6 @@
 Root Strawberry GraphQL schema — wired to FastAPI via GraphQLRouter.
 """
 
-from typing import Optional
 
 import strawberry
 from strawberry.fastapi import GraphQLRouter
@@ -42,35 +41,35 @@ from .types import (
 class Query:
     @strawberry.field
     async def activities(
-        self, limit: int = 25, offset: int = 0, action: Optional[str] = None,
+        self, limit: int = 25, offset: int = 0, action: str | None = None,
     ) -> list[ActivityType]:
         return await resolve_activities(limit=limit, offset=offset, action=action)
 
     @strawberry.field
     async def thoughts(
-        self, limit: int = 20, offset: int = 0, category: Optional[str] = None,
+        self, limit: int = 20, offset: int = 0, category: str | None = None,
     ) -> list[ThoughtType]:
         return await resolve_thoughts(limit=limit, offset=offset, category=category)
 
     @strawberry.field
     async def memories(
-        self, limit: int = 20, offset: int = 0, category: Optional[str] = None,
+        self, limit: int = 20, offset: int = 0, category: str | None = None,
     ) -> list[MemoryType]:
         return await resolve_memories(limit=limit, offset=offset, category=category)
 
     @strawberry.field
-    async def memory(self, key: str) -> Optional[MemoryType]:
+    async def memory(self, key: str) -> MemoryType | None:
         return await resolve_memory(key=key)
 
     @strawberry.field
     async def goals(
-        self, limit: int = 25, offset: int = 0, status: Optional[str] = None,
+        self, limit: int = 25, offset: int = 0, status: str | None = None,
     ) -> list[GoalType]:
         return await resolve_goals(limit=limit, offset=offset, status=status)
 
     @strawberry.field
     async def knowledge_entities(
-        self, limit: int = 25, offset: int = 0, entity_type: Optional[str] = None,
+        self, limit: int = 25, offset: int = 0, entity_type: str | None = None,
     ) -> list[KnowledgeEntityType]:
         return await resolve_knowledge_entities(limit=limit, offset=offset, entity_type=entity_type)
 
@@ -80,7 +79,7 @@ class Query:
 
     @strawberry.field
     async def sessions(
-        self, limit: int = 25, offset: int = 0, status: Optional[str] = None,
+        self, limit: int = 25, offset: int = 0, status: str | None = None,
     ) -> list[SessionType]:
         return await resolve_sessions(limit=limit, offset=offset, status=status)
 
@@ -91,7 +90,7 @@ class Query:
     # S4-08: Knowledge graph traversal + skill discovery
     @strawberry.field
     async def graph_traverse(
-        self, start: str, relation_type: Optional[str] = None,
+        self, start: str, relation_type: str | None = None,
         max_depth: int = 3, direction: str = "outgoing",
     ) -> GraphTraversalResult:
         return await resolve_graph_traverse(

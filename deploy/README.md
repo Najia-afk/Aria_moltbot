@@ -20,7 +20,7 @@ cd stacks/brain
 | `./deploy.sh status` | Health check all services |
 | `./deploy.sh clean` | Remove all containers & volumes |
 
-## Services (12 total)
+## Services (14 total)
 
 | Service | Port | Purpose |
 |---------|------|---------|
@@ -29,7 +29,7 @@ cd stacks/brain
 | aria-brain | 8001 | Core agent logic |
 | litellm | 4000 | LLM router |
 | traefik | 80/443 | Reverse proxy |
-| clawdbot | 3000 | Chat interface |
+| aria-engine | 8100 | AI engine gateway |
 | aria-db | 5432 | PostgreSQL |
 | prometheus | 9090 | Metrics |
 | grafana | 3001 | Dashboards |

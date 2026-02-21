@@ -38,7 +38,7 @@ Every skill belongs to exactly one layer. Lower layers **must not** import highe
 |-------|---------------|--------------------------------|---------------------------------------|
 | 0     | Kernel        | Read-only identity & security  | `input_guard`                         |
 | 1     | API Client    | Sole DB / HTTP gateway         | `api_client`                          |
-| 2     | Core          | Essential runtime services     | `llm`, `litellm`, `health`, `ollama`  |
+| 2     | Core          | Essential runtime services     | `llm`, `litellm`, `health`, `moonshot`|
 | 3     | Domain        | Feature-specific logic         | `goals`, `research`, `social`         |
 | 4     | Orchestration | Planning & scheduling          | `schedule`, `pipeline_skill`          |
 

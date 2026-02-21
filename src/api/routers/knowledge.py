@@ -6,7 +6,6 @@ import json as json_lib
 import uuid
 from collections import deque
 from datetime import datetime, timezone
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
@@ -293,7 +292,7 @@ async def delete_auto_generated(db: AsyncSession = Depends(get_db)):
 @router.get("/knowledge-graph/traverse")
 async def graph_traverse(
     start: str = Query(..., description="Starting entity ID or name"),
-    relation_type: Optional[str] = Query(None, description="Filter by relation type"),
+    relation_type: str | None = Query(None, description="Filter by relation type"),
     max_depth: int = Query(3, ge=1, le=10),
     direction: str = Query("outgoing", regex="^(outgoing|incoming|both)$"),
     db: AsyncSession = Depends(get_db),
@@ -365,7 +364,7 @@ async def graph_traverse(
 @router.get("/knowledge-graph/search")
 async def graph_search(
     q: str = Query(..., min_length=1, description="Search query"),
-    entity_type: Optional[str] = Query(None, description="Filter by entity type"),
+    entity_type: str | None = Query(None, description="Filter by entity type"),
     limit: int = Query(25, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
 ):
@@ -480,7 +479,7 @@ async def find_skill_for_task(
 @router.get("/knowledge-graph/query-log")
 async def get_query_log(
     limit: int = Query(50, ge=1, le=200),
-    query_type: Optional[str] = Query(None),
+    query_type: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
     """Get recent knowledge graph query log entries."""

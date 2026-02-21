@@ -1,21 +1,33 @@
-"""Model switcher skill — catalog-backed active model and thinking-mode state."""
+# aria_skills/model_switcher/__init__.py
+"""
+Model switcher skill — switch LLM models and toggle thinking mode.
 
-from __future__ import annotations
-
+Layer 2 orchestrator skill. Reads available models from the API
+and manages the active model + thinking mode state.
+"""
+import os
 from datetime import datetime, timezone
+from typing import Any
 
-from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
+from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
 from aria_skills.registry import SkillRegistry
 
 
 @SkillRegistry.register
 class ModelSwitcherSkill(BaseSkill):
-    def __init__(self, config: SkillConfig):
-        super().__init__(config)
-        self._catalog: dict = {}
-        self._current_model: str | None = None
-        self._thinking_enabled: bool = True
-        self._history: list[dict] = []
+    """
+    Switch between LLM models and toggle thinking/reasoning mode.
+
+    Tools: list_models, switch_model, get_current_model,
+           set_thinking_mode, get_thinking_mode, get_switch_history.
+    """
+
+    def __init__(self, config: SkillConfig | None = None):
+        super().__init__(config or SkillConfig(name="model_switcher"))
+        self._api = None
+        self._current_model: str = "kimi"
+        self._thinking_enabled: bool = False
+        self._switch_history: list[dict] = []
 
     @property
     def name(self) -> str:
@@ -23,58 +35,142 @@ class ModelSwitcherSkill(BaseSkill):
 
     async def initialize(self) -> bool:
         try:
-            from aria_models.loader import load_catalog
+            from aria_skills.api_client import get_api_client
+            self._api = await get_api_client()
+        except Exception as e:
+            self.logger.warning(f"API client not available: {e}")
+            # Can still work in degraded mode without API
 
-            self._catalog = load_catalog() or {}
-            model_ids = list((self._catalog.get("models") or {}).keys())
-            self._current_model = model_ids[0] if model_ids else "qwen-cpu-fallback"
-            self._status = SkillStatus.AVAILABLE
-            return True
+        # Try to load current model from models.yaml routing config
+        try:
+            from aria_models.loader import load_catalog
+            catalog = load_catalog()
+            routing = catalog.get("routing", {})
+            primary = routing.get("primary", "litellm/kimi")
+            self._current_model = primary.split("/")[-1] if "/" in primary else primary
         except Exception:
-            self._catalog = {"models": {"qwen-cpu-fallback": {}}}
-            self._current_model = "qwen-cpu-fallback"
-            self._status = SkillStatus.AVAILABLE
-            return True
+            self._current_model = "kimi"
+
+        self._status = SkillStatus.AVAILABLE
+        self.logger.info(f"Model switcher initialized (current: {self._current_model})")
+        return True
 
     async def health_check(self) -> SkillStatus:
         return self._status
 
-    def _record(self, action: str, payload: dict):
-        self._history.append(
-            {
-                "action": action,
-                "payload": payload,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            }
-        )
-        self._history = self._history[-100:]
-
-    async def list_models(self) -> SkillResult:
+    @logged_method()
+    async def list_models(self, **kwargs) -> SkillResult:
+        """List available LLM models."""
         models = []
-        for model_id, meta in (self._catalog.get("models") or {}).items():
-            litellm_model = ((meta or {}).get("litellm") or {}).get("model")
-            models.append({"model": model_id, "litellm_model": litellm_model})
-        return SkillResult.ok({"current_model": self._current_model, "models": models})
 
-    async def switch_model(self, model: str, reason: str | None = None) -> SkillResult:
-        if model not in (self._catalog.get("models") or {}):
-            return SkillResult.fail(f"Unknown model: {model}")
+        # Try API first
+        if self._api:
+            try:
+                result = await self._api.get_litellm_models()
+                if result.success and isinstance(result.data, dict):
+                    for m in result.data.get("data", []):
+                        models.append({
+                            "id": m.get("id", ""),
+                            "name": m.get("id", ""),
+                            "owned_by": m.get("owned_by", ""),
+                        })
+            except Exception:
+                pass
+
+        # Fallback: load from models.yaml
+        if not models:
+            try:
+                from aria_models.loader import load_catalog
+                catalog = load_catalog()
+                for model_id, model_data in catalog.get("models", {}).items():
+                    models.append({
+                        "id": model_id,
+                        "name": model_data.get("name", model_id),
+                        "tier": model_data.get("tier", "unknown"),
+                        "provider": model_data.get("provider", "unknown"),
+                    })
+            except Exception:
+                pass
+
+        return SkillResult.ok({
+            "models": models,
+            "total": len(models),
+            "current_model": self._current_model,
+        })
+
+    @logged_method()
+    async def switch_model(
+        self, model: str = "", reason: str = "", **kwargs
+    ) -> SkillResult:
+        """Switch the active LLM model."""
+        model = model or kwargs.get("model", "")
+        if not model:
+            return SkillResult.fail("No model specified")
+
         previous = self._current_model
         self._current_model = model
-        self._record("switch_model", {"from": previous, "to": model, "reason": reason})
-        return SkillResult.ok({"previous_model": previous, "current_model": model, "reason": reason})
+        entry = {
+            "from": previous,
+            "to": model,
+            "reason": reason or kwargs.get("reason", ""),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        self._switch_history.append(entry)
 
-    async def get_current_model(self) -> SkillResult:
-        return SkillResult.ok({"current_model": self._current_model, "thinking_mode": self._thinking_enabled})
+        return SkillResult.ok({
+            "previous_model": previous,
+            "current_model": model,
+            "switch_count": len(self._switch_history),
+            "message": f"Switched from {previous} to {model}",
+        })
 
-    async def set_thinking_mode(self, enabled: bool, reason: str | None = None) -> SkillResult:
+    @logged_method()
+    async def get_current_model(self, **kwargs) -> SkillResult:
+        """Get the currently active model."""
+        return SkillResult.ok({
+            "model": self._current_model,
+            "thinking_enabled": self._thinking_enabled,
+            "total_switches": len(self._switch_history),
+        })
+
+    @logged_method()
+    async def set_thinking_mode(
+        self, enabled: bool = True, **kwargs
+    ) -> SkillResult:
+        """Enable or disable thinking/reasoning mode."""
+        enabled = kwargs.get("enabled", enabled)
+        previous = self._thinking_enabled
         self._thinking_enabled = bool(enabled)
-        self._record("set_thinking_mode", {"enabled": self._thinking_enabled, "reason": reason})
-        return SkillResult.ok({"thinking_mode": self._thinking_enabled, "reason": reason})
 
-    async def get_thinking_mode(self) -> SkillResult:
-        models = list((self._catalog.get("models") or {}).keys())
-        return SkillResult.ok({"thinking_mode": self._thinking_enabled, "catalog_models": models})
+        # Build model-specific thinking params
+        from aria_engine.thinking import build_thinking_params
+        params = build_thinking_params(self._current_model, enable=self._thinking_enabled)
 
-    async def get_switch_history(self, limit: int = 10) -> SkillResult:
-        return SkillResult.ok({"history": self._history[-max(1, limit):][::-1]})
+        return SkillResult.ok({
+            "thinking_enabled": self._thinking_enabled,
+            "previous": previous,
+            "model": self._current_model,
+            "thinking_params": params,
+            "message": f"Thinking mode {'enabled' if self._thinking_enabled else 'disabled'} for {self._current_model}",
+        })
+
+    @logged_method()
+    async def get_thinking_mode(self, **kwargs) -> SkillResult:
+        """Get current thinking mode status."""
+        from aria_engine.thinking import build_thinking_params
+        params = build_thinking_params(self._current_model, enable=self._thinking_enabled)
+        return SkillResult.ok({
+            "thinking_enabled": self._thinking_enabled,
+            "model": self._current_model,
+            "thinking_params": params,
+        })
+
+    @logged_method()
+    async def get_switch_history(self, limit: int = 20, **kwargs) -> SkillResult:
+        """Get model switch history."""
+        limit = limit or kwargs.get("limit", 20)
+        return SkillResult.ok({
+            "history": self._switch_history[-limit:],
+            "total_switches": len(self._switch_history),
+            "current_model": self._current_model,
+        })

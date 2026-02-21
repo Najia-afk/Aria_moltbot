@@ -5,10 +5,12 @@ Aria API Client Skill.
 Centralized HTTP client for all aria-api interactions.
 Skills should use this instead of direct database access.
 """
+from __future__ import annotations
+
 import asyncio
 import os
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 from datetime import datetime
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
@@ -33,7 +35,7 @@ class AriaAPIClient(BaseSkill):
     
     def __init__(self, config: SkillConfig):
         super().__init__(config)
-        self._client: Optional["httpx.AsyncClient"] = None
+        self._client: "httpx.AsyncClient" | None = None
         self._api_url: str = ""
         self._max_retries: int = int(self.config.config.get("max_retries", 3))
         self._base_backoff_seconds: float = float(self.config.config.get("base_backoff_seconds", 0.5))
@@ -113,10 +115,10 @@ class AriaAPIClient(BaseSkill):
     async def create_activity(
         self, 
         action: str, 
-        skill: Optional[str] = None,
-        details: Optional[Dict] = None,
+        skill: str | None = None,
+        details: Dict | None = None,
         success: bool = True,
-        error_message: Optional[str] = None
+        error_message: str | None = None
     ) -> SkillResult:
         """Log an activity."""
         try:
@@ -139,7 +141,7 @@ class AriaAPIClient(BaseSkill):
         self, 
         limit: int = 25, 
         page: int = 1,
-        threat_level: Optional[str] = None,
+        threat_level: str | None = None,
         blocked_only: bool = False
     ) -> SkillResult:
         """Get security events (paginated)."""
@@ -159,12 +161,12 @@ class AriaAPIClient(BaseSkill):
         self,
         threat_level: str = "LOW",
         threat_type: str = "unknown",
-        threat_patterns: Optional[List[str]] = None,
-        input_preview: Optional[str] = None,
+        threat_patterns: list[str] | None = None,
+        input_preview: str | None = None,
         source: str = "api",
-        user_id: Optional[str] = None,
+        user_id: str | None = None,
         blocked: bool = False,
-        details: Optional[Dict] = None
+        details: Dict | None = None
     ) -> SkillResult:
         """Log a security event."""
         try:
@@ -209,7 +211,7 @@ class AriaAPIClient(BaseSkill):
         self, 
         content: str, 
         category: str = "general",
-        metadata: Optional[Dict] = None
+        metadata: Dict | None = None
     ) -> SkillResult:
         """Create a thought."""
         try:
@@ -230,7 +232,7 @@ class AriaAPIClient(BaseSkill):
         self, 
         limit: int = 25, 
         page: int = 1,
-        category: Optional[str] = None
+        category: str | None = None
     ) -> SkillResult:
         """Get memories (paginated)."""
         try:
@@ -289,7 +291,7 @@ class AriaAPIClient(BaseSkill):
         self, 
         limit: int = 25, 
         page: int = 1,
-        status: Optional[str] = None
+        status: str | None = None
     ) -> SkillResult:
         """Get goals (paginated)."""
         try:
@@ -308,8 +310,8 @@ class AriaAPIClient(BaseSkill):
         description: str = "",
         priority: int = 2,
         status: str = "pending",
-        due_date: Optional[str] = None,
-        goal_id: Optional[str] = None
+        due_date: str | None = None,
+        goal_id: str | None = None
     ) -> SkillResult:
         """Create a goal."""
         try:
@@ -333,9 +335,9 @@ class AriaAPIClient(BaseSkill):
     async def update_goal(
         self,
         goal_id: str,
-        status: Optional[str] = None,
-        progress: Optional[int] = None,
-        priority: Optional[int] = None
+        status: str | None = None,
+        progress: int | None = None,
+        priority: int | None = None
     ) -> SkillResult:
         """Update a goal."""
         try:
@@ -416,7 +418,7 @@ class AriaAPIClient(BaseSkill):
     # ========================================
     # Hourly Goals
     # ========================================
-    async def get_hourly_goals(self, status: Optional[str] = None) -> SkillResult:
+    async def get_hourly_goals(self, status: str | None = None) -> SkillResult:
         """Get hourly goals."""
         try:
             url = "/hourly-goals"
@@ -479,7 +481,7 @@ class AriaAPIClient(BaseSkill):
     async def get_entities(
         self, 
         limit: int = 100, 
-        entity_type: Optional[str] = None
+        entity_type: str | None = None
     ) -> SkillResult:
         """Get knowledge entities."""
         try:
@@ -497,7 +499,7 @@ class AriaAPIClient(BaseSkill):
         self,
         name: str,
         entity_type: str,
-        properties: Optional[Dict] = None
+        properties: Dict | None = None
     ) -> SkillResult:
         """Create a knowledge entity."""
         try:
@@ -516,7 +518,7 @@ class AriaAPIClient(BaseSkill):
         from_entity: str,
         to_entity: str,
         relation_type: str,
-        properties: Optional[Dict] = None
+        properties: Dict | None = None
     ) -> SkillResult:
         """Create a knowledge relation."""
         try:
@@ -534,7 +536,7 @@ class AriaAPIClient(BaseSkill):
     async def graph_traverse(
         self,
         start: str,
-        relation_type: Optional[str] = None,
+        relation_type: str | None = None,
         max_depth: int = 3,
         direction: str = "outgoing",
     ) -> SkillResult:
@@ -552,12 +554,12 @@ class AriaAPIClient(BaseSkill):
     async def graph_search(
         self,
         query: str,
-        entity_type: Optional[str] = None,
+        entity_type: str | None = None,
         limit: int = 25,
     ) -> SkillResult:
         """ILIKE text search for entities matching a query string."""
         try:
-            params: Dict[str, Any] = {"q": query, "limit": limit}
+            params: dict[str, Any] = {"q": query, "limit": limit}
             if entity_type:
                 params["entity_type"] = entity_type
             resp = await self._client.get("/knowledge-graph/search", params=params)
@@ -612,7 +614,7 @@ class AriaAPIClient(BaseSkill):
         self, 
         limit: int = 25, 
         page: int = 1,
-        platform: Optional[str] = None
+        platform: str | None = None
     ) -> SkillResult:
         """Get social posts (paginated)."""
         try:
@@ -631,10 +633,10 @@ class AriaAPIClient(BaseSkill):
         content: str,
         platform: str = "unknown",
         visibility: str = "public",
-        post_id: Optional[str] = None,
-        reply_to: Optional[str] = None,
-        url: Optional[str] = None,
-        metadata: Optional[Dict] = None
+        post_id: str | None = None,
+        reply_to: str | None = None,
+        url: str | None = None,
+        metadata: Dict | None = None
     ) -> SkillResult:
         """Create a social post."""
         try:
@@ -684,7 +686,7 @@ class AriaAPIClient(BaseSkill):
         self,
         beat_number: int = 0,
         status: str = "healthy",
-        details: Optional[Dict] = None
+        details: Dict | None = None
     ) -> SkillResult:
         """Log a heartbeat."""
         try:
@@ -714,9 +716,9 @@ class AriaAPIClient(BaseSkill):
     async def create_performance_log(
         self,
         review_period: str,
-        successes: Optional[str] = None,
-        failures: Optional[str] = None,
-        improvements: Optional[str] = None
+        successes: str | None = None,
+        failures: str | None = None,
+        improvements: str | None = None
     ) -> SkillResult:
         """Create a performance log."""
         try:
@@ -734,7 +736,7 @@ class AriaAPIClient(BaseSkill):
     # ========================================
     # Tasks
     # ========================================
-    async def get_tasks(self, status: Optional[str] = None) -> SkillResult:
+    async def get_tasks(self, status: str | None = None) -> SkillResult:
         """Get pending complex tasks."""
         try:
             url = "/tasks"
@@ -753,7 +755,7 @@ class AriaAPIClient(BaseSkill):
         description: str,
         agent_type: str,
         priority: str = "medium",
-        task_id: Optional[str] = None
+        task_id: str | None = None
     ) -> SkillResult:
         """Create a pending complex task."""
         try:
@@ -776,7 +778,7 @@ class AriaAPIClient(BaseSkill):
         self,
         task_id: str,
         status: str,
-        result: Optional[str] = None
+        result: str | None = None
     ) -> SkillResult:
         """Update a task status."""
         try:
@@ -822,7 +824,7 @@ class AriaAPIClient(BaseSkill):
             return SkillResult.fail(f"Failed to get jobs: {e}")
     
     async def sync_jobs(self) -> SkillResult:
-        """Sync jobs from OpenClaw."""
+        """Sync jobs from scheduler."""
         try:
             resp = await self._client.post("/jobs/sync")
             resp.raise_for_status()
@@ -837,7 +839,7 @@ class AriaAPIClient(BaseSkill):
         self,
         limit: int = 25,
         page: int = 1,
-        status: Optional[str] = None,
+        status: str | None = None,
     ) -> SkillResult:
         """Get agent sessions (paginated)."""
         try:
@@ -854,7 +856,7 @@ class AriaAPIClient(BaseSkill):
         self,
         agent_id: str,
         session_type: str = "interactive",
-        metadata: Optional[Dict] = None,
+        metadata: Dict | None = None,
     ) -> SkillResult:
         """Start a new agent session."""
         try:
@@ -871,10 +873,10 @@ class AriaAPIClient(BaseSkill):
     async def update_session(
         self,
         session_id: str,
-        status: Optional[str] = None,
-        messages_count: Optional[int] = None,
-        tokens_used: Optional[int] = None,
-        cost_usd: Optional[float] = None,
+        status: str | None = None,
+        messages_count: int | None = None,
+        tokens_used: int | None = None,
+        cost_usd: float | None = None,
     ) -> SkillResult:
         """Update agent session."""
         try:
@@ -917,18 +919,18 @@ class AriaAPIClient(BaseSkill):
     async def create_model_usage(
         self,
         model: str,
-        provider: Optional[str] = None,
+        provider: str | None = None,
         input_tokens: int = 0,
         output_tokens: int = 0,
         cost_usd: float = 0.0,
-        latency_ms: Optional[int] = None,
+        latency_ms: int | None = None,
         success: bool = True,
-        error_message: Optional[str] = None,
-        session_id: Optional[str] = None,
+        error_message: str | None = None,
+        session_id: str | None = None,
     ) -> SkillResult:
         """Log model usage."""
         try:
-            data: Dict[str, Any] = {
+            data: dict[str, Any] = {
                 "model": model,
                 "provider": provider,
                 "input_tokens": input_tokens,
@@ -1003,8 +1005,8 @@ class AriaAPIClient(BaseSkill):
     # Working Memory
     # ========================================
     async def remember(self, key: str, value: Any, category: str = "general",
-                       importance: float = 0.5, ttl_hours: Optional[int] = None,
-                       source: Optional[str] = None) -> SkillResult:
+                       importance: float = 0.5, ttl_hours: int | None = None,
+                       source: str | None = None) -> SkillResult:
         """Store a working memory item."""
         try:
             resp = await self._client.post("/working-memory", json={
@@ -1016,12 +1018,12 @@ class AriaAPIClient(BaseSkill):
         except Exception as e:
             return SkillResult.fail(f"Failed to store working memory: {e}")
 
-    async def recall(self, key: Optional[str] = None,
-                     category: Optional[str] = None,
+    async def recall(self, key: str | None = None,
+                     category: str | None = None,
                      limit: int = 25, page: int = 1) -> SkillResult:
         """Retrieve working memory items (paginated)."""
         try:
-            params: Dict[str, Any] = {"limit": limit, "page": page}
+            params: dict[str, Any] = {"limit": limit, "page": page}
             if key:
                 params["key"] = key
             if category:
@@ -1033,10 +1035,10 @@ class AriaAPIClient(BaseSkill):
             return SkillResult.fail(f"Failed to recall working memory: {e}")
 
     async def get_working_memory_context(self, limit: int = 20,
-                                          category: Optional[str] = None) -> SkillResult:
+                                          category: str | None = None) -> SkillResult:
         """Get weighted-ranked context for LLM injection."""
         try:
-            params: Dict[str, Any] = {"limit": limit}
+            params: dict[str, Any] = {"limit": limit}
             if category:
                 params["category"] = category
             resp = await self._client.get("/working-memory/context", params=params)
@@ -1109,7 +1111,7 @@ class AriaAPIClient(BaseSkill):
             raise RuntimeError("API circuit breaker is open")
 
         attempts = max(1, self._max_retries)
-        last_error: Optional[Exception] = None
+        last_error: Exception | None = None
         for attempt in range(attempts):
             try:
                 resp = await self._client.request(method, path, **kwargs)
@@ -1131,7 +1133,7 @@ class AriaAPIClient(BaseSkill):
 
         raise RuntimeError(f"request failed: {last_error}")
 
-    async def get(self, path: str, params: Optional[Dict] = None) -> SkillResult:
+    async def get(self, path: str, params: Dict | None = None) -> SkillResult:
         """Generic GET request."""
         try:
             resp = await self._request_with_retry("GET", path, params=params)
@@ -1139,7 +1141,7 @@ class AriaAPIClient(BaseSkill):
         except Exception as e:
             return SkillResult.fail(f"GET {path} failed: {e}")
     
-    async def post(self, path: str, data: Optional[Dict] = None) -> SkillResult:
+    async def post(self, path: str, data: Dict | None = None) -> SkillResult:
         """Generic POST request."""
         try:
             resp = await self._request_with_retry("POST", path, json=data)
@@ -1147,7 +1149,7 @@ class AriaAPIClient(BaseSkill):
         except Exception as e:
             return SkillResult.fail(f"POST {path} failed: {e}")
     
-    async def patch(self, path: str, data: Optional[Dict] = None) -> SkillResult:
+    async def patch(self, path: str, data: Dict | None = None) -> SkillResult:
         """Generic PATCH request."""
         try:
             resp = await self._request_with_retry("PATCH", path, json=data)
@@ -1155,7 +1157,7 @@ class AriaAPIClient(BaseSkill):
         except Exception as e:
             return SkillResult.fail(f"PATCH {path} failed: {e}")
 
-    async def put(self, path: str, data: Optional[Dict] = None) -> SkillResult:
+    async def put(self, path: str, data: Dict | None = None) -> SkillResult:
         """Generic PUT request."""
         try:
             resp = await self._request_with_retry("PUT", path, json=data)
@@ -1178,10 +1180,10 @@ class AriaAPIClient(BaseSkill):
         return await self.post("/performance", data=data)
 
     async def get_agent_performance(
-        self, agent_id: Optional[str] = None, limit: int = 100
+        self, agent_id: str | None = None, limit: int = 100
     ) -> list:
         """GET agent performance records, optionally filtered by agent."""
-        params: Dict[str, Any] = {"limit": limit}
+        params: dict[str, Any] = {"limit": limit}
         if agent_id:
             params["agent_id"] = agent_id
         result = await self.get("/performance", params=params)
@@ -1214,7 +1216,7 @@ class AriaAPIClient(BaseSkill):
     async def store_memory_semantic(
         self, content: str, category: str = "general",
         importance: float = 0.5, source: str = "aria",
-        summary: str = None, metadata: Optional[Dict] = None,
+        summary: str = None, metadata: Dict | None = None,
     ) -> SkillResult:
         """Store a memory with vector embedding for semantic search."""
         try:
@@ -1239,11 +1241,11 @@ class AriaAPIClient(BaseSkill):
         self, message: str, session_id: str = None,
         external_session_id: str = None, agent_id: str = None,
         source_channel: str = None, store_semantic: bool = True,
-        metadata: Optional[Dict] = None,
+        metadata: Dict | None = None,
     ) -> SkillResult:
         """Analyze and persist sentiment for a user message via /analysis/sentiment/reply."""
         try:
-            data: Dict[str, Any] = {
+            data: dict[str, Any] = {
                 "message": message,
                 "store_semantic": store_semantic,
             }
@@ -1269,7 +1271,7 @@ class AriaAPIClient(BaseSkill):
     ) -> SkillResult:
         """Search memories by semantic similarity."""
         try:
-            params: Dict[str, Any] = {"query": query, "limit": limit}
+            params: dict[str, Any] = {"query": query, "limit": limit}
             if category:
                 params["category"] = category
             if min_importance > 0:
@@ -1287,7 +1289,7 @@ class AriaAPIClient(BaseSkill):
     ) -> SkillResult:
         """List semantic memories with optional category/source filter (no embedding query needed)."""
         try:
-            params: Dict[str, Any] = {"limit": limit, "page": page}
+            params: dict[str, Any] = {"limit": limit, "page": page}
             if category:
                 params["category"] = category
             if source:
@@ -1317,7 +1319,7 @@ class AriaAPIClient(BaseSkill):
     async def record_lesson(
         self, error_pattern: str, error_type: str,
         resolution: str, skill_name: str = None,
-        context: Optional[Dict] = None,
+        context: Dict | None = None,
     ) -> SkillResult:
         """Record a lesson learned from an error."""
         try:
@@ -1340,7 +1342,7 @@ class AriaAPIClient(BaseSkill):
     ) -> SkillResult:
         """Check if a known resolution exists for an error type."""
         try:
-            params: Dict[str, Any] = {}
+            params: dict[str, Any] = {}
             if error_type:
                 params["error_type"] = error_type
             if skill_name:
@@ -1373,7 +1375,7 @@ class AriaAPIClient(BaseSkill):
     ) -> SkillResult:
         """Submit an improvement proposal."""
         try:
-            data: Dict[str, Any] = {
+            data: dict[str, Any] = {
                 "title": title, "description": description,
                 "category": category, "risk_level": risk_level,
                 "rationale": rationale,
@@ -1393,7 +1395,7 @@ class AriaAPIClient(BaseSkill):
     async def get_proposals(self, status: str = None, page: int = 1) -> SkillResult:
         """List improvement proposals."""
         try:
-            params: Dict[str, Any] = {"page": page}
+            params: dict[str, Any] = {"page": page}
             if status:
                 params["status"] = status
             resp = await self._client.get("/proposals", params=params)
@@ -1453,7 +1455,7 @@ class AriaAPIClient(BaseSkill):
     ) -> SkillResult:
         """Record a skill invocation for observability."""
         try:
-            data: Dict[str, Any] = {
+            data: dict[str, Any] = {
                 "skill_name": skill_name, "tool_name": tool_name,
                 "duration_ms": duration_ms, "success": success,
             }
@@ -1478,9 +1480,66 @@ class AriaAPIClient(BaseSkill):
         except Exception as e:
             return SkillResult.fail(f"Failed to get skill stats: {e}")
 
+    # ── File Artifacts (aria_memories) ──────────────────────────────────────
+
+    async def write_artifact(
+        self,
+        content: str,
+        filename: str,
+        category: str = "memory",
+        subfolder: str | None = None,
+    ) -> SkillResult:
+        """Write a file artifact (diary, plan, research, draft, etc.) to persistent storage in aria_memories/."""
+        try:
+            data: dict = {"content": content, "filename": filename, "category": category}
+            if subfolder:
+                data["subfolder"] = subfolder
+            resp = await self._client.post("/artifacts", json=data)
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to write artifact: {e}")
+
+    async def read_artifact(self, category: str, filename: str) -> SkillResult:
+        """Read a file artifact from aria_memories/<category>/<filename>."""
+        try:
+            resp = await self._client.get(f"/artifacts/{category}/{filename}")
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to read artifact: {e}")
+
+    async def list_artifacts(
+        self,
+        category: str | None = None,
+        pattern: str | None = None,
+        limit: int = 50,
+    ) -> SkillResult:
+        """List file artifacts in aria_memories/. Optionally filter by category and filename pattern."""
+        try:
+            params: dict = {"limit": limit}
+            if category:
+                params["category"] = category
+            if pattern:
+                params["pattern"] = pattern
+            resp = await self._client.get("/artifacts", params=params)
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to list artifacts: {e}")
+
+    async def delete_artifact(self, category: str, filename: str) -> SkillResult:
+        """Delete a file artifact from aria_memories/<category>/<filename>."""
+        try:
+            resp = await self._client.delete(f"/artifacts/{category}/{filename}")
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to delete artifact: {e}")
+
 
 # Singleton instance for convenience
-_client: Optional[AriaAPIClient] = None
+_client: AriaAPIClient | None = None
 
 
 async def get_api_client() -> AriaAPIClient:

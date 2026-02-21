@@ -1,6 +1,6 @@
 # SKILLS.md - Complete Skill Reference
 
-I have **26 active skills** available. **Use the tool syntax** to call them:
+I have **35+ active skills** available. **Use the tool syntax** to call them:
 
 ```tool
 aria-<skill-name>.<function>({"param": "value"})
@@ -254,10 +254,10 @@ aria-pipeline-skill.run({"pipeline": "deep_research", "params": {"topic": "AI sa
 
 ```bash
 # Compact routing (no per-skill info payload)
-python3 aria_mind/skills/run_skill.py --auto-task "summarize goal progress" --route-limit 2 --route-no-info
+python3 skills/run_skill.py --auto-task "summarize goal progress" --route-limit 2 --route-no-info
 
 # Introspect one skill only when needed
-python3 aria_mind/skills/run_skill.py --skill-info api_client
+python3 skills/run_skill.py --skill-info api_client
 ```
 
 ## Error Handling

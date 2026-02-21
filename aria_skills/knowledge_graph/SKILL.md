@@ -1,7 +1,7 @@
 ---
 name: aria-knowledgegraph
 description: Build and query Aria's knowledge graph. Store entities and relationships.
-metadata: {"openclaw": {"emoji": "🕸️", "requires": {"env": ["DATABASE_URL"]}}}
+metadata: {"aria": {"emoji": "🕸️", "requires": {"env": ["DATABASE_URL"]}}}
 ---
 
 # aria-knowledgegraph
@@ -11,7 +11,7 @@ Build and query Aria's knowledge graph. Store entities (people, places, concepts
 ## Usage
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py knowledge_graph <function> '<json_args>'
+exec python3 /app/skills/run_skill.py knowledge_graph <function> '<json_args>'
 ```
 
 ## Functions
@@ -20,7 +20,7 @@ exec python3 /root/.openclaw/workspace/skills/run_skill.py knowledge_graph <func
 Create or update an entity in the knowledge graph.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py knowledge_graph add_entity '{"name": "Najia", "type": "person", "properties": {"role": "creator", "relationship": "guardian"}}'
+exec python3 /app/skills/run_skill.py knowledge_graph add_entity '{"name": "Najia", "type": "person", "properties": {"role": "creator", "relationship": "guardian"}}'
 ```
 
 **Parameters:**
@@ -32,7 +32,7 @@ exec python3 /root/.openclaw/workspace/skills/run_skill.py knowledge_graph add_e
 Create a relationship between two entities.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py knowledge_graph add_relation '{"from_entity": "Najia", "to_entity": "Aria", "relation_type": "created", "properties": {"date": "2024"}}'
+exec python3 /app/skills/run_skill.py knowledge_graph add_relation '{"from_entity": "Najia", "to_entity": "Aria", "relation_type": "created", "properties": {"date": "2024"}}'
 ```
 
 **Relation types:**
@@ -45,14 +45,14 @@ exec python3 /root/.openclaw/workspace/skills/run_skill.py knowledge_graph add_r
 Find entities related to a given entity.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py knowledge_graph query_related '{"entity_name": "Najia", "depth": 2}'
+exec python3 /app/skills/run_skill.py knowledge_graph query_related '{"entity_name": "Najia", "depth": 2}'
 ```
 
 ### search
 Search entities by name, type, or properties.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py knowledge_graph search '{"query": "python"}'
+exec python3 /app/skills/run_skill.py knowledge_graph search '{"query": "python"}'
 ```
 
 ## Database Schema
@@ -80,16 +80,16 @@ exec python3 /root/.openclaw/workspace/skills/run_skill.py knowledge_graph searc
 
 ```bash
 # Add people
-exec python3 /root/.openclaw/workspace/skills/run_skill.py knowledge_graph add_entity '{"name": "Najia", "type": "person"}'
-exec python3 /root/.openclaw/workspace/skills/run_skill.py knowledge_graph add_entity '{"name": "Aria", "type": "ai_agent"}'
+exec python3 /app/skills/run_skill.py knowledge_graph add_entity '{"name": "Najia", "type": "person"}'
+exec python3 /app/skills/run_skill.py knowledge_graph add_entity '{"name": "Aria", "type": "ai_agent"}'
 
 # Add relationship
-exec python3 /root/.openclaw/workspace/skills/run_skill.py knowledge_graph add_relation '{"from_entity": "Najia", "to_entity": "Aria", "relation_type": "created"}'
+exec python3 /app/skills/run_skill.py knowledge_graph add_relation '{"from_entity": "Najia", "to_entity": "Aria", "relation_type": "created"}'
 
 # Query
-exec python3 /root/.openclaw/workspace/skills/run_skill.py knowledge_graph query_related '{"entity_name": "Najia"}'
+exec python3 /app/skills/run_skill.py knowledge_graph query_related '{"entity_name": "Najia"}'
 ```
 
 ## Python Module
 
-This skill wraps `/root/.openclaw/workspace/skills/aria_skills/knowledge_graph.py`
+This skill wraps `/app/skills/aria_skills/knowledge_graph.py`

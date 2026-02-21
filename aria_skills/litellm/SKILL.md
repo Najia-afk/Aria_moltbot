@@ -1,7 +1,7 @@
 ---
 name: aria-litellm
 description: Manage LiteLLM proxy, models, and API spend tracking.
-metadata: {"openclaw": {"emoji": "⚡"}}
+metadata: {"aria": {"emoji": "âš¡"}}
 ---
 
 # aria-litellm
@@ -11,7 +11,7 @@ Manage LiteLLM proxy, query available models, track API spend and provider balan
 ## Usage
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py litellm <function> '<json_args>'
+exec python3 /app/skills/run_skill.py litellm <function> '<json_args>'
 ```
 
 ## Functions
@@ -20,35 +20,35 @@ exec python3 /root/.openclaw/workspace/skills/run_skill.py litellm <function> '<
 List all available models.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py litellm litellm_models '{}'
+exec python3 /app/skills/run_skill.py litellm litellm_models '{}'
 ```
 
 ### litellm_health
 Check proxy health.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py litellm litellm_health '{}'
+exec python3 /app/skills/run_skill.py litellm litellm_health '{}'
 ```
 
 ### litellm_spend
 Get spend logs.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py litellm litellm_spend '{"limit": 20}'
+exec python3 /app/skills/run_skill.py litellm litellm_spend '{"limit": 20}'
 ```
 
 ### litellm_global_spend
 Get total spend summary.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py litellm litellm_global_spend '{}'
+exec python3 /app/skills/run_skill.py litellm litellm_global_spend '{}'
 ```
 
 ### provider_balances
 Get wallet balances from Kimi and OpenRouter.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py litellm provider_balances '{}'
+exec python3 /app/skills/run_skill.py litellm provider_balances '{}'
 ```
 
 Returns:
@@ -73,4 +73,4 @@ Returns:
 |----------|-------------|----------|
 | Kimi/Moonshot | `MOONSHOT_KIMI_KEY` | USD |
 | OpenRouter | `OPEN_ROUTER_KEY` | USD |
-| Local (MLX/Ollama) | N/A | Free |
+| Local (MLX) | N/A | Free |

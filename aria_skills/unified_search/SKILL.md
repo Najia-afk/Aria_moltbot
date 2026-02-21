@@ -2,7 +2,7 @@
 ---
 name: aria-unified-search
 description: "🔎 RRF-merged search across semantic + graph + memory backends"
-metadata: {"openclaw": {"emoji": "🔎"}}
+metadata: {"aria": {"emoji": "🔎"}}
 ---
 
 # aria-unified-search
@@ -41,19 +41,19 @@ Where $k = 60$ (damping constant) and $w_b$ is the backend weight.
 
 ```bash
 # Unified search across all backends
-exec python3 /root/.openclaw/workspace/skills/run_skill.py unified_search search '{"query": "security best practices"}'
+exec python3 /app/skills/run_skill.py unified_search search '{"query": "security best practices"}'
 
 # With filters
-exec python3 /root/.openclaw/workspace/skills/run_skill.py unified_search search '{"query": "AI safety", "limit": 10, "backends": ["semantic", "graph"], "min_importance": 0.5}'
+exec python3 /app/skills/run_skill.py unified_search search '{"query": "AI safety", "limit": 10, "backends": ["semantic", "graph"], "min_importance": 0.5}'
 
 # Semantic-only search
-exec python3 /root/.openclaw/workspace/skills/run_skill.py unified_search semantic_search '{"query": "deployment pipeline"}'
+exec python3 /app/skills/run_skill.py unified_search semantic_search '{"query": "deployment pipeline"}'
 
 # Graph-only search
-exec python3 /root/.openclaw/workspace/skills/run_skill.py unified_search graph_search '{"query": "moltbook"}'
+exec python3 /app/skills/run_skill.py unified_search graph_search '{"query": "moltbook"}'
 
 # Memory-only search
-exec python3 /root/.openclaw/workspace/skills/run_skill.py unified_search memory_search '{"query": "user preferences"}'
+exec python3 /app/skills/run_skill.py unified_search memory_search '{"query": "user preferences"}'
 ```
 
 ## Functions

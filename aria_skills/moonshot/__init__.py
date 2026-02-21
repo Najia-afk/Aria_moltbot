@@ -7,7 +7,7 @@ Split from aria_skills/llm/ per Skill Standard v2 naming convention.
 import json
 import os
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
 from aria_skills.registry import SkillRegistry
@@ -40,7 +40,7 @@ class MoonshotSkill(BaseSkill):
     
     def __init__(self, config: SkillConfig):
         super().__init__(config)
-        self._client: Optional["httpx.AsyncClient"] = None
+        self._client: "httpx.AsyncClient" | None = None
         self._model: str = ""
     
     @property
@@ -95,10 +95,10 @@ class MoonshotSkill(BaseSkill):
     
     async def chat(
         self,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         temperature: float = 0.7,
         max_tokens: int = 2048,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
     ) -> SkillResult:
         """
         Send chat completion request.

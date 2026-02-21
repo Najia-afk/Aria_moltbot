@@ -6,14 +6,13 @@ Loads identity from IDENTITY.md and provides personality attributes.
 """
 import re
 from pathlib import Path
-from typing import Optional
 
 
 class Identity:
     """
     Aria's identity - name, creature type, vibe, visual representation.
     
-    Loaded from IDENTITY.md in OpenClaw format.
+    Loaded from IDENTITY.md.
     """
     
     def __init__(self):
@@ -21,7 +20,7 @@ class Identity:
         self.creature: str = "Silicon Familiar"
         self.vibe: str = "sharp, efficient, secure"
         self.emoji: str = "⚡️"
-        self.avatar: Optional[str] = None
+        self.avatar: str | None = None
         self.handles: dict = {}
         self._loaded = False
     

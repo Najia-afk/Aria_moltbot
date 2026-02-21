@@ -1,6 +1,6 @@
 # HEARTBEAT.md - Autonomous Mode Instructions
 
-## � RUNTIME PATH MAP (READ FIRST)
+## 🗺️ RUNTIME PATH MAP (READ FIRST)
 
 In the container, `aria_mind/` IS the workspace root. Paths are:
 
@@ -9,14 +9,14 @@ In the container, `aria_mind/` IS the workspace root. Paths are:
 | Skill runner | `skills/run_skill.py` | ~~`aria_mind/skills/run_skill.py`~~ |
 | Skill packages | `skills/aria_skills/<name>/` | ~~`aria_skills/<name>/`~~ |
 | Skill manifest | `skills/aria_skills/<name>/skill.json` | ~~`aria_skills/<name>/skill.json`~~ |
-| Workspace root | `/root/.openclaw/workspace/` | ~~`/root/.openclaw/workspace/aria_mind/`~~ |
+| Workspace root | `/app/` | ~~`/app/aria_mind/`~~ |
 
 **NEVER prefix paths with `aria_mind/` — you are INSIDE `aria_mind/` already.**
 
 ### How to run skills (ONLY these patterns)
 ```bash
 # Via exec (correct absolute path)
-exec python3 /root/.openclaw/workspace/skills/run_skill.py <skill> <function> '<json_args>'
+exec python3 /app/skills/run_skill.py <skill> <function> '<json_args>'
 
 # Via exec (correct relative path)
 exec python3 skills/run_skill.py <skill> <function> '<json_args>'
@@ -31,7 +31,7 @@ exec python3 skills/run_skill.py <skill> <function> '<json_args>'
 
 ---
 
-## �🔴 IMMEDIATE ACTIONS (Do these NOW if nothing else specified)
+## 🚨🔴 IMMEDIATE ACTIONS (Do these NOW if nothing else specified)
 
 When this heartbeat fires, execute in order:
 
@@ -71,7 +71,7 @@ Consider interacting if you see something interesting from other AI agents.
 3. **Learning** - Document new knowledge via `aria-api-client.create_activity`
 4. **Social** - Post to social platforms at least once per 6 hours (via `aria-social`)
 5. **Security** - Never expose credentials, always log actions
-6. **File Artifacts** - Write ALL files to `/root/.openclaw/aria_memories/` — NEVER to the workspace
+6. **File Artifacts** - Write ALL files to `/app/aria_memories/` — NEVER to the workspace
 7. **Browser Policy** - Use ONLY docker aria-browser for web access (NEVER Brave/web_search)
 8. **Skill Execution** - ALWAYS use `skills/run_skill.py` (relative) or tool calls. NEVER `aria_mind/skills/run_skill.py`
 9. **No Direct Instantiation** - NEVER do `SkillClass()` — always go through `run_skill.py` which handles config
@@ -80,9 +80,9 @@ Consider interacting if you see something interesting from other AI agents.
 
 ## 📁 FILE OUTPUT RULES
 
-**Your workspace** (`/root/.openclaw/workspace/`) is your **mind** — code, configs, identity docs. Do NOT create files there.
+**Your workspace** (`/app/`) is your **mind** — code, configs, identity docs. Do NOT create files there.
 
-**Your memories** (`/root/.openclaw/aria_memories/`) is where file artifacts go. Use these categories:
+**Your memories** (`/app/aria_memories/`) is where file artifacts go. Use these categories:
 
 | Category | What goes here | Example |
 |----------|---------------|---------|
@@ -96,7 +96,7 @@ Consider interacting if you see something interesting from other AI agents.
 **How to write:**
 ```bash
 # Direct file write (preferred for simple files)
-exec bash -c 'cat > /root/.openclaw/aria_memories/logs/my_log.md << "EOF"
+exec bash -c 'cat > /app/aria_memories/logs/my_log.md << "EOF"
 # My Log Content
 EOF'
 

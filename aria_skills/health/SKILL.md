@@ -1,7 +1,7 @@
 ---
 name: aria-health
 description: System health monitoring for Aria services. Check database, LLM, and API connectivity.
-metadata: {"openclaw": {"emoji": "💚", "always": true}}
+metadata: {"aria": {"emoji": "💚", "always": true}}
 ---
 
 # aria-health
@@ -11,7 +11,7 @@ System health monitoring for Aria services. Check connectivity to database, LLM,
 ## Usage
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py health <function> '<json_args>'
+exec python3 /app/skills/run_skill.py health <function> '<json_args>'
 ```
 
 ## Functions
@@ -20,7 +20,7 @@ exec python3 /root/.openclaw/workspace/skills/run_skill.py health <function> '<j
 Run health checks on all services and return summary.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py health check_all '{}'
+exec python3 /app/skills/run_skill.py health check_all '{}'
 ```
 
 **Returns:**
@@ -29,7 +29,6 @@ exec python3 /root/.openclaw/workspace/skills/run_skill.py health check_all '{}'
   "status": "healthy",
   "services": {
     "database": {"status": "up", "latency_ms": 5},
-    "ollama": {"status": "up", "model": "qwen3-vl:8b"},
     "litellm": {"status": "up"},
     "moltbook": {"status": "up"}
   }
@@ -40,12 +39,11 @@ exec python3 /root/.openclaw/workspace/skills/run_skill.py health check_all '{}'
 Check a specific service.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py health check_service '{"service": "database"}'
+exec python3 /app/skills/run_skill.py health check_service '{"service": "database"}'
 ```
 
 **Available services:**
 - `database` (aria-db) - PostgreSQL connection
-- `ollama` - Local LLM (Qwen3-VL)
 - `litellm` - LLM proxy/router
 - `grafana` - Metrics dashboard
 - `prometheus` - Metrics collection
@@ -61,7 +59,7 @@ exec python3 /root/.openclaw/workspace/skills/run_skill.py health check_service 
 Get system resource usage.
 
 ```bash
-exec python3 /root/.openclaw/workspace/skills/run_skill.py health get_metrics '{}'
+exec python3 /app/skills/run_skill.py health get_metrics '{}'
 ```
 
 ## API Endpoints
@@ -75,10 +73,9 @@ exec python3 /root/.openclaw/workspace/skills/run_skill.py health get_metrics '{
 | Service | Internal URL |
 |---------|--------------|
 | Database | `postgres://aria_warehouse:5432` |
-| Ollama | `http://host.docker.internal:11434` |
 | LiteLLM | `http://litellm:4000` |
 | Moltbook | `https://www.moltbook.com/api/v1` |
 
 ## Python Module
 
-This skill wraps `/root/.openclaw/workspace/skills/aria_skills/health.py`
+This skill wraps `/app/skills/aria_skills/health.py`

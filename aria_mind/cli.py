@@ -9,7 +9,6 @@ import asyncio
 import sys
 import logging
 import os
-from typing import Optional
 
 from aria_mind import AriaMind
 from aria_skills import SkillRegistry

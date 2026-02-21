@@ -2,7 +2,6 @@
 import os
 import asyncio
 import logging
-from typing import Optional, List
 from datetime import datetime, timezone
 
 import httpx
@@ -24,7 +23,7 @@ class TelegramSkill(BaseSkill):
 
     def __init__(self, config: SkillConfig):
         super().__init__(config)
-        self._client: Optional[httpx.AsyncClient] = None
+        self._client: httpx.AsyncClient | None = None
         self._base_url: str = ""
         self._bot_info: dict = {}
         self._default_chat_id: str = ""
@@ -81,7 +80,7 @@ class TelegramSkill(BaseSkill):
     async def send_message(
         self,
         text: str,
-        chat_id: Optional[str] = None,
+        chat_id: str | None = None,
         parse_mode: str = "Markdown",
     ) -> SkillResult:
         """Send a message to a Telegram chat."""
@@ -141,7 +140,7 @@ class TelegramSkill(BaseSkill):
 
     # SocialPlatform protocol
     async def post(
-        self, content: str, tags: Optional[List[str]] = None
+        self, content: str, tags: list[str] | None = None
     ) -> SkillResult:
         return await self.send_message(text=content)
 
@@ -154,7 +153,7 @@ class TelegramSkill(BaseSkill):
         )
 
     async def get_updates(
-        self, offset: Optional[int] = None, limit: int = 100
+        self, offset: int | None = None, limit: int = 100
     ) -> SkillResult:
         """Get incoming updates (messages) from Telegram."""
         if not self._client:

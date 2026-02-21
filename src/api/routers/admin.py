@@ -4,7 +4,6 @@ Admin endpoints — service control + soul file access + DB maintenance.
 
 import asyncio
 import os
-from typing import Optional
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -27,7 +26,7 @@ def _service_cmd_env(service_id: str, action: str) -> str:
     return f"ARIA_SERVICE_CMD_{normalized_service}_{normalized_action}"
 
 
-async def _run_docker_command(command: str) -> Optional[dict]:
+async def _run_docker_command(command: str) -> dict | None:
     tokens = command.strip().split()
     if len(tokens) < 3 or tokens[0] != "docker":
         return None

@@ -3,7 +3,6 @@ Health, status, and stats endpoints.
 """
 
 from datetime import datetime, timezone
-from typing import Optional
 
 import asyncio
 import httpx
@@ -33,7 +32,7 @@ class StatsResponse(BaseModel):
     activities_count: int
     thoughts_count: int
     memories_count: int
-    last_activity: Optional[str]
+    last_activity: str | None
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
@@ -72,24 +71,72 @@ async def host_stats():
 
 @router.get("/status")
 async def api_status():
-    results = {}
+    """
+    Check all registered services.
 
-    async def check_service(name, base_url, health_path):
+    Uses synchronous httpx in a thread-pool with a hard 1-second
+    future timeout to cap DNS-resolution hangs for non-existent
+    Docker hostnames (which ignore httpx connect timeouts).
+    The pool is shut down with ``wait=False`` so we don't block on
+    threads still stuck in DNS lookups.
+    """
+    import concurrent.futures
+    import socket
+
+    _HARD_TIMEOUT = 0.8   # max wall-clock seconds per service
+
+    def _check_sync(name: str, url: str) -> tuple[str, dict]:
         try:
-            async with httpx.AsyncClient(timeout=3.0) as client:
-                url = base_url.rstrip("/") + health_path
-                resp = await client.get(url)
-                return name, {"status": "up", "code": resp.status_code}
+            prev = socket.getdefaulttimeout()
+            socket.setdefaulttimeout(0.8)
+            try:
+                with httpx.Client(
+                    timeout=httpx.Timeout(
+                        connect=0.2, read=0.4, write=0.2, pool=0.3,
+                    ),
+                ) as client:
+                    resp = client.get(url)
+                    return name, {"status": "up", "code": resp.status_code}
+            finally:
+                socket.setdefaulttimeout(prev)
         except Exception as e:
             return name, {"status": "down", "code": None, "error": str(e)[:50]}
 
-    tasks = [
-        check_service(name, base_url, health_path)
+    urls = {
+        name: base_url.rstrip("/") + health_path
         for name, (base_url, health_path) in SERVICE_URLS.items()
-    ]
-    service_results = await asyncio.gather(*tasks)
-    for name, result in service_results:
-        results[name] = result
+    }
+
+    results: dict[str, dict] = {}
+    pool = concurrent.futures.ThreadPoolExecutor(max_workers=len(urls))
+    try:
+        future_map = {
+            pool.submit(_check_sync, name, url): name
+            for name, url in urls.items()
+        }
+        done, not_done = concurrent.futures.wait(
+            future_map, timeout=_HARD_TIMEOUT + 0.5,
+        )
+        for future in done:
+            try:
+                name, info = future.result(timeout=0)
+                results[name] = info
+            except Exception:
+                results[future_map[future]] = {
+                    "status": "down", "code": None, "error": "timeout",
+                }
+        for future in not_done:
+            future.cancel()
+            results[future_map[future]] = {
+                "status": "down", "code": None, "error": "timeout",
+            }
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
+
+    # Any services that didn't complete in time
+    for name in urls:
+        if name not in results:
+            results[name] = {"status": "down", "code": None, "error": "timeout"}
 
     # Check PostgreSQL via SQLAlchemy engine
     try:
@@ -116,9 +163,9 @@ async def api_status_service(service_id: str):
         raise HTTPException(status_code=404, detail="Unknown service")
     base_url, health_path = service_info
     try:
-        async with httpx.AsyncClient(timeout=3.0) as client:
+        with httpx.Client(timeout=httpx.Timeout(connect=0.3, read=0.5, write=0.3, pool=0.5)) as client:
             url = base_url.rstrip("/") + health_path
-            resp = await client.get(url)
+            resp = client.get(url)
         return {"status": "online", "code": resp.status_code}
     except Exception:
         return {"status": "offline", "code": None}

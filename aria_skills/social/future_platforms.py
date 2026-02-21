@@ -1,14 +1,12 @@
 """Future-ready social platform connectors with safe simulation defaults."""
 
-from __future__ import annotations
 
 import os
-from typing import List, Optional
 
 from aria_skills.base import SkillResult
 
 
-def _compact_tags(tags: Optional[List[str]]) -> list[str]:
+def _compact_tags(tags: list[str] | None) -> list[str]:
     return [str(tag).strip().lstrip("#") for tag in (tags or []) if str(tag).strip()]
 
 
@@ -29,9 +27,9 @@ class TelegramSimulationPlatform:
     async def post(
         self,
         content: str,
-        tags: Optional[List[str]] = None,
+        tags: list[str] | None = None,
         simulate: bool = True,
-        chat_id: Optional[str] = None,
+        chat_id: str | None = None,
         **_: object,
     ) -> SkillResult:
         if not content or not content.strip():

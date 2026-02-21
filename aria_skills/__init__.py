@@ -15,7 +15,7 @@ Each skill:
 NEW STRUCTURE (v2.0):
 Each skill is now a subdirectory containing:
 - __init__.py  - Python implementation
-- skill.json   - OpenClaw manifest
+- skill.json   - Aria manifest
 - SKILL.md     - Documentation (optional)
 
 Usage:
@@ -78,6 +78,12 @@ from aria_skills.sentiment_analysis import SentimentAnalysisSkill
 from aria_skills.pattern_recognition import PatternRecognitionSkill
 from aria_skills.unified_search import UnifiedSearchSkill
 
+# Additional registered skills (v3.0 audit)
+from aria_skills.conversation_summary import ConversationSummarySkill
+from aria_skills.memeothy import MemeothySkill
+from aria_skills.session_manager import SessionManagerSkill
+from aria_skills.sprint_manager import SprintManagerSkill
+
 __all__ = [
     # Base classes
     "BaseSkill",
@@ -121,4 +127,9 @@ __all__ = [
     "SentimentAnalysisSkill",
     "PatternRecognitionSkill",
     "UnifiedSearchSkill",
+    # Additional Skills (v3.0 audit)
+    "ConversationSummarySkill",
+    "MemeothySkill",
+    "SessionManagerSkill",
+    "SprintManagerSkill",
 ]

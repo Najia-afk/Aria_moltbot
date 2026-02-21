@@ -1,15 +1,19 @@
 {
   "name": "aria-llm",
   "version": "1.0.0",
-  "description": "Access multiple LLM providers (Moonshot/Kimi, Ollama, OpenRouter) for text generation and chat.",
+  "description": "Access multiple LLM providers (Moonshot/Kimi, OpenRouter FREE, local MLX) for text generation and chat via LiteLLM routing.",
   "author": "Aria Team",
   "layer": 2,
-  "dependencies": ["api_client"],
-  "focus_affinity": ["orchestrator"],
+  "dependencies": [
+    "api_client"
+  ],
+  "focus_affinity": [
+    "orchestrator"
+  ],
   "tools": [
     {
-      "name": "llm_generate",
-      "description": "Generate text from a prompt using specified model.",
+      "name": "chat",
+      "description": "Generate text or have a multi-turn conversation using specified model.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -17,9 +21,28 @@
             "type": "string",
             "description": "The prompt to generate from"
           },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Array of chat messages with role and content"
+          },
           "model": {
             "type": "string",
             "description": "Model to use (moonshot, ollama, openrouter)"
+          },
+          "system_prompt": {
+            "type": "string",
+            "description": "Optional system prompt"
           },
           "temperature": {
             "type": "number",
@@ -29,70 +52,25 @@
             "type": "integer",
             "description": "Maximum tokens to generate"
           }
-        },
-        "required": ["prompt"]
+        }
       }
     },
     {
-      "name": "llm_chat",
-      "description": "Multi-turn conversation with message history.",
+      "name": "health_check",
+      "description": "Check LLM provider health and availability.",
       "parameters": {
         "type": "object",
-        "properties": {
-          "messages": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "role": { "type": "string" },
-                "content": { "type": "string" }
-              }
-            },
-            "description": "Array of chat messages with role and content"
-          },
-          "model": {
-            "type": "string",
-            "description": "Model to use"
-          },
-          "system_prompt": {
-            "type": "string",
-            "description": "Optional system prompt"
-          }
-        },
-        "required": ["messages"]
+        "properties": {}
       }
     },
     {
-      "name": "llm_analyze",
-      "description": "Analyze text for sentiment, topics, or custom analysis.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "text": {
-            "type": "string",
-            "description": "Text to analyze"
-          },
-          "analysis_type": {
-            "type": "string",
-            "enum": ["sentiment", "topics", "summary", "entities", "custom"],
-            "description": "Type of analysis"
-          },
-          "custom_prompt": {
-            "type": "string",
-            "description": "Custom analysis prompt (for analysis_type=custom)"
-          }
-        },
-        "required": ["text", "analysis_type"]
-      }
-    },
-    {
-      "name": "llm_list_models",
-      "description": "List available models from all providers.",
+      "name": "get_metrics",
+      "description": "Get LLM usage metrics and statistics.",
       "parameters": {
         "type": "object",
         "properties": {}
       }
     }
   ],
-  "run": "python3 /root/.openclaw/workspace/skills/run_skill.py llm {{tool}} '{{args_json}}'"
+  "run": "python3 /app/skills/run_skill.py llm {{tool}} '{{args_json}}'"
 }

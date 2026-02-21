@@ -6,7 +6,7 @@ Fetches and analyzes cryptocurrency market data.
 """
 import os
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
 from aria_skills.registry import SkillRegistry
@@ -30,9 +30,9 @@ class MarketDataSkill(BaseSkill):
     
     def __init__(self, config: SkillConfig):
         super().__init__(config)
-        self._client: Optional["httpx.AsyncClient"] = None
-        self._cache: Dict[str, Any] = {}
-        self._cache_time: Dict[str, datetime] = {}
+        self._client: "httpx.AsyncClient" | None = None
+        self._cache: dict[str, Any] = {}
+        self._cache_time: dict[str, datetime] = {}
     
     @property
     def name(self) -> str:

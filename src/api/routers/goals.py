@@ -4,7 +4,6 @@ Goals + hourly goals endpoints.
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func, select, update, delete
@@ -61,7 +60,7 @@ def _is_noisy_goal_payload(goal_id: str | None, title: str | None, description: 
 async def list_goals(
     page: int = 1,
     limit: int = 25,
-    status: Optional[str] = None,
+    status: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
     base = select(Goal).order_by(Goal.priority.asc(), Goal.created_at.desc())
@@ -107,61 +106,6 @@ async def create_goal(request: Request, db: AsyncSession = Depends(get_db)):
     db.add(goal)
     await db.commit()
     return {"id": str(goal.id), "goal_id": goal.goal_id, "created": True}
-
-
-@router.delete("/goals/{goal_id}")
-async def delete_goal(goal_id: str, db: AsyncSession = Depends(get_db)):
-    try:
-        uid = uuid.UUID(goal_id)
-        result = await db.execute(delete(Goal).where(Goal.id == uid))
-    except ValueError:
-        result = await db.execute(delete(Goal).where(Goal.goal_id == goal_id))
-    if result.rowcount == 0:
-        raise HTTPException(status_code=404, detail=f"Goal {goal_id} not found")
-    await db.commit()
-    return {"deleted": True}
-
-
-@router.patch("/goals/{goal_id}")
-async def update_goal(
-    goal_id: str, request: Request, db: AsyncSession = Depends(get_db)
-):
-    data = await request.json()
-    next_title = data.get("title")
-    next_description = data.get("description")
-    if _is_noisy_goal_payload(goal_id, next_title, next_description):
-        return {"updated": False, "skipped": True, "reason": "test_or_patch_noise"}
-
-    values: dict = {}
-    if data.get("status") is not None:
-        values["status"] = data["status"]
-        if data["status"] == "completed":
-            from sqlalchemy import text
-            values["completed_at"] = text("NOW()")
-        # Auto-sync board_column when status changes (unless explicitly set)
-        if "board_column" not in data:
-            status_col_map = {"active": "doing", "completed": "done", "paused": "on_hold", "cancelled": "done", "pending": "todo"}
-            if data["status"] in status_col_map:
-                values["board_column"] = status_col_map[data["status"]]
-    if data.get("progress") is not None:
-        values["progress"] = data["progress"]
-    if data.get("priority") is not None:
-        values["priority"] = data["priority"]
-    # Sprint board fields (S3-01)
-    for field in ("sprint", "board_column", "position", "assigned_to", "tags", "title", "description", "due_date"):
-        if data.get(field) is not None:
-            values[field] = data[field]
-
-    if values:
-        try:
-            uid = uuid.UUID(goal_id)
-            result = await db.execute(update(Goal).where(Goal.id == uid).values(**values))
-        except ValueError:
-            result = await db.execute(update(Goal).where(Goal.goal_id == goal_id).values(**values))
-        if result.rowcount == 0:
-            raise HTTPException(status_code=404, detail=f"Goal {goal_id} not found")
-        await db.commit()
-    return {"updated": True}
 
 
 # ── Sprint Board (S3-02) ────────────────────────────────────────────────────
@@ -273,58 +217,6 @@ async def goal_archive(
     return build_paginated_response(items, total, page, limit)
 
 
-@router.patch("/goals/{goal_id}/move")
-async def move_goal(
-    goal_id: str,
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-):
-    """Move goal to new board column (for drag-and-drop)."""
-    data = await request.json()
-    new_column = data.get("board_column")
-    new_position = data.get("position", 0)
-
-    column_to_status = {
-        "backlog": "pending",
-        "todo": "pending",
-        "doing": "active",
-        "on_hold": "paused",
-        "done": "completed",
-    }
-
-    # Validate board_column
-    if not new_column or new_column not in column_to_status:
-        raise HTTPException(
-            status_code=400,
-            detail=f"board_column is required and must be one of: {list(column_to_status.keys())}",
-        )
-
-    values = {
-        "board_column": new_column,
-        "position": new_position,
-    }
-
-    new_status = column_to_status[new_column]
-    values["status"] = new_status
-    if new_status == "completed":
-        values["completed_at"] = datetime.now()
-    elif new_column != "done":
-        # Clear completed_at when moving away from done
-        values["completed_at"] = None
-
-    try:
-        uid = uuid.UUID(goal_id)
-        result = await db.execute(update(Goal).where(Goal.id == uid).values(**values))
-    except ValueError:
-        result = await db.execute(update(Goal).where(Goal.goal_id == goal_id).values(**values))
-
-    if result.rowcount == 0:
-        raise HTTPException(status_code=404, detail=f"Goal {goal_id} not found")
-
-    await db.commit()
-    return {"moved": True, "board_column": new_column, "position": new_position}
-
-
 @router.get("/goals/sprint-summary")
 async def goal_sprint_summary(
     sprint: str = "current",
@@ -395,11 +287,134 @@ async def goal_history(
     }
 
 
+# ── Parameterized goal routes (catch-all MUST come after named routes) ───────
+
+@router.get("/goals/{goal_id}")
+async def get_goal(goal_id: str, db: AsyncSession = Depends(get_db)):
+    """Fetch a single goal by UUID or goal_id string."""
+    try:
+        uid = uuid.UUID(goal_id)
+        result = await db.execute(select(Goal).where(Goal.id == uid))
+    except ValueError:
+        result = await db.execute(select(Goal).where(Goal.goal_id == goal_id))
+    goal = result.scalars().first()
+    if not goal:
+        raise HTTPException(status_code=404, detail=f"Goal {goal_id!r} not found")
+    return goal.to_dict()
+
+
+@router.delete("/goals/{goal_id}")
+async def delete_goal(goal_id: str, db: AsyncSession = Depends(get_db)):
+    try:
+        uid = uuid.UUID(goal_id)
+        result = await db.execute(delete(Goal).where(Goal.id == uid))
+    except ValueError:
+        result = await db.execute(delete(Goal).where(Goal.goal_id == goal_id))
+    if result.rowcount == 0:
+        raise HTTPException(status_code=404, detail=f"Goal {goal_id} not found")
+    await db.commit()
+    return {"deleted": True}
+
+
+@router.patch("/goals/{goal_id}")
+async def update_goal(
+    goal_id: str, request: Request, db: AsyncSession = Depends(get_db)
+):
+    data = await request.json()
+    next_title = data.get("title")
+    next_description = data.get("description")
+    if _is_noisy_goal_payload(goal_id, next_title, next_description):
+        return {"updated": False, "skipped": True, "reason": "test_or_patch_noise"}
+
+    values: dict = {}
+    if data.get("status") is not None:
+        values["status"] = data["status"]
+        if data["status"] == "completed":
+            from sqlalchemy import text
+            values["completed_at"] = text("NOW()")
+        # Auto-sync board_column when status changes (unless explicitly set)
+        if "board_column" not in data:
+            status_col_map = {"active": "doing", "completed": "done", "paused": "on_hold", "cancelled": "done", "pending": "todo"}
+            if data["status"] in status_col_map:
+                values["board_column"] = status_col_map[data["status"]]
+    if data.get("progress") is not None:
+        values["progress"] = data["progress"]
+    if data.get("priority") is not None:
+        values["priority"] = data["priority"]
+    # Sprint board fields (S3-01)
+    for field in ("sprint", "board_column", "position", "assigned_to", "tags", "title", "description", "due_date"):
+        if data.get(field) is not None:
+            values[field] = data[field]
+
+    if values:
+        try:
+            uid = uuid.UUID(goal_id)
+            result = await db.execute(update(Goal).where(Goal.id == uid).values(**values))
+        except ValueError:
+            result = await db.execute(update(Goal).where(Goal.goal_id == goal_id).values(**values))
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail=f"Goal {goal_id} not found")
+        await db.commit()
+    return {"updated": True}
+
+
+@router.patch("/goals/{goal_id}/move")
+async def move_goal(
+    goal_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Move goal to new board column (for drag-and-drop)."""
+    data = await request.json()
+    new_column = data.get("board_column")
+    new_position = data.get("position", 0)
+
+    column_to_status = {
+        "backlog": "pending",
+        "todo": "pending",
+        "doing": "active",
+        "on_hold": "paused",
+        "done": "completed",
+    }
+
+    # Validate board_column
+    if not new_column or new_column not in column_to_status:
+        raise HTTPException(
+            status_code=400,
+            detail=f"board_column is required and must be one of: {list(column_to_status.keys())}",
+        )
+
+    values = {
+        "board_column": new_column,
+        "position": new_position,
+    }
+
+    new_status = column_to_status[new_column]
+    values["status"] = new_status
+    if new_status == "completed":
+        values["completed_at"] = datetime.now()
+    elif new_column != "done":
+        # Clear completed_at when moving away from done
+        values["completed_at"] = None
+
+    try:
+        uid = uuid.UUID(goal_id)
+        result = await db.execute(update(Goal).where(Goal.id == uid).values(**values))
+    except ValueError:
+        result = await db.execute(update(Goal).where(Goal.goal_id == goal_id).values(**values))
+
+    if result.rowcount == 0:
+        raise HTTPException(status_code=404, detail=f"Goal {goal_id} not found")
+
+    await db.commit()
+    return {"moved": True, "board_column": new_column, "position": new_position}
+
+
 # ── Hourly goals ─────────────────────────────────────────────────────────────
 
 @router.get("/hourly-goals")
 async def get_hourly_goals(
-    status: Optional[str] = None, db: AsyncSession = Depends(get_db)
+    status: str | None = None, db: AsyncSession = Depends(get_db)
 ):
     stmt = select(HourlyGoal).order_by(HourlyGoal.hour_slot, HourlyGoal.created_at.desc())
     if status:
