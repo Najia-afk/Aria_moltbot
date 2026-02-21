@@ -1,7 +1,7 @@
 ---
 name: aria-knowledgegraph
 description: Build and query Aria's knowledge graph. Store entities and relationships.
-metadata: {"aria": {"emoji": "ðŸ•¸ï¸", "requires": {"env": ["DATABASE_URL"]}}}
+metadata: {"aria": {"emoji": "🕸️", "requires": {"env": ["DATABASE_URL"]}}}
 ---
 
 # aria-knowledgegraph

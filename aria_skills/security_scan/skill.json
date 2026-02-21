@@ -1,7 +1,7 @@
 {
   "name": "aria-security-scan",
   "version": "1.0.0",
-  "description": "ðŸ”’ Security scanning and vulnerability detection for DevSecOps",
+  "description": "🔒 Security scanning and vulnerability detection for DevSecOps",
   "author": "Aria Blue",
   "layer": 3,
   "dependencies": [

@@ -44,6 +44,30 @@ ROLE_TO_FOCUS_MAP = {
 }
 
 
+# Default mind files loaded for each agent role.
+# Orchestrator/main agents load everything; sub-agents load a lighter set.
+DEFAULT_MIND_FILES_FULL = [
+    "IDENTITY.md", "SOUL.md", "SKILLS.md", "TOOLS.md", "MEMORY.md",
+    "GOALS.md", "AGENTS.md", "SECURITY.md",
+]
+DEFAULT_MIND_FILES_LIGHT = [
+    "IDENTITY.md", "SOUL.md", "TOOLS.md",
+]
+
+ROLE_DEFAULT_MIND_FILES: dict[str, list[str]] = {
+    "coordinator": DEFAULT_MIND_FILES_FULL,
+    "devsecops": ["IDENTITY.md", "SOUL.md", "TOOLS.md", "SECURITY.md"],
+    "data": ["IDENTITY.md", "SOUL.md", "TOOLS.md", "MEMORY.md"],
+    "trader": DEFAULT_MIND_FILES_LIGHT,
+    "creative": ["IDENTITY.md", "SOUL.md", "TOOLS.md", "SKILLS.md"],
+    "social": ["IDENTITY.md", "SOUL.md", "TOOLS.md", "SKILLS.md"],
+    "journalist": ["IDENTITY.md", "SOUL.md", "TOOLS.md", "SECURITY.md"],
+    "memory": ["IDENTITY.md", "SOUL.md", "MEMORY.md"],
+    "researcher": DEFAULT_MIND_FILES_LIGHT,
+    "coder": ["IDENTITY.md", "SOUL.md", "TOOLS.md", "SECURITY.md"],
+}
+
+
 @dataclass
 class AgentConfig:
     """Configuration for an agent."""
@@ -57,7 +81,14 @@ class AgentConfig:
     system_prompt: str | None = None
     temperature: float = 0.7
     max_tokens: int = 2048
+    mind_files: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
+
+    def get_mind_files(self) -> list[str]:
+        """Return mind files for this agent — explicit list or role-based default."""
+        if self.mind_files:
+            return self.mind_files
+        return ROLE_DEFAULT_MIND_FILES.get(self.role.value, DEFAULT_MIND_FILES_LIGHT)
 
 
 # Mandatory browser policy for all agents

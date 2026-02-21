@@ -1,7 +1,7 @@
 ---
 name: aria-datapipeline
-description: "ðŸ“Š Data pipeline management and ETL operations for Data Architect"
-metadata: {"aria": {"emoji": "ðŸ“Š"}}
+description: "📊 Data pipeline management and ETL operations for Data Architect"
+metadata: {"aria": {"emoji": "📊"}}
 ---
 
 # aria-datapipeline

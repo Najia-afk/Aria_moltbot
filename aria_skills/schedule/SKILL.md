@@ -1,7 +1,7 @@
 ---
 name: aria-schedule
 description: Manage Aria's scheduled jobs, tasks, and background operations.
-metadata: {"aria": {"emoji": "ðŸ“…", "requires": {"env": ["DATABASE_URL"]}}}
+metadata: {"aria": {"emoji": "📅", "requires": {"env": ["DATABASE_URL"]}}}
 ---
 
 # aria-schedule

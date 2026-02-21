@@ -1,7 +1,7 @@
 ---
 name: aria-llm
 description: Access LLM providers via LiteLLM routing (MLX local, OpenRouter FREE, Kimi paid).
-metadata: {"aria": {"emoji": "ðŸ§ ", "requires": {"anyEnv": ["MOONSHOT_KIMI_KEY", "OLLAMA_URL", "OPEN_ROUTER_KEY"]}}}
+metadata: {"aria": {"emoji": "🧠", "requires": {"anyEnv": ["MOONSHOT_KIMI_KEY", "OLLAMA_URL", "OPEN_ROUTER_KEY"]}}}
 ---
 
 # aria-llm
@@ -10,9 +10,9 @@ Access multiple LLM providers via LiteLLM routing for text generation and chat.
 
 ## Model Priority
 
-**Source of truth**: `aria_models/models.yaml` â†’ `criteria.priority` and `criteria.tiers`.
+**Source of truth**: `aria_models/models.yaml` → `criteria.priority` and `criteria.tiers`.
 
-Order: **Local â†’ Free Cloud â†’ Paid**. Never hardcode model names outside `models.yaml`.
+Order: **Local → Free Cloud → Paid**. Never hardcode model names outside `models.yaml`.
 
 ## Usage
 
@@ -45,7 +45,7 @@ exec python3 /app/skills/run_skill.py llm analyze '{"text": "I had a great day t
 
 ## Model Selection
 
-See `aria_models/models.yaml` â†’ `criteria.use_cases` for model-to-task mapping.
+See `aria_models/models.yaml` → `criteria.use_cases` for model-to-task mapping.
 
 When in doubt, use the `routing.primary` model defined in `models.yaml`.
 

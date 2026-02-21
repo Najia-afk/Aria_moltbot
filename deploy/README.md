@@ -20,7 +20,7 @@ cd stacks/brain
 | `./deploy.sh status` | Health check all services |
 | `./deploy.sh clean` | Remove all containers & volumes |
 
-## Services (12 total)
+## Services (14 total)
 
 | Service | Port | Purpose |
 |---------|------|---------|

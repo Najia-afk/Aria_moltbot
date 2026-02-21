@@ -73,4 +73,4 @@ Returns:
 |----------|-------------|----------|
 | Kimi/Moonshot | `MOONSHOT_KIMI_KEY` | USD |
 | OpenRouter | `OPEN_ROUTER_KEY` | USD |
-| Local (MLX/Ollama) | N/A | Free |
+| Local (MLX) | N/A | Free |

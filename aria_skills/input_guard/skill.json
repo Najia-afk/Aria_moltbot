@@ -1,7 +1,7 @@
 {
   "name": "aria-input-guard",
   "version": "1.0.0",
-  "description": "ðŸ›¡ï¸ Runtime security for Aria - analyzes inputs for prompt injection, validates API params, and filters sensitive output",
+  "description": "🛡️ Runtime security for Aria - analyzes inputs for prompt injection, validates API params, and filters sensitive output",
   "author": "Aria Team",
   "layer": 0,
   "dependencies": [],

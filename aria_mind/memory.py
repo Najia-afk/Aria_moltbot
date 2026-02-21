@@ -512,6 +512,90 @@ class MemoryManager:
         """Get flagged important memories."""
         return list(self._important_memories)
 
+    # -------------------------------------------------------------------------
+    # 3-Tier Memory: surface → medium → deep
+    #
+    # Surface: transient heartbeat state (1-beat TTL, auto-cleared)
+    # Medium:  daily context & activity summaries (24h TTL)
+    # Deep:    synthesized insights & patterns (permanent)
+    # -------------------------------------------------------------------------
+
+    def write_surface(self, beat_data: dict[str, Any]) -> dict[str, Any]:
+        """
+        Write transient state to surface memory.
+
+        Called every heartbeat. Overwrites previous surface state.
+        Surface memory is ephemeral — it captures the *current* beat snapshot.
+        """
+        filename = f"beat_{beat_data.get('beat_number', 0):06d}.json"
+        return self.save_json_artifact(beat_data, filename, "surface")
+
+    def clear_stale_surface(self, max_files: int = 20) -> int:
+        """Remove old surface files, keeping only the most recent ones."""
+        files = self.list_artifacts("surface", pattern="beat_*.json")
+        removed = 0
+        if len(files) > max_files:
+            # files are sorted by modified desc — remove oldest
+            for f in files[max_files:]:
+                try:
+                    Path(f["path"]).unlink()
+                    removed += 1
+                except Exception:
+                    pass
+        return removed
+
+    def promote_to_medium(
+        self,
+        summary: dict[str, Any],
+        date_key: str | None = None,
+    ) -> dict[str, Any]:
+        """
+        Promote aggregated surface data to medium-term memory.
+
+        Called every 6 heartbeats (6-hour consolidation). Aggregates recent
+        surface snapshots into a daily activity summary.
+        """
+        if not date_key:
+            date_key = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        subfolder = date_key
+        filename = f"summary_{datetime.now(timezone.utc).strftime('%H%M')}.json"
+        return self.save_json_artifact(summary, filename, "medium", subfolder)
+
+    def promote_to_deep(
+        self,
+        insight: dict[str, Any],
+        category: str = "patterns",
+    ) -> dict[str, Any]:
+        """
+        Promote validated insights to deep (permanent) memory.
+
+        Called when patterns are detected across multiple medium summaries
+        or when goals complete. Deep memory is append-only and permanent.
+        """
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M")
+        filename = f"{category}_{ts}.json"
+        return self.save_json_artifact(insight, filename, "deep", category)
+
+    def get_surface_state(self) -> dict[str, Any] | None:
+        """Get the most recent surface memory snapshot."""
+        files = self.list_artifacts("surface", pattern="beat_*.json")
+        if not files:
+            return None
+        result = self.load_json_artifact(files[0]["name"], "surface")
+        return result.get("data") if result.get("success") else None
+
+    def get_medium_summaries(self, date_key: str | None = None) -> list[dict]:
+        """Get medium-term summaries for a given date."""
+        if not date_key:
+            date_key = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        files = self.list_artifacts("medium", subfolder=date_key, pattern="summary_*.json")
+        summaries = []
+        for f in files:
+            result = self.load_json_artifact(f["name"], "medium", date_key)
+            if result.get("success") and result.get("data"):
+                summaries.append(result["data"])
+        return summaries
+
     async def checkpoint_short_term(self) -> dict[str, Any]:
         """
         Save short-term memory to disk for restart survival.
@@ -566,8 +650,9 @@ class MemoryManager:
     # -------------------------------------------------------------------------
 
     ALLOWED_CATEGORIES = frozenset({
-        "archive", "drafts", "exports", "income_ops", "knowledge",
-        "logs", "memory", "moltbook", "plans", "research", "skills",
+        "archive", "deep", "drafts", "exports", "income_ops", "knowledge",
+        "logs", "medium", "memory", "moltbook", "plans", "research",
+        "skills", "surface",
     })
 
     def _get_memories_path(self) -> Path:

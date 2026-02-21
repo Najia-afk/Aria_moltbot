@@ -1,7 +1,7 @@
 ---
 name: aria-pytest
 description: Run pytest for the Aria codebase and return structured results.
-metadata: {"aria": {"emoji": "ðŸ§ª"}}
+metadata: {"aria": {"emoji": "🧪"}}
 ---
 
 # aria-pytest

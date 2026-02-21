@@ -661,6 +661,89 @@
         "type": "object",
         "properties": {}
       }
+    },
+    {
+      "name": "write_artifact",
+      "description": "Write a file artifact (diary entry, plan, research notes, draft, code, etc.) to persistent storage in aria_memories/. Use this to save any file-based content. Categories: archive, bugs, deep, deliveries, drafts, exports, income_ops, knowledge, logs, medium, memory, moltbook, plans, research, sandbox, skills, specs, surface, tickets, work.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "The full text content to write to the file"
+          },
+          "filename": {
+            "type": "string",
+            "description": "The filename (e.g. 'diary_2025-02-21.md', 'research_report.txt')"
+          },
+          "category": {
+            "type": "string",
+            "description": "Category folder in aria_memories/ (default: 'memory'). Use 'memory' for diary/thoughts, 'plans' for plans, 'research' for research, 'drafts' for drafts, 'knowledge' for knowledge base, 'logs' for logs."
+          },
+          "subfolder": {
+            "type": "string",
+            "description": "Optional subfolder within the category"
+          }
+        },
+        "required": ["content", "filename"]
+      }
+    },
+    {
+      "name": "read_artifact",
+      "description": "Read a file artifact from aria_memories/<category>/<filename>. Use this to read back any saved file.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "description": "Category folder (e.g. 'memory', 'plans', 'research')"
+          },
+          "filename": {
+            "type": "string",
+            "description": "The filename to read (can include subfolder path like 'sub/file.md')"
+          }
+        },
+        "required": ["category", "filename"]
+      }
+    },
+    {
+      "name": "list_artifacts",
+      "description": "List file artifacts in aria_memories/. Optionally filter by category and filename pattern.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "description": "Filter by category folder (e.g. 'memory', 'plans')"
+          },
+          "pattern": {
+            "type": "string",
+            "description": "Filter by filename pattern (e.g. 'diary_*', '*.md')"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Maximum number of results (default: 50)"
+          }
+        }
+      }
+    },
+    {
+      "name": "delete_artifact",
+      "description": "Delete a file artifact from aria_memories/. Use carefully.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "description": "Category folder"
+          },
+          "filename": {
+            "type": "string",
+            "description": "Filename to delete"
+          }
+        },
+        "required": ["category", "filename"]
+      }
     }
   ],
   "run": "python3 /app/skills/run_skill.py api_client {{tool}} '{{args_json}}'"

@@ -1,7 +1,7 @@
 ---
 name: aria-inputguard
-description: "ðŸ›¡ï¸ Runtime security for Aria - analyzes inputs for prompt injection, validates API params, filters sensitive output"
-metadata: {"aria": {"emoji": "ðŸ›¡ï¸", "always": true}}
+description: "🛡️ Runtime security for Aria - analyzes inputs for prompt injection, validates API params, filters sensitive output"
+metadata: {"aria": {"emoji": "🛡️", "always": true}}
 ---
 
 # aria-inputguard

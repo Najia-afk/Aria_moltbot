@@ -1,7 +1,7 @@
 ---
 name: aria-research
-description: "ðŸ“° Research and information gathering for Journalist"
-metadata: {"aria": {"emoji": "ðŸ“°"}}
+description: "📰 Research and information gathering for Journalist"
+metadata: {"aria": {"emoji": "📰"}}
 ---
 
 # aria-research

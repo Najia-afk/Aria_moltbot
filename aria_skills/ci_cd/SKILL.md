@@ -1,7 +1,7 @@
 ---
 name: aria-cicd
-description: "ðŸ”„ CI/CD pipeline management and automation for DevSecOps"
-metadata: {"aria": {"emoji": "ðŸ”„"}}
+description: "🔄 CI/CD pipeline management and automation for DevSecOps"
+metadata: {"aria": {"emoji": "🔄"}}
 ---
 
 # aria-cicd

@@ -171,7 +171,7 @@ class Roundtable:
             )
 
         start = time.monotonic()
-        session_id = f"roundtable-{uuid4().hex[:12]}"
+        session_id = str(uuid4())
 
         # Create a roundtable session in the DB
         await self._create_session(session_id, topic, agent_ids)

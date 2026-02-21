@@ -1,6 +1,6 @@
 # Aria Blue — Rollback Guide
 
-> Last updated: Sprint 12 (aria_engine v2.0.0 migration)
+> Last updated: Sprint 13 (aria_engine v3.0.0)
 
 ## Quick Reference
 
@@ -112,7 +112,7 @@ docker ps
 docker compose stop aria-brain aria-api aria-web
 
 # Check database
-docker compose exec aria-db pg_isready -U aria
+docker compose exec aria-db pg_isready -U ${DB_USER:-aria_admin}
 
 # Check logs
 docker compose logs --tail=100 aria-brain
@@ -127,7 +127,7 @@ docker compose stop
 LATEST=$(ls -t /home/najia/aria/backups/db_*.sql | head -1)
 docker compose start aria-db
 sleep 5
-docker compose exec -T aria-db psql -U aria aria_blue < "$LATEST"
+docker compose exec -T aria-db psql -U ${DB_USER:-aria_admin} ${DB_NAME:-aria_warehouse} < "$LATEST"
 
 # Start services
 docker compose start
@@ -138,12 +138,14 @@ docker compose start
 # Check memory
 vm_stat | head -10
 
-# Restart Ollama (biggest memory consumer)
-docker compose restart ollama
+# Restart LiteLLM (model router, biggest memory consumer)
+docker compose restart litellm
 
-# If still OOM, reduce Ollama model:
-# Edit .env: OLLAMA_MODEL=qwen3:14b (instead of 32b)
-docker compose restart ollama litellm
+# If still OOM, check container memory usage:
+docker stats --no-stream
+
+# Reduce model size in .env or litellm-config.yaml
+docker compose restart litellm
 ```
 
 ### 4. Disk Full
@@ -168,7 +170,7 @@ find /home/najia/aria/aria_memories/logs -name "*.log" -mtime +30 -delete
 |----------|----------|---------------|
 | `GET /health` | `{"status": "ok"}` | Application alive |
 | `GET /api/health` | `{"status": "ok", ...}` | API + DB healthy |
-| `GET /api/status` | `{"version": "2.0.0", ...}` | Correct version deployed |
+| `GET /api/status` | `{"version": "3.0.0", ...}` | Correct version deployed |
 | `GET :8081/metrics` | Prometheus text | Metrics collecting |
 | `GET :3000` | Grafana UI | Monitoring available |
 

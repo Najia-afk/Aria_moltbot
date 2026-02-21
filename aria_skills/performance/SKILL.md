@@ -1,7 +1,7 @@
 ---
 name: aria-performance
 description: Log and query Aria's performance reviews and self-assessments.
-metadata: {"aria": {"emoji": "ðŸ“Š", "requires": {"env": ["DATABASE_URL"]}}}
+metadata: {"aria": {"emoji": "📊", "requires": {"env": ["DATABASE_URL"]}}}
 ---
 
 # aria-performance

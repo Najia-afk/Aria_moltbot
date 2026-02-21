@@ -84,6 +84,7 @@ class PromptAssembler:
         include_datetime: bool = True,
         include_tools: bool = True,
         include_goals: bool = True,
+        mind_files: list[str] | None = None,
     ) -> AssembledPrompt:
         """
         Assemble a complete system prompt for an agent.
@@ -118,53 +119,43 @@ class PromptAssembler:
             # Only use cache when no dynamic content is provided
             return cached
 
+        # Determine which mind files to load (per-agent selection)
+        _mind_file_sections = {
+            "IDENTITY.md": ("identity", 100),
+            "SOUL.md": ("soul", 90),
+            "SKILLS.md": ("skills", 85),
+            "TOOLS.md": ("tools_reference", 84),
+            "MEMORY.md": ("memory", 83),
+            "GOALS.md": ("goals_reference", 82),
+            "AGENTS.md": ("agents_reference", 81),
+            "SECURITY.md": ("security_reference", 80),
+        }
+        # Default: load all if mind_files not specified
+        files_to_load = mind_files if mind_files else list(_mind_file_sections.keys())
+
         # Build sections
         sections: list[PromptSection] = []
 
-        # ── Section 1: Soul Identity (highest priority) ───────────────────
-        identity = self._load_soul_file("IDENTITY.md")
-        if identity:
-            sections.append(PromptSection(
-                name="identity",
-                content=identity,
-                priority=100,
-            ))
-
-        # ── Section 2: Soul Values ────────────────────────────────────────
-        soul = self._load_soul_file("SOUL.md")
-        if soul:
-            sections.append(PromptSection(
-                name="soul",
-                content=soul,
-                priority=90,
-            ))
-
-        # ── Section 2b: Skill Knowledge ──────────────────────────────────
-        skills_md = self._load_soul_file("SKILLS.md")
-        if skills_md:
-            sections.append(PromptSection(
-                name="skills",
-                content=skills_md,
-                priority=85,
-            ))
-
-        # ── Section 2c: Tools Quick Reference ────────────────────────────
-        tools_md = self._load_soul_file("TOOLS.md")
-        if tools_md:
-            sections.append(PromptSection(
-                name="tools_reference",
-                content=tools_md,
-                priority=84,
-            ))
-
-        # ── Section 2d: Memory System ────────────────────────────────────
-        memory_md = self._load_soul_file("MEMORY.md")
-        if memory_md:
-            sections.append(PromptSection(
-                name="memory",
-                content=memory_md,
-                priority=83,
-            ))
+        # ── Soul / Mind file sections (loaded per agent config) ───────────
+        for filename in files_to_load:
+            if filename not in _mind_file_sections:
+                # Custom file — load with default priority
+                content = self._load_soul_file(filename)
+                if content:
+                    sections.append(PromptSection(
+                        name=filename.replace(".md", "").lower(),
+                        content=content,
+                        priority=75,
+                    ))
+                continue
+            section_name, priority = _mind_file_sections[filename]
+            content = self._load_soul_file(filename)
+            if content:
+                sections.append(PromptSection(
+                    name=section_name,
+                    content=content,
+                    priority=priority,
+                ))
 
         # ── Section 3: Agent-specific prompt ──────────────────────────────
         if agent_prompt:
@@ -266,15 +257,16 @@ class PromptAssembler:
         """
         Assemble prompt with agent-specific data from the database.
 
-        Loads agent_prompt and goals from DB, then calls assemble().
+        Loads agent_prompt, goals, and mind_files from DB, then calls assemble().
         """
         from sqlalchemy import select
 
         agent_prompt = None
         goals: list[str] = []
+        mind_files: list[str] | None = None
 
         async with db_session_factory() as db:
-            # Load agent state for system_prompt
+            # Load agent state for system_prompt + mind_files
             try:
                 from db.models import EngineAgentState
                 result = await db.execute(
@@ -285,6 +277,11 @@ class PromptAssembler:
                 agent = result.scalar_one_or_none()
                 if agent and agent.system_prompt:
                     agent_prompt = agent.system_prompt
+                # Read mind_files from agent metadata if available
+                if agent and agent.metadata_json:
+                    mf = agent.metadata_json.get("mind_files")
+                    if isinstance(mf, list) and mf:
+                        mind_files = mf
             except Exception as e:
                 logger.debug("Could not load agent state: %s", e)
 
@@ -306,6 +303,7 @@ class PromptAssembler:
             tools=tools,
             goals=goals if goals else None,
             agent_prompt=agent_prompt,
+            mind_files=mind_files,
         )
 
     def _load_soul_file(self, filename: str) -> str | None:

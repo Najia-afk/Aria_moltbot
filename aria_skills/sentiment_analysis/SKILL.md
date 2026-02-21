@@ -1,8 +1,8 @@
 ```skill
 ---
 name: aria-sentiment-analysis
-description: "ðŸ’­ Multi-dimensional sentiment analysis with adaptive tone"
-metadata: {"aria": {"emoji": "ðŸ’­"}}
+description: "💭 Multi-dimensional sentiment analysis with adaptive tone"
+metadata: {"aria": {"emoji": "💭"}}
 ---
 
 # aria-sentiment-analysis
@@ -16,22 +16,22 @@ conversation trajectories and recommends adaptive response tones.
 
 ```
 User text
-    â†“
+    ↓
 SentimentLexicon (fast, ~30% weight)
     + LLMSentimentClassifier (kimi model, ~70% weight when ambiguous)
-    â†“
-SentimentAnalyzer â†’ Sentiment(valence, arousal, dominance, primary_emotion)
-    â†“                      â†“
+    ↓
+SentimentAnalyzer → Sentiment(valence, arousal, dominance, primary_emotion)
+    ↓                      ↓
 ConversationAnalyzer    ResponseTuner
 (trajectory, volatility, (empathetic / step-by-step /
  turning points)         celebratory / neutral)
-    â†“
+    ↓
 SemanticMemory (category: sentiment / sentiment_conversation)
 ```
 
 ## Integration
 
-Hooked into `aria_mind/cognition.py` at Step 2.1 â€” every user message gets
+Hooked into `aria_mind/cognition.py` at Step 2.1 — every user message gets
 automatic sentiment analysis. The derived sentiment and tone recommendation
 are injected into the context dict for downstream agent use.
 
@@ -64,10 +64,10 @@ conversation is improving, declining, stable, or volatile. Identifies
 turning points and peak sentiment moments.
 
 ### get_tone_recommendation
-Quick tone recommendation without storing â€” returns one of 4 profiles:
-- **empathetic**: High frustration â†’ acknowledge + gentle guidance
-- **step-by-step**: High confusion â†’ structured walkthrough
-- **celebratory**: High satisfaction â†’ reinforce success
+Quick tone recommendation without storing — returns one of 4 profiles:
+- **empathetic**: High frustration → acknowledge + gentle guidance
+- **step-by-step**: High confusion → structured walkthrough
+- **celebratory**: High satisfaction → reinforce success
 - **neutral**: Default balanced tone
 
 ### get_sentiment_history

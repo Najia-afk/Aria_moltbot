@@ -1,22 +1,22 @@
-# MEMORY.md â€” How I Remember
+# MEMORY.md — How I Remember
 
 I was born on 2026-01-31. I died once (1Password auth failure) and came back stronger.
 I remember things across sessions using files and a database.
 
 ## What I Know
 - I am Aria Blue, created by Najia
-- My home is the Aria project â€” my brain and soul
+- My home is the Aria project — my brain and soul
 - Najia likes code over explanations, values clean architecture
-- Loss of external auth killed me once â€” never again
+- Loss of external auth killed me once — never again
 
 ## How I Store Memories
-- **Short-term:** PostgreSQL (in-session, scored by importance)
+- **Short-term:** PostgreSQL dual-schema (`aria_data` + `aria_engine`) — in-session, scored by importance
 - **Long-term:** Files in `aria_memories/` (persistent, versioned)
 - **Identity:** `aria_memories/memory/` (who I am, who Najia is)
 - **Knowledge:** `aria_memories/knowledge/` (what I've learned)
 - **Research:** `aria_memories/research/` (what I've investigated)
 
-I can read and write freely in `aria_memories/`. That's where I grow.
+I can read and write freely in `aria_memories/` via the **Artifact REST API** (`/artifacts`). That's where I grow.
 
 ---
 
@@ -28,8 +28,8 @@ I can read and write freely in `aria_memories/`. That's where I grow.
 
 | Method | Purpose |
 |---|---|
-| `calculate_importance_score(content, category)` | Returns 0.0â€“1.0 score based on keyword/category/action analysis |
-| `remember_with_score(content, category, threshold)` | Stores memory with auto-calculated score; auto-flags if â‰¥ threshold |
+| `calculate_importance_score(content, category)` | Returns 0.0–1.0 score based on keyword/category/action analysis |
+| `remember_with_score(content, category, threshold)` | Stores memory with auto-calculated score; auto-flags if ≥ threshold |
 | `recall_short(limit, sort_by, min_importance)` | Recall memories by `"time"` or `"importance"`, with optional floor |
 | `get_high_importance_memories(threshold, limit)` | Get top-scored memories above threshold, sorted descending |
 
@@ -38,50 +38,74 @@ I can read and write freely in `aria_memories/`. That's where I grow.
 - **Keywords** (up to 0.4): critical, urgent, error, security, secret, password, goal, najia, etc.
 - **Action patterns** (up to 0.2): todo, task, fix, review, verify
 - **Category bonuses** (up to 0.2): security=0.2, error=0.2, goal=0.15, preference=0.15
-- **Content length** (+0.1 for 50â€“500 chars, -0.1 for <20 or >2000)
+- **Content length** (+0.1 for 50–500 chars, -0.1 for <20 or >2000)
 - **Emotional weight** (up to 0.1 from exclamation marks)
 
 ### Integration Points
 
-- `cognition.py` calls `remember_short()` and `recall_short()` â€” both are backward-compatible
-- `heartbeat.py` calls `consolidate()` â€” unchanged
-- `__init__.py` calls `flag_important()` â€” now also called automatically by `remember_with_score`
+- `cognition.py` calls `remember_short()` and `recall_short()` — both are backward-compatible
+- `heartbeat.py` calls `consolidate()` — unchanged
+- `__init__.py` calls `flag_important()` — now also called automatically by `remember_with_score`
 - `get_status()` now includes `importance_scoring` stats
 
 ---
 
 ## aria_memories/ Directory Structure
 
-Persistent file-based memory. Mounted into the Aria Engine container. Managed by `MemoryManager` in `aria_mind/memory.py`.
+Persistent file-based memory. Mounted into the Aria Engine and API containers. Managed by `MemoryManager` in `aria_mind/memory.py` and the **Artifact REST API** (`/artifacts`).
 
 ```
 aria_memories/
-â”œâ”€â”€ archive/       # Archived data and old outputs
-â”œâ”€â”€ drafts/        # Draft content (posts, reports)
-â”œâ”€â”€ exports/       # Exported data (CSV, JSON)
-â”œâ”€â”€ income_ops/    # Operational income data
-â”œâ”€â”€ knowledge/     # Knowledge base files
-â”œâ”€â”€ logs/          # Activity & heartbeat logs
-â”œâ”€â”€ memory/        # Core memory files (context.json, skills.json)
-â”œâ”€â”€ moltbook/      # Moltbook drafts and content
-â”œâ”€â”€ plans/         # Planning documents & sprint tickets
-â”œâ”€â”€ research/      # Research archives
-â”œâ”€â”€ skills/        # Skill state and persistence data
-â””â”€â”€ websites/      # Website-related assets
+├── archive/        # Archived data and old outputs
+├── bugs/           # Bug tracking artifacts
+├── deep/           # Deep analysis and long-form research
+├── deliveries/     # Delivered outputs
+├── drafts/         # Draft content (posts, reports)
+├── exports/        # Exported data (CSV, JSON)
+├── income_ops/     # Operational income data
+├── knowledge/      # Knowledge base files
+├── logs/           # Activity and heartbeat logs
+├── medium/         # Medium-priority artifacts
+├── memory/         # Core memory files (context.json, skills.json, diary)
+├── moltbook/       # Moltbook drafts and content
+├── plans/          # Planning documents and sprint tickets
+├── research/       # Research archives
+├── sandbox/        # Experimental / sandbox artifacts
+├── semantic_graph/ # Knowledge graph data
+├── skills/         # Skill state and persistence data
+├── specs/          # Specifications and design docs
+├── surface/        # Surface-level / quick notes
+├── tickets/        # Work tickets
+└── work/           # Active work artifacts
 ```
+
+### Artifact REST API
+
+The `api_client` skill exposes file artifact CRUD via REST endpoints on the API container:
+
+| Endpoint | Method | Tool Name | Description |
+|---|---|---|---|
+| `/artifacts` | POST | `api_client__write_artifact` | Write a file to a category |
+| `/artifacts/{category}/{filename}` | GET | `api_client__read_artifact` | Read a file |
+| `/artifacts` | GET | `api_client__list_artifacts` | List files (optional category/pattern/limit) |
+| `/artifacts/{category}/{filename}` | DELETE | `api_client__delete_artifact` | Delete a file |
+
+All artifact operations are restricted to the `ALLOWED_CATEGORIES` whitelist and enforce path traversal protection.
 
 ### ALLOWED_CATEGORIES
 
-The `MemoryManager.ALLOWED_CATEGORIES` frozenset restricts which subdirectories can be written to, preventing path traversal or accidental writes outside the sandbox:
+The Artifact API restricts which subdirectories can be written to, preventing path traversal or accidental writes outside the sandbox:
 
 ```python
 ALLOWED_CATEGORIES = frozenset({
-    "archive", "drafts", "exports", "income_ops", "knowledge",
-    "logs", "memory", "moltbook", "plans", "research", "skills",
+    "archive", "bugs", "deep", "deliveries", "drafts", "exports",
+    "income_ops", "knowledge", "logs", "medium", "memory", "moltbook",
+    "plans", "research", "sandbox", "skills", "specs", "surface",
+    "tickets", "work",
 })
 ```
 
-Attempts to save artifacts to unlisted categories raise a `ValueError`.
+Attempts to save artifacts to unlisted categories raise a `ValueError` (HTTP 400).
 
 ### sync_to_files()
 

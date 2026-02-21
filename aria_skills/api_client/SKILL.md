@@ -1,10 +1,10 @@
 ---
 name: aria-apiclient
 description: Centralized HTTP client for aria-api interactions
-metadata: {"aria": {"emoji": "ðŸ”Œ", "requires": {"env": ["ARIA_API_URL"]}}}
+metadata: {"aria": {"emoji": "🔌", "requires": {"env": ["ARIA_API_URL"]}}}
 ---
 
-# Aria API Client ðŸ”Œ
+# Aria API Client 🔌
 
 Centralized HTTP client for all aria-api interactions. Skills should use this instead of direct database access when available.
 

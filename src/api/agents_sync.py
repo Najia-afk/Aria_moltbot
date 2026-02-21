@@ -92,6 +92,11 @@ def _parse_agents_md(text: str) -> list[dict[str, Any]]:
             "aria_talk": "Aria Talk (Conversational)",
         }
 
+        # Parse mind_files (per-agent aria_mind file selection)
+        mind_files = data.get("mind_files", [])
+        if not isinstance(mind_files, list):
+            mind_files = []
+
         agents.append({
             "agent_id": agent_id,
             "display_name": display_names.get(agent_id, agent_id.title()),
@@ -104,6 +109,7 @@ def _parse_agents_md(text: str) -> list[dict[str, Any]]:
             "capabilities": capabilities if isinstance(capabilities, list) else [],
             "timeout_seconds": timeout_seconds,
             "rate_limit": rate_limit if isinstance(rate_limit, dict) else {},
+            "mind_files": mind_files,
         })
 
     return agents
@@ -154,6 +160,11 @@ async def sync_agents_from_markdown(
                 existing.capabilities = agent["capabilities"]
                 existing.timeout_seconds = agent["timeout_seconds"]
                 existing.rate_limit = agent["rate_limit"]
+                # Persist mind_files in metadata_json
+                meta = existing.metadata_json or {}
+                if agent.get("mind_files"):
+                    meta["mind_files"] = agent["mind_files"]
+                existing.metadata_json = meta
                 existing.updated_at = now
                 updated += 1
             else:
@@ -170,6 +181,7 @@ async def sync_agents_from_markdown(
                     enabled=True,
                     timeout_seconds=agent["timeout_seconds"],
                     rate_limit=agent["rate_limit"],
+                    metadata_json={"mind_files": agent.get("mind_files", [])} if agent.get("mind_files") else {},
                 )
                 db.add(row)
                 inserted += 1

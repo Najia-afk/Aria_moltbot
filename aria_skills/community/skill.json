@@ -1,7 +1,7 @@
 {
   "name": "aria-community",
   "version": "1.0.0",
-  "description": "ðŸŒ Community management and growth for Social Architect",
+  "description": "🌐 Community management and growth for Social Architect",
   "author": "Aria Blue",
   "layer": 3,
   "dependencies": ["api_client", "social"],

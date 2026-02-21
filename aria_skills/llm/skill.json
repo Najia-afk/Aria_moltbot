@@ -1,7 +1,7 @@
 {
   "name": "aria-llm",
   "version": "1.0.0",
-  "description": "Access multiple LLM providers (Moonshot/Kimi, Ollama, OpenRouter) for text generation and chat.",
+  "description": "Access multiple LLM providers (Moonshot/Kimi, OpenRouter FREE, local MLX) for text generation and chat via LiteLLM routing.",
   "author": "Aria Team",
   "layer": 2,
   "dependencies": [

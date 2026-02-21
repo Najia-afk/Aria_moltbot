@@ -1,4 +1,4 @@
-﻿"""Working Memory  Full lifecycle with context retrieval integration tests.
+"""Working Memory  Full lifecycle with context retrieval integration tests.
 
 Chain 5: create -> list -> patch -> context -> checkpoint -> stats -> cleanup dry_run -> delete -> verify gone.
 """

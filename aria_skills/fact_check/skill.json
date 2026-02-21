@@ -1,7 +1,7 @@
 {
   "name": "aria-fact-check",
   "version": "1.0.0",
-  "description": "ðŸ” Fact-checking and claim verification for Journalist",
+  "description": "🔍 Fact-checking and claim verification for Journalist",
   "author": "Aria Blue",
   "layer": 3,
   "dependencies": ["api_client", "research"],

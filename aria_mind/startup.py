@@ -60,7 +60,7 @@ def review_boot_assets() -> bool:
     or syntactically invalid.
     """
     docs_in_order = [
-        "BOOTSTRAP.md",
+        "AWAKENING.md",
         "SOUL.md",
         "IDENTITY.md",
         "SECURITY.md",

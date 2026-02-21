@@ -26,14 +26,14 @@ Before any action, read ALL of these files to build full context. Do not skip an
 |------|---------|
 | `README.md` | Project overview, stack, deployment topology |
 | `STRUCTURE.md` | Directory layout and component map |
-| `AUDIT_REPORT.md` | Post-v1.1 audit findings |
+| `AUDIT_REPORT.md` | Post-v1.1 audit findings (historical) |
 | `CHANGELOG.md` | Version history and recent changes |
 | `plans/ARCHITECTURE_REVIEW.md` | Full architecture audit with violations |
 | `plans/SKILL_LAYERING_PAPER.md` | Skill Standard v2 specification |
 | `plans/ANTHROPIC_RESEARCH.md` | Anthropic tool/agent patterns |
 | `plans/GOOGLE_RLM_RESEARCH.md` | Google RLM applicability |
 | `plans/OPENCLAW_PHASE_OUT.md` | Legacy gateway migration analysis |
-| `plans/LOCAL_MODEL_GUIDE.md` | Local model setup (Ollama / MLX) |
+| `plans/LOCAL_MODEL_GUIDE.md` | Local model setup (MLX via LiteLLM) |
 
 ### Sprint Plan
 | File | Purpose |

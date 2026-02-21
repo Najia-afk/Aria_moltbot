@@ -5,7 +5,7 @@
 - Avoid writing secrets or tokens into repo files; prompt for them at runtime or keep them unset by default.
 - When refactoring skills, verify file content after edits to avoid duplicated blocks and syntax errors; re-read the file before running tests.
 
-## Sprint Planning (v1.2 — 2026-02-10)
+## Sprint Planning (v1.2 — 2026-02-10, historical)
 - **Read EVERYTHING before acting.** Full codebase read (200+ files) via parallel subagents is the fastest way. Never plan from summary alone.
 - **Parallel subagents work well** for codebase ingestion. 6 subagents reading different directories simultaneously gives full context in minutes.
 - **Filename consistency matters.** When a master index references ticket filenames, verify the actual filenames on disk match. Found 5 mismatches in first pass.
@@ -28,7 +28,7 @@
 - **Cron 6-field vs 5-field format** caused massive over-firing. Always validate cron expressions.
 - **Empty registries from constructors:** `PipelineExecutor(SkillRegistry())` creates a fresh empty registry instead of using the shared one. Pass the existing registry instance.
 
-## Sprint v1.2 Execution (2025)
+## Sprint v1.2 Execution (2026, historical)
 - **Swarm execution works.** 44 tickets across 9 epics completed autonomously via parallel subagent dispatch. Tickets grouped into dependency waves avoid blocking.
 - **Deprecated code removal (S-18) must happen before init cleanup (S-19).** Removing imports of deleted skills first prevents ImportError cascades.
 - **Duplicate index=True + standalone Index() is common.** S-36 found 3 instances. Always check before adding standalone indexes whether inline `index=True` exists.

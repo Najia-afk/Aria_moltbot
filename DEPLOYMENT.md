@@ -1,8 +1,8 @@
 # Aria Blue — Deployment & Operations Guide
 
-> **Version**: 2.0.0 (aria_engine, post-legacy-gateway migration)
+> **Version**: 3.0.0 (aria_engine v3, multi-agent + artifact API)
 > **Target**: Mac Mini — najia@192.168.1.53
-> **Last updated**: Sprint 12
+> **Last updated**: Sprint 13
 
 For architecture overview see [ARCHITECTURE.md](ARCHITECTURE.md). For model details see [MODELS.md](MODELS.md). For skill details see [SKILLS.md](SKILLS.md). For rollback procedures see [ROLLBACK.md](ROLLBACK.md).
 
@@ -14,7 +14,7 @@ For architecture overview see [ARCHITECTURE.md](ARCHITECTURE.md). For model deta
 - **macOS with Apple Silicon** (M1/M2/M3/M4) for Metal GPU acceleration
 - Docker & Docker Compose installed on Mac Mini
 - At least 5GB free disk space
-- All Sprint 11 tests passing
+- All Sprint 13 tests passing
 
 ---
 
@@ -183,7 +183,7 @@ PYTHONPATH=/app:/app/skills
 The `init-scripts/` folder runs on first PostgreSQL startup:
 
 1. `00-create-litellm-db.sh` — Creates the separate `litellm` database
-2. `01-schema.sql` — Creates Aria's 8 core tables with seed data
+2. `01-schema.sql` — Creates Aria's dual-schema tables (aria_data + aria_engine) with seed data
 
 ### Manual Access
 
@@ -465,7 +465,7 @@ docker exec -it aria-db psql -U aria_admin -d aria_warehouse -c 'SELECT COUNT(*)
 - [ ] `.env` configured with all credentials
 - [ ] MLX Server running on Apple Silicon host
 - [ ] Docker stack started (`docker compose up -d`)
-- [ ] All 13 containers healthy
+- [ ] All 14 containers healthy
 
 ### Verification
 
@@ -491,9 +491,9 @@ docker exec -it aria-db psql -U aria_admin -d aria_warehouse -c 'SELECT COUNT(*)
 Mac Mini (192.168.1.53)
 ├── docker compose stack:
 │   ├── aria-db (PostgreSQL 16 + pgvector)
-│   ├── litellm (Ollama proxy)
+│   ├── litellm (LLM model router)
 │   ├── aria-brain (aria_engine — heartbeat, cron, agents)
-│   ├── aria-api (Flask REST API)
+│   ├── aria-api (FastAPI REST API)
 │   ├── aria-web (Dashboard)
 │   ├── prometheus (Metrics collection)
 │   └── grafana (Monitoring dashboards)

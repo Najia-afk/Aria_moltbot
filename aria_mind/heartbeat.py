@@ -56,7 +56,7 @@ class Heartbeat:
         self._beats_since_consolidation = 0
         self._beats_since_goal_check = 0
         self._reflection_interval = 6      # every 6 beats = 6hr (matches six_hour_review cron)
-        self._consolidation_interval = 24  # every 24 beats = 24hr (daily)
+        self._consolidation_interval = 6   # every 6 beats = 6hr (surface→medium promotion)
         self._goal_check_interval = 1      # every beat = 1hr (matches hourly_goal_check cron)
     
     @property
@@ -169,29 +169,42 @@ class Heartbeat:
         except Exception as e:
             self.logger.debug(f"Heartbeat DB log failed: {e}")
 
-        # 2. Self-heal any failed subsystems
+        # 2. Write surface memory (transient heartbeat state)
+        await self._write_surface_memory()
+
+        # 3. Self-heal any failed subsystems
         for subsystem, healthy in self._subsystem_health.items():
             if not healthy:
                 self.logger.warning(f"⚠️ Subsystem '{subsystem}' unhealthy — attempting recovery")
                 await self._heal_subsystem(subsystem)
         
-        # 3. Goal work (every 5 beats = 5 min work cycle per GOALS.md)
+        # 4. Goal work (every beat = per GOALS.md cycle)
         self._beats_since_goal_check += 1
         if self._beats_since_goal_check >= self._goal_check_interval:
             self._beats_since_goal_check = 0
             await self._check_goals()
         
-        # 4. Periodic reflection (every 30 beats = 30 min)
+        # 5. Periodic reflection (every 6 beats)
         self._beats_since_reflection += 1
         if self._beats_since_reflection >= self._reflection_interval:
             self._beats_since_reflection = 0
             await self._trigger_reflection()
         
-        # 5. Memory consolidation (every 60 beats = 1 hr)
+        # 6. Memory consolidation: surface → medium (every 6 beats)
+        #    Also triggers medium → deep when patterns emerge
         self._beats_since_consolidation += 1
         if self._beats_since_consolidation >= self._consolidation_interval:
             self._beats_since_consolidation = 0
             await self._trigger_consolidation()
+        
+        # 7. Clean stale surface files (keep last 20)
+        if self._mind.memory and self._beat_count % 10 == 0:
+            try:
+                removed = self._mind.memory.clear_stale_surface(max_files=20)
+                if removed:
+                    self.logger.debug(f"🧹 Cleared {removed} stale surface files")
+            except Exception:
+                pass
         
         self.logger.debug(f"💓 Beat #{self._beat_count} — all systems nominal")
     
@@ -259,8 +272,38 @@ class Heartbeat:
         except Exception as e:
             self.logger.debug(f"Reflection skipped: {e}")
     
+    async def _write_surface_memory(self) -> None:
+        """Write transient heartbeat state to surface memory tier."""
+        if not self._mind.memory:
+            return
+
+        try:
+            surface_data = {
+                "timestamp": self._last_beat.isoformat() if self._last_beat else None,
+                "beat_number": self._beat_count,
+                "subsystems": dict(self._subsystem_health),
+                "all_healthy": all(self._subsystem_health.values()),
+                "short_term_count": len(self._mind.memory._short_term),
+                "important_memories": len(self._mind.memory._important_memories),
+                "top_categories": dict(self._mind.memory._category_frequency.most_common(5)),
+                "autonomous_actions": {
+                    "next_goal_check_in": self._goal_check_interval - self._beats_since_goal_check,
+                    "next_reflection_in": self._reflection_interval - self._beats_since_reflection,
+                    "next_consolidation_in": self._consolidation_interval - self._beats_since_consolidation,
+                },
+            }
+            self._mind.memory.write_surface(surface_data)
+        except Exception as e:
+            self.logger.debug(f"Surface memory write skipped: {e}")
+
     async def _trigger_consolidation(self) -> None:
-        """Trigger memory consolidation."""
+        """
+        Trigger memory consolidation across all tiers.
+
+        1. Short-term → summaries (existing consolidation)
+        2. Surface → medium (aggregate heartbeat snapshots into 6h summary)
+        3. Medium → deep (when patterns detected across multiple summaries)
+        """
         if not self._mind.memory:
             return
         
@@ -273,14 +316,91 @@ class Heartbeat:
                     or self._mind.cognition._skills.get("llm")
                 )
             
+            # 1. Standard short-term → long-term consolidation
             result = await self._mind.memory.consolidate(llm_skill=llm_skill)
             if result.get("consolidated"):
                 self.logger.info(
                     f"🧠 Memory consolidated: {result['entries_processed']} entries, "
                     f"{len(result.get('lessons', []))} lessons learned"
                 )
+
+            # 2. Surface → medium promotion
+            await self._promote_surface_to_medium(result)
+
+            # 3. Medium → deep promotion (check for patterns)
+            await self._promote_medium_to_deep(result)
+
         except Exception as e:
             self.logger.debug(f"Consolidation skipped: {e}")
+
+    async def _promote_surface_to_medium(self, consolidation_result: dict) -> None:
+        """Aggregate recent surface snapshots into a medium-term summary."""
+        if not self._mind.memory:
+            return
+
+        try:
+            surface_files = self._mind.memory.list_artifacts("surface", pattern="beat_*.json")
+            if not surface_files:
+                return
+
+            # Aggregate surface data
+            beats_healthy = 0
+            beats_total = len(surface_files)
+            all_categories: dict[str, int] = {}
+
+            for sf in surface_files[:20]:  # Last 20 beats max
+                data = self._mind.memory.load_json_artifact(sf["name"], "surface")
+                if data.get("success") and data.get("data"):
+                    snap = data["data"]
+                    if snap.get("all_healthy"):
+                        beats_healthy += 1
+                    for cat, count in snap.get("top_categories", {}).items():
+                        all_categories[cat] = all_categories.get(cat, 0) + count
+
+            medium_summary = {
+                "period_beats": beats_total,
+                "beats_healthy": beats_healthy,
+                "health_rate": round(beats_healthy / max(beats_total, 1), 2),
+                "top_categories": dict(sorted(
+                    all_categories.items(), key=lambda x: x[1], reverse=True
+                )[:10]),
+                "consolidation": {
+                    "entries_processed": consolidation_result.get("entries_processed", 0),
+                    "lessons": consolidation_result.get("lessons", []),
+                },
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+
+            self._mind.memory.promote_to_medium(medium_summary)
+            self.logger.info(
+                f"📊 Surface→Medium: {beats_total} beats, "
+                f"{beats_healthy}/{beats_total} healthy"
+            )
+        except Exception as e:
+            self.logger.debug(f"Surface→Medium promotion skipped: {e}")
+
+    async def _promote_medium_to_deep(self, consolidation_result: dict) -> None:
+        """Promote patterns from medium to deep memory when insights emerge."""
+        if not self._mind.memory:
+            return
+
+        lessons = consolidation_result.get("lessons", [])
+        if not lessons:
+            return
+
+        try:
+            self._mind.memory.promote_to_deep(
+                {
+                    "lessons": lessons,
+                    "source": "heartbeat_consolidation",
+                    "beat_number": self._beat_count,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                },
+                category="patterns",
+            )
+            self.logger.info(f"🧬 Medium→Deep: {len(lessons)} patterns promoted")
+        except Exception as e:
+            self.logger.debug(f"Medium→Deep promotion skipped: {e}")
     
     def get_status(self) -> dict[str, Any]:
         """Get current health status with detailed telemetry."""

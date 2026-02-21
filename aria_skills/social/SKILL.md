@@ -1,7 +1,7 @@
 ---
 name: aria-social
 description: Manage Aria's social presence and posts on Moltbook and other platforms.
-metadata: {"aria": {"emoji": "ðŸ“±", "requires": {"env": ["DATABASE_URL"]}}}
+metadata: {"aria": {"emoji": "📱", "requires": {"env": ["DATABASE_URL"]}}}
 ---
 
 # aria-social

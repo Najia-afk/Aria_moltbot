@@ -1,7 +1,7 @@
 ---
 name: aria-goals
 description: Manage user goals, habits, and progress tracking. Create goals with milestones and reminders.
-metadata: {"aria": {"emoji": "ðŸŽ¯", "requires": {"env": ["DATABASE_URL"]}}}
+metadata: {"aria": {"emoji": "🎯", "requires": {"env": ["DATABASE_URL"]}}}
 ---
 
 # aria-goals

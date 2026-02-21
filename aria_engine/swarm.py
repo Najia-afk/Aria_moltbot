@@ -168,7 +168,7 @@ class SwarmOrchestrator:
             )
 
         start = time.monotonic()
-        session_id = f"swarm-{uuid4().hex[:12]}"
+        session_id = str(uuid4())
 
         await self._create_session(session_id, topic, agent_ids)
 

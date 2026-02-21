@@ -410,8 +410,8 @@ services:
       - ../../aria_engine:/aria_engine:ro
       # Mount aria_skills for knowledge graph sync (read-only)
       - ../../aria_skills:/aria_skills:ro
-      # Mount aria_memories for live memory view (read-only)
-      - ../../aria_memories:/aria_memories:ro
+      # Mount aria_memories for file artifact read/write
+      - ../../aria_memories:/aria_memories
       # Mount aria_agents for soul file browser (read-only)
       - ../../aria_agents:/aria_agents:ro
       # Mount aria_souvenirs for soul file browser (read-only)

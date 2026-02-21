@@ -1,7 +1,7 @@
 {
   "name": "aria-ci-cd",
   "version": "1.0.0",
-  "description": "ðŸ”„ CI/CD pipeline management and automation for DevSecOps",
+  "description": "🔄 CI/CD pipeline management and automation for DevSecOps",
   "author": "Aria Blue",
   "layer": 3,
   "dependencies": ["api_client"],

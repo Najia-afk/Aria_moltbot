@@ -143,7 +143,7 @@ Aria_moltbot/
 │   └── skills/                   # Skill state and persistence data
 │
 ├── stacks/
-│   ├── brain/                    # Docker deployment (12 services)
+│   ├── brain/                    # Docker deployment (14 services)
 │   │   ├── docker-compose.yml    # Full stack orchestration
 │   │   ├── .env                  # Environment configuration (DO NOT COMMIT)
 │   │   ├── .env.example          # Template for .env
@@ -223,7 +223,7 @@ Aria_moltbot/
 │   │   │   ├── schema.py         # GraphQL schema
 │   │   │   ├── types.py          # GraphQL type definitions
 │   │   │   └── resolvers.py      # Query resolvers
-│   │   └── routers/              # 28 REST routers
+│   │   └── routers/              # 30+ REST routers
 │   │       ├── activities.py     # Activity log CRUD + stats
 │   │       ├── admin.py          # Admin operations
 │   │       ├── agents_crud.py    # Agent CRUD lifecycle (v1.2)
@@ -509,7 +509,7 @@ docker compose up -d
 cd stacks/brain
 docker compose down -v    # Remove volumes (data loss!)
 docker compose up -d      # Rebuild
-docker compose ps         # Verify 13 healthy services
+docker compose ps         # Verify 14 healthy services
 ```
 
 ### Service URLs

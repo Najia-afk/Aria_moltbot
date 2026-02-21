@@ -1,26 +1,26 @@
 ```skill
 ---
 name: aria-memory-compression
-description: "ðŸ—œï¸ 3-tier hierarchical memory compression"
-metadata: {"aria": {"emoji": "ðŸ—œï¸"}}
+description: "🗜️ 3-tier hierarchical memory compression"
+metadata: {"aria": {"emoji": "🗜️"}}
 ---
 
 # aria-memory-compression
 
 3-tier hierarchical memory compression engine. Scores memory importance,
 compresses via LLM summarization (with rule-based fallback), and manages
-raw â†’ recent â†’ archive tiers. Stores compressed summaries in semantic memory.
+raw → recent → archive tiers. Stores compressed summaries in semantic memory.
 
 ## Architecture
 
 ```
 Raw memories (limit: 20)
-    â†“ ImportanceScorer (recency Ã— significance Ã— category Ã— length)
-    â†“ MemoryCompressor (LLM via LiteLLM + fallback)
+    ↓ ImportanceScorer (recency × significance × category × length)
+    ↓ MemoryCompressor (LLM via LiteLLM + fallback)
 Recent tier (limit: 100, ratio: 0.3)
-    â†“
+    ↓
 Archive tier (all older, ratio: 0.1)
-    â†“
+    ↓
 SemanticMemory (category: compressed_recent / compressed_archive)
 ```
 
@@ -56,7 +56,7 @@ Retrieve working memory context within a token budget. Includes both raw
 working memory items and compressed summaries from previous runs.
 
 ### get_compression_stats
-Get statistics from the last compression run â€” memories processed,
+Get statistics from the last compression run — memories processed,
 compression ratio, tokens saved, tier breakdown.
 
 ## Dependencies

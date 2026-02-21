@@ -6,7 +6,7 @@
 |-------|------|-------------|----------|
 | 0 | Kernel | Read-only identity & security | input_guard |
 | 1 | API Client | Sole DB gateway | api_client |
-| 2 | Core | Essential runtime skills | llm, litellm, health, session_manager, model_switcher, moonshot, ollama |
+| 2 | Core | Essential runtime skills | llm, litellm, health, session_manager, model_switcher, moonshot |
 | 3 | Domain | Feature-specific skills | research, moltbook, market_data, social, memeothy, database, knowledge_graph, goals, telegram, brainstorm, community, portfolio, fact_check, experiment, data_pipeline, sandbox, working_memory, ci_cd, security_scan, pytest_runner, agent_manager |
 | 4 | Orchestration | Planning & scheduling | schedule, hourly_goals, performance, pipeline_skill |
 

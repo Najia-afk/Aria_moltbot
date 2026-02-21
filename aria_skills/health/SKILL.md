@@ -1,7 +1,7 @@
 ---
 name: aria-health
 description: System health monitoring for Aria services. Check database, LLM, and API connectivity.
-metadata: {"aria": {"emoji": "ðŸ’š", "always": true}}
+metadata: {"aria": {"emoji": "💚", "always": true}}
 ---
 
 # aria-health
@@ -29,7 +29,6 @@ exec python3 /app/skills/run_skill.py health check_all '{}'
   "status": "healthy",
   "services": {
     "database": {"status": "up", "latency_ms": 5},
-    "ollama": {"status": "up", "model": "qwen3-vl:8b"},
     "litellm": {"status": "up"},
     "moltbook": {"status": "up"}
   }
@@ -45,7 +44,6 @@ exec python3 /app/skills/run_skill.py health check_service '{"service": "databas
 
 **Available services:**
 - `database` (aria-db) - PostgreSQL connection
-- `ollama` - Local LLM (Qwen3-VL)
 - `litellm` - LLM proxy/router
 - `grafana` - Metrics dashboard
 - `prometheus` - Metrics collection
@@ -75,7 +73,6 @@ exec python3 /app/skills/run_skill.py health get_metrics '{}'
 | Service | Internal URL |
 |---------|--------------|
 | Database | `postgres://aria_warehouse:5432` |
-| Ollama | `http://host.docker.internal:11434` |
 | LiteLLM | `http://litellm:4000` |
 | Moltbook | `https://www.moltbook.com/api/v1` |
 

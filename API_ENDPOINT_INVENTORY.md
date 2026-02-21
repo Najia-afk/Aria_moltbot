@@ -7,11 +7,11 @@
 
 | Metric | Count |
 |--------|-------|
-| **Total REST endpoints** | 163 |
-| **WebSocket endpoints** | 1 |
+| **Total REST endpoints** | 175+ |
+| **WebSocket endpoints** | 3 |
 | **GraphQL endpoint** | 1 |
 | **Standalone (non-FastAPI)** | 1 |
-| **Router files** | 28 |
+| **Router files** | 30 |
 | **Test files** | 35 |
 | **Endpoints with direct test coverage** | ~130 |
 | **Endpoints with NO test coverage** | ~35 |

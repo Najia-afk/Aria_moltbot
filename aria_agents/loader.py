@@ -142,6 +142,14 @@ class AgentLoader:
             if not isinstance(capabilities, list):
                 capabilities = [str(capabilities)] if capabilities else []
 
+            # Parse mind_files list (explicit per-agent aria_mind file selection)
+            mind_files_raw = props.get("mind_files", [])
+            if isinstance(mind_files_raw, str):
+                mind_files_raw = [f.strip() for f in mind_files_raw.split(",") if f.strip()]
+            elif not isinstance(mind_files_raw, list):
+                mind_files_raw = []
+            mind_files = [str(f) for f in mind_files_raw]
+
             config = AgentConfig(
                 id=agent_id,
                 name=props.get("name", agent_id),
@@ -152,6 +160,7 @@ class AgentLoader:
                 skills=skills,
                 temperature=float(props.get("temperature", 0.7)),
                 max_tokens=int(props.get("max_tokens", 2048)),
+                mind_files=mind_files,
             )
             
             agents[agent_id] = config

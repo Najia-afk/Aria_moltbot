@@ -1,4 +1,4 @@
-﻿"""
+"""
 Agent sessions endpoints - CRUD + stats.
 Reads from agent_sessions (PostgreSQL-native). No external sync.
 """

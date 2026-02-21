@@ -105,7 +105,8 @@ async def lifespan(app: FastAPI):
             from aria_engine.routing import EngineRouter
             from aria_engine.swarm import SwarmOrchestrator
 
-            _rt_pool = AgentPool(engine_cfg, async_engine)
+            _rt_pool = AgentPool(engine_cfg, async_engine, llm_gateway=gateway)
+            await _rt_pool.load_agents()
             _rt_router = EngineRouter(async_engine)
             _roundtable = Roundtable(async_engine, _rt_pool, _rt_router)
             _swarm = SwarmOrchestrator(async_engine, _rt_pool, _rt_router)
@@ -414,6 +415,7 @@ try:
     from .routers.agents_crud import router as agents_crud_router
     from .routers.engine_roundtable import router as engine_roundtable_router, configure_roundtable, configure_swarm, register_roundtable
     from .routers.engine_chat import register_engine_chat, configure_engine
+    from .routers.artifacts import router as artifacts_router
 except ImportError:
     from routers.health import router as health_router
     from routers.activities import router as activities_router
@@ -444,6 +446,7 @@ except ImportError:
     from routers.agents_crud import router as agents_crud_router
     from routers.engine_roundtable import router as engine_roundtable_router, configure_roundtable, configure_swarm, register_roundtable
     from routers.engine_chat import register_engine_chat, configure_engine
+    from routers.artifacts import router as artifacts_router
 
 app.include_router(health_router)
 app.include_router(activities_router)
@@ -472,6 +475,7 @@ app.include_router(engine_sessions_router)
 app.include_router(engine_agent_metrics_router)
 app.include_router(engine_agents_router)
 app.include_router(agents_crud_router)
+app.include_router(artifacts_router)
 
 # Engine Roundtable + Swarm — REST + WebSocket
 register_roundtable(app)

@@ -6,7 +6,49 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [1.3.0] — 2026-02-XX (Schema Architecture & Swiss-Clock Audit)
+## [3.0.0] — 2026-02-21 (Multi-Agent v3 — Roundtable, Swarm & Artifacts)
+
+**Theme:** Multi-agent orchestration, file-based memory artifacts, per-agent mind configuration, production hardening.  
+**Philosophy:** "Aria as a CEO: delegates, discusses, synthesizes, remembers."
+
+### Added — New Capabilities
+
+#### Multi-Agent Roundtable & Swarm
+- **Roundtable discussions**: structured multi-agent debates with rounds + AI synthesis
+- **Swarm decisions**: iterative convergence protocol with consensus scoring
+- REST API endpoints: `POST /engine/roundtable`, `POST /engine/roundtable/async`, `POST /engine/swarm`
+- WebSocket streaming for real-time roundtable progress
+- Session persistence in `aria_engine.chat_sessions` with proper UUID session IDs
+- Slash commands `/roundtable` and `/swarm` in chat interface
+
+#### Artifact File API
+- New `artifacts.py` router: full CRUD for file artifacts in `aria_memories/`
+- Endpoints: `POST /artifacts` (write), `GET /artifacts/{category}/{filename}` (read), `GET /artifacts` (list), `DELETE /artifacts/{category}/{filename}` (delete)
+- Path traversal protection, category whitelist (20 categories)
+- `api_client` skill extended with `write_artifact`, `read_artifact`, `list_artifacts`, `delete_artifact` tools
+- Writable bind-mount on aria-api container for `aria_memories/`
+
+#### Per-Agent Mind Files
+- `mind_files` field on `AgentConfig` — each agent loads only relevant `aria_mind/*.md` files
+- Default file sets per role: orchestrator gets all 8 files, sub-agents get 3-5
+- Persisted in `agent_state.metadata_json` via `agents_sync.py`
+- `prompts.py` dynamically assembles system prompts from agent's `mind_files` list
+
+### Fixed
+- **UUID session IDs**: Roundtable and Swarm now use proper UUIDs (was `roundtable-{hex}` / `swarm-{hex}`)
+- **Agent Pool initialization**: `load_agents()` now called at startup with LLM gateway injection
+- **Agent enablement**: All agents enabled on fresh deploy (was defaulting to disabled)
+
+### Changed
+- `aria_memories` volume mount changed from `:ro` to writable for artifact API
+- `api_client` skill: added to `aria`, `memory`, and `aria_talk` agent skill lists
+- Version bumped to 3.0.0 across pyproject.toml, deployment docs, and health endpoints
+- Python badge updated to 3.13+ (was 3.10+)
+- Documentation references updated from "local-first Apple Silicon" to multi-model routing
+
+---
+
+## [1.3.0] — 2026-02-20 (Schema Architecture & Swiss-Clock Audit)
 
 **Theme:** Zero raw SQL, dual-schema ORM, comprehensive endpoint audit, 100% test coverage.  
 **Philosophy:** "Every chain from DB to API to UI verified — Swiss-clock precision."

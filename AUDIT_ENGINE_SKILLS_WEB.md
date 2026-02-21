@@ -1,6 +1,8 @@
 # Aria_moltbot — Full Audit Report
 > Generated: 2026-02-20
 
+> **⚠️ HISTORICAL DOCUMENT** — This audit was conducted pre-v3.0.0. Ollama references are now replaced by LiteLLM. Skill count is now 35+. See CHANGELOG.md for current state.
+
 ---
 
 ## 1. Engine Functions Audit (`aria_engine/`)

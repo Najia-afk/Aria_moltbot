@@ -1,4 +1,4 @@
-﻿"""Goals  Full Kanban lifecycle integration tests.
+"""Goals  Full Kanban lifecycle integration tests.
 
 Chain 2: create -> read -> update -> board -> move -> sprint-summary -> archive -> history -> delete -> verify gone.
 """

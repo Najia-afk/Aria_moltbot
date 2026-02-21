@@ -1,7 +1,7 @@
 ---
 name: aria-securityscan
-description: "ðŸ”’ Security scanning and vulnerability detection for DevSecOps"
-metadata: {"aria": {"emoji": "ðŸ”’"}}
+description: "🔒 Security scanning and vulnerability detection for DevSecOps"
+metadata: {"aria": {"emoji": "🔒"}}
 ---
 
 # aria-securityscan

@@ -1,8 +1,8 @@
 ```skill
 ---
 name: aria-unified-search
-description: "ðŸ”Ž RRF-merged search across semantic + graph + memory backends"
-metadata: {"aria": {"emoji": "ðŸ”Ž"}}
+description: "🔎 RRF-merged search across semantic + graph + memory backends"
+metadata: {"aria": {"emoji": "🔎"}}
 ---
 
 # aria-unified-search
@@ -16,18 +16,18 @@ deduplication.
 
 ```
 Query
-    â†“ (parallel to 3 backends)
-    â”œâ”€â”€ SemanticBackend (pgvector cosine similarity via api_client)
-    â”œâ”€â”€ GraphBackend (ILIKE text match via api_client.graph_search)
-    â””â”€â”€ MemoryBackend (text match via api_client.get_memories)
-    â†“
+    ↓ (parallel to 3 backends)
+    ├── SemanticBackend (pgvector cosine similarity via api_client)
+    ├── GraphBackend (ILIKE text match via api_client.graph_search)
+    └── MemoryBackend (text match via api_client.get_memories)
+    ↓
 RRFMerger (k=60)
-    â”œâ”€â”€ semantic weight: 1.0
-    â”œâ”€â”€ graph weight: 0.8
-    â””â”€â”€ memory weight: 0.6
-    â†“
+    ├── semantic weight: 1.0
+    ├── graph weight: 0.8
+    └── memory weight: 0.6
+    ↓
 Content-hash deduplication
-    â†“
+    ↓
 Ranked results (SearchResult objects)
 ```
 

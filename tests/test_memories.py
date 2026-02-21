@@ -1,4 +1,4 @@
-﻿"""Memories  KV memory lifecycle and semantic memory integration tests.
+"""Memories  KV memory lifecycle and semantic memory integration tests.
 
 Chain 4: upsert -> read -> upsert update -> read updated -> delete -> verify 404.
 """

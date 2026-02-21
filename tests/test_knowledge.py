@@ -1,4 +1,4 @@
-﻿"""Knowledge Graph  Build and query integration tests.
+"""Knowledge Graph  Build and query integration tests.
 
 Chain 3: create entities -> create relation -> verify graph -> search -> traverse -> query-log -> cleanup.
 """

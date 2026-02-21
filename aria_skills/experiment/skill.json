@@ -1,7 +1,7 @@
 {
   "name": "aria-experiment",
   "version": "1.0.0",
-  "description": "ðŸ§ª ML experiment tracking and model management for Data Architect",
+  "description": "🧪 ML experiment tracking and model management for Data Architect",
   "author": "Aria Blue",
   "layer": 3,
   "dependencies": ["api_client"],

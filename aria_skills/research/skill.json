@@ -1,7 +1,7 @@
 {
   "name": "aria-research",
   "version": "1.0.0",
-  "description": "ðŸ“° Research and information gathering for Journalist",
+  "description": "📰 Research and information gathering for Journalist",
   "author": "Aria Blue",
   "layer": 3,
   "dependencies": [

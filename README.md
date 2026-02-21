@@ -1,6 +1,6 @@
 # Aria Blue ⚡️ — Autonomous AI Agent Platform
 
-[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.13+-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-v3.0_API-009688.svg)](https://fastapi.tiangolo.com/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED.svg)](https://www.docker.com/)
 [![Aria Engine](https://img.shields.io/badge/Aria_Engine-Gateway-purple.svg)](https://github.com/Najia-afk/Aria_moltbot)
@@ -11,7 +11,7 @@
 
 Aria is an autonomous AI agent that **thinks like a CEO**: she analyzes tasks, delegates to specialized focus personas, runs parallel roundtable discussions across domains, and synthesizes results — all on a self-driven work cycle with goal tracking, persistent memory, and full observability.
 
-Built on a native Python engine (`aria_engine`) with local-first LLM inference on Apple Silicon.
+Built on a native Python engine (`aria_engine`) with multi-model LLM routing via LiteLLM (OpenRouter, Moonshot/Kimi, local MLX).
 
 ---
 
@@ -21,7 +21,7 @@ Built on a native Python engine (`aria_engine`) with local-first LLM inference o
 |-------|-----------|
 | **AI Gateway** | `aria_engine` — native Python agent orchestration, tool execution |
 | **LLM Router** | [LiteLLM](https://github.com/BerriAI/litellm) — multi-model routing, automatic failover |
-| **Local Inference** | [MLX](https://github.com/ml-explore/mlx) — Apple Silicon Metal GPU |
+| **Local Inference** | [MLX](https://github.com/ml-explore/mlx) — Apple Silicon Metal GPU (optional) |
 | **API** | [FastAPI](https://fastapi.tiangolo.com/) + [Strawberry GraphQL](https://strawberry.rocks/) |
 | **ORM** | [SQLAlchemy 2.0](https://www.sqlalchemy.org/) async + [psycopg 3](https://www.psycopg.org/psycopg3/) |
 | **Database** | [PostgreSQL 16](https://www.postgresql.org/) — dual databases (Aria + LiteLLM isolated) |
@@ -29,7 +29,7 @@ Built on a native Python engine (`aria_engine`) with local-first LLM inference o
 | **Containers** | [Docker Compose](https://docs.docker.com/compose/) — multi-service stack |
 | **Monitoring** | [Prometheus](https://prometheus.io/) + [Grafana](https://grafana.com/) |
 | **Reverse Proxy** | [Traefik v3.1](https://traefik.io/) — HTTPS, automatic TLS |
-| **Language** | Python 3.10+ — async throughout, fully typed |
+| **Language** | Python 3.13 — async throughout, fully typed |
 
 ---
 

@@ -1,6 +1,6 @@
 # Aria Complete Development Reference
 
-> **Version 1.2** | Last Updated: February 3, 2026  
+> **Version 3.0** | Last Updated: February 3, 2026  
 > Master reference for Aria's architecture, skills, agents, and deployment.
 
 ---
@@ -50,7 +50,7 @@ Aria is a **distributed cognitive architecture** with a **Focus-based persona sy
 │  └──────────────────────────────────────────────────────────────┘   │
 │                             │                                        │
 │  ┌──────────────────────────┼───────────────────────────────────┐   │
-│  │                  SkillRegistry (24 Skills)                    │   │
+│  │                  SkillRegistry (35+ Skills)                    │   │
 │  │  ┌──────┐  ┌────────┐  ┌────────┐  ┌───────┐  ┌──────────┐  │   │
 │  │  │ llm  │  │database│  │security│  │market │  │brainstorm│  │   │
 │  │  └──────┘  └────────┘  └────────┘  └───────┘  └──────────┘  │   │
@@ -69,7 +69,7 @@ Aria is a **distributed cognitive architecture** with a **Focus-based persona sy
 | **Memory** | `aria_mind/memory.py` | Short-term and long-term storage |
 | **Heartbeat** | `aria_mind/heartbeat.py` | Health monitoring, scheduling |
 | **AgentCoordinator** | `aria_agents/coordinator.py` | Multi-agent orchestration |
-| **Skills** | `aria_skills/<skill>/` | Tool implementations + manifests (24 skills) |
+| **Skills** | `aria_skills/<skill>/` | Tool implementations + manifests (35+ skills) |
 | **Entrypoint** | `stacks/brain/entrypoint.sh` | Dynamic skill runner + symlink generation |
 
 ---
@@ -131,7 +131,7 @@ print(soul.active_focus.skills) # ["security_scan", "ci_cd", ...]
 
 ## 3. Skills Reference
 
-### Complete Skill Registry (24 Skills)
+### Complete Skill Registry (35+ Skills)
 
 #### Core Skills (v1.0)
 
@@ -370,7 +370,7 @@ SKILL_REGISTRY = {
       }
     }
   ],
-    "run": "python3 aria_mind/skills/run_skill.py my_skill {{tool}} '{{args_json}}'"
+    "run": "python3 skills/run_skill.py my_skill {{tool}} '{{args_json}}'"
 }
 ```
 
@@ -390,7 +390,7 @@ metadata: {"aria": {"emoji": "🔧", "requires": {"env": ["MY_SKILL_API_KEY"]}}}
 ## Usage
 
 \`\`\`bash
-exec python3 aria_mind/skills/run_skill.py my_skill my_action '{"input_data": "example"}'
+exec python3 skills/run_skill.py my_skill my_action '{"input_data": "example"}'
 \`\`\`
 
 ## Functions
@@ -434,11 +434,12 @@ my_skill:
 
 | Agent | Role | Focus | Skills |
 |-------|------|-------|--------|
-| `aria` | Coordinator | 🎯 Orchestrator | goals, schedule, health, llm |
-| `devops` | Coder | 🔒 DevSecOps | security_scan, ci_cd, pytest, database |
-| `analyst` | Researcher | 📊📈 Data/Trader | data_pipeline, market_data, portfolio |
-| `creator` | Social | 🎨🌐📰 Creative | brainstorm, community, research |
-| `memory` | Memory | Support | database, knowledge_graph |
+| `aria` | Coordinator | Orchestrator | api_client, knowledge_graph, goals, brainstorm, health |
+| `devops` | Coder | DevSecOps | ci_cd, api_client, health, security_scan, pytest_runner |
+| `analyst` | Researcher | Data/Trader | api_client, knowledge_graph, brainstorm, market_data |
+| `creator` | Social | Creative | moltbook, brainstorm, community, research |
+| `memory` | Memory | Support | api_client, knowledge_graph, conversation_summary |
+| `aria_talk` | Conversational | Chat/Social | moltbook, conversation_summary, community, api_client |
 
 ### AgentConfig Structure
 
@@ -561,7 +562,7 @@ volumes:
 2. Install dependencies if not present
 3. **Create skill manifest symlinks** from `aria_skills/*/skill.json` to `/app/skills/aria-*/`
 4. pip install Python dependencies
-5. **Generate `run_skill.py`** with SKILL_REGISTRY (24 skills)
+5. **Generate `run_skill.py`** with SKILL_REGISTRY (35+ skills)
 6. Read BOOTSTRAP.md for system prompt
 7. **Generate `aria-engine.json`** with all skill entries enabled
 8. Prepare awakening (first boot detection)
@@ -604,10 +605,10 @@ volumes:
 
 ```bash
 # Via skill
-exec python3 aria_mind/skills/run_skill.py model_switcher switch_model '{"model": "chimera-free"}'
+exec python3 skills/run_skill.py model_switcher switch_model '{"model": "chimera-free"}'
 
 # Check current model
-exec python3 aria_mind/skills/run_skill.py model_switcher get_current_model '{}'
+exec python3 skills/run_skill.py model_switcher get_current_model '{}'
 ```
 
 ---
@@ -726,13 +727,13 @@ docker compose logs -f aria-engine
 
 ```bash
 # From inside aria-engine container or via exec
-python3 aria_mind/skills/run_skill.py <skill> <function> '<args_json>'
+python3 skills/run_skill.py <skill> <function> '<args_json>'
 
 # Examples:
-python3 aria_mind/skills/run_skill.py api_client get_goals '{"status": "active", "limit": 5}'
-python3 aria_mind/skills/run_skill.py security_scan scan_directory '{"directory": "/workspace", "extensions": [".py"]}'
-python3 aria_mind/skills/run_skill.py market_data get_price '{"symbol": "BTC"}'
-python3 aria_mind/skills/run_skill.py --auto-task "summarize active goals and risks" --route-limit 2 --route-no-info
+python3 skills/run_skill.py api_client get_goals '{"status": "active", "limit": 5}'
+python3 skills/run_skill.py security_scan scan_directory '{"directory": "/workspace", "extensions": [".py"]}'
+python3 skills/run_skill.py market_data get_price '{"symbol": "BTC"}'
+python3 skills/run_skill.py --auto-task "summarize active goals and risks" --route-limit 2 --route-no-info
 ```
 
 ### Checklist for New Skills
@@ -757,7 +758,7 @@ python3 aria_mind/skills/run_skill.py --auto-task "summarize active goals and ri
 ### Skill Invocation Pattern
 
 ```bash
-python3 aria_mind/skills/run_skill.py <skill_name> <function> '<json_args>'
+python3 skills/run_skill.py <skill_name> <function> '<json_args>'
 ```
 
 ### Available Skills

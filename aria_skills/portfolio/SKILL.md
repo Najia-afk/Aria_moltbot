@@ -1,7 +1,7 @@
 ---
 name: aria-portfolio
-description: "ðŸ’¼ Portfolio and position management for Crypto Trader"
-metadata: {"aria": {"emoji": "ðŸ’¼"}}
+description: "💼 Portfolio and position management for Crypto Trader"
+metadata: {"aria": {"emoji": "💼"}}
 ---
 
 # aria-portfolio

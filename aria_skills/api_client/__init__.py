@@ -1480,6 +1480,63 @@ class AriaAPIClient(BaseSkill):
         except Exception as e:
             return SkillResult.fail(f"Failed to get skill stats: {e}")
 
+    # ── File Artifacts (aria_memories) ──────────────────────────────────────
+
+    async def write_artifact(
+        self,
+        content: str,
+        filename: str,
+        category: str = "memory",
+        subfolder: str | None = None,
+    ) -> SkillResult:
+        """Write a file artifact (diary, plan, research, draft, etc.) to persistent storage in aria_memories/."""
+        try:
+            data: dict = {"content": content, "filename": filename, "category": category}
+            if subfolder:
+                data["subfolder"] = subfolder
+            resp = await self._client.post("/artifacts", json=data)
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to write artifact: {e}")
+
+    async def read_artifact(self, category: str, filename: str) -> SkillResult:
+        """Read a file artifact from aria_memories/<category>/<filename>."""
+        try:
+            resp = await self._client.get(f"/artifacts/{category}/{filename}")
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to read artifact: {e}")
+
+    async def list_artifacts(
+        self,
+        category: str | None = None,
+        pattern: str | None = None,
+        limit: int = 50,
+    ) -> SkillResult:
+        """List file artifacts in aria_memories/. Optionally filter by category and filename pattern."""
+        try:
+            params: dict = {"limit": limit}
+            if category:
+                params["category"] = category
+            if pattern:
+                params["pattern"] = pattern
+            resp = await self._client.get("/artifacts", params=params)
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to list artifacts: {e}")
+
+    async def delete_artifact(self, category: str, filename: str) -> SkillResult:
+        """Delete a file artifact from aria_memories/<category>/<filename>."""
+        try:
+            resp = await self._client.delete(f"/artifacts/{category}/{filename}")
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to delete artifact: {e}")
+
 
 # Singleton instance for convenience
 _client: AriaAPIClient | None = None

@@ -1,7 +1,7 @@
 {
   "name": "aria-market-data",
   "version": "1.0.0",
-  "description": "ðŸ“ˆ Cryptocurrency market data and analysis for Crypto Trader",
+  "description": "📈 Cryptocurrency market data and analysis for Crypto Trader",
   "author": "Aria Blue",
   "layer": 3,
   "dependencies": [

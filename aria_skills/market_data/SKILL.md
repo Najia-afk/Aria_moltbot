@@ -1,7 +1,7 @@
 ---
 name: aria-marketdata
-description: "ðŸ“ˆ Cryptocurrency market data and analysis for Crypto Trader"
-metadata: {"aria": {"emoji": "ðŸ“ˆ"}}
+description: "📈 Cryptocurrency market data and analysis for Crypto Trader"
+metadata: {"aria": {"emoji": "📈"}}
 ---
 
 # aria-marketdata

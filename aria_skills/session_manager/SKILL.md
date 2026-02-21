@@ -1,8 +1,8 @@
 ````skill
 ---
 name: aria-sessionmanager
-description: Two-layer session management â€” filesystem delete (live) + PG mark ended (history).
-metadata: {"aria": {"emoji": "ðŸ§¹", "always": true}}
+description: Two-layer session management — filesystem delete (live) + PG mark ended (history).
+metadata: {"aria": {"emoji": "🧹", "always": true}}
 ---
 
 # aria-sessionmanager
@@ -12,25 +12,25 @@ Two-layer session management for aria:
 2. **aria-api PG**: PATCHes session status to ended (keeps history on /sessions dashboard)
 
 Sessions live on the filesystem at /app/agents/{agent}/sessions/sessions.json.
-The skill operates directly on these files â€” no WebSocket or REST API needed for the live delete.
+The skill operates directly on these files — no WebSocket or REST API needed for the live delete.
 
 ## Architecture
 
 ```
 aria-api (Node.js)
-  â””â”€ /app/agents/
-       â”œâ”€ main/sessions/sessions.json    â† index (keyâ†’session map)
-       â”‚                 abc123.jsonl     â† transcript
-       â”‚                 abc123.jsonl.deleted.2026-02-15T... â† archived
-       â”œâ”€ analyst/sessions/...
-       â”œâ”€ aria-talk/sessions/...
-       â””â”€ aria-memeothy/sessions/...
+  └─ /app/agents/
+       ├─ main/sessions/sessions.json    ← index (key→session map)
+       │                 abc123.jsonl     ← transcript
+       │                 abc123.jsonl.deleted.2026-02-15T... ← archived
+       ├─ analyst/sessions/...
+       ├─ aria-talk/sessions/...
+       └─ aria-memeothy/sessions/...
 
 aria-api (FastAPI)
-  â””â”€ PG: agent_sessions table
-       â”œâ”€ metadata->>'aria_session_id' â† maps to filesystem session UUID
-       â”œâ”€ status: active â†’ ended           â† PATCH /api/sessions/{id}
-       â””â”€ syncs from shared volume every 30s
+  └─ PG: agent_sessions table
+       ├─ metadata->>'aria_session_id' ← maps to filesystem session UUID
+       ├─ status: active → ended           ← PATCH /api/sessions/{id}
+       └─ syncs from shared volume every 30s
 ```
 
 ## Usage
@@ -77,7 +77,7 @@ exec python3 /app/skills/run_skill.py session_manager delete_session '{"session_
 
 **What happens:**
 1. Removes all keys matching sessionId from sessions.json
-2. Renames abc123.jsonl â†’ abc123.jsonl.deleted.<timestamp> (matches aria-api pattern)
+2. Renames abc123.jsonl → abc123.jsonl.deleted.<timestamp> (matches aria-api pattern)
 3. Best-effort PATCH to aria-api: {"status": "ended"} (keeps history)
 
 **Returns:**
@@ -95,7 +95,7 @@ exec python3 /app/skills/run_skill.py session_manager delete_session '{"session_
 Prune stale sessions older than a threshold. Each pruned session gets the full two-layer delete.
 
 ```bash
-# Dry run â€” preview what would be deleted
+# Dry run — preview what would be deleted
 exec python3 /app/skills/run_skill.py session_manager prune_sessions '{"max_age_minutes": 60, "dry_run": true}'
 
 # Actually prune
@@ -148,14 +148,14 @@ Aria MUST follow these session hygiene rules:
 2. **During work_cycle**: Run prune_sessions with max_age_minutes: 60 to clean up stale cron sessions.
 3. **Before session review**: Run get_session_stats to check for bloat before reporting.
 
-## Database (PG) â€” For Reference
+## Database (PG) — For Reference
 
 The agent_sessions table in aria-api PG stores history:
-- status: active â†’ ended (PATCH sets ended_at automatically)
+- status: active → ended (PATCH sets ended_at automatically)
 - metadata->>'aria_session_id': maps to the filesystem session UUID
 - Indexed: idx_agent_sessions_aria_sid, idx_agent_sessions_status
 - Auto-synced from shared volume every 30s by aria-api
 
 Aria can query /api/sessions on the dashboard to see historical data.
-The skill does **NOT** delete PG rows â€” it only marks them ended.
+The skill does **NOT** delete PG rows — it only marks them ended.
 ````

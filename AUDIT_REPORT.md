@@ -1,5 +1,7 @@
 # Aria Blue — Complete Website & API Audit Report
 
+> **⚠️ HISTORICAL DOCUMENT** — This audit was conducted during v1.1. Current version is v3.0.0. Many findings have been resolved or superseded. See CHANGELOG.md for current state.
+
 ## v1.1 Sprint Remediation Status
 
 > **Updated:** 2026-02-10 — Aria Blue v1.1 Sprint (37 tickets across 7 waves)

@@ -1,6 +1,6 @@
 # aria_skills/moltbook.py
 """
-� Moltbook Social Skill
+📖 Moltbook Social Skill
 
 Moltbook API integration for Aria.
 API docs: https://www.moltbook.com/skill.md

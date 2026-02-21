@@ -104,4 +104,4 @@ Then `Base.metadata.create_all()` creates all 37 tables in their respective sche
 
 ---
 
-*Last updated: v1.3.0 — Schema Architecture & Swiss-Clock Audit*
+*Last updated: v3.0.0 — Schema Architecture & Swiss-Clock Audit*
