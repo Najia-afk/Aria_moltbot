@@ -895,11 +895,13 @@ async function loadSpendLogs() {
             if (log.startTime && log.endTime) {
                 duration = (new Date(log.endTime) - new Date(log.startTime)) / 1000;
             }
+            // Use model_group (friendly alias) when available, fall back to raw model
+            const displayModel = log.model_group || log.model || 'unknown';
             
             return `
                 <tr>
                     <td>${date.toLocaleString()}</td>
-                    <td><code>${log.model || 'unknown'}</code></td>
+                    <td><code>${displayModel}</code></td>
                     <td>${formatNumber(tokens)}</td>
                     <td class="money">${formatMoney(cost)}</td>
                     <td>${duration.toFixed(2)}s</td>

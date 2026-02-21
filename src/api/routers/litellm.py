@@ -59,7 +59,7 @@ async def api_litellm_spend(
         total = count_result.scalar() or 0
 
         if lite:
-            cols = """model, prompt_tokens, completion_tokens, total_tokens,
+            cols = """model, model_group, prompt_tokens, completion_tokens, total_tokens,
                       spend, "startTime", "endTime", status"""
         else:
             cols = """request_id, call_type, model, model_group,

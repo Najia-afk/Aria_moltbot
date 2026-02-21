@@ -396,7 +396,7 @@
 let _statsData = null;     // /model-usage/stats response
 let _usageData = null;     // /model-usage response (recent records)
 let _llmUsageData = null;  // /model-usage?source=litellm response
-let _skillsUsageData = null; // /model-usage?source=skills response
+let _skillInsights = null; // /skills/insights response (real skill invocations)
 let _charts = {};          // Chart.js instances
 let usagePager;
 let _usageRequestSeq = 0;
@@ -431,7 +431,12 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 async function loadModelUsageStats() {
     const hours = document.getElementById('hours-filter').value;
     try {
-        _statsData = await fetchAriaData(`${API_BASE_URL}/model-usage/stats?hours=${hours}`);
+        const [stats, insights] = await Promise.all([
+            fetchAriaData(`${API_BASE_URL}/model-usage/stats?hours=${hours}`),
+            fetchAriaData(`${API_BASE_URL}/skills/insights?hours=${hours}&limit=150`),
+        ]);
+        _statsData = stats;
+        _skillInsights = insights;
         renderModelUsageOverview();
         renderLLMTab();
         renderSkillsTab();
@@ -449,17 +454,15 @@ async function loadUsage(page = 1, limit = 50) {
     try {
         const hours = document.getElementById('hours-filter').value;
         const cacheBust = Date.now();
-        const [allResp, llmResp, skillsResp] = await Promise.all([
+        const [allResp, llmResp] = await Promise.all([
             fetchAriaData(`${API_BASE_URL}/model-usage?hours=${hours}&limit=${limit}&page=${page}&_ts=${cacheBust}`),
             fetchAriaData(`${API_BASE_URL}/model-usage?hours=${hours}&source=litellm&limit=25&page=1&_ts=${cacheBust}`),
-            fetchAriaData(`${API_BASE_URL}/model-usage?hours=${hours}&source=skills&limit=25&page=1&_ts=${cacheBust}`),
         ]);
 
         if (requestSeq !== _usageRequestSeq) return;
 
         _usageData = allResp;
         _llmUsageData = llmResp;
-        _skillsUsageData = skillsResp;
 
         const items = _usageData.items || _usageData.usage || [];
         _usageData._allItems = items;
@@ -476,9 +479,6 @@ async function loadUsage(page = 1, limit = 50) {
             effectiveLlmItems = _llmUsageData.items || _llmUsageData.usage || [];
         }
         _llmUsageData._allItems = effectiveLlmItems;
-
-        const skillItems = _skillsUsageData.items || _skillsUsageData.usage || [];
-        _skillsUsageData._allItems = skillItems;
 
         renderRecentLLM();
         renderRecentSkills();
@@ -502,23 +502,24 @@ function renderModelUsageOverview() {
     // Tab badges
     document.getElementById('tab-badge-total').textContent = formatNumber(s.total_requests);
     document.getElementById('tab-badge-llm').textContent = formatNumber(src.litellm?.requests || 0);
-    document.getElementById('tab-badge-skills').textContent = formatNumber(src.skills?.requests || 0);
+    const skillTotal = _skillInsights?.summary?.total_invocations || src.skills?.requests || 0;
+    document.getElementById('tab-badge-skills').textContent = formatNumber(skillTotal);
 
     // Stats cards
     document.getElementById('stat-requests').textContent = formatNumber(s.total_requests);
     document.getElementById('stat-requests-sub').textContent =
-        `LLM: ${src.litellm?.requests || 0} | Skills: ${src.skills?.requests || 0}`;
+        `LLM: ${src.litellm?.requests || 0} | Skills: ${skillTotal}`;
     document.getElementById('stat-tokens').textContent = formatNumber(s.total_tokens);
     document.getElementById('stat-tokens-sub').textContent =
-        `LLM: ${formatNumber(src.litellm?.tokens || 0)} | Skills: ${formatNumber(src.skills?.tokens || 0)}`;
+        `LLM: ${formatNumber(src.litellm?.tokens || 0)} | Skills: ${formatNumber(_skillInsights?.summary?.total_tokens || src.skills?.tokens || 0)}`;
     document.getElementById('stat-cost').textContent = formatCost(s.total_cost);
     document.getElementById('stat-cost-sub').textContent =
         `LLM: ${formatCost(src.litellm?.cost || 0)} | Skills: ${formatCost(src.skills?.cost || 0)}`;
-    document.getElementById('stat-latency').textContent = `${s.avg_latency_ms || 0}ms`;
+    document.getElementById('stat-latency').textContent = `${_skillInsights?.summary?.avg_duration_ms ? Math.round(_skillInsights.summary.avg_duration_ms) : (s.avg_latency_ms || 0)}ms`;
 
     // ── Chart: Source Split (doughnut) ──
     const llmReq = src.litellm?.requests || 0;
-    const skillReq = src.skills?.requests || 0;
+    const skillReq = _skillInsights?.summary?.total_invocations || src.skills?.requests || 0;
     ARIAChartHelpers.renderChart(_charts, 'chart-source-split', 'doughnut', {
         labels: ['LLM Calls', 'Skill Executions'],
         datasets: [{
@@ -564,18 +565,20 @@ function renderModelUsageOverview() {
         overviewLLMBody.innerHTML = '<tr><td colspan="5" class="empty-state">No LLM calls in this period</td></tr>';
     }
 
-    // ── Top Skills (overview) ──
-    const topSkills = (s.by_model || []).filter(m => m.source === 'skills').slice(0, 8);
+    // ── Top Skills (overview) — from /skills/insights ──
+    const topSkills = (_skillInsights?.by_skill || []).slice(0, 8);
     const overviewSkillsBody = document.getElementById('overview-skills-body');
     if (topSkills.length > 0) {
-        overviewSkillsBody.innerHTML = topSkills.map(m => `
+        overviewSkillsBody.innerHTML = topSkills.map(m => {
+            const sr = m.invocations > 0 ? Math.round((m.successes / m.invocations) * 100) : 100;
+            return `
             <tr>
-                <td><span class="model-name">⚡ ${skillDisplayName(m.model)}</span></td>
-                <td>${safeNumber(m.requests)}</td>
-                <td>${safeNumber(m.avg_latency) ? safeNumber(m.avg_latency) + 'ms' : '-'}</td>
-                <td><span class="success-badge success">✓</span></td>
-            </tr>
-        `).join('');
+                <td><span class="model-name">⚡ ${skillDisplayName(m.skill_name)}</span></td>
+                <td>${safeNumber(m.invocations)}</td>
+                <td>${safeNumber(m.avg_duration_ms) ? Math.round(safeNumber(m.avg_duration_ms)) + 'ms' : '-'}</td>
+                <td><span class="success-badge ${sr >= 90 ? 'success' : 'error'}">${sr}%</span></td>
+            </tr>`;
+        }).join('');
     } else {
         overviewSkillsBody.innerHTML = '<tr><td colspan="4" class="empty-state">No skill calls in this period</td></tr>';
     }
@@ -677,27 +680,23 @@ function renderRecentLLM() {
 // SKILLS TAB
 // ════════════════════════════════════════════════════════════════════════════
 function renderSkillsTab() {
-    if (!_statsData) return;
-    const skills = (_statsData.by_model || []).filter(m => m.source === 'skills');
+    if (!_skillInsights) return;
+    const skills = _skillInsights.by_skill || [];
+    const summary = _skillInsights.summary || {};
 
     // Stats
-    const totalCalls = skills.reduce((a, m) => a + safeNumber(m.requests), 0);
-    const avgLat = totalCalls > 0
-        ? Math.round(skills.reduce((a, m) => a + safeNumber(m.avg_latency) * safeNumber(m.requests), 0) / totalCalls)
-        : 0;
-
-    document.getElementById('skill-stat-calls').textContent = formatNumber(totalCalls);
-    document.getElementById('skill-stat-success').textContent = '100%';
-    document.getElementById('skill-stat-latency').textContent = avgLat ? avgLat + 'ms' : '-';
-    document.getElementById('skill-stat-unique').textContent = skills.length;
+    document.getElementById('skill-stat-calls').textContent = formatNumber(summary.total_invocations || 0);
+    document.getElementById('skill-stat-success').textContent = `${summary.success_rate || 100}%`;
+    document.getElementById('skill-stat-latency').textContent = summary.avg_duration_ms ? Math.round(summary.avg_duration_ms) + 'ms' : '-';
+    document.getElementById('skill-stat-unique').textContent = summary.unique_skills || skills.length;
 
     // ── Chart: Calls per Skill (horizontal bar) ──
     const topSkills = skills.slice(0, 12);
     ARIAChartHelpers.renderChart(_charts, 'chart-skill-calls', 'bar', {
-        labels: topSkills.map(m => skillDisplayName(m.model)),
+        labels: topSkills.map(m => skillDisplayName(m.skill_name)),
         datasets: [{
             label: 'Calls',
-            data: topSkills.map(m => safeNumber(m.requests)),
+            data: topSkills.map(m => safeNumber(m.invocations)),
             backgroundColor: '#a855f7',
             borderRadius: 6,
         }]
@@ -706,8 +705,8 @@ function renderSkillsTab() {
     // ── Chart: Latency Distribution (bar) ──
     const latencyBuckets = { '<50ms': 0, '50-100ms': 0, '100-200ms': 0, '200-500ms': 0, '>500ms': 0 };
     skills.forEach(m => {
-        const lat = safeNumber(m.avg_latency);
-        const req = safeNumber(m.requests);
+        const lat = safeNumber(m.avg_duration_ms);
+        const req = safeNumber(m.invocations);
         if (lat < 50) latencyBuckets['<50ms'] += req;
         else if (lat < 100) latencyBuckets['50-100ms'] += req;
         else if (lat < 200) latencyBuckets['100-200ms'] += req;
@@ -728,17 +727,18 @@ function renderSkillsTab() {
     const body = document.getElementById('skill-summary-body');
     if (skills.length > 0) {
         body.innerHTML = skills.map(m => {
-            const lat = safeNumber(m.avg_latency);
+            const lat = Math.round(safeNumber(m.avg_duration_ms));
             const barClass = lat < 100 ? 'fast' : lat < 300 ? 'medium' : 'slow';
             const barWidth = Math.min(lat / 10, 80);
+            const sr = m.invocations > 0 ? Math.round((m.successes / m.invocations) * 100) : 100;
             return `
             <tr>
-                <td><span class="model-name">⚡ ${skillDisplayName(m.model)}</span></td>
-                <td>${safeNumber(m.requests)}</td>
+                <td><span class="model-name">⚡ ${skillDisplayName(m.skill_name)}</span></td>
+                <td>${safeNumber(m.invocations)}</td>
                 <td><span class="latency-bar ${barClass}" style="width:${barWidth}px"></span>${lat}ms</td>
                 <td>${lat > 0 ? Math.max(Math.round(lat * 0.5), 10) + 'ms' : '-'}</td>
                 <td>${lat > 0 ? Math.round(lat * 1.8) + 'ms' : '-'}</td>
-                <td><span class="success-badge success">100%</span></td>
+                <td><span class="success-badge ${sr >= 90 ? 'success' : 'error'}">${sr}%</span></td>
             </tr>`;
         }).join('');
     } else {
@@ -747,17 +747,17 @@ function renderSkillsTab() {
 }
 
 function renderRecentSkills() {
-    if (!_skillsUsageData) return;
-    const skillRecent = (_skillsUsageData._allItems || _skillsUsageData.usage || []).slice(0, 25);
+    if (!_skillInsights) return;
+    const skillRecent = (_skillInsights.recent_invocations || []).slice(0, 25);
     const body = document.getElementById('skill-recent-body');
     if (skillRecent.length > 0) {
         body.innerHTML = skillRecent.map(u => {
-            const lat = safeNumber(u.latency_ms);
+            const lat = safeNumber(u.duration_ms);
             const barClass = lat < 100 ? 'fast' : lat < 300 ? 'medium' : 'slow';
             const barWidth = Math.min(lat / 10, 80);
             return `
             <tr>
-                <td><span class="model-name">⚡ ${skillDisplayName(u.model)}</span></td>
+                <td><span class="model-name">⚡ ${skillDisplayName(u.skill_name)}</span></td>
                 <td><span class="latency-bar ${barClass}" style="width:${barWidth}px"></span>${lat ? lat + 'ms' : '-'}</td>
                 <td><span class="success-badge ${u.success ? 'success' : 'error'}">${u.success ? '✓' : '✗'}</span></td>
                 <td>${formatDate(u.created_at)}</td>
