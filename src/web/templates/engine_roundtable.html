@@ -673,7 +673,7 @@ function renderAgentPicker() {
     }).join('');
 
     synthSelect.innerHTML = availableAgents.map(a =>
-        `<option value="${esc(a.agent_id)}" ${a.agent_id === 'main' ? 'selected' : ''}>${esc(a.display_name || a.agent_id)}</option>`
+        `<option value="${esc(a.agent_id)}" ${a.agent_id === 'aria' ? 'selected' : ''}>${esc(a.display_name || a.agent_id)}</option>`
     ).join('');
 }
 

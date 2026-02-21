@@ -41,7 +41,7 @@ ws_router = APIRouter(tags=["Engine Chat WebSocket"])
 
 class CreateSessionRequest(BaseModel):
     """Request body for creating a new chat session."""
-    agent_id: str = Field(default="main", description="Agent owning this session")
+    agent_id: str = Field(default="aria", description="Agent owning this session")
     model: str | None = Field(default=None, description="LLM model (defaults to config)")
     session_type: str = Field(default="interactive", description="Session type")
     system_prompt: str | None = Field(default=None, description="Override system prompt")
@@ -197,7 +197,7 @@ async def create_session(
                 except ImportError:
                     from db import AsyncSessionLocal
                 assembled = await assembler.assemble_for_session(
-                    agent_id=body.agent_id or "main",
+                    agent_id=body.agent_id or "aria",
                     db_session_factory=AsyncSessionLocal,
                 )
                 system_prompt = str(assembled)

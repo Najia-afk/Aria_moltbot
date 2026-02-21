@@ -267,8 +267,8 @@ CREATE INDEX IF NOT EXISTS idx_ae_lm_tier     ON aria_engine.llm_models(tier);
 CREATE INDEX IF NOT EXISTS idx_ae_lm_enabled  ON aria_engine.llm_models(enabled);
 
 -- ============================================================================
--- Seed default agent (main)
+-- Seed default agent (aria = orchestrator)
 -- ============================================================================
 INSERT INTO aria_engine.agent_state (agent_id, display_name, model, system_prompt, status)
-VALUES ('main', 'Aria Main', 'litellm/kimi', 'You are Aria, an autonomous AI agent.', 'idle')
+VALUES ('aria', 'Aria (Orchestrator)', 'kimi', 'You are Aria, an autonomous AI agent.', 'idle')
 ON CONFLICT (agent_id) DO NOTHING;

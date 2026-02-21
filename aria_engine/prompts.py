@@ -76,7 +76,7 @@ class PromptAssembler:
 
     def assemble(
         self,
-        agent_id: str = "main",
+        agent_id: str = "aria",
         tools: list[dict[str, Any]] | None = None,
         goals: list[str] | None = None,
         agent_prompt: str | None = None,

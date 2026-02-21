@@ -144,7 +144,7 @@ async def create_agent_session(request: Request, db: AsyncSession = Depends(get_
 
     payload = {
         "id": uuid.uuid4(),
-        "agent_id": data.get("agent_id", "main"),
+        "agent_id": data.get("agent_id", "aria"),
         "session_type": data.get("session_type", "interactive"),
         "messages_count": int(data.get("messages_count") or 0),
         "tokens_used": int(data.get("tokens_used") or 0),

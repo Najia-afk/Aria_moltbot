@@ -74,7 +74,7 @@ def _transform_job(job: Dict[str, Any]) -> Dict[str, Any]:
         "id": name,
         "name": name.replace("_", " ").title(),
         "schedule": _parse_schedule(job),
-        "agent_id": job.get("agent", "main"),
+        "agent_id": job.get("agent", "aria"),
         "enabled": job.get("enabled", True),
         "payload_type": "prompt",
         "payload": job.get("text", ""),

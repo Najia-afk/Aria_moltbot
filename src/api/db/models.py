@@ -375,7 +375,7 @@ class ScheduledJob(Base):
     __table_args__ = {"schema": "aria_engine"}
 
     id: Mapped[str] = mapped_column(String(50), primary_key=True)
-    agent_id: Mapped[str] = mapped_column(String(50), server_default=text("'main'"))
+    agent_id: Mapped[str] = mapped_column(String(50), server_default=text("'aria'"))
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
     schedule_kind: Mapped[str] = mapped_column(String(20), server_default=text("'cron'"))
@@ -796,7 +796,7 @@ class EngineChatSession(Base):
     __table_args__ = {"schema": "aria_engine"}
 
     id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
-    agent_id: Mapped[str] = mapped_column(String(100), nullable=False, server_default=text("'main'"))
+    agent_id: Mapped[str] = mapped_column(String(100), nullable=False, server_default=text("'aria'"))
     session_type: Mapped[str] = mapped_column(String(50), nullable=False, server_default=text("'interactive'"))
     title: Mapped[str | None] = mapped_column(String(500))
     system_prompt: Mapped[str | None] = mapped_column(Text)
@@ -863,7 +863,7 @@ class EngineCronJob(Base):
     id: Mapped[str] = mapped_column(String(100), primary_key=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     schedule: Mapped[str] = mapped_column(String(100), nullable=False)
-    agent_id: Mapped[str] = mapped_column(String(100), server_default=text("'main'"))
+    agent_id: Mapped[str] = mapped_column(String(100), server_default=text("'aria'"))
     enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
     payload_type: Mapped[str] = mapped_column(String(50), server_default=text("'prompt'"))
     payload: Mapped[str] = mapped_column(Text, nullable=False)

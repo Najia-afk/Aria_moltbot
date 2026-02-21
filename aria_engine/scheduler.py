@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine, async_sessi
 
 from aria_engine.config import EngineConfig
 from aria_engine.exceptions import SchedulerError
+from aria_engine.prompts import PromptAssembler
 from db.models import EngineCronJob, ActivityLog
 
 logger = logging.getLogger("aria.engine.scheduler")
@@ -165,6 +166,7 @@ class EngineScheduler:
             self._db_engine, expire_on_commit=False,
         )
         self._active_executions: dict[str, asyncio.Task] = {}
+        self._prompt_assembler = PromptAssembler(config)
 
     async def start(self) -> None:
         """
@@ -385,6 +387,16 @@ class EngineScheduler:
             raise SchedulerError(f"Agent {agent_id!r} not found in pool")
 
         if payload_type == "prompt":
+            # Inject assembled system prompt (soul/identity files) so the
+            # agent has full context when running scheduled jobs.
+            if not agent.system_prompt:
+                assembled = self._prompt_assembler.assemble(
+                    agent_id=agent_id,
+                    agent_prompt=agent.system_prompt,
+                )
+                agent.system_prompt = assembled.prompt
+            # Clear stale context from previous job runs
+            agent.clear_context()
             # Send the payload text as a message to the agent
             await agent.process(payload)
 
@@ -475,7 +487,7 @@ class EngineScheduler:
                 id=job_id,
                 name=job_data["name"],
                 schedule=job_data["schedule"],
-                agent_id=job_data.get("agent_id", "main"),
+                agent_id=job_data.get("agent_id", "aria"),
                 enabled=job_data.get("enabled", True),
                 payload_type=job_data.get("payload_type", "prompt"),
                 payload=job_data["payload"],
@@ -494,7 +506,7 @@ class EngineScheduler:
                 id=job_id,
                 kwargs={
                     "job_id": job_id,
-                    "agent_id": job_data.get("agent_id", "main"),
+                    "agent_id": job_data.get("agent_id", "aria"),
                     "payload_type": job_data.get("payload_type", "prompt"),
                     "payload": job_data["payload"],
                     "session_mode": job_data.get("session_mode", "isolated"),
