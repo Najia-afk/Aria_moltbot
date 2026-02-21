@@ -15,6 +15,8 @@ import json as json_lib
 import logging
 import os
 import re
+import time
+import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import select, func
@@ -23,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import ARIA_AGENTS_ROOT
 from db.session import AsyncSessionLocal
-from db.models import SessionMessage, SentimentEvent, EngineChatMessage
+from db.models import SessionMessage, SentimentEvent, EngineChatMessage, ModelUsage
 
 _logger = logging.getLogger("aria.sentiment_autoscorer")
 
@@ -39,6 +41,37 @@ COMMIT_EVERY = 5
 # SENTIMENT_MODEL: override the LLM model (default: profiles.sentiment from models.yaml)
 SENTIMENT_METHOD = os.environ.get("SENTIMENT_METHOD", "auto").lower().strip()
 SENTIMENT_MODEL = os.environ.get("SENTIMENT_MODEL", "").strip() or None
+
+
+async def _track_model_usage(
+    db: AsyncSession,
+    *,
+    model: str,
+    provider: str = "litellm",
+    input_tokens: int = 0,
+    output_tokens: int = 0,
+    cost_usd: float = 0.0,
+    latency_ms: int | None = None,
+    success: bool = True,
+    error_message: str | None = None,
+) -> None:
+    """Fire-and-forget: log an LLM/embedding call to model_usage."""
+    try:
+        row = ModelUsage(
+            id=uuid.uuid4(),
+            model=model or "unknown",
+            provider=provider,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cost_usd=cost_usd,
+            latency_ms=latency_ms,
+            success=success,
+            error_message=error_message,
+        )
+        db.add(row)
+        # don't commit here — caller batches commits
+    except Exception as e:
+        _logger.debug("_track_model_usage failed (non-fatal): %s", e)
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -422,6 +455,7 @@ async def _score_batch(db: AsyncSession) -> int:
 
         # ── Semantic (embedding) ──────────────────────────────────
         if SENTIMENT_METHOD in ("auto", "semantic"):
+            t0 = time.monotonic()
             try:
                 sentiment = await asyncio.wait_for(
                     semantic_classifier.classify(text),
@@ -429,13 +463,33 @@ async def _score_batch(db: AsyncSession) -> int:
                 )
                 if sentiment is not None:
                     method = "semantic"
+                    await _track_model_usage(
+                        db,
+                        model=semantic_classifier._embedding_model,
+                        provider="ollama",
+                        input_tokens=len(text.split()),
+                        latency_ms=int((time.monotonic() - t0) * 1000),
+                    )
             except asyncio.TimeoutError:
                 print(f"🎯 _score_batch: semantic timeout for msg {msg.id}")
+                await _track_model_usage(
+                    db, model=semantic_classifier._embedding_model,
+                    provider="ollama", success=False,
+                    error_message="timeout",
+                    latency_ms=int((time.monotonic() - t0) * 1000),
+                )
             except Exception as e:
                 print(f"🎯 _score_batch: semantic analyze failed for msg {msg.id}: {e}")
+                await _track_model_usage(
+                    db, model=semantic_classifier._embedding_model,
+                    provider="ollama", success=False,
+                    error_message=str(e)[:200],
+                    latency_ms=int((time.monotonic() - t0) * 1000),
+                )
 
         # ── LLM ───────────────────────────────────────────────────
         if sentiment is None and SENTIMENT_METHOD in ("auto", "llm"):
+            t0 = time.monotonic()
             try:
                 sentiment = await asyncio.wait_for(
                     llm_classifier.classify(text),
@@ -443,11 +497,31 @@ async def _score_batch(db: AsyncSession) -> int:
                 )
                 if sentiment is not None:
                     method = "llm"
+                    await _track_model_usage(
+                        db,
+                        model=llm_classifier._model,
+                        provider="mlx" if "mlx" in llm_classifier._model else "litellm",
+                        input_tokens=len(text.split()),
+                        output_tokens=50,  # ~200 max_tokens, typically ~50
+                        latency_ms=int((time.monotonic() - t0) * 1000),
+                    )
             except asyncio.TimeoutError:
                 print(f"🎯 _score_batch: llm timeout for msg {msg.id}")
+                await _track_model_usage(
+                    db, model=llm_classifier._model,
+                    provider="mlx" if "mlx" in llm_classifier._model else "litellm",
+                    success=False, error_message="timeout",
+                    latency_ms=int((time.monotonic() - t0) * 1000),
+                )
                 sentiment = None
             except Exception as e:
                 print(f"🎯 _score_batch: llm analyze failed for msg {msg.id}: {e}")
+                await _track_model_usage(
+                    db, model=llm_classifier._model,
+                    provider="mlx" if "mlx" in llm_classifier._model else "litellm",
+                    success=False, error_message=str(e)[:200],
+                    latency_ms=int((time.monotonic() - t0) * 1000),
+                )
                 sentiment = None
 
         # ── Lexicon (always available as fallback) ────────────────
