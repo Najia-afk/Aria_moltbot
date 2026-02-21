@@ -90,9 +90,12 @@ class LLMGateway:
         """Resolve model alias to (litellm_model_string, extra_kwargs).
 
         Returns the litellm model identifier and any per-model overrides
-        (``api_key``, ``api_base``, ``temperature``, etc.) from models.yaml
-        so that calls go directly to the provider rather than requiring a
-        litellm proxy.
+        (``api_key``, ``api_base``, ``temperature``, etc.) from models.yaml.
+
+        When the engine has a ``LITELLM_BASE_URL`` configured (i.e. a litellm
+        proxy is available), we route through the proxy instead of going
+        direct to each provider.  The proxy already holds all API keys, so
+        the engine only needs the master key.
         """
         import os
 
@@ -101,9 +104,21 @@ class LLMGateway:
         model_entries = models.get("models", {})
         model_def = model_entries.get(model_id, {})
         litellm_block = model_def.get("litellm", {})
-        litellm_model = litellm_block.get("model", model)
 
-        extra: dict[str, Any] = {}
+        # If a litellm proxy is available, route through it.
+        litellm_base = self.config.litellm_base_url  # e.g. http://litellm:4000/v1
+        if litellm_base:
+            # Use the model alias directly — litellm proxy resolves it.
+            proxy_model = f"openai/{model_id}"
+            extra: dict[str, Any] = {
+                "api_base": litellm_base,
+                "api_key": self.config.litellm_master_key or "sk-aria-local-key",
+            }
+            return proxy_model, extra
+
+        # Fallback: direct provider access (no proxy)
+        litellm_model = litellm_block.get("model", model)
+        extra = {}
 
         # Per-model api_key (supports "os.environ/VAR" syntax)
         raw_key = litellm_block.get("api_key", "")
