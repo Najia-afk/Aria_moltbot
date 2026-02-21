@@ -5,6 +5,7 @@ Endpoints:
     GET  /api/engine/agents          — list all agents with status
     GET  /api/engine/agents/{id}     — get single agent detail
 """
+import asyncio
 import logging
 from typing import Any
 
@@ -16,6 +17,10 @@ from aria_engine.agent_pool import AgentPool
 logger = logging.getLogger("aria.api.engine_agents")
 
 router = APIRouter(prefix="/engine/agents", tags=["engine-agents"])
+
+# ── Cached fallback pool (avoids creating a new DB engine per request) ────
+_fallback_pool: AgentPool | None = None
+_fallback_pool_lock = None  # initialized lazily
 
 
 class AgentSummary(BaseModel):
@@ -43,27 +48,36 @@ def get_pool() -> AgentPool:
     """
     Get the agent pool from the global engine instance.
 
-    First tries the global engine. Falls back to creating a DB-backed
+    First tries the global engine. Falls back to a **cached** DB-backed
     pool for read operations (API-only mode where engine runs separately).
     """
+    global _fallback_pool, _fallback_pool_lock
+
     from aria_engine import get_engine
 
     engine = get_engine()
     if engine is not None and hasattr(engine, "agent_pool") and engine.agent_pool is not None:
         return engine.agent_pool
 
-    # Fallback: create a DB-backed pool (read-only, loads agents from DB)
+    # Return cached fallback pool if available
+    if _fallback_pool is not None:
+        return _fallback_pool
+
+    # Create once and cache
     from aria_engine.config import EngineConfig
     from sqlalchemy.ext.asyncio import create_async_engine
 
     config = EngineConfig()
     db_url = config.database_url
-    for prefix in ("postgresql://", "postgresql+asyncpg://", "postgres://"):
+    # Ensure we use asyncpg driver for async operations
+    for prefix in ("postgresql://", "postgresql+psycopg://", "postgres://"):
         if db_url.startswith(prefix):
-            db_url = db_url.replace(prefix, "postgresql+psycopg://", 1)
+            db_url = db_url.replace(prefix, "postgresql+asyncpg://", 1)
             break
-    db = create_async_engine(db_url, pool_size=5, max_overflow=10)
-    return AgentPool(config, db)
+    db = create_async_engine(db_url, pool_size=5, max_overflow=10, pool_pre_ping=True)
+    _fallback_pool = AgentPool(config, db)
+    logger.info("Created cached fallback AgentPool (API-only mode)")
+    return _fallback_pool
 
 
 @router.get("", response_model=AgentPoolStatus)
