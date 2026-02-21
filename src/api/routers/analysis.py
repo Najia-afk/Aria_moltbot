@@ -1098,6 +1098,139 @@ async def get_sentiment_history(category: str = "sentiment",
     }
 
 
+@router.get("/sentiment/score")
+async def get_sentiment_score(
+    hours: int = 24,
+    db: AsyncSession = Depends(get_db),
+):
+    """Compute Aria's overall sentiment score (0-100) from recent events.
+
+    Returns an aggregate score, trend, emotion breakdown, and per-hour
+    timeline for dashboard visualisation.
+    """
+    from datetime import timedelta
+
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+
+    # Aggregate stats
+    agg = (await db.execute(
+        select(
+            func.count(SentimentEvent.id).label("total"),
+            func.avg(SentimentEvent.valence).label("avg_valence"),
+            func.avg(SentimentEvent.arousal).label("avg_arousal"),
+            func.avg(SentimentEvent.dominance).label("avg_dominance"),
+            func.avg(SentimentEvent.confidence).label("avg_confidence"),
+        ).where(SentimentEvent.created_at > cutoff)
+    )).one()
+
+    total = int(agg.total or 0)
+    avg_valence = float(agg.avg_valence or 0)
+    avg_arousal = float(agg.avg_arousal or 0)
+    avg_dominance = float(agg.avg_dominance or 0)
+    avg_confidence = float(agg.avg_confidence or 0)
+
+    # Score: map valence [-1, 1] to [0, 100]
+    score = round(max(0, min(100, (avg_valence + 1) * 50)), 1) if total > 0 else 50
+
+    # Label breakdown
+    label_rows = (await db.execute(
+        select(
+            SentimentEvent.sentiment_label,
+            func.count(SentimentEvent.id),
+        )
+        .where(SentimentEvent.created_at > cutoff)
+        .group_by(SentimentEvent.sentiment_label)
+    )).all()
+    label_dist = {row[0]: row[1] for row in label_rows}
+
+    # Top emotions
+    emotion_rows = (await db.execute(
+        select(
+            SentimentEvent.primary_emotion,
+            func.count(SentimentEvent.id),
+        )
+        .where(SentimentEvent.created_at > cutoff)
+        .where(SentimentEvent.primary_emotion.isnot(None))
+        .group_by(SentimentEvent.primary_emotion)
+        .order_by(func.count(SentimentEvent.id).desc())
+        .limit(8)
+    )).all()
+    emotions = [{"emotion": r[0], "count": r[1]} for r in emotion_rows]
+
+    # Hourly timeline (last N hours)
+    timeline = []
+    for h in range(min(hours, 48)):
+        h_start = datetime.now(timezone.utc) - timedelta(hours=h + 1)
+        h_end = datetime.now(timezone.utc) - timedelta(hours=h)
+        h_agg = (await db.execute(
+            select(
+                func.count(SentimentEvent.id),
+                func.avg(SentimentEvent.valence),
+            )
+            .where(SentimentEvent.created_at.between(h_start, h_end))
+        )).one()
+        if h_agg[0] > 0:
+            timeline.append({
+                "hour": h_end.isoformat(),
+                "count": int(h_agg[0]),
+                "avg_valence": round(float(h_agg[1] or 0), 4),
+                "score": round(max(0, min(100, (float(h_agg[1] or 0) + 1) * 50)), 1),
+            })
+    timeline.reverse()
+
+    # Trend: compare first half vs second half
+    trend = "stable"
+    if total >= 10:
+        mid = datetime.now(timezone.utc) - timedelta(hours=hours / 2)
+        first_half = (await db.execute(
+            select(func.avg(SentimentEvent.valence))
+            .where(SentimentEvent.created_at.between(cutoff, mid))
+        )).scalar() or 0
+        second_half = (await db.execute(
+            select(func.avg(SentimentEvent.valence))
+            .where(SentimentEvent.created_at > mid)
+        )).scalar() or 0
+        diff = float(second_half) - float(first_half)
+        if diff > 0.1:
+            trend = "improving"
+        elif diff < -0.1:
+            trend = "declining"
+
+    # Speaker breakdown
+    speaker_rows = (await db.execute(
+        select(
+            SentimentEvent.speaker,
+            func.count(SentimentEvent.id),
+            func.avg(SentimentEvent.valence),
+        )
+        .where(SentimentEvent.created_at > cutoff)
+        .group_by(SentimentEvent.speaker)
+    )).all()
+    by_speaker = {
+        (r[0] or "user"): {
+            "count": r[1],
+            "avg_valence": round(float(r[2] or 0), 4),
+            "score": round(max(0, min(100, (float(r[2] or 0) + 1) * 50)), 1),
+        }
+        for r in speaker_rows
+    }
+
+    return {
+        "period_hours": hours,
+        "total_events": total,
+        "score": score,
+        "trend": trend,
+        "avg_valence": round(avg_valence, 4),
+        "avg_arousal": round(avg_arousal, 4),
+        "avg_dominance": round(avg_dominance, 4),
+        "avg_confidence": round(avg_confidence, 4),
+        "label_distribution": label_dist,
+        "top_emotions": emotions,
+        "by_speaker": by_speaker,
+        "timeline": timeline,
+    }
+
+
 # ═══════════════════════════════════════════════════════════════════
 # Embedding Reference Seeding & Feedback  (S-47 pgvector integration)
 # ═══════════════════════════════════════════════════════════════════

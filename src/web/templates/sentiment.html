@@ -49,14 +49,65 @@
     .page-controls select, .page-controls input { padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-secondary); color: var(--text-primary); font-size: 13px; }
     .empty-state { text-align: center; padding: 50px 20px; color: var(--text-secondary); background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; }
 
-    @media (max-width: 768px) { .charts-row { grid-template-columns: 1fr; } }
+    /* Score Gauge */
+    .score-section { display: grid; grid-template-columns: 280px 1fr; gap: 20px; margin-bottom: 25px; }
+    .score-gauge-card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .score-gauge { position: relative; width: 180px; height: 180px; }
+    .score-gauge canvas { width: 180px; height: 180px; }
+    .score-value { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; }
+    .score-number { font-size: 42px; font-weight: 800; line-height: 1; }
+    .score-label { font-size: 12px; color: var(--text-muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .score-trend { display: flex; align-items: center; gap: 6px; margin-top: 12px; font-size: 13px; font-weight: 600; }
+    .score-trend.improving { color: #22c55e; }
+    .score-trend.declining { color: #ef4444; }
+    .score-trend.stable { color: #6b7280; }
+    .score-details { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; width: 100%; }
+    .score-detail { text-align: center; }
+    .score-detail-val { font-size: 16px; font-weight: 700; color: var(--text-primary); }
+    .score-detail-lbl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; }
+
+    .score-timeline-card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; }
+    .score-timeline-card h4 { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 12px; }
+    .score-timeline-card canvas { max-height: 220px; }
+
+    .emotion-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .emotion-chip { padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; background: var(--bg-tertiary, var(--bg-secondary)); border: 1px solid var(--border-color); }
+
+    @media (max-width: 768px) { .charts-row { grid-template-columns: 1fr; } .score-section { grid-template-columns: 1fr; } }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="page-header">
     <h1>💭 Sentiment Dashboard</h1>
-    <p>Track user sentiment across sessions — helps Aria adapt tone and detect frustration</p>
+    <p>Track Aria's overall sentiment — adapts tone, detects frustration, measures engagement</p>
+</div>
+
+<!-- Score Gauge + Timeline -->
+<div class="score-section">
+    <div class="score-gauge-card" id="score-gauge-card">
+        <div class="score-gauge">
+            <canvas id="gauge-canvas" width="180" height="180"></canvas>
+            <div class="score-value">
+                <div class="score-number" id="score-number">--</div>
+                <div class="score-label">Sentiment</div>
+            </div>
+        </div>
+        <div class="score-trend stable" id="score-trend">
+            <span>—</span><span>Loading…</span>
+        </div>
+        <div class="score-details">
+            <div class="score-detail"><div class="score-detail-val" id="sd-valence">--</div><div class="score-detail-lbl">Valence</div></div>
+            <div class="score-detail"><div class="score-detail-val" id="sd-arousal">--</div><div class="score-detail-lbl">Arousal</div></div>
+            <div class="score-detail"><div class="score-detail-val" id="sd-dominance">--</div><div class="score-detail-lbl">Dominance</div></div>
+            <div class="score-detail"><div class="score-detail-val" id="sd-confidence">--</div><div class="score-detail-lbl">Confidence</div></div>
+        </div>
+        <div class="emotion-chips" id="emotion-chips"></div>
+    </div>
+    <div class="score-timeline-card">
+        <h4>📈 Sentiment Score Timeline (24h)</h4>
+        <canvas id="chart-score-timeline"></canvas>
+    </div>
 </div>
 
 <div class="stats-grid">
@@ -127,6 +178,145 @@ const API = window.ARIA_API_BASE_URL || '';
 const _charts = {};
 let _allItems = [];
 let _seedItems = [];  // all seeded memories for context
+
+// ── Score Gauge ──────────────────────────────────────────────────
+function drawGauge(score) {
+    const canvas = document.getElementById('gauge-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const w = 180, h = 180, cx = w/2, cy = h/2, r = 70, lw = 14;
+    ctx.clearRect(0, 0, w, h);
+
+    // Background arc
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, Math.PI * 0.75, Math.PI * 2.25);
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.lineWidth = lw;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    // Score arc
+    const pct = Math.max(0, Math.min(100, score)) / 100;
+    const endAngle = Math.PI * 0.75 + pct * Math.PI * 1.5;
+    const grad = ctx.createLinearGradient(0, h, w, 0);
+    if (score >= 60) { grad.addColorStop(0, '#22c55e'); grad.addColorStop(1, '#4ade80'); }
+    else if (score >= 40) { grad.addColorStop(0, '#f59e0b'); grad.addColorStop(1, '#fbbf24'); }
+    else { grad.addColorStop(0, '#ef4444'); grad.addColorStop(1, '#f87171'); }
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, Math.PI * 0.75, endAngle);
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = lw;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+}
+
+function getScoreColor(score) {
+    if (score >= 60) return '#22c55e';
+    if (score >= 40) return '#f59e0b';
+    return '#ef4444';
+}
+
+async function loadScore() {
+    try {
+        const resp = await fetchWithRetry(`${API}/analysis/sentiment/score?hours=24`);
+        const data = await resp.json();
+
+        const score = data.score ?? 50;
+        drawGauge(score);
+        const numEl = document.getElementById('score-number');
+        numEl.textContent = Math.round(score);
+        numEl.style.color = getScoreColor(score);
+
+        // Trend
+        const trendEl = document.getElementById('score-trend');
+        const arrows = { improving: '↑ Improving', declining: '↓ Declining', stable: '→ Stable' };
+        trendEl.className = `score-trend ${data.trend || 'stable'}`;
+        trendEl.innerHTML = `<span>${arrows[data.trend] || '→ Stable'}</span><span style="font-weight:400;color:var(--text-muted)">${data.total_events} events</span>`;
+
+        // Details
+        document.getElementById('sd-valence').textContent = (data.avg_valence ?? 0).toFixed(2);
+        document.getElementById('sd-arousal').textContent = (data.avg_arousal ?? 0).toFixed(2);
+        document.getElementById('sd-dominance').textContent = (data.avg_dominance ?? 0).toFixed(2);
+        document.getElementById('sd-confidence').textContent = ((data.avg_confidence ?? 0) * 100).toFixed(0) + '%';
+
+        // Emotion chips
+        const chips = document.getElementById('emotion-chips');
+        const emotionIcons = {frustrated:'😤',happy:'😄',neutral:'😶',satisfied:'😊',excited:'🎉',sad:'😢',confused:'🤔',assertive:'💪',angry:'😡'};
+        chips.innerHTML = (data.top_emotions || []).slice(0, 6).map(e =>
+            `<span class="emotion-chip">${emotionIcons[e.emotion]||'😐'} ${e.emotion} <b>${e.count}</b></span>`
+        ).join('');
+
+        // Score timeline chart
+        renderScoreTimeline(data.timeline || []);
+    } catch (err) {
+        console.error('Failed to load score:', err);
+        document.getElementById('score-number').textContent = '?';
+    }
+}
+
+function renderScoreTimeline(timeline) {
+    if (_charts['scoreLine']) _charts['scoreLine'].destroy();
+    const ctx = document.getElementById('chart-score-timeline');
+    if (!ctx || !timeline.length) return;
+
+    const labels = timeline.map(t => {
+        const d = new Date(t.hour);
+        return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    });
+    const scores = timeline.map(t => t.score);
+    const counts = timeline.map(t => t.count);
+
+    _charts['scoreLine'] = new Chart(ctx.getContext('2d'), {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: 'Score',
+                    data: scores,
+                    borderColor: '#8b5cf6',
+                    backgroundColor: 'rgba(139,92,246,0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 3,
+                    yAxisID: 'y',
+                },
+                {
+                    label: 'Events',
+                    data: counts,
+                    borderColor: 'rgba(255,255,255,0.2)',
+                    backgroundColor: 'rgba(255,255,255,0.05)',
+                    fill: true,
+                    type: 'bar',
+                    yAxisID: 'y1',
+                },
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 11 } } },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => ctx.dataset.label === 'Score'
+                            ? `Score: ${ctx.raw}/100`
+                            : `${ctx.raw} events`
+                    }
+                }
+            },
+            scales: {
+                x: { ticks: { color: '#94a3b8', maxRotation: 45, font: { size: 10 } }, grid: { display: false } },
+                y: { min: 0, max: 100, ticks: { color: '#94a3b8', stepSize: 25 }, grid: { color: 'rgba(255,255,255,0.05)' }, title: { display: true, text: 'Score', color: '#94a3b8' } },
+                y1: { position: 'right', beginAtZero: true, ticks: { color: '#94a3b8' }, grid: { display: false }, title: { display: true, text: 'Events', color: '#94a3b8' } }
+            }
+        }
+    });
+}
+
+// ── Sentiment Data ───────────────────────────────────────────────
 
 async function loadSentiment() {
     try {
@@ -446,7 +636,8 @@ function renderFiltered() {
 }
 
 // Initial load + auto-refresh every 30s
+loadScore();
 loadSentiment();
-setInterval(loadSentiment, 30_000);
+setInterval(() => { loadScore(); loadSentiment(); }, 30_000);
 </script>
 {% endblock %}

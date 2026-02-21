@@ -1,8 +1,9 @@
 """
-Background auto-scorer — two-phase pipeline:
+Background auto-scorer — three-phase pipeline:
 
-  Phase 1 ➜ JSONL → session_messages   (all agents: main, analyst, …)
-    Phase 2 ➜ session_messages → sentiment_events  (LLM-only from models.yaml profile, zero lexicon)
+  Phase 1a ➜ JSONL → session_messages   (legacy: file-based agent logs)
+  Phase 1b ➜ engine chat_messages → session_messages  (live engine conversations)
+  Phase 2  ➜ session_messages → sentiment_events  (semantic + LLM + lexicon)
 
 Runs inside aria-api as an asyncio background task every 60 s.
 """
@@ -22,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import ARIA_AGENTS_ROOT
 from db.session import AsyncSessionLocal
-from db.models import SessionMessage, SentimentEvent
+from db.models import SessionMessage, SentimentEvent, EngineChatMessage
 
 _logger = logging.getLogger("aria.sentiment_autoscorer")
 
@@ -210,6 +211,85 @@ async def _sync_jsonl(db: AsyncSession) -> int:
                         break
         except Exception:
             continue
+
+        if inserted >= BATCH_SIZE * 4:
+            break
+
+    if inserted:
+        await db.commit()
+    return inserted
+
+
+# ── Phase 1b: aria_engine.chat_messages → session_messages ──────────────────
+
+async def _sync_engine_messages(db: AsyncSession) -> int:
+    """Copy new user/assistant messages from aria_engine.chat_messages
+    into aria_data.session_messages so Phase 2 can score them."""
+    # Subquery: content hashes already present
+    existing_hashes_q = select(SessionMessage.content_hash).where(
+        SessionMessage.source_channel == "engine_sync",
+    )
+    existing = set(
+        row for row in (await db.execute(existing_hashes_q)).scalars().all() if row
+    )
+
+    # Fetch recent engine messages not yet synced
+    stmt = (
+        select(EngineChatMessage)
+        .where(EngineChatMessage.role.in_(["user", "assistant"]))
+        .order_by(EngineChatMessage.created_at.desc())
+        .limit(200)
+    )
+    rows = (await db.execute(stmt)).scalars().all()
+    if not rows:
+        return 0
+
+    inserted = 0
+    for msg in rows:
+        text = _normalize(msg.content or "")
+        if len(text) < MIN_CHARS or _is_noise(text):
+            continue
+        if _is_operational_text(text):
+            continue
+
+        text_sha1 = hashlib.sha1(text.encode("utf-8")).hexdigest()
+        dedup_key = f"{msg.session_id}:{msg.role}:{text_sha1}"
+        if dedup_key in existing or text_sha1 in existing:
+            continue
+        existing.add(dedup_key)
+        existing.add(text_sha1)
+
+        # Check DB dedup
+        dup = (await db.execute(
+            select(SessionMessage.id)
+            .where(SessionMessage.content_hash == text_sha1)
+            .where(SessionMessage.role == msg.role)
+            .limit(1)
+        )).scalar_one_or_none()
+        if dup:
+            continue
+
+        new_msg = SessionMessage(
+            session_id=None,  # engine session is in different schema
+            external_session_id=str(msg.session_id) if msg.session_id else None,
+            agent_id=msg.agent_id,
+            role=msg.role,
+            content=text,
+            content_hash=text_sha1,
+            source_channel="engine_sync",
+            metadata_json={
+                "origin": "engine_chat_messages",
+                "engine_msg_id": str(msg.id),
+                "model": msg.model,
+                "tokens_input": msg.tokens_input,
+                "tokens_output": msg.tokens_output,
+            },
+        )
+        if msg.created_at:
+            new_msg.created_at = msg.created_at
+
+        db.add(new_msg)
+        inserted += 1
 
         if inserted >= BATCH_SIZE * 4:
             break
@@ -448,17 +528,22 @@ async def _score_batch(db: AsyncSession) -> int:
 # ── Main loop ────────────────────────────────────────────────────────────────
 
 async def run_autoscorer_loop():
-    """Background loop — Phase 1 (sync JSONL) then Phase 2 (score) every 60s."""
+    """Background loop — Phase 1a (JSONL), 1b (engine DB), Phase 2 (score) every 60s."""
     print(f"🎯 Sentiment auto-scorer started (interval={INTERVAL_SECONDS}s, batch={BATCH_SIZE})")
     await asyncio.sleep(10)  # let API finish starting
 
     while True:
         try:
             async with AsyncSessionLocal() as db:
-                # Phase 1: pull new messages from ALL agent JSONL files
+                # Phase 1a: pull new messages from ALL agent JSONL files
                 synced = await _sync_jsonl(db)
                 if synced:
                     print(f"🎯 Synced {synced} new messages from JSONL → session_messages")
+
+                # Phase 1b: pull from aria_engine.chat_messages
+                engine_synced = await _sync_engine_messages(db)
+                if engine_synced:
+                    print(f"🎯 Synced {engine_synced} new engine messages → session_messages")
 
                 # Phase 2: score unscored session_messages
                 scored = await _score_batch(db)
