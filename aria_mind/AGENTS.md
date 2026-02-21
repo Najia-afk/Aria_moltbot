@@ -81,7 +81,7 @@ Main coordinator. Routes tasks, tracks progress, maintains big picture.
 ```yaml
 id: aria
 focus: orchestrator
-model: qwen3-mlx
+model: kimi
 fallback: trinity-free
 skills: [goals, schedule, health, database, api_client, agent_manager, model_switcher, litellm, llm, brainstorm, knowledge_graph]
 capabilities: [task_routing, delegation, priority_management, autonomous_action, agent_lifecycle, model_selection, token_management]
@@ -155,7 +155,7 @@ Knowledge storage and retrieval. No specific focus - serves all.
 ```yaml
 id: memory
 focus: memory
-model: qwen3-mlx
+model: kimi
 fallback: qwen3-next-free
 parent: aria
 skills: [database, knowledge_graph, api_client, llm, conversation_summary, working_memory]
