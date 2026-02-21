@@ -540,11 +540,15 @@
         <div class="charts-row">
             <div class="content-card">
                 <h4>📊 Participation</h4>
-                <canvas id="chart-participation" height="200"></canvas>
+                <div style="position:relative;height:220px;">
+                    <canvas id="chart-participation"></canvas>
+                </div>
             </div>
             <div class="content-card">
                 <h4>⏱️ Response Time (ms)</h4>
-                <canvas id="chart-duration" height="200"></canvas>
+                <div style="position:relative;height:220px;">
+                    <canvas id="chart-duration"></canvas>
+                </div>
             </div>
         </div>
 
@@ -1031,7 +1035,7 @@ function renderDurationChart(rt) {
     const datasets = agents.map(a => ({
         label: a,
         data: roundNumbers.map(roundNumber => {
-            const t = turns.find(t => t.agent_id === a && t.round === roundNumber);
+            const t = turns.find(t => t.agent_id === a && Number.parseInt(t.round, 10) === roundNumber);
             return t ? Math.max(0, Math.round(safeNumber(t.duration_ms, 0))) : 0;
         }),
         borderColor: agentColor(a),
@@ -1045,6 +1049,7 @@ function renderDurationChart(rt) {
     }, {
         spanGaps: true,
         maxTicksLimit: 10,
+        legendDisplay: true,
     });
 }
 
