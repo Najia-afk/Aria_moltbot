@@ -17,11 +17,17 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks, WebSocket
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select, update, and_
+from sqlalchemy import func, select, update, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession, AsyncEngine, async_sessionmaker
 from starlette.websockets import WebSocketDisconnect, WebSocketState
 
-from db.models import EngineChatSession, EngineChatMessage, EngineAgentState
+from db.models import (
+    EngineChatSession,
+    EngineChatMessage,
+    EngineAgentState,
+    EngineChatSessionArchive,
+    EngineChatMessageArchive,
+)
 from aria_engine.roundtable import Roundtable, RoundtableResult
 
 logger = logging.getLogger("aria.api.engine_roundtable")
@@ -71,10 +77,58 @@ class RoundtableResponse(BaseModel):
 class RoundtableSummary(BaseModel):
     """Summary for list endpoints."""
     session_id: str
+    session_type: str | None = None
     title: str | None = None
     participants: list[str] = Field(default_factory=list)
     message_count: int = 0
     created_at: str | None = None
+
+
+async def _load_any_session(
+    db: AsyncSession,
+    session_id: str,
+    allowed_types: tuple[str, ...],
+) -> tuple[Any, bool]:
+    """Load session row from working first, then archive; returns (row, is_archived)."""
+    working_stmt = select(EngineChatSession).where(
+        and_(
+            EngineChatSession.id == session_id,
+            EngineChatSession.session_type.in_(allowed_types),
+        )
+    )
+    working_result = await db.execute(working_stmt)
+    working_row = working_result.scalar_one_or_none()
+    if working_row is not None:
+        return working_row, False
+
+    archive_stmt = select(EngineChatSessionArchive).where(
+        and_(
+            EngineChatSessionArchive.id == session_id,
+            EngineChatSessionArchive.session_type.in_(allowed_types),
+        )
+    )
+    archive_result = await db.execute(archive_stmt)
+    archive_row = archive_result.scalar_one_or_none()
+    if archive_row is not None:
+        return archive_row, True
+
+    return None, False
+
+
+async def _load_messages_for_session(
+    db: AsyncSession,
+    session_id: str,
+    from_archive: bool,
+) -> list[Any]:
+    """Load ordered messages for a session from working or archive table."""
+    model = EngineChatMessageArchive if from_archive else EngineChatMessage
+    stmt = (
+        select(model)
+        .where(model.session_id == session_id)
+        .order_by(model.created_at.asc())
+    )
+    result = await db.execute(stmt)
+    return result.scalars().all()
 
 
 class PaginatedRoundtables(BaseModel):
@@ -294,31 +348,75 @@ async def list_roundtables(
     offset = (page - 1) * page_size
 
     try:
-        rows = await roundtable.list_roundtables(limit=page_size, offset=offset)
+        if _db_session is None:
+            rows = await roundtable.list_roundtables(limit=page_size, offset=offset)
+            return PaginatedRoundtables(
+                items=[
+                    RoundtableSummary(
+                        session_id=r["session_id"],
+                        session_type="roundtable",
+                        title=r.get("title"),
+                        participants=r.get("participants", []),
+                        message_count=r.get("message_count", 0),
+                        created_at=r.get("created_at"),
+                    )
+                    for r in rows
+                ],
+                total=len(rows),
+                page=page,
+                page_size=page_size,
+            )
 
-        # Get total count
-        if _db_session is not None:
-            async with _db_session() as session:
-                result = await session.execute(
-                    select(func.count(EngineChatSession.id)).where(
-                        EngineChatSession.session_type == "roundtable"
+        async with _db_session() as session:
+            allowed_types = ["roundtable", "swarm"]
+
+            working_count_stmt = select(func.count(EngineChatSession.id)).where(
+                EngineChatSession.session_type.in_(allowed_types)
+            )
+            archive_count_stmt = select(func.count(EngineChatSessionArchive.id)).where(
+                EngineChatSessionArchive.session_type.in_(allowed_types)
+            )
+            working_count_res = await session.execute(working_count_stmt)
+            archive_count_res = await session.execute(archive_count_stmt)
+            total = (working_count_res.scalar() or 0) + (archive_count_res.scalar() or 0)
+
+            working_stmt = select(EngineChatSession).where(
+                EngineChatSession.session_type.in_(allowed_types)
+            )
+            archive_stmt = select(EngineChatSessionArchive).where(
+                EngineChatSessionArchive.session_type.in_(allowed_types)
+            )
+
+            working_res = await session.execute(working_stmt)
+            archive_res = await session.execute(archive_stmt)
+            merged_rows = [
+                *[(row, False) for row in working_res.scalars().all()],
+                *[(row, True) for row in archive_res.scalars().all()],
+            ]
+
+            merged_rows.sort(
+                key=lambda pair: pair[0].created_at or pair[0].updated_at,
+                reverse=True,
+            )
+            page_rows = merged_rows[offset: offset + page_size]
+
+            items: list[RoundtableSummary] = []
+            for row, _is_archived in page_rows:
+                metadata = row.metadata_json or {}
+                participants = metadata.get("participants", []) if isinstance(metadata, dict) else []
+                items.append(
+                    RoundtableSummary(
+                        session_id=str(row.id),
+                        session_type=row.session_type,
+                        title=row.title,
+                        participants=participants,
+                        message_count=int(row.message_count or 0),
+                        created_at=row.created_at.isoformat() if row.created_at else None,
                     )
                 )
-                total = result.scalar() or 0
-        else:
-            total = len(rows)
 
         return PaginatedRoundtables(
-            items=[
-                RoundtableSummary(
-                    session_id=r["session_id"],
-                    title=r.get("title"),
-                    participants=r.get("participants", []),
-                    message_count=r.get("message_count", 0),
-                    created_at=r.get("created_at"),
-                )
-                for r in rows
-            ],
+            items=items,
             total=total,
             page=page,
             page_size=page_size,
@@ -418,29 +516,15 @@ async def get_roundtable(session_id: str):
 
     try:
         async with _db_session() as session:
-            # Load session
-            stmt = (
-                select(EngineChatSession)
-                .where(
-                    and_(
-                        EngineChatSession.id == session_id,
-                        EngineChatSession.session_type == "roundtable",
-                    )
-                )
+            session_row, is_archived = await _load_any_session(
+                session,
+                session_id,
+                ("roundtable",),
             )
-            result = await session.execute(stmt)
-            session_row = result.scalar_one_or_none()
             if session_row is None:
                 raise HTTPException(status_code=404, detail=f"Roundtable {session_id} not found")
 
-            # Load all messages/turns
-            msg_stmt = (
-                select(EngineChatMessage)
-                .where(EngineChatMessage.session_id == session_id)
-                .order_by(EngineChatMessage.created_at.asc())
-            )
-            msg_result = await session.execute(msg_stmt)
-            messages = msg_result.scalars().all()
+            messages = await _load_messages_for_session(session, session_id, is_archived)
 
             metadata = session_row.metadata_json or {}
             participants = metadata.get("participants", []) if isinstance(metadata, dict) else []
@@ -520,13 +604,14 @@ async def get_roundtable_turns(session_id: str):
         raise HTTPException(status_code=503, detail="Database not available")
 
     async with _db_session() as session:
-        stmt = (
-            select(EngineChatMessage)
-            .where(EngineChatMessage.session_id == session_id)
-            .order_by(EngineChatMessage.created_at.asc())
+        session_row, is_archived = await _load_any_session(
+            session,
+            session_id,
+            ("roundtable",),
         )
-        result = await session.execute(stmt)
-        messages = result.scalars().all()
+        if session_row is None:
+            raise HTTPException(status_code=404, detail=f"Roundtable {session_id} not found")
+        messages = await _load_messages_for_session(session, session_id, is_archived)
 
     turns = []
     for msg in messages:
@@ -714,27 +799,15 @@ async def get_swarm(session_id: str):
     # Fallback: load from DB (same schema as roundtable but session_type='swarm')
     try:
         async with _db_session() as session:
-            stmt = (
-                select(EngineChatSession)
-                .where(
-                    and_(
-                        EngineChatSession.id == session_id,
-                        EngineChatSession.session_type == "swarm",
-                    )
-                )
+            row, is_archived = await _load_any_session(
+                session,
+                session_id,
+                ("swarm",),
             )
-            result = await session.execute(stmt)
-            row = result.scalar_one_or_none()
             if row is None:
                 raise HTTPException(status_code=404, detail=f"Swarm {session_id} not found")
 
-            msg_stmt = (
-                select(EngineChatMessage)
-                .where(EngineChatMessage.session_id == session_id)
-                .order_by(EngineChatMessage.created_at.asc())
-            )
-            msg_result = await session.execute(msg_stmt)
-            messages = msg_result.scalars().all()
+            messages = await _load_messages_for_session(session, session_id, is_archived)
 
             metadata = row.metadata_json or {}
             participants = metadata.get("participants", []) if isinstance(metadata, dict) else []

@@ -859,6 +859,85 @@ Index("idx_ecm_created", EngineChatMessage.created_at)
 Index("idx_ecm_session_created", EngineChatMessage.session_id, EngineChatMessage.created_at)
 
 
+class EngineChatSessionArchive(Base):
+    """Archived copy of engine chat sessions (internal, non-public)."""
+
+    __tablename__ = "chat_sessions_archive"
+    __table_args__ = {"schema": "aria_engine"}
+
+    id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    agent_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    session_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    title: Mapped[str | None] = mapped_column(String(500))
+    system_prompt: Mapped[str | None] = mapped_column(Text)
+    model: Mapped[str | None] = mapped_column(String(200))
+    temperature: Mapped[float] = mapped_column(Float, server_default=text("0.7"))
+    max_tokens: Mapped[int] = mapped_column(Integer, server_default=text("4096"))
+    context_window: Mapped[int] = mapped_column(Integer, server_default=text("50"))
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    message_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    total_tokens: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    total_cost: Mapped[float] = mapped_column(Numeric(10, 6), server_default=text("0"))
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSONB, server_default=text("'{}'::jsonb"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    archived_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
+
+    messages: Mapped[list["EngineChatMessageArchive"]] = relationship(
+        "EngineChatMessageArchive",
+        back_populates="session",
+        cascade="all, delete-orphan",
+    )
+
+
+Index("idx_ecsa_archived", EngineChatSessionArchive.archived_at.desc())
+Index("idx_ecsa_session_type", EngineChatSessionArchive.session_type)
+Index("idx_ecsa_status", EngineChatSessionArchive.status)
+Index("idx_ecsa_updated", EngineChatSessionArchive.updated_at.desc())
+
+
+class EngineChatMessageArchive(Base):
+    """Archived copy of engine chat messages (internal, non-public)."""
+
+    __tablename__ = "chat_messages_archive"
+    __table_args__ = {"schema": "aria_engine"}
+
+    id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    session_id: Mapped[Any] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("aria_engine.chat_sessions_archive.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    agent_id: Mapped[str | None] = mapped_column(String(100))
+    role: Mapped[str] = mapped_column(String(20), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    thinking: Mapped[str | None] = mapped_column(Text)
+    tool_calls: Mapped[dict | None] = mapped_column(JSONB)
+    tool_results: Mapped[dict | None] = mapped_column(JSONB)
+    model: Mapped[str | None] = mapped_column(String(200))
+    tokens_input: Mapped[int | None] = mapped_column(Integer)
+    tokens_output: Mapped[int | None] = mapped_column(Integer)
+    cost: Mapped[float | None] = mapped_column(Numeric(10, 6))
+    latency_ms: Mapped[int | None] = mapped_column(Integer)
+    embedding: Mapped[Any] = mapped_column(Vector(1536), nullable=True) if HAS_PGVECTOR else mapped_column(JSONB, nullable=True)
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSONB, server_default=text("'{}'::jsonb"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    archived_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
+
+    session: Mapped["EngineChatSessionArchive"] = relationship(
+        "EngineChatSessionArchive",
+        back_populates="messages",
+    )
+
+
+Index("idx_ecma_session", EngineChatMessageArchive.session_id)
+Index("idx_ecma_role", EngineChatMessageArchive.role)
+Index("idx_ecma_created", EngineChatMessageArchive.created_at)
+Index("idx_ecma_archived", EngineChatMessageArchive.archived_at.desc())
+Index("idx_ecma_session_created", EngineChatMessageArchive.session_id, EngineChatMessageArchive.created_at)
+
+
 class EngineCronJob(Base):
     __tablename__ = "cron_jobs"
     __table_args__ = {"schema": "aria_engine"}

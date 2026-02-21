@@ -576,6 +576,7 @@
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="/static/js/chart-helpers.js"></script>
 <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 <script>
 const API_BASE = '{{ api_base_url }}';
@@ -585,7 +586,6 @@ let currentRoundtable = null;
 let rtNetwork = null;
 let charts = {};
 let currentMode = 'roundtable';  // 'roundtable' or 'swarm'
-const MAX_RENDER_ROUNDS = 50;
 
 // ── Mode Toggle ──────────────────────────────────────────────────────────
 
@@ -624,19 +624,9 @@ function fmtDate(iso) {
     return isNaN(dt) ? '—' : dt.toLocaleString();
 }
 
-function clampPositiveInt(value, fallback = 1, max = MAX_RENDER_ROUNDS) {
-    const n = Number.parseInt(value, 10);
-    if (!Number.isFinite(n) || n <= 0) return fallback;
-    return Math.min(n, max);
-}
-
-function getRenderableRounds(turns, configuredRounds) {
-    const highestRoundInTurns = turns.reduce((maxRound, turn) => {
-        const n = Number.parseInt(turn?.round, 10);
-        return Number.isFinite(n) && n > maxRound ? n : maxRound;
-    }, 0);
-    const inferred = Math.max(highestRoundInTurns, 1);
-    return clampPositiveInt(configuredRounds, inferred, MAX_RENDER_ROUNDS);
+function safeNumber(value, fallback = 0) {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : fallback;
 }
 
 const AGENT_COLORS = [
@@ -851,7 +841,8 @@ function renderRoundtableGraph(rt) {
     const container = document.getElementById('roundtable-graph');
     const turns = (rt.turns || []).filter(t => Number.isFinite(Number.parseInt(t?.round, 10)));
     const participants = rt.participants || [];
-    const maxRound = getRenderableRounds(turns, rt.rounds);
+    const roundNumbers = [...new Set(turns.map(t => Number.parseInt(t.round, 10)).filter(n => Number.isFinite(n) && n > 0))]
+        .sort((a, b) => a - b);
 
     const nodes = [];
     const edges = [];
@@ -898,7 +889,7 @@ function renderRoundtableGraph(rt) {
     });
 
     // Round nodes (small, show interaction flow)
-    for (let r = 1; r <= maxRound; r++) {
+    for (const r of roundNumbers) {
         const roundTurns = turns.filter(t => t.round === r);
         const roundRadius = agentRadius + 60 + (r * 50);
 
@@ -962,8 +953,8 @@ function renderRoundtableGraph(rt) {
             arrows: 'to',
         });
         // Connect last round turns to synthesis
-        const lastRound = maxRound;
-        turns.filter(t => t.round === lastRound).forEach(t => {
+        const lastRound = roundNumbers.length ? roundNumbers[roundNumbers.length - 1] : null;
+        turns.filter(t => lastRound != null && t.round === lastRound).forEach(t => {
             edges.push({
                 from: `turn-r${lastRound}-${t.agent_id}`,
                 to: 'synthesis',
@@ -997,31 +988,11 @@ function renderRoundtableGraph(rt) {
 
 // ── Charts ───────────────────────────────────────────────────────────────
 
-function renderChart(key, type, data, extraOpts = {}) {
-    const canvas = document.getElementById(key);
-    if (!canvas) return;
-    if (charts[key]) charts[key].destroy();
-    charts[key] = new Chart(canvas.getContext('2d'), {
-        type,
-        data,
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { labels: { color: '#9ca3af', font: { size: 11 } } } },
-            scales: {
-                x: { ticks: { color: '#6b7280', font: { size: 10 } }, grid: { color: '#ffffff08' } },
-                y: { ticks: { color: '#6b7280', font: { size: 10 } }, grid: { color: '#ffffff08' }, beginAtZero: true },
-            },
-            ...extraOpts,
-        },
-    });
-}
-
 function renderParticipationChart(rt) {
-    const turns = rt.turns || [];
+    const turns = (rt.turns || []).filter(t => Number.isFinite(Number.parseInt(t?.round, 10)));
     const agents = rt.participants || [];
     const counts = agents.map(a => turns.filter(t => t.agent_id === a).length);
-    renderChart('chart-participation', 'bar', {
+    ARIAChartHelpers.renderChart(charts, 'chart-participation', 'bar', {
         labels: agents,
         datasets: [{
             label: 'Turns',
@@ -1037,22 +1008,26 @@ function renderParticipationChart(rt) {
 function renderDurationChart(rt) {
     const turns = (rt.turns || []).filter(t => Number.isFinite(Number.parseInt(t?.round, 10)));
     const agents = rt.participants || [];
-    const maxRound = getRenderableRounds(turns, rt.rounds);
+    const roundNumbers = [...new Set(turns.map(t => Number.parseInt(t.round, 10)).filter(n => Number.isFinite(n) && n > 0))]
+        .sort((a, b) => a - b);
 
     const datasets = agents.map(a => ({
         label: a,
-        data: Array.from({ length: maxRound }, (_, r) => {
-            const t = turns.find(t => t.agent_id === a && t.round === r + 1);
-            return t ? t.duration_ms : 0;
+        data: roundNumbers.map(roundNumber => {
+            const t = turns.find(t => t.agent_id === a && t.round === roundNumber);
+            return t ? Math.max(0, Math.round(safeNumber(t.duration_ms, 0))) : 0;
         }),
         borderColor: agentColor(a),
         backgroundColor: agentColor(a) + '22',
         tension: 0.3,
     }));
 
-    renderChart('chart-duration', 'line', {
-        labels: Array.from({ length: maxRound }, (_, r) => `Round ${r + 1}`),
+    ARIAChartHelpers.renderChart(charts, 'chart-duration', 'line', {
+        labels: roundNumbers.map(r => `Round ${r}`),
         datasets,
+    }, {
+        spanGaps: true,
+        maxTicksLimit: 10,
     });
 }
 
@@ -1061,12 +1036,13 @@ function renderDurationChart(rt) {
 function renderTimeline(rt) {
     const container = document.getElementById('turn-timeline');
     const turns = (rt.turns || []).filter(t => Number.isFinite(Number.parseInt(t?.round, 10)));
-    const maxRound = getRenderableRounds(turns, rt.rounds);
+    const roundNumbers = [...new Set(turns.map(t => Number.parseInt(t.round, 10)).filter(n => Number.isFinite(n) && n > 0))]
+        .sort((a, b) => a - b);
 
     let html = '';
     const phases = { 1: 'EXPLORE', 2: 'WORK' };
 
-    for (let r = 1; r <= maxRound; r++) {
+    for (const r of roundNumbers) {
         const phase = r <= 2 ? phases[r] : 'VALIDATE';
         html += `<div class="round-divider">Round ${r} — ${phase}</div>`;
 
@@ -1079,7 +1055,7 @@ function renderTimeline(rt) {
                         <span class="turn-agent" style="color: ${color};">${esc(t.agent_id)}</span>
                         <div class="turn-meta">
                             <span>Round ${t.round}</span>
-                            ${t.duration_ms ? `<span>${t.duration_ms}ms</span>` : ''}
+                            ${safeNumber(t.duration_ms, 0) > 0 ? `<span>${Math.round(safeNumber(t.duration_ms, 0))}ms</span>` : ''}
                         </div>
                     </div>
                     <div class="turn-content">${esc(t.content)}</div>
@@ -1131,7 +1107,7 @@ async function loadHistory() {
                 ? '<span class="status-badge" style="background:rgba(245,158,11,0.2);color:#f59e0b;">🐝 Swarm</span>'
                 : '<span class="status-badge" style="background:rgba(139,92,246,0.2);color:#a78bfa;">🔄 Roundtable</span>';
             return `
-            <tr class="clickable" onclick="viewRoundtable('${esc(item.session_id)}')">
+            <tr class="clickable" onclick="viewRoundtable('${esc(item.session_id)}', '${esc(item.session_type || '')}')">
                 <td>${typeBadge}</td>
                 <td>${esc(item.title || '(untitled)')}</td>
                 <td>${(item.participants || []).map(a =>
@@ -1150,20 +1126,25 @@ async function loadHistory() {
     } catch (err) {
         console.error('Load history failed:', err);
         document.getElementById('history-body').innerHTML =
-            '<tr><td colspan="5" class="empty-state">Failed to load history</td></tr>';
+            '<tr><td colspan="6" class="empty-state">Failed to load history</td></tr>';
     }
 }
 
-async function viewRoundtable(sessionId) {
+async function viewRoundtable(sessionId, sessionType = 'roundtable') {
     try {
-        const r = await fetch(`${API_BASE}/engine/roundtable/${sessionId}`);
+        const isSwarm = String(sessionType || '').includes('swarm');
+        const endpoint = isSwarm
+            ? `${API_BASE}/engine/roundtable/swarm/${sessionId}`
+            : `${API_BASE}/engine/roundtable/${sessionId}`;
+        const r = await fetch(endpoint);
         if (!r.ok) throw new Error(`${r.status}`);
         const data = await r.json();
+        data._mode = isSwarm ? 'swarm' : 'roundtable';
         currentRoundtable = data;
         document.querySelector('[data-tab="view"]').click();
         renderRoundtableDetail(data);
     } catch (err) {
-        alert('Failed to load roundtable: ' + err.message);
+        alert('Failed to load discussion: ' + err.message);
     }
 }
 

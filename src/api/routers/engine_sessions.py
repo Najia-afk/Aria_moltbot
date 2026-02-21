@@ -406,7 +406,12 @@ async def cleanup_sessions(
     dry_run: bool = Query(default=True, description="If true, only count — don't delete"),
 ):
     """
-    Prune stale sessions older than N days (S-67 session auto-cleanup).
+    Archive + prune stale sessions older than N days (S-67 session auto-cleanup).
+
+    Behavior:
+    - stale sessions/messages are copied into internal archive tables
+    - only then removed from working tables
+    - archive tables are not exposed via API/UI yet
 
     Default is dry_run=true for safety. Set dry_run=false to actually remove.
     """
