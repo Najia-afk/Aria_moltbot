@@ -344,7 +344,15 @@ async def get_session_messages(
     Returns ``{"messages": [...]}`` with each message containing role, content,
     thinking, tool_calls, model, and timestamp fields.
     """
+    import uuid as _uuid
+
     from aria_engine.exceptions import SessionError
+
+    # Reject obviously invalid session IDs (e.g. "undefined" from JS)
+    try:
+        _uuid.UUID(session_id)
+    except (ValueError, AttributeError):
+        raise HTTPException(status_code=400, detail=f"Invalid session ID: {session_id!r}")
 
     try:
         session = await engine.resume_session(session_id)

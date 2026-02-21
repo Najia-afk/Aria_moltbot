@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 from aria_engine.config import EngineConfig
 from aria_engine.session_manager import NativeSessionManager
@@ -40,6 +40,12 @@ class SessionResponse(BaseModel):
     updated_at: str | None = None
     last_message_at: str | None = None
     metadata: dict[str, Any] | None = None
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def id(self) -> str:
+        """Alias for session_id — used by the frontend."""
+        return self.session_id
 
 
 class SessionListResponse(BaseModel):
