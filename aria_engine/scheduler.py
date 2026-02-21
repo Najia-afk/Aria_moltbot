@@ -26,8 +26,10 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine, async_sessi
 
 from aria_engine.config import EngineConfig
 from aria_engine.exceptions import SchedulerError
-from aria_engine.prompts import PromptAssembler
 from db.models import EngineCronJob, ActivityLog
+
+# aria-api base URL (inside Docker network)
+_API_BASE = "http://aria-api:8000"
 
 logger = logging.getLogger("aria.engine.scheduler")
 
@@ -166,7 +168,6 @@ class EngineScheduler:
             self._db_engine, expire_on_commit=False,
         )
         self._active_executions: dict[str, asyncio.Task] = {}
-        self._prompt_assembler = PromptAssembler(config)
 
     async def start(self) -> None:
         """
@@ -369,39 +370,75 @@ class EngineScheduler:
         session_mode: str,
     ) -> None:
         """
-        Dispatch a job to the appropriate agent for execution.
-
-        payload_type determines execution strategy:
-        - 'prompt': send payload as chat message to agent
-        - 'skill': execute a skill function directly
-        - 'pipeline': run a pipeline by name
+        Dispatch a job by creating a session via aria-api and sending
+        the payload as a message.  This reuses the same proven code path
+        as the web UI: prompt assembly, litellm proxy, session tracking.
         """
-        if self._agent_pool is None:
-            logger.warning(
-                "AgentPool not available — job %s logged but not dispatched", job_id
-            )
+        import aiohttp
+
+        if payload_type != "prompt":
+            # skill / pipeline payloads are not session-based
+            await self._dispatch_non_prompt(job_id, payload_type, payload)
             return
 
-        agent = self._agent_pool.get_agent(agent_id)
-        if agent is None:
-            raise SchedulerError(f"Agent {agent_id!r} not found in pool")
-
-        if payload_type == "prompt":
-            # Inject assembled system prompt (soul/identity files) so the
-            # agent has full context when running scheduled jobs.
-            if not agent.system_prompt:
-                assembled = self._prompt_assembler.assemble(
-                    agent_id=agent_id,
-                    agent_prompt=agent.system_prompt,
+        async with aiohttp.ClientSession() as http:
+            # 1. Create a session via aria-api
+            create_resp = await http.post(
+                f"{_API_BASE}/api/engine/chat/sessions",
+                json={
+                    "agent_id": agent_id,
+                    "session_type": "cron",
+                    "metadata": {"cron_job_id": job_id},
+                },
+            )
+            if create_resp.status != 201:
+                body = await create_resp.text()
+                raise SchedulerError(
+                    f"Failed to create session for job {job_id}: "
+                    f"HTTP {create_resp.status} — {body}"
                 )
-                agent.system_prompt = assembled.prompt
-            # Clear stale context from previous job runs
-            agent.clear_context()
-            # Send the payload text as a message to the agent
-            await agent.process(payload)
+            session_data = await create_resp.json()
+            session_id = session_data["id"]
 
-        elif payload_type == "skill":
-            # payload format: "skill_name.function_name {'arg': 'val'}"
+            logger.info(
+                "Job %s: created session %s (agent=%s)",
+                job_id, session_id, agent_id,
+            )
+
+            # 2. Send the cron payload as a message
+            msg_resp = await http.post(
+                f"{_API_BASE}/api/engine/chat/sessions/{session_id}/messages",
+                json={
+                    "content": payload,
+                    "enable_thinking": False,
+                    "enable_tools": True,
+                },
+            )
+            if msg_resp.status != 200:
+                body = await msg_resp.text()
+                raise SchedulerError(
+                    f"Job {job_id} message failed: HTTP {msg_resp.status} — {body}"
+                )
+
+            result = await msg_resp.json()
+            logger.info(
+                "Job %s: completed (model=%s, tokens=%s, cost=$%s)",
+                job_id,
+                result.get("model", "?"),
+                result.get("total_tokens", "?"),
+                result.get("cost_usd", "?"),
+            )
+
+            # 3. Close the session
+            await http.delete(
+                f"{_API_BASE}/api/engine/chat/sessions/{session_id}",
+            )
+
+    async def _dispatch_non_prompt(
+        self, job_id: str, payload_type: str, payload: str,
+    ) -> None:
+        """Handle skill/pipeline payloads that don't need a chat session."""
+        if payload_type == "skill":
             import json as _json
 
             parts = payload.strip().split(" ", 1)
@@ -410,10 +447,11 @@ class EngineScheduler:
             skill_name, func_name = skill_func.rsplit(".", 1)
             args = _json.loads(args_str)
 
+            if self._agent_pool is None:
+                raise SchedulerError("AgentPool not available for skill dispatch")
             skill = self._agent_pool.get_skill(skill_name)
             if skill is None:
                 raise SchedulerError(f"Skill {skill_name!r} not found")
-
             func = getattr(skill, func_name, None)
             if func is None:
                 raise SchedulerError(
@@ -423,7 +461,6 @@ class EngineScheduler:
 
         elif payload_type == "pipeline":
             from aria_skills.pipeline_executor import PipelineExecutor
-
             executor = PipelineExecutor()
             await executor.run(payload)
 
