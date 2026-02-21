@@ -199,7 +199,29 @@ class EngineScheduler:
         # processes them — __aenter__ alone only sets up the data store.
         await self._scheduler.start_in_background()
 
+        # Wait for aria-api to be reachable before jobs start dispatching.
+        # IntervalTrigger jobs fire immediately, so without this check
+        # they fail with "Cannot connect to host aria-api:8000" on cold start.
+        await self._wait_for_api()
+
         logger.info("EngineScheduler started — jobs loaded and processing")
+
+    async def _wait_for_api(self, timeout: int = 60) -> None:
+        """Block until aria-api is reachable, up to *timeout* seconds."""
+        import aiohttp
+
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            try:
+                async with aiohttp.ClientSession() as http:
+                    resp = await http.get(f"{_API_BASE}/api/health", timeout=aiohttp.ClientTimeout(total=5))
+                    if resp.status == 200:
+                        logger.info("aria-api is reachable")
+                        return
+            except Exception:
+                pass
+            await asyncio.sleep(2)
+        logger.warning("aria-api not reachable after %ds — jobs may fail initially", timeout)
 
     async def stop(self) -> None:
         """Gracefully stop the scheduler and wait for active jobs."""
