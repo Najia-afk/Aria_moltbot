@@ -553,19 +553,18 @@ async function loadModelBalances() {
     }
 }
 
-// === Shared Spend Log Fetcher (deduplicates all spend requests) ===
+// === Shared Log Fetcher — reads from aria_data.model_usage ===
 let _spendLogsPromise = null;
-async function fetchSpendLogs(limit = 50) {
+async function fetchSpendLogs(limit = 200) {
     if (_spendLogsPromise) return _spendLogsPromise;
     _spendLogsPromise = (async () => {
-        const raw = await fetchWithTimeout(`${API_URL}/litellm/spend?limit=${limit}&lite=true`);
-        window._allSpendLogs = raw.logs || (Array.isArray(raw) ? raw : []);
+        const raw = await fetchWithTimeout(`${API_URL}/model-usage?limit=${limit}&page=1`);
+        window._allSpendLogs = raw.items || [];
         return window._allSpendLogs;
     })();
     try {
         return await _spendLogsPromise;
     } finally {
-        // Allow re-fetch after 30s staleness
         setTimeout(() => { _spendLogsPromise = null; }, 30000);
     }
 }
@@ -575,10 +574,14 @@ async function loadGlobalSpend() {
     const container = document.getElementById('spend-cards');
     
     try {
-        const summary = await fetchSpendSummary(API_URL, 50);
-        window._allSpendLogs = summary.logs;
+        // All-time stats from aria_data.model_usage
+        const stats = await fetchWithTimeout(`${API_URL}/model-usage/stats?hours=0`);
         
-        const { totalSpend, inputTokens, outputTokens, totalTokens, requestCount } = summary;
+        const totalSpend = stats.total_cost || 0;
+        const inputTokens = stats.input_tokens || 0;
+        const outputTokens = stats.output_tokens || 0;
+        const totalTokens = stats.total_tokens || 0;
+        const requestCount = stats.total_requests || 0;
         
         // Store for other uses
         spendData = { spend: totalSpend, total_tokens: totalTokens, input_tokens: inputTokens, output_tokens: outputTokens, api_requests: requestCount };
@@ -647,16 +650,11 @@ async function loadSpendLogs() {
         }
         
         tbody.innerHTML = logs.map(log => {
-            const date = new Date(log.startTime || log.created_at);
-            const tokens = (log.prompt_tokens || log.promptTokens || 0) + (log.completion_tokens || log.completionTokens || 0);
-            const cost = (typeof calculateLogCost === 'function') ? calculateLogCost(log) : (log.spend || 0);
-            // Calculate duration from startTime and endTime
-            let duration = 0;
-            if (log.startTime && log.endTime) {
-                duration = (new Date(log.endTime) - new Date(log.startTime)) / 1000;
-            }
-            // Use model_group (friendly alias) when available, fall back to raw model
-            const displayModel = log.model_group || log.model || 'unknown';
+            const date = new Date(log.created_at);
+            const tokens = log.total_tokens || ((log.input_tokens || 0) + (log.output_tokens || 0));
+            const cost = log.cost_usd || 0;
+            const duration = (log.latency_ms || 0) / 1000;
+            const displayModel = log.model || 'unknown';
             
             return `
                 <tr>
@@ -701,7 +699,7 @@ function filterLogsByPeriod(logs, days) {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - days);
     return logs.filter(log => {
-        const logDate = new Date(log.startTime || log.created_at);
+        const logDate = new Date(log.created_at);
         return logDate >= cutoff;
     });
 }
@@ -723,8 +721,7 @@ async function updateCharts() {
     const providerTokens = {};
     allLogs.forEach(log => {
         const provider = getProvider(log.model || '');
-        // Use total_tokens (which is prompt + completion) or fall back to sum
-        const tokens = log.total_tokens || ((log.prompt_tokens || 0) + (log.completion_tokens || 0));
+        const tokens = log.total_tokens || ((log.input_tokens || 0) + (log.output_tokens || 0));
         providerTokens[provider] = (providerTokens[provider] || 0) + tokens;
     });
     
@@ -798,13 +795,12 @@ async function updateCharts() {
         
         // Aggregate logs into buckets
         allLogs.forEach(log => {
-            const logDate = new Date(log.startTime || log.created_at);
+            const logDate = new Date(log.created_at);
             const key = periodDays === 1
                 ? logDate.toISOString().slice(0, 13)
                 : logDate.toISOString().split('T')[0];
             if (dayData.hasOwnProperty(key)) {
-                // Use total_tokens (which is prompt + completion) or fall back to sum
-                const tokens = log.total_tokens || ((log.prompt_tokens || 0) + (log.completion_tokens || 0));
+                const tokens = log.total_tokens || ((log.input_tokens || 0) + (log.output_tokens || 0));
                 dayData[key] += tokens;
             }
         });
@@ -873,7 +869,7 @@ async function updateCharts() {
         const modelTokens = {};
         allLogs.forEach(log => {
             const model = (log.model || 'unknown').split('/').pop();
-            const tokens = log.total_tokens || ((log.prompt_tokens || 0) + (log.completion_tokens || 0));
+            const tokens = log.total_tokens || ((log.input_tokens || 0) + (log.output_tokens || 0));
             modelTokens[model] = (modelTokens[model] || 0) + tokens;
         });
         
@@ -930,19 +926,14 @@ async function updateCharts() {
         let outputTokens = 0;
         
         allLogs.forEach(log => {
-            inputTokens += log.prompt_tokens || 0;
-            outputTokens += log.completion_tokens || 0;
+            inputTokens += log.input_tokens || 0;
+            outputTokens += log.output_tokens || 0;
         });
         
-        // If no breakdown available, try global spend
-        if (inputTokens === 0 && outputTokens === 0) {
-            try {
-                const globalData = await fetchWithTimeout(`${API_URL}/litellm/global-spend`);
-                inputTokens = globalData.input_tokens || 0;
-                outputTokens = globalData.output_tokens || 0;
-            } catch (err) {
-                console.error('Failed to load global spend:', err);
-            }
+        // Fallback to cached global stats
+        if (inputTokens === 0 && outputTokens === 0 && spendData) {
+            inputTokens = spendData.input_tokens || 0;
+            outputTokens = spendData.output_tokens || 0;
         }
         
         if (inputTokens === 0 && outputTokens === 0) {

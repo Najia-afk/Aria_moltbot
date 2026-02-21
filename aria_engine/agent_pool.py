@@ -380,7 +380,7 @@ class AgentPool:
             except asyncio.CancelledError:
                 pass
 
-        # Persist final state
+        # Persist final state as disabled for explicit termination.
         await self._persist_agent_state(agent_id, status="disabled")
 
         # Remove from pool
@@ -513,5 +513,20 @@ class AgentPool:
     async def shutdown(self) -> None:
         """Gracefully shutdown all agents."""
         for agent_id in list(self._agents.keys()):
-            await self.terminate_agent(agent_id)
+            agent = self._agents.get(agent_id)
+            if agent is None:
+                continue
+
+            if agent._worker_task and not agent._worker_task.done():
+                agent._worker_task.cancel()
+                try:
+                    await agent._worker_task
+                except asyncio.CancelledError:
+                    pass
+
+            agent.status = "idle"
+            agent.current_task = None
+            await self._persist_agent_state(agent_id, status="idle")
+            del self._agents[agent_id]
+
         logger.info("Agent pool shutdown complete")

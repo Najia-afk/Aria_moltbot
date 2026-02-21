@@ -131,9 +131,12 @@ async def get_model_usage_stats(
     hours: int = 24,
     db: AsyncSession = Depends(get_db),
 ):
-    """Aggregate stats from aria_data.model_usage."""
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
-    window_filter = and_(ModelUsage.created_at > cutoff, _db_non_test_usage_filter())
+    """Aggregate stats from aria_data.model_usage.  hours=0 → all time."""
+    if hours > 0:
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+        window_filter = and_(ModelUsage.created_at > cutoff, _db_non_test_usage_filter())
+    else:
+        window_filter = _db_non_test_usage_filter()
 
     # Aggregate totals
     agg_result = await db.execute(
@@ -196,6 +199,8 @@ async def get_model_usage_stats(
         "period_hours": hours,
         "total_requests": total_requests,
         "total_tokens": total_tokens,
+        "input_tokens": int(agg.input_tokens),
+        "output_tokens": int(agg.output_tokens),
         "total_cost": total_cost,
         "avg_latency_ms": avg_latency,
         "success_rate": success_rate,

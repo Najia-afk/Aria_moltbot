@@ -9,36 +9,21 @@ Endpoints:
   DELETE /agents/db/{agent_id}         — delete an agent
   POST   /agents/db/{agent_id}/enable  — enable agent
   POST   /agents/db/{agent_id}/disable — disable agent
-    POST   /agents/db/enable-core        — enable core agents (aria/devops/analyst/memory/creator/aria_talk)
-    POST   /agents/db/enable-all         — enable all non-terminated agents
-  POST   /agents/db/sync              — re-sync from AGENTS.md → DB
+  POST   /agents/db/enable-core        — enable core agents derived from DB hierarchy
+  POST   /agents/db/enable-all         — enable all non-terminated agents
+  POST   /agents/db/sync               — re-sync from AGENTS.md → DB
 """
 import logging
-import os
 from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import select, func
+from sqlalchemy import select
 
 logger = logging.getLogger("aria.api.agents_crud")
 
 router = APIRouter(tags=["Agents DB"])
-DEFAULT_CORE_AGENT_IDS = ("aria", "devops", "analyst", "memory", "creator", "aria_talk")
-
-
-def _resolve_core_agent_ids() -> set[str]:
-    """Resolve core agent IDs from env, fallback to sensible defaults."""
-    raw = os.getenv("ARIA_CORE_AGENT_IDS", "")
-    if raw.strip():
-        ids = {part.strip() for part in raw.split(",") if part.strip()}
-        if ids:
-            return ids
-    return set(DEFAULT_CORE_AGENT_IDS)
-
-
-CORE_AGENT_IDS = _resolve_core_agent_ids()
 
 
 # ── Pydantic Schemas ─────────────────────────────────────────────────────────
@@ -162,9 +147,7 @@ async def list_agents_db(
     from db.models import EngineAgentState
 
     async for db in _get_db():
-        q = select(EngineAgentState).order_by(
-            EngineAgentState.agent_id.asc(),
-        )
+        q = select(EngineAgentState).order_by(EngineAgentState.agent_id.asc())
         if agent_type is not None:
             q = q.where(EngineAgentState.agent_type == agent_type)
         if focus_type is not None:
@@ -246,11 +229,10 @@ async def update_agent_db(agent_id: str, body: AgentUpdate):
             raise HTTPException(404, f"Agent '{agent_id}' not found")
 
         updates = body.model_dump(exclude_unset=True)
-        # Map 'metadata' to 'metadata_json' column name
         if "metadata" in updates:
             updates["metadata_json"] = updates.pop("metadata")
-        for k, v in updates.items():
-            setattr(row, k, v)
+        for key, value in updates.items():
+            setattr(row, key, value)
         row.updated_at = datetime.now(timezone.utc)
         await db.commit()
         await db.refresh(row)
@@ -314,18 +296,34 @@ async def disable_agent(agent_id: str):
 
 @router.post("/agents/db/enable-core")
 async def enable_core_agents():
-    """Enable the default core agents in one operation."""
+    """Enable top-level agents derived from AGENTS.md-imported table state."""
     from db.models import EngineAgentState
 
     async for db in _get_db():
+        core_stmt = select(EngineAgentState.agent_id).where(
+            EngineAgentState.parent_agent_id.is_(None)
+        )
+        core_result = await db.execute(core_stmt)
+        core_agent_ids = {row[0] for row in core_result.fetchall() if row and row[0]}
+
+        if not core_agent_ids:
+            return {
+                "status": "enabled_core",
+                "enabled_count": 0,
+                "enabled_agents": [],
+                "core_agents": [],
+                "missing_agents": [],
+            }
+
         result = await db.execute(
-            select(EngineAgentState).where(EngineAgentState.agent_id.in_(CORE_AGENT_IDS))
+            select(EngineAgentState).where(EngineAgentState.agent_id.in_(core_agent_ids))
         )
         rows = result.scalars().all()
 
         now = datetime.now(timezone.utc)
         enabled_ids: list[str] = []
-        missing_ids = sorted(CORE_AGENT_IDS.difference({row.agent_id for row in rows}))
+        existing_ids = {row.agent_id for row in rows}
+        missing_ids = sorted(core_agent_ids.difference(existing_ids))
 
         for row in rows:
             row.enabled = True
@@ -338,6 +336,7 @@ async def enable_core_agents():
             "status": "enabled_core",
             "enabled_count": len(enabled_ids),
             "enabled_agents": sorted(enabled_ids),
+            "core_agents": sorted(core_agent_ids),
             "missing_agents": missing_ids,
         }
 
