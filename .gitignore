@@ -89,3 +89,7 @@ pheromone_scores.json
 .coverage
 htmlcov/
 .tox/
+
+# Database CSV exports (sensitive data)
+aria_souvenirs/*/db_export/
+
