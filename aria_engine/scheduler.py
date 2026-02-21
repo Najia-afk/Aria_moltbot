@@ -183,8 +183,7 @@ class EngineScheduler:
         data_store = SQLAlchemyDataStore(self._db_engine)
         self._scheduler = AsyncScheduler(data_store=data_store)
 
-        # Start the scheduler FIRST (enters async context manager)
-        # so that add_schedule() calls in _load_jobs_from_db() work
+        # Enter async context manager (initializes services + task group)
         await self._scheduler.__aenter__()
         self._running = True
         _active_scheduler = self
@@ -192,7 +191,12 @@ class EngineScheduler:
         # Load and register all enabled jobs from the DB
         await self._load_jobs_from_db()
 
-        logger.info("EngineScheduler started — jobs loaded and scheduled")
+        # Start the background task processor so schedules actually fire.
+        # Without this, APScheduler 4.x registers schedules but never
+        # processes them — __aenter__ alone only sets up the data store.
+        await self._scheduler.start_in_background()
+
+        logger.info("EngineScheduler started — jobs loaded and processing")
 
     async def stop(self) -> None:
         """Gracefully stop the scheduler and wait for active jobs."""
@@ -218,6 +222,10 @@ class EngineScheduler:
 
         # Shutdown APScheduler
         if self._scheduler is not None:
+            try:
+                await self._scheduler.stop()
+            except Exception:
+                pass  # already stopped or never started
             await self._scheduler.__aexit__(None, None, None)
             self._scheduler = None
 
