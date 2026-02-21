@@ -289,6 +289,7 @@ class EngineScheduler:
             max_attempts = retry_count + 1
             last_error: str | None = None
             elapsed_ms = 0
+            dispatch_result: dict = {}
 
             while attempt < max_attempts:
                 start_time = time.monotonic()
@@ -301,7 +302,7 @@ class EngineScheduler:
                     )
 
                     # Execute with timeout
-                    await asyncio.wait_for(
+                    dispatch_result = await asyncio.wait_for(
                         self._dispatch_to_agent(
                             job_id=job_id,
                             agent_id=agent_id,
@@ -310,7 +311,7 @@ class EngineScheduler:
                             session_mode=session_mode,
                         ),
                         timeout=max_duration,
-                    )
+                    ) or {}
 
                     elapsed_ms = int((time.monotonic() - start_time) * 1000)
 
@@ -321,6 +322,19 @@ class EngineScheduler:
                         last_duration_ms=elapsed_ms,
                         increment_success=True,
                     )
+
+                    # Write heartbeat log entry
+                    model = dispatch_result.get("model", "")
+                    tokens = dispatch_result.get("total_tokens", 0)
+                    cost = dispatch_result.get("cost_usd", 0)
+                    details = f"model={model}, tokens={tokens}, cost=${cost}" if model else "OK"
+                    await self._write_heartbeat_log(
+                        job_name=job_id,
+                        status="success",
+                        details=details,
+                        duration_ms=elapsed_ms,
+                    )
+
                     logger.info(
                         "Job %s completed in %dms", job_id, elapsed_ms
                     )
@@ -357,6 +371,15 @@ class EngineScheduler:
                 last_error=last_error,
                 increment_fail=True,
             )
+
+            # Write heartbeat log entry for failure
+            await self._write_heartbeat_log(
+                job_name=job_id,
+                status="error",
+                details=last_error or "Unknown error",
+                duration_ms=elapsed_ms,
+            )
+
             logger.error(
                 "Job %s failed after %d attempts: %s", job_id, max_attempts, last_error
             )
@@ -368,18 +391,20 @@ class EngineScheduler:
         payload_type: str,
         payload: str,
         session_mode: str,
-    ) -> None:
+    ) -> dict:
         """
         Dispatch a job by creating a session via aria-api and sending
         the payload as a message.  This reuses the same proven code path
         as the web UI: prompt assembly, litellm proxy, session tracking.
+
+        Returns dict with model, total_tokens, cost_usd from the API response.
         """
         import aiohttp
 
         if payload_type != "prompt":
             # skill / pipeline payloads are not session-based
             await self._dispatch_non_prompt(job_id, payload_type, payload)
-            return
+            return {}
 
         async with aiohttp.ClientSession() as http:
             # 1. Create a session via aria-api
@@ -433,6 +458,8 @@ class EngineScheduler:
             await http.delete(
                 f"{_API_BASE}/api/engine/chat/sessions/{session_id}",
             )
+
+            return result
 
     async def _dispatch_non_prompt(
         self, job_id: str, payload_type: str, payload: str,
@@ -503,6 +530,31 @@ class EngineScheduler:
 
         async with self._db_engine.begin() as conn:
             await conn.execute(stmt)
+
+    async def _write_heartbeat_log(
+        self,
+        job_name: str,
+        status: str,
+        details: str,
+        duration_ms: int,
+    ) -> None:
+        """Write a heartbeat_log entry via aria-api so the heartbeat page shows it."""
+        import aiohttp
+
+        try:
+            async with aiohttp.ClientSession() as http:
+                await http.post(
+                    f"{_API_BASE}/api/heartbeat",
+                    json={
+                        "job_name": job_name,
+                        "status": status,
+                        "details": details,
+                        "executed_at": datetime.now(timezone.utc).isoformat(),
+                        "duration_ms": duration_ms,
+                    },
+                )
+        except Exception as e:
+            logger.warning("Failed to write heartbeat log for %s: %s", job_name, e)
 
     # ── Public management API ────────────────────────────────────────
 

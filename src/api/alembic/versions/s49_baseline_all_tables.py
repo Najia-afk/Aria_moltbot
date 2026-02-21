@@ -302,12 +302,16 @@ def upgrade():
     _safe_create_table(
         "heartbeat_log",
         sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("uuid_generate_v4()")),
-        sa.Column("beat_number", sa.Integer, nullable=False),
+        sa.Column("beat_number", sa.Integer, nullable=False, server_default=sa.text("0")),
+        sa.Column("job_name", sa.String(100), nullable=True),
         sa.Column("status", sa.String(50), server_default=sa.text("'healthy'")),
         sa.Column("details", JSONB, server_default=sa.text("'{}'::jsonb")),
+        sa.Column("executed_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("duration_ms", sa.Integer, nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()")),
     )
     _safe_execute("CREATE INDEX IF NOT EXISTS idx_heartbeat_created ON heartbeat_log (created_at DESC)")
+    _safe_execute("CREATE INDEX IF NOT EXISTS idx_heartbeat_job_name ON heartbeat_log (job_name)")
 
     # ==================================================================
     # 15. scheduled_jobs

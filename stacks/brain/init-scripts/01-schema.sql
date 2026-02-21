@@ -103,12 +103,16 @@ CREATE INDEX IF NOT EXISTS idx_posts_posted   ON aria_data.social_posts(posted_a
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS aria_data.heartbeat_log (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    beat_number INTEGER NOT NULL,
+    beat_number INTEGER NOT NULL DEFAULT 0,
+    job_name VARCHAR(100),
     status VARCHAR(50) DEFAULT 'healthy',
     details JSONB DEFAULT '{}',
+    executed_at TIMESTAMP WITH TIME ZONE,
+    duration_ms INTEGER,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_heartbeat_created ON aria_data.heartbeat_log(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_heartbeat_job_name ON aria_data.heartbeat_log(job_name);
 
 -- ============================================================================
 -- Hourly Goals

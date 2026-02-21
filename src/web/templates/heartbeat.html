@@ -948,6 +948,12 @@ function filterLogs() {
         const icon = jobInfo?.icon || jobIcons[log.job_name] || '📋';
         const displayName = jobInfo?.name || log.job_name || 'Unknown Job';
         
+        // details may be JSONB object or string
+        const detailStr = typeof log.details === 'object' && log.details !== null
+            ? JSON.stringify(log.details) : (log.details || '-');
+        // duration stored as duration_ms
+        const durationMs = log.duration_ms || log.duration;
+
         return `
             <tr>
                 <td>
@@ -955,9 +961,9 @@ function filterLogs() {
                     ${displayName}
                 </td>
                 <td><span class="log-status ${statusClass}">${status}</span></td>
-                <td class="log-details" title="${escapeHtml(log.details || '')}">${escapeHtml(log.details || '-')}</td>
+                <td class="log-details" title="${escapeHtml(detailStr)}">${escapeHtml(detailStr)}</td>
                 <td>${executedAt ? formatRelativeTime(new Date(executedAt)) : '-'}</td>
-                <td>${log.duration ? formatDuration(log.duration) : '-'}</td>
+                <td>${durationMs ? formatDuration(durationMs) : '-'}</td>
             </tr>
         `;
     }).join('');

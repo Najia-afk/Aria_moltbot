@@ -183,8 +183,11 @@ async def create_heartbeat(request: Request, db: AsyncSession = Depends(get_db))
     hb = HeartbeatLog(
         id=uuid.uuid4(),
         beat_number=data.get("beat_number", 0),
+        job_name=data.get("job_name"),
         status=data.get("status", "healthy"),
         details=data.get("details", {}),
+        executed_at=data.get("executed_at"),
+        duration_ms=data.get("duration_ms"),
     )
     db.add(hb)
     await db.commit()

@@ -359,9 +359,12 @@ class HeartbeatLog(Base):
     __table_args__ = {"schema": "aria_data"}
 
     id: Mapped[Any] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
-    beat_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    beat_number: Mapped[int] = mapped_column(Integer, server_default=text("0"), nullable=False)
+    job_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     status: Mapped[str] = mapped_column(String(50), server_default=text("'healthy'"))
-    details: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    details: Mapped[str | None] = mapped_column(JSONB, server_default=text("'{}'::jsonb"), nullable=True)
+    executed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
 
 
