@@ -62,6 +62,8 @@ services:
       - ../../aria_mind:/aria_mind:ro
       - ../../aria_models:/aria_models:ro
       - ../../aria_engine:/aria_engine:ro
+      # Shadow baked /app/aria_engine with bind mount for live code updates
+      - ../../aria_engine:/app/aria_engine:ro
       - ../../aria_skills:/aria_skills:ro
       - ../../aria_agents:/aria_agents:ro
       # db.models needed by agent_pool, routing, heartbeat
