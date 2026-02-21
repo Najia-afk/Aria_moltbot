@@ -11,8 +11,8 @@ class TestModelUsageLifecycle:
     def test_01_record_usage(self, api, uid):
         """POST /model-usage -> record usage."""
         payload = {
-            'model': f'gpt-4o-mini-{uid}',
-            'provider': 'openai',
+            'model': f'test-llm-usage-{uid[:4]}',
+            'provider': 'integration-test',
             'input_tokens': 850,
             'output_tokens': 320,
             'cost_usd': 0.0023,
@@ -30,7 +30,7 @@ class TestModelUsageLifecycle:
         assert usage_id, f'No id in response: {data}'
         TestModelUsageLifecycle._usage_id = usage_id
         TestModelUsageLifecycle._uid = uid
-        TestModelUsageLifecycle._model_name = f'gpt-4o-mini-{uid}'
+        TestModelUsageLifecycle._model_name = f'test-llm-usage-{uid[:4]}'
 
     def test_02_verify_in_list(self, api):
         """GET /model-usage -> verify our usage record is in list."""

@@ -22,18 +22,30 @@ router = APIRouter(tags=["Model Usage"])
 
 
 _TEST_MODEL_NAMES = {"test-model", "test_model"}
+_TEST_PROVIDERS = {"pytest", "test"}
 
 
 def _is_test_usage_entry(model: str | None, provider: str | None) -> bool:
     provider_l = (provider or "").strip().lower()
     model_l = (model or "").strip().lower()
-    return provider_l == "pytest" or model_l in _TEST_MODEL_NAMES
+    if provider_l in _TEST_PROVIDERS or model_l in _TEST_MODEL_NAMES:
+        return True
+    # Detect synthetic entries with hash suffix like gpt-4o-mini-ab12cd34
+    import re
+    if re.search(r"-[a-f0-9]{8}$", model_l):
+        return True
+    return False
 
 
 def _db_non_test_usage_filter():
     model_l = func.lower(func.coalesce(ModelUsage.model, ""))
     provider_l = func.lower(func.coalesce(ModelUsage.provider, ""))
-    return and_(provider_l != "pytest", ~model_l.in_(list(_TEST_MODEL_NAMES)))
+    return and_(
+        ~provider_l.in_(list(_TEST_PROVIDERS)),
+        ~model_l.in_(list(_TEST_MODEL_NAMES)),
+        # Exclude hash-suffixed synthetic model names
+        ~model_l.op("~")(r"-[a-f0-9]{8}$"),
+    )
 
 
 # ── LiteLLM helper (direct DB) ──────────────────────────────────────────────

@@ -86,7 +86,7 @@ OPEN_ROUTER_KEY    = os.getenv("OPEN_ROUTER_KEY", "")
 
 # ── Startup jobs ─────────────────────────────────────────────────────────────
 SKILL_BACKFILL_ON_STARTUP = os.getenv(
-    "SKILL_BACKFILL_ON_STARTUP", "true"
+    "SKILL_BACKFILL_ON_STARTUP", "false"
 ).lower() in {"1", "true", "yes"}
 
 # ── Filesystem paths ────────────────────────────────────────────────────────

@@ -95,6 +95,9 @@ class ChatEngine:
     # Maximum tool call iterations to prevent infinite loops
     MAX_TOOL_ITERATIONS = 10
 
+    # Slash commands that trigger multi-agent orchestration
+    SLASH_COMMANDS = {"/roundtable", "/swarm"}
+
     def __init__(
         self,
         config: EngineConfig,
@@ -105,7 +108,23 @@ class ChatEngine:
         self.config = config
         self.gateway = gateway
         self.tools = tool_registry
-        self._db_factory = db_session_factory  # async sessionmaker
+        self._db_factory = db_session_factory
+        # Optional multi-agent orchestration (set by main.py after init)
+        self._roundtable: Any | None = None
+        self._swarm: Any | None = None
+        self._escalation_router: Any | None = None
+
+    def set_roundtable(self, roundtable: Any) -> None:
+        """Inject Roundtable instance for /roundtable slash command."""
+        self._roundtable = roundtable
+
+    def set_swarm(self, swarm: Any) -> None:
+        """Inject SwarmOrchestrator instance for /swarm slash command."""
+        self._swarm = swarm
+
+    def set_escalation_router(self, router: Any) -> None:
+        """Inject EngineRouter for auto-escalation detection."""
+        self._escalation_router = router  # async sessionmaker
 
     async def create_session(
         self,
@@ -293,6 +312,13 @@ class ChatEngine:
             )
             db.add(user_msg)
             await db.flush()
+
+            # ── 2b. Slash command: /roundtable or /swarm ──────────────────
+            slash_result = await self._handle_slash_command(
+                db, session, sid, content, overall_start
+            )
+            if slash_result is not None:
+                return slash_result
 
             # ── 3. Build conversation context ─────────────────────────────
             if context_messages is not None:
@@ -535,6 +561,150 @@ class ChatEngine:
         messages.append({"role": "user", "content": current_content})
 
         return messages
+
+    # ── Slash commands & auto-escalation ──────────────────────────────
+
+    async def _handle_slash_command(
+        self,
+        db,
+        session,
+        sid: uuid.UUID,
+        content: str,
+        overall_start: float,
+    ) -> ChatResponse | None:
+        """
+        Detect and handle /roundtable or /swarm slash commands.
+
+        Returns a ChatResponse if a command was handled, None otherwise.
+
+        Usage in chat:
+            /roundtable <topic> — start a roundtable with available agents
+            /swarm <topic>      — start a swarm decision with available agents
+        """
+        stripped = content.strip()
+        lower = stripped.lower()
+
+        orchestrator = None
+        mode = None
+
+        if lower.startswith("/roundtable"):
+            if self._roundtable is None:
+                return None  # Fall through to normal LLM flow
+            orchestrator = self._roundtable
+            mode = "roundtable"
+            topic = stripped[len("/roundtable"):].strip()
+        elif lower.startswith("/swarm"):
+            if self._swarm is None:
+                return None
+            orchestrator = self._swarm
+            mode = "swarm"
+            topic = stripped[len("/swarm"):].strip()
+        else:
+            return None  # Not a slash command
+
+        if not topic:
+            return self._make_slash_response(
+                sid, overall_start,
+                f"Usage: /{mode} <topic>\n\n"
+                f"Example: /{mode} Should we migrate to microservices?",
+            )
+
+        # Auto-select agents: get top 3-4 available agents by pheromone score
+        agent_ids = await self._get_auto_agents(db, session.agent_id)
+        if len(agent_ids) < 2:
+            return self._make_slash_response(
+                sid, overall_start,
+                f"⚠️ Need at least 2 active agents for /{mode}. "
+                f"Only found: {agent_ids or 'none'}",
+            )
+
+        try:
+            if mode == "roundtable":
+                result = await orchestrator.discuss(
+                    topic=topic,
+                    agent_ids=agent_ids,
+                    rounds=3,
+                    synthesizer_id=session.agent_id or "main",
+                )
+                content_out = (
+                    f"## 🔄 Roundtable: {topic}\n\n"
+                    f"**Participants:** {', '.join(result.participants)}\n"
+                    f"**Rounds:** {result.rounds} | "
+                    f"**Turns:** {result.turn_count} | "
+                    f"**Duration:** {result.total_duration_ms}ms\n\n"
+                    f"### Synthesis\n{result.synthesis}\n\n"
+                    f"---\n*Session: {result.session_id}*"
+                )
+            else:  # swarm
+                result = await orchestrator.execute(
+                    topic=topic,
+                    agent_ids=agent_ids,
+                )
+                content_out = (
+                    f"## 🐝 Swarm Decision: {topic}\n\n"
+                    f"**Participants:** {', '.join(result.participants)}\n"
+                    f"**Iterations:** {result.iterations} | "
+                    f"**Votes:** {result.vote_count} | "
+                    f"**Consensus:** {result.consensus_score:.0%}\n"
+                    f"**Converged:** {'✅ Yes' if result.converged else '❌ No'}\n\n"
+                    f"### Consensus\n{result.consensus}\n\n"
+                    f"---\n*Session: {result.session_id}*"
+                )
+
+            return self._make_slash_response(sid, overall_start, content_out)
+
+        except Exception as e:
+            logger.error("/%s command failed: %s", mode, e)
+            return self._make_slash_response(
+                sid, overall_start,
+                f"⚠️ /{mode} failed: {e}",
+            )
+
+    async def _get_auto_agents(
+        self, db, current_agent_id: str
+    ) -> list[str]:
+        """
+        Auto-select agents for a roundtable/swarm based on pheromone score.
+
+        Returns top 4 enabled agents (including current agent).
+        """
+        from db.models import EngineAgentState
+
+        result = await db.execute(
+            select(EngineAgentState.agent_id)
+            .where(
+                EngineAgentState.enabled == True,
+                EngineAgentState.status != "disabled",
+                EngineAgentState.status != "terminated",
+            )
+            .order_by(EngineAgentState.pheromone_score.desc())
+            .limit(6)
+        )
+        candidates = [r[0] for r in result]
+
+        # Ensure current agent is included
+        if current_agent_id and current_agent_id not in candidates:
+            candidates.insert(0, current_agent_id)
+
+        # Return top 4
+        return candidates[:4]
+
+    def _make_slash_response(
+        self,
+        sid: uuid.UUID,
+        overall_start: float,
+        content: str,
+    ) -> ChatResponse:
+        """Build a ChatResponse for slash command output."""
+        elapsed_ms = int((time.monotonic() - overall_start) * 1000)
+        return ChatResponse(
+            message_id=str(uuid.uuid4()),
+            session_id=str(sid),
+            content=content,
+            model="orchestration",
+            latency_ms=elapsed_ms,
+            finish_reason="slash_command",
+        )
 
     @staticmethod
     def _generate_title(first_message: str) -> str:

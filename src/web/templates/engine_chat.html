@@ -1498,6 +1498,7 @@
 
         if (ws && ws.readyState <= 1) {
             ws.close();
+            ws = null;
         }
 
         sessionId = sid;
@@ -1510,9 +1511,34 @@
             el.classList.toggle('active', el.dataset.id === sid);
         });
 
-        const item = document.querySelector(`.session-item[data-id="${sid}"]`);
-        if (item) {
-            document.getElementById('chatTitle').textContent = item.dataset.title || 'Chat';
+        // Load session detail to restore agent + model + title
+        try {
+            const detailResp = await fetch(`/api/engine/sessions/${sid}`);
+            if (detailResp.ok) {
+                const detail = await detailResp.json();
+                document.getElementById('chatTitle').textContent = detail.title || 'Untitled';
+                // Restore agent selector
+                const agentSel = document.getElementById('agentSelector');
+                if (detail.agent_id && agentSel.querySelector(`option[value="${detail.agent_id}"]`)) {
+                    agentSel.value = detail.agent_id;
+                }
+                // Restore model selector
+                if (detail.model) {
+                    currentModel = detail.model;
+                    const modelSel = document.getElementById('modelSelector');
+                    if (modelSel.querySelector(`option[value="${detail.model}"]`)) {
+                        modelSel.value = detail.model;
+                    }
+                    updateModelInfo();
+                }
+            } else {
+                const item = document.querySelector(`.session-item[data-id="${sid}"]`);
+                document.getElementById('chatTitle').textContent = (item && item.dataset.title) || 'Chat';
+            }
+        } catch(e) {
+            console.warn('Failed to load session detail:', e);
+            const item = document.querySelector(`.session-item[data-id="${sid}"]`);
+            document.getElementById('chatTitle').textContent = (item && item.dataset.title) || 'Chat';
         }
 
         await loadSession(sid);
@@ -1542,8 +1568,24 @@
         document.getElementById('chatInput').focus();
     }
 
+    async function archiveSession(sid) {
+        try {
+            await fetch(`/api/engine/sessions/${sid}/archive`, { method: 'POST' });
+            // Update local state
+            const sess = allSessions.find(s => s.id === sid);
+            if (sess) sess.status = 'archived';
+            filterSessions();
+
+            if (sid === sessionId) {
+                await createNewSession();
+            }
+        } catch(e) {
+            alert('Failed to archive session: ' + e.message);
+        }
+    }
+
     async function deleteSession(sid) {
-        if (!confirm('Delete this session? This cannot be undone.')) return;
+        if (!confirm('Permanently delete this session? Use archive to keep the data.')) return;
 
         try {
             await fetch(`/api/engine/sessions/${sid}`, { method: 'DELETE' });
@@ -1770,6 +1812,9 @@
         streamThinking = '';
         document.getElementById('sendBtn').disabled = false;
         document.getElementById('chatInput').focus();
+
+        // Auto-generate title after first assistant response
+        autoGenerateTitle();
     }
 
     // ── Messages ────────────────────────────────────────────────
@@ -1922,10 +1967,12 @@
 
     async function loadSession(sid) {
         try {
-            const resp = await fetch(`/api/engine/chat/sessions/${sid}/messages`);
+            // Use the NativeSessionManager endpoint (direct DB) — never 404s for valid sessions
+            const resp = await fetch(`/api/engine/sessions/${sid}/messages?limit=200`);
             if (resp.ok) {
                 const data = await resp.json();
-                const messages = data.messages || data || [];
+                // engine_sessions returns list directly, engine_chat wraps in {messages:[]}
+                const messages = Array.isArray(data) ? data : (data.messages || []);
                 if (messages.length) {
                     document.getElementById('chatEmpty').style.display = 'none';
                 }
@@ -1936,6 +1983,8 @@
                         model: m.model,
                     });
                 });
+            } else {
+                console.warn(`Messages load returned ${resp.status} for session ${sid}`);
             }
             connectWS();
         } catch(e) {

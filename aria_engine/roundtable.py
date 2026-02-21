@@ -134,6 +134,7 @@ class Roundtable:
         synthesizer_id: str = "main",
         agent_timeout: int = DEFAULT_AGENT_TIMEOUT,
         total_timeout: int = DEFAULT_TOTAL_TIMEOUT,
+        on_turn: Any = None,  # Optional async callback(RoundtableTurn)
     ) -> RoundtableResult:
         """
         Run a multi-round collaborative discussion.
@@ -148,6 +149,8 @@ class Roundtable:
             synthesizer_id: Agent to produce the final synthesis.
             agent_timeout: Seconds per agent response (default 60).
             total_timeout: Max total seconds (default 300).
+            on_turn: Optional async callback invoked after each agent turn
+                     (for WebSocket streaming).
 
         Returns:
             RoundtableResult with all turns and final synthesis.
@@ -202,6 +205,14 @@ class Roundtable:
                 round_timeout=round_timeout,
             )
             turns.extend(round_turns)
+
+            # Invoke per-turn callback for WS streaming
+            if on_turn is not None:
+                for t in round_turns:
+                    try:
+                        await on_turn(t)
+                    except Exception:
+                        pass
 
         # Synthesis round
         elapsed = time.monotonic() - start

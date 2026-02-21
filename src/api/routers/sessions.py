@@ -8,10 +8,10 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy import delete, func, select, text, update
+from sqlalchemy import delete, func, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.models import AgentSession, ModelUsage
+from db.models import AgentSession, EngineChatSession, ModelUsage
 from deps import get_db, get_litellm_db
 from pagination import paginate_query, build_paginated_response
 
@@ -32,22 +32,27 @@ async def get_agent_sessions(
     include_cron_events: bool = False,
     db: AsyncSession = Depends(get_db),
 ):
-    """List chat sessions with filtering, search, and pagination."""
-    base = select(AgentSession).order_by(AgentSession.started_at.desc())
+    """List engine chat sessions with filtering, search, and pagination."""
+    base = select(EngineChatSession).order_by(EngineChatSession.updated_at.desc())
 
     if not include_runtime_events:
-        base = base.where(AgentSession.session_type != "skill_exec")
+        base = base.where(EngineChatSession.session_type != "skill_exec")
     if not include_cron_events:
-        base = base.where(AgentSession.session_type != "cron")
+        base = base.where(EngineChatSession.session_type != "cron")
     if status:
-        base = base.where(AgentSession.status == status)
+        base = base.where(EngineChatSession.status == status)
     if agent_id:
-        base = base.where(AgentSession.agent_id == agent_id)
+        base = base.where(EngineChatSession.agent_id == agent_id)
     if session_type:
-        base = base.where(AgentSession.session_type == session_type)
+        base = base.where(EngineChatSession.session_type == session_type)
     if search:
         pattern = f"%{search}%"
-        base = base.where(AgentSession.agent_id.ilike(pattern))
+        base = base.where(
+            or_(
+                EngineChatSession.agent_id.ilike(pattern),
+                EngineChatSession.title.ilike(pattern),
+            )
+        )
 
     count_stmt = select(func.count()).select_from(base.subquery())
     total = (await db.execute(count_stmt)).scalar() or 0
@@ -55,7 +60,7 @@ async def get_agent_sessions(
     stmt, _ = paginate_query(base, page, limit)
     rows = (await db.execute(stmt)).scalars().all()
 
-    items = [_session_to_dict(s) for s in rows]
+    items = [_engine_session_to_dict(s) for s in rows]
     return build_paginated_response(items, total, page, limit)
 
 
@@ -73,31 +78,31 @@ async def get_sessions_hourly(
     """Hourly session counts grouped by agent for time-series charts."""
     bounded_hours = max(1, min(int(hours), 168))
     cutoff = datetime.now(timezone.utc) - timedelta(hours=bounded_hours)
-    hour_bucket = func.date_trunc("hour", AgentSession.started_at).label("hour")
+    hour_bucket = func.date_trunc("hour", EngineChatSession.created_at).label("hour")
 
     hourly_stmt = (
         select(
             hour_bucket,
-            AgentSession.agent_id,
-            func.count(AgentSession.id).label("count"),
+            EngineChatSession.agent_id,
+            func.count(EngineChatSession.id).label("count"),
         )
-        .where(AgentSession.started_at.is_not(None))
-        .where(AgentSession.started_at >= cutoff)
+        .where(EngineChatSession.created_at.is_not(None))
+        .where(EngineChatSession.created_at >= cutoff)
     )
 
     if not include_runtime_events:
-        hourly_stmt = hourly_stmt.where(AgentSession.session_type != "skill_exec")
+        hourly_stmt = hourly_stmt.where(EngineChatSession.session_type != "skill_exec")
     if not include_cron_events:
-        hourly_stmt = hourly_stmt.where(AgentSession.session_type != "cron")
+        hourly_stmt = hourly_stmt.where(EngineChatSession.session_type != "cron")
     if status:
-        hourly_stmt = hourly_stmt.where(AgentSession.status == status)
+        hourly_stmt = hourly_stmt.where(EngineChatSession.status == status)
     if agent_id:
-        hourly_stmt = hourly_stmt.where(AgentSession.agent_id == agent_id)
+        hourly_stmt = hourly_stmt.where(EngineChatSession.agent_id == agent_id)
 
     result = await db.execute(
         hourly_stmt
-        .group_by(hour_bucket, AgentSession.agent_id)
-        .order_by(hour_bucket.asc(), AgentSession.agent_id.asc())
+        .group_by(hour_bucket, EngineChatSession.agent_id)
+        .order_by(hour_bucket.asc(), EngineChatSession.agent_id.asc())
     )
 
     items = [
@@ -211,6 +216,27 @@ async def delete_agent_session(session_id: str, db: AsyncSession = Depends(get_d
 
 # -- Session stats -----------------------------------------------------------
 
+
+def _engine_filters(include_cron=False, include_runtime=False, status=None, agent_id=None):
+    """Build a list of WHERE clauses for EngineChatSession queries."""
+    f = []
+    if not include_runtime:
+        f.append(EngineChatSession.session_type != "skill_exec")
+    if not include_cron:
+        f.append(EngineChatSession.session_type != "cron")
+    if status:
+        f.append(EngineChatSession.status == status)
+    if agent_id:
+        f.append(EngineChatSession.agent_id == agent_id)
+    return f
+
+
+def _apply(stmt, filters):
+    for clause in filters:
+        stmt = stmt.where(clause)
+    return stmt
+
+
 @router.get("/sessions/stats")
 async def get_session_stats(
     include_runtime_events: bool = False,
@@ -220,135 +246,88 @@ async def get_session_stats(
     db: AsyncSession = Depends(get_db),
     litellm_db: AsyncSession = Depends(get_litellm_db),
 ):
-    """Session statistics with LiteLLM enrichment."""
-    session_filters = []
-    if not include_runtime_events:
-        session_filters.append(AgentSession.session_type != "skill_exec")
-    if not include_cron_events:
-        session_filters.append(AgentSession.session_type != "cron")
-    if status:
-        session_filters.append(AgentSession.status == status)
-    if agent_id:
-        session_filters.append(AgentSession.agent_id == agent_id)
+    """Session statistics from engine chat sessions + LiteLLM."""
+    filters = _engine_filters(include_cron_events, include_runtime_events, status, agent_id)
 
-    total_stmt = select(func.count(AgentSession.id))
-    if session_filters:
-        total_stmt = total_stmt.where(*session_filters)
-    total = (await db.execute(total_stmt)).scalar() or 0
+    total = (await db.execute(
+        _apply(select(func.count(EngineChatSession.id)), filters)
+    )).scalar() or 0
 
-    active_stmt = select(func.count(AgentSession.id)).where(AgentSession.status == "active")
-    if session_filters:
-        active_stmt = active_stmt.where(*session_filters)
-    active = (await db.execute(active_stmt)).scalar() or 0
-
-    skill_tokens = (
-        await db.execute(
-            select(func.coalesce(func.sum(ModelUsage.input_tokens + ModelUsage.output_tokens), 0))
+    active = (await db.execute(
+        _apply(
+            select(func.count(EngineChatSession.id)).where(EngineChatSession.status == "active"),
+            filters,
         )
-    ).scalar() or 0
-    skill_cost = (
-        await db.execute(select(func.coalesce(func.sum(ModelUsage.cost_usd), 0)))
-    ).scalar() or 0
+    )).scalar() or 0
 
-    llm_totals = {"tokens": 0, "cost": 0.0, "rows": 0}
+    agg = (await db.execute(
+        _apply(
+            select(
+                func.coalesce(func.sum(EngineChatSession.total_tokens), 0).label("tokens"),
+                func.coalesce(func.sum(EngineChatSession.total_cost), 0).label("cost"),
+            ),
+            filters,
+        )
+    )).one()
+    engine_tokens, engine_cost = int(agg.tokens), float(agg.cost)
+
+    # LiteLLM aggregates
+    llm = {"rows": 0, "tokens": 0, "cost": 0.0}
     try:
-        llm_result = await litellm_db.execute(
-            text(
-                'SELECT COUNT(*) AS rows, '
-                'COALESCE(SUM(total_tokens), 0) AS tokens, '
-                'COALESCE(SUM(spend), 0) AS cost '
-                'FROM "LiteLLM_SpendLogs"'
-            )
-        )
-        row = llm_result.mappings().one()
-        llm_totals = {
-            "rows": int(row.get("rows") or 0),
-            "tokens": int(row.get("tokens") or 0),
-            "cost": float(row.get("cost") or 0),
-        }
+        r = (await litellm_db.execute(text(
+            'SELECT COUNT(*) AS rows, COALESCE(SUM(total_tokens),0) AS tokens, '
+            'COALESCE(SUM(spend),0) AS cost FROM "LiteLLM_SpendLogs"'
+        ))).mappings().one()
+        llm = {"rows": int(r["rows"]), "tokens": int(r["tokens"]), "cost": float(r["cost"])}
     except Exception:
         pass
 
-    total_tokens = int(skill_tokens) + int(llm_totals["tokens"])
-    total_cost = float(skill_cost) + float(llm_totals["cost"])
-
-    by_agent_stmt = select(
-        AgentSession.agent_id,
-        func.count(AgentSession.id).label("sessions"),
+    # By agent (sessions + tokens + cost in one query)
+    by_agent_result = await db.execute(
+        _apply(
+            select(
+                EngineChatSession.agent_id,
+                func.count(EngineChatSession.id).label("sessions"),
+                func.coalesce(func.sum(EngineChatSession.total_tokens), 0).label("tokens"),
+                func.coalesce(func.sum(EngineChatSession.total_cost), 0).label("cost"),
+            ),
+            filters,
+        ).group_by(EngineChatSession.agent_id)
+        .order_by(func.count(EngineChatSession.id).desc())
     )
-    if session_filters:
-        by_agent_stmt = by_agent_stmt.where(*session_filters)
-    by_agent_stmt = by_agent_stmt.group_by(AgentSession.agent_id).order_by(
-        func.count(AgentSession.id).desc()
-    )
-    by_agent_result = await db.execute(by_agent_stmt)
-    by_agent_map = {
-        str(r[0]): {"agent_id": str(r[0]), "sessions": int(r[1] or 0), "tokens": 0, "cost": 0.0}
+    by_agent = [
+        {"agent_id": r[0], "sessions": int(r[1]), "tokens": int(r[2]), "cost": float(r[3])}
         for r in by_agent_result.all()
-    }
+    ]
 
-    usage_stmt = (
-        select(
-            AgentSession.agent_id,
-            func.coalesce(func.sum(ModelUsage.input_tokens + ModelUsage.output_tokens), 0).label("tokens"),
-            func.coalesce(func.sum(ModelUsage.cost_usd), 0).label("cost"),
-        )
-        .select_from(ModelUsage)
-        .join(AgentSession, AgentSession.id == ModelUsage.session_id)
+    by_status_result = await db.execute(
+        _apply(
+            select(EngineChatSession.status, func.count(EngineChatSession.id)),
+            filters,
+        ).group_by(EngineChatSession.status)
     )
-    if session_filters:
-        usage_stmt = usage_stmt.where(*session_filters)
-    usage_stmt = usage_stmt.group_by(AgentSession.agent_id)
-    by_agent_skill_usage = await db.execute(usage_stmt)
-    for r in by_agent_skill_usage.all():
-        agent = str(r[0] or "unknown")
-        if agent == "unknown":
-            continue
-        if agent not in by_agent_map:
-            by_agent_map[agent] = {"agent_id": agent, "sessions": 0, "tokens": 0, "cost": 0.0}
-        by_agent_map[agent]["tokens"] += int(r[1] or 0)
-        by_agent_map[agent]["cost"] += float(r[2] or 0)
-
-    by_agent = sorted(
-        by_agent_map.values(),
-        key=lambda entry: entry["sessions"],
-        reverse=True,
-    )
-
-    by_status_stmt = select(
-        AgentSession.status,
-        func.count(AgentSession.id).label("count"),
-    )
-    if session_filters:
-        by_status_stmt = by_status_stmt.where(*session_filters)
-    by_status_result = await db.execute(by_status_stmt.group_by(AgentSession.status))
     by_status = [{"status": r[0], "count": r[1]} for r in by_status_result.all()]
 
-    by_type_stmt = select(
-        AgentSession.session_type,
-        func.count(AgentSession.id).label("count"),
+    by_type_result = await db.execute(
+        _apply(
+            select(EngineChatSession.session_type, func.count(EngineChatSession.id)),
+            filters,
+        ).group_by(EngineChatSession.session_type)
     )
-    if session_filters:
-        by_type_stmt = by_type_stmt.where(*session_filters)
-    by_type_result = await db.execute(by_type_stmt.group_by(AgentSession.session_type))
     by_type = [{"type": r[0], "count": r[1]} for r in by_type_result.all()]
 
     return {
         "total_sessions": total,
         "active_sessions": active,
-        "total_tokens": total_tokens,
-        "total_cost": float(total_cost),
+        "total_tokens": engine_tokens + llm["tokens"],
+        "total_cost": engine_cost + llm["cost"],
         "by_agent": by_agent,
         "by_status": by_status,
         "by_type": by_type,
-        "litellm": {
-            "sessions": llm_totals["rows"],
-            "tokens": llm_totals["tokens"],
-            "cost": llm_totals["cost"],
-        },
+        "litellm": llm,
         "sources": {
-            "skills": {"tokens": int(skill_tokens), "cost": float(skill_cost)},
-            "litellm": {"tokens": int(llm_totals["tokens"]), "cost": float(llm_totals["cost"])},
+            "engine": {"tokens": engine_tokens, "cost": engine_cost},
+            "litellm": {"tokens": llm["tokens"], "cost": llm["cost"]},
         },
     }
 
@@ -376,6 +355,24 @@ def _session_to_dict(s):
         "messages_count": s.messages_count,
         "tokens_used": s.tokens_used,
         "cost_usd": float(s.cost_usd) if s.cost_usd else 0,
+        "status": s.status,
+        "metadata": s.metadata_json or {},
+    }
+
+
+def _engine_session_to_dict(s):
+    """Convert an EngineChatSession ORM object to a JSON-serializable dict."""
+    return {
+        "id": str(s.id),
+        "agent_id": s.agent_id,
+        "session_type": s.session_type,
+        "title": s.title,
+        "model": s.model,
+        "started_at": s.created_at.isoformat() if s.created_at else None,
+        "ended_at": s.ended_at.isoformat() if s.ended_at else None,
+        "messages_count": s.message_count or 0,
+        "tokens_used": s.total_tokens or 0,
+        "cost_usd": float(s.total_cost) if s.total_cost else 0,
         "status": s.status,
         "metadata": s.metadata_json or {},
     }

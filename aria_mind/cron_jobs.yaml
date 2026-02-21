@@ -133,6 +133,22 @@ jobs:
 
   # ── DB Maintenance (weekly, off-peak) ───────────────────────────
 
+  - name: session_cleanup
+    cron: "0 0 5 * * *"
+    text: "Session auto-cleanup: POST /api/engine/sessions/cleanup?days=30&dry_run=false via api_client. Log pruned count to activity_log via api_client activity action='cron_execution' with details {'job':'session_cleanup'}."
+    agent: main
+    session: isolated
+    delivery: none
+    best_effort_deliver: true
+
+  - name: roundtable_architecture_review
+    cron: "0 0 3 * * 3"
+    text: "Weekly architecture roundtable: Use /roundtable command or POST /api/engine/roundtable to start a 3-round discussion on 'Review this week's architecture decisions and technical debt priorities'. Select top 4 agents by pheromone score. Log result to activity_log via api_client activity action='cron_execution' with details {'job':'roundtable_architecture_review','estimated_tokens':2000}."
+    agent: main
+    session: isolated
+    delivery: none
+    best_effort_deliver: true
+
   - name: memory_consolidation
     cron: "0 0 5 * * 0"
     agent: main

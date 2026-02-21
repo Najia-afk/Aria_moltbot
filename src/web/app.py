@@ -273,6 +273,13 @@ def create_app():
     # ============================================
     # Engine Routes (native chat UI)
     # ============================================
+    @app.route('/roundtable')
+    @app.route('/roundtable/')
+    @app.route('/roundtable/<session_id>')
+    def roundtable(session_id=None):
+        """Roundtable — multi-agent discussion visualization."""
+        return render_template('engine_roundtable.html', session_id=session_id)
+
     @app.route('/chat/')
     @app.route('/chat/<session_id>')
     def chat(session_id=None):

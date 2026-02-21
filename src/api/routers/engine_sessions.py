@@ -304,6 +304,25 @@ async def end_session(session_id: str):
     return {"status": "ended", "session_id": session_id}
 
 
+@router.post("/cleanup")
+async def cleanup_sessions(
+    days: int = Query(default=30, ge=1, le=365, description="Prune sessions inactive for this many days"),
+    dry_run: bool = Query(default=True, description="If true, only count — don't delete"),
+):
+    """
+    Prune stale sessions older than N days (S-67 session auto-cleanup).
+
+    Default is dry_run=true for safety. Set dry_run=false to actually remove.
+    """
+    mgr = await _get_manager()
+    result = await mgr.prune_old_sessions(days=days, dry_run=dry_run)
+    logger.info(
+        "Session cleanup: %s (days=%d, dry_run=%s)",
+        result, days, dry_run,
+    )
+    return result
+
+
 ### SQL indexes for performance (add via Alembic migration)
 _INDEXES_SQL = """
 -- Session listing performance

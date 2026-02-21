@@ -98,7 +98,30 @@ async def lifespan(app: FastAPI):
             context_manager=context_manager,
             prompt_assembler=prompt_assembler,
         )
-        print("✅ Aria Engine initialized (chat + streaming + agents)")
+        # Initialize Roundtable + Swarm engines (multi-agent discussions)
+        try:
+            from aria_engine.roundtable import Roundtable
+            from aria_engine.agent_pool import AgentPool
+            from aria_engine.routing import EngineRouter
+            from aria_engine.swarm import SwarmOrchestrator
+
+            _rt_pool = AgentPool(engine_cfg, async_engine)
+            _rt_router = EngineRouter(async_engine)
+            _roundtable = Roundtable(async_engine, _rt_pool, _rt_router)
+            _swarm = SwarmOrchestrator(async_engine, _rt_pool, _rt_router)
+            configure_roundtable(_roundtable, async_engine)
+            configure_swarm(_swarm)
+            print("✅ Roundtable + Swarm engines initialized")
+
+            # Inject orchestrators into ChatEngine for /roundtable & /swarm commands
+            chat_engine.set_roundtable(_roundtable)
+            chat_engine.set_swarm(_swarm)
+            chat_engine.set_escalation_router(_rt_router)
+            print("✅ Slash commands wired (chat → roundtable/swarm)")
+        except Exception as rte:
+            print(f"⚠️  Roundtable/Swarm init failed (non-fatal): {rte}")
+
+        print("✅ Aria Engine initialized (chat + streaming + agents + roundtable + swarm)")
     except Exception as e:
         print(f"⚠️  Engine init failed (chat will be degraded): {e}")
 
@@ -178,15 +201,38 @@ async def lifespan(app: FastAPI):
     scorer_task = asyncio.create_task(run_autoscorer_loop())
     print("🎯 Sentiment auto-scorer background task launched")
 
+    # S-67: Background session auto-cleanup (every 6 hours)
+    async def _session_cleanup_loop():
+        """Prune stale sessions (>30 days) every 6 hours."""
+        from aria_engine.session_manager import NativeSessionManager
+        mgr = NativeSessionManager(async_engine)
+        while True:
+            try:
+                await asyncio.sleep(6 * 3600)  # 6 hours
+                result = await mgr.prune_old_sessions(days=30, dry_run=False)
+                if result["pruned_count"] > 0:
+                    _logger.info(
+                        "Session cleanup: pruned %d sessions (%d messages)",
+                        result["pruned_count"], result["message_count"],
+                    )
+            except asyncio.CancelledError:
+                break
+            except Exception as exc:
+                _logger.warning("Session cleanup error: %s", exc)
+
+    cleanup_task = asyncio.create_task(_session_cleanup_loop())
+    print("🧹 Session auto-cleanup background task launched (every 6h, >30d)")
+
     yield
 
-    # Graceful shutdown of auto-scorer
-    scorer_task.cancel()
-    try:
-        await scorer_task
-    except asyncio.CancelledError:
-        pass
-    print("🛑 Sentiment auto-scorer stopped")
+    # Graceful shutdown
+    for task in (scorer_task, cleanup_task):
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+    print("🛑 Background tasks stopped (auto-scorer + session-cleanup)")
 
     await async_engine.dispose()
     print("🔌 Database engine disposed")
@@ -366,6 +412,7 @@ try:
     from .routers.engine_agents import router as engine_agents_router
     from .routers.engine_agent_metrics import router as engine_agent_metrics_router
     from .routers.agents_crud import router as agents_crud_router
+    from .routers.engine_roundtable import router as engine_roundtable_router, configure_roundtable, configure_swarm, register_roundtable
     from .routers.engine_chat import register_engine_chat, configure_engine
 except ImportError:
     from routers.health import router as health_router
@@ -395,6 +442,7 @@ except ImportError:
     from routers.engine_agents import router as engine_agents_router
     from routers.engine_agent_metrics import router as engine_agent_metrics_router
     from routers.agents_crud import router as agents_crud_router
+    from routers.engine_roundtable import router as engine_roundtable_router, configure_roundtable, configure_swarm, register_roundtable
     from routers.engine_chat import register_engine_chat, configure_engine
 
 app.include_router(health_router)
@@ -424,6 +472,9 @@ app.include_router(engine_sessions_router)
 app.include_router(engine_agent_metrics_router)
 app.include_router(engine_agents_router)
 app.include_router(agents_crud_router)
+
+# Engine Roundtable + Swarm — REST + WebSocket
+register_roundtable(app)
 
 # Engine Chat — REST + WebSocket
 register_engine_chat(app)

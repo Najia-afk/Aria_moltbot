@@ -60,6 +60,23 @@ SPECIALTY_PATTERNS: dict[str, re.Pattern] = {
     ),
 }
 
+# Patterns that suggest a question benefits from multiple perspectives
+ESCALATION_PATTERNS: list[tuple[re.Pattern, float]] = [
+    # Direct multi-agent requests
+    (re.compile(r"\b(roundtable|swarm|discuss|debate|discuss|brainstorm)\b", re.I), 0.9),
+    # Comparative / evaluative questions
+    (re.compile(r"\b(compare|versus|vs\.?|tradeoff|trade-off|pros and cons)\b", re.I), 0.7),
+    # Strategic / architectural decisions
+    (re.compile(r"\b(should we|strategy|architect|rewrite|refactor|migrate|redesign)\b", re.I), 0.6),
+    # Cross-domain questions (touches multiple specialties)
+    (re.compile(r"\b(also|both|and also|end-to-end|full.?stack|holistic)\b", re.I), 0.3),
+    # Opinion-seeking
+    (re.compile(r"\b(what do you think|your opinion|recommend|advise|suggest)\b", re.I), 0.4),
+]
+
+# Minimum escalation score to recommend multi-agent
+ESCALATION_THRESHOLD = 0.6
+
 
 def compute_specialty_match(
     message: str,
@@ -488,3 +505,78 @@ class EngineRouter:
             })
 
         return table
+
+    # ── Auto-escalation detection ────────────────────────────────────
+
+    def assess_escalation(self, message: str) -> dict[str, Any]:
+        """
+        Assess whether a message should be escalated to multi-agent
+        orchestration (roundtable or swarm).
+
+        Uses keyword pattern matching against ESCALATION_PATTERNS.
+        Returns a dict with:
+          - should_escalate (bool): whether escalation is recommended
+          - score (float): 0.0-1.0 escalation confidence
+          - mode (str): "roundtable" or "swarm" recommendation
+          - reason (str): human-readable explanation
+          - matching_domains (list[str]): which specialty domains matched
+
+        The score is NOT a hard gate — the caller decides whether to act.
+        """
+        score = 0.0
+        reasons: list[str] = []
+
+        # Check escalation patterns
+        for pattern, weight in ESCALATION_PATTERNS:
+            matches = pattern.findall(message)
+            if matches:
+                score += weight
+                reasons.append(
+                    f"pattern '{matches[0]}' (+{weight:.1f})"
+                )
+
+        # Check how many specialty domains the message touches
+        matching_domains: list[str] = []
+        for domain, pattern in SPECIALTY_PATTERNS.items():
+            if pattern.search(message):
+                matching_domains.append(domain)
+
+        # Multiple domains → more likely to benefit from multiple agents
+        if len(matching_domains) >= 2:
+            domain_bonus = min(len(matching_domains) * 0.15, 0.4)
+            score += domain_bonus
+            reasons.append(
+                f"cross-domain ({', '.join(matching_domains)}) (+{domain_bonus:.1f})"
+            )
+
+        # Message length heuristic: longer questions tend to be more complex
+        word_count = len(message.split())
+        if word_count > 50:
+            length_bonus = min((word_count - 50) * 0.005, 0.2)
+            score += length_bonus
+
+        # Cap at 1.0
+        score = min(score, 1.0)
+
+        # Recommend mode: swarm for decisions, roundtable for analysis
+        decision_keywords = re.compile(
+            r"\b(should|decide|choose|pick|vote|yes or no)\b", re.I
+        )
+        mode = (
+            "swarm" if decision_keywords.search(message) else "roundtable"
+        )
+
+        should_escalate = score >= ESCALATION_THRESHOLD
+
+        logger.debug(
+            "Escalation assessment: score=%.3f escalate=%s mode=%s reasons=%s",
+            score, should_escalate, mode, reasons,
+        )
+
+        return {
+            "should_escalate": should_escalate,
+            "score": round(score, 3),
+            "mode": mode,
+            "reason": "; ".join(reasons) if reasons else "no escalation signals",
+            "matching_domains": matching_domains,
+        }
