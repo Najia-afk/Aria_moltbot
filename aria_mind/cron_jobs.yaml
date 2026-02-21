@@ -30,6 +30,7 @@ jobs:
     delivery: none
 
   - name: moltbook_check
+    enabled: false
     every: "60m"
     text: "moltbook_check: If 60+ min since last_check in state file, check feed (5 posts), reply mentions, engage on relevant posts. Update state. Log via api_client. Skip email checks. Token target: 100."
     agent: aria
@@ -46,6 +47,7 @@ jobs:
   #   delivery: none
 
   - name: health_check
+    enabled: false
     cron: "0 0 0 * * *"
     text: "Run health check on all systems: exec python3 /root/.openclaw/workspace/skills/run_skill.py health health_check '{}', exec python3 /root/.openclaw/workspace/skills/run_skill.py api_client health_check '{}'. If any check fails, log an alert via api_client. If all pass, silently continue."
     agent: aria
@@ -55,6 +57,7 @@ jobs:
   # ── Social (delegated to aria-talk by main) ─────────────────────
 
   - name: social_post
+    enabled: false
     cron: "0 0 18 * * *"
     text: "Delegate to aria-talk: Post a social update to available social platforms. Read HEARTBEAT.md social_post section. Use the social skill to route content to registered platforms. Quality over quantity. Only post if something genuinely valuable to share. Save drafts to aria_memories/moltbook/drafts/ instead of auto-posting."
     agent: aria

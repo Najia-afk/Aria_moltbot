@@ -78,6 +78,7 @@ class RoundtableSummary(BaseModel):
     """Summary for list endpoints."""
     session_id: str
     session_type: str | None = None
+    source: str | None = None
     title: str | None = None
     participants: list[str] = Field(default_factory=list)
     message_count: int = 0
@@ -355,6 +356,7 @@ async def list_roundtables(
                     RoundtableSummary(
                         session_id=r["session_id"],
                         session_type="roundtable",
+                        source="working",
                         title=r.get("title"),
                         participants=r.get("participants", []),
                         message_count=r.get("message_count", 0),
@@ -401,13 +403,14 @@ async def list_roundtables(
             page_rows = merged_rows[offset: offset + page_size]
 
             items: list[RoundtableSummary] = []
-            for row, _is_archived in page_rows:
+            for row, is_archived in page_rows:
                 metadata = row.metadata_json or {}
                 participants = metadata.get("participants", []) if isinstance(metadata, dict) else []
                 items.append(
                     RoundtableSummary(
                         session_id=str(row.id),
                         session_type=row.session_type,
+                        source="archive" if is_archived else "working",
                         title=row.title,
                         participants=participants,
                         message_count=int(row.message_count or 0),
