@@ -134,12 +134,16 @@ class AriaEngine:
             logger.warning("Alembic migration skipped: %s", e)
 
     async def _init_agents(self):
-        """Load agent definitions from DB and instantiate pool."""
+        """Load agent definitions from DB and instantiate pool with LLM gateway."""
         from aria_engine.agent_pool import AgentPool
+        from aria_engine.llm_gateway import LLMGateway
+
+        llm_gateway = LLMGateway(self.config)
 
         self._agent_pool = AgentPool(
             config=self.config,
             db_engine=self._db_engine,
+            llm_gateway=llm_gateway,
         )
         await self._agent_pool.load_agents()
 
