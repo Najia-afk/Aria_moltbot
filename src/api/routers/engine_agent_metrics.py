@@ -5,16 +5,23 @@ Provides:
 - GET /api/engine/agents/metrics — all agents with current stats
 - GET /api/engine/agents/metrics/{agent_id} — single agent detail
 - GET /api/engine/agents/metrics/{agent_id}/history — score history
+
+Architecture: Pure SQLAlchemy ORM — zero raw SQL.
 """
 import logging
-from datetime import datetime, timezone
-from typing import Any
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import text
+from sqlalchemy import select, func, case, cast, Integer, Numeric
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from aria_engine.config import EngineConfig
+
+try:
+    from db.models import EngineAgentState, EngineChatMessage, EngineChatSession
+except ImportError:
+    from .db.models import EngineAgentState, EngineChatMessage, EngineChatSession
 
 logger = logging.getLogger("aria.api.agent_metrics")
 router = APIRouter(
@@ -22,6 +29,8 @@ router = APIRouter(
     tags=["engine-agents"],
 )
 
+
+# ── Pydantic response models ────────────────────────────────────────────────
 
 class AgentMetric(BaseModel):
     """Per-agent performance metric."""
@@ -59,107 +68,129 @@ class AgentMetricsResponse(BaseModel):
     timestamp: str
 
 
-async def _get_db():
-    """Get database engine from config."""
-    from sqlalchemy.ext.asyncio import create_async_engine
+# ── DB helper ────────────────────────────────────────────────────────────────
+
+_engine_cache = None
+
+
+async def _get_db_engine():
+    """Get or create a cached async engine (psycopg3 driver)."""
+    global _engine_cache
+    if _engine_cache is not None:
+        return _engine_cache
 
     config = EngineConfig()
     db_url = config.database_url
-    # Use psycopg3 driver (same as the rest of the API)
     for prefix in ("postgresql://", "postgresql+asyncpg://", "postgres://"):
         if db_url.startswith(prefix):
             db_url = db_url.replace(prefix, "postgresql+psycopg://", 1)
             break
-    return create_async_engine(db_url, pool_size=5, max_overflow=10)
+    _engine_cache = create_async_engine(db_url, pool_size=5, max_overflow=10)
+    return _engine_cache
 
+
+async def _msg_stats_for_agent(db: AsyncSession, agent_id: str | None = None):
+    """Compute message stats per agent using ORM joins.
+
+    Returns dict keyed by agent_id with msg_count, total_tokens, avg_latency_ms, error_count.
+    If agent_id is given, filters to that single agent.
+    """
+    # Join messages → sessions to get agent_id
+    query = (
+        select(
+            EngineChatSession.agent_id.label("agent_id"),
+            func.count(EngineChatMessage.id).label("msg_count"),
+            func.coalesce(
+                func.sum(
+                    cast(
+                        EngineChatMessage.metadata_json["token_count"].as_string(),
+                        Integer,
+                    )
+                ),
+                0,
+            ).label("total_tokens"),
+            func.coalesce(
+                cast(
+                    func.avg(
+                        cast(
+                            EngineChatMessage.metadata_json["latency_ms"].as_string(),
+                            Integer,
+                        )
+                    ),
+                    Integer,
+                ),
+                0,
+            ).label("avg_latency_ms"),
+            func.count(
+                case(
+                    (EngineChatMessage.metadata_json["error"].as_string().is_not(None), 1),
+                )
+            ).label("error_count"),
+        )
+        .join(EngineChatSession, EngineChatSession.id == EngineChatMessage.session_id)
+        .group_by(EngineChatSession.agent_id)
+    )
+
+    if agent_id is not None:
+        query = query.where(EngineChatSession.agent_id == agent_id)
+
+    result = await db.execute(query)
+    return {row.agent_id: row._mapping for row in result.all()}
+
+
+# ── Endpoints ────────────────────────────────────────────────────────────────
 
 @router.get("", response_model=AgentMetricsResponse)
 async def get_all_metrics():
     """Get performance metrics for all agents."""
-    db = await _get_db()
-
-    async with db.begin() as conn:
-        # Core agent state
-        result = await conn.execute(
-            text("""
-                SELECT
-                    a.agent_id,
-                    a.display_name,
-                    a.focus_type,
-                    a.status,
-                    a.pheromone_score,
-                    a.consecutive_failures,
-                    a.last_active_at,
-                    a.created_at,
-                    COALESCE(m.msg_count, 0) AS messages_processed,
-                    COALESCE(m.total_tokens, 0) AS total_tokens,
-                    COALESCE(m.avg_latency_ms, 0) AS avg_latency_ms,
-                    COALESCE(m.error_count, 0) AS error_count
-                FROM aria_engine.agent_state a
-                LEFT JOIN LATERAL (
-                    SELECT
-                        COUNT(*) AS msg_count,
-                        SUM(COALESCE(
-                            (metadata->>'token_count')::int, 0
-                        )) AS total_tokens,
-                        AVG(COALESCE(
-                            (metadata->>'latency_ms')::int, 0
-                        ))::int AS avg_latency_ms,
-                        COUNT(*) FILTER (
-                            WHERE metadata->>'error' IS NOT NULL
-                        ) AS error_count
-                    FROM aria_engine.chat_messages cm
-                    JOIN aria_engine.chat_sessions cs ON cs.id = cm.session_id
-                    WHERE cs.agent_id = a.agent_id
-                ) m ON true
-                ORDER BY a.pheromone_score DESC
-            """)
-        )
-        rows = result.mappings().all()
-
-    agents = []
-    total_messages = 0
-    total_errors = 0
-    scores = []
-
+    engine = await _get_db_engine()
     now = datetime.now(timezone.utc)
 
-    for row in rows:
-        msg_count = row["messages_processed"]
-        err_count = row["error_count"]
-        error_rate = (
-            round(err_count / msg_count, 3) if msg_count > 0 else 0.0
-        )
+    async with AsyncSession(engine) as db:
+        # All agents ordered by pheromone score
+        agent_rows = (
+            await db.execute(
+                select(EngineAgentState).order_by(EngineAgentState.pheromone_score.desc())
+            )
+        ).scalars().all()
 
-        created = row["created_at"]
-        if created and hasattr(created, "tzinfo") and created.tzinfo is None:
+        # Aggregate message stats per agent
+        stats_map = await _msg_stats_for_agent(db)
+
+    agents: list[AgentMetric] = []
+    total_messages = 0
+    total_errors = 0
+    scores: list[float] = []
+
+    for agent in agent_rows:
+        stats = stats_map.get(agent.agent_id, {})
+        msg_count = int(stats.get("msg_count", 0))
+        err_count = int(stats.get("error_count", 0))
+        error_rate = round(err_count / msg_count, 3) if msg_count > 0 else 0.0
+
+        created = agent.created_at
+        if created and created.tzinfo is None:
             created = created.replace(tzinfo=timezone.utc)
-        uptime = (
-            int((now - created).total_seconds()) if created else 0
-        )
+        uptime = int((now - created).total_seconds()) if created else 0
 
-        score = float(row["pheromone_score"] or 0.5)
+        score = float(agent.pheromone_score or 0.5)
         scores.append(score)
 
         agents.append(
             AgentMetric(
-                agent_id=row["agent_id"],
-                display_name=row["display_name"] or row["agent_id"],
-                focus_type=row["focus_type"],
-                status=row["status"] or "idle",
+                agent_id=agent.agent_id,
+                display_name=agent.display_name or agent.agent_id,
+                focus_type=agent.focus_type,
+                status=agent.status or "idle",
                 pheromone_score=score,
                 messages_processed=msg_count,
-                total_tokens=row["total_tokens"],
-                avg_latency_ms=row["avg_latency_ms"],
+                total_tokens=int(stats.get("total_tokens", 0)),
+                avg_latency_ms=int(stats.get("avg_latency_ms", 0)),
                 error_count=err_count,
                 error_rate=error_rate,
-                consecutive_failures=row["consecutive_failures"] or 0,
+                consecutive_failures=agent.consecutive_failures or 0,
                 uptime_seconds=uptime,
-                last_active_at=(
-                    row["last_active_at"].isoformat()
-                    if row["last_active_at"]
-                    else None
-                ),
+                last_active_at=agent.last_active_at.isoformat() if agent.last_active_at else None,
             )
         )
         total_messages += msg_count
@@ -169,9 +200,7 @@ async def get_all_metrics():
         agents=agents,
         total_messages=total_messages,
         total_errors=total_errors,
-        avg_pheromone=(
-            round(sum(scores) / len(scores), 3) if scores else 0.0
-        ),
+        avg_pheromone=round(sum(scores) / len(scores), 3) if scores else 0.0,
         timestamp=now.isoformat(),
     )
 
@@ -179,102 +208,70 @@ async def get_all_metrics():
 @router.get("/{agent_id}", response_model=AgentMetricDetail)
 async def get_agent_metrics(agent_id: str):
     """Get detailed metrics for a single agent."""
-    db = await _get_db()
+    engine = await _get_db_engine()
+    now = datetime.now(timezone.utc)
 
-    async with db.begin() as conn:
+    async with AsyncSession(engine) as db:
         # Agent state
-        result = await conn.execute(
-            text("""
-                SELECT * FROM aria_engine.agent_state
-                WHERE agent_id = :agent_id
-            """),
-            {"agent_id": agent_id},
-        )
-        row = result.mappings().first()
+        agent = (
+            await db.execute(
+                select(EngineAgentState).where(EngineAgentState.agent_id == agent_id)
+            )
+        ).scalar_one_or_none()
 
-        if not row:
+        if not agent:
             raise HTTPException(404, f"Agent {agent_id} not found")
 
         # Message stats
-        stats = await conn.execute(
-            text("""
-                SELECT
-                    COUNT(*) AS msg_count,
-                    SUM(COALESCE(
-                        (metadata->>'token_count')::int, 0
-                    )) AS total_tokens,
-                    AVG(COALESCE(
-                        (metadata->>'latency_ms')::int, 0
-                    ))::int AS avg_latency_ms,
-                    COUNT(*) FILTER (
-                        WHERE metadata->>'error' IS NOT NULL
-                    ) AS error_count
-                FROM aria_engine.chat_messages cm
-                JOIN aria_engine.chat_sessions cs ON cs.id = cm.session_id
-                WHERE cs.agent_id = :agent_id
-            """),
-            {"agent_id": agent_id},
+        stats_map = await _msg_stats_for_agent(db, agent_id=agent_id)
+        stats = stats_map.get(agent_id, {})
+
+        # Recent sessions (last 24h)
+        recent_count_result = await db.execute(
+            select(func.count(EngineChatSession.id)).where(
+                EngineChatSession.agent_id == agent_id,
+                EngineChatSession.created_at > now - timedelta(hours=24),
+            )
         )
-        msg_row = stats.mappings().first()
+        recent_sessions = recent_count_result.scalar() or 0
 
-        # Recent sessions
-        sessions = await conn.execute(
-            text("""
-                SELECT COUNT(DISTINCT id) AS cnt
-                FROM aria_engine.chat_sessions
-                WHERE agent_id = :agent_id
-                  AND created_at > NOW() - INTERVAL '24 hours'
-            """),
-            {"agent_id": agent_id},
+        # Last error from messages metadata
+        last_err_result = await db.execute(
+            select(EngineChatMessage.metadata_json["error"].as_string())
+            .join(EngineChatSession, EngineChatSession.id == EngineChatMessage.session_id)
+            .where(
+                EngineChatSession.agent_id == agent_id,
+                EngineChatMessage.metadata_json["error"].as_string().is_not(None),
+            )
+            .order_by(EngineChatMessage.created_at.desc())
+            .limit(1)
         )
-        session_row = sessions.mappings().first()
+        last_error = last_err_result.scalar_one_or_none()
 
-        # Last error
-        last_err = await conn.execute(
-            text("""
-                SELECT metadata->>'error' AS error_msg
-                FROM aria_engine.chat_messages cm
-                JOIN aria_engine.chat_sessions cs ON cs.id = cm.session_id
-                WHERE cs.agent_id = :agent_id
-                  AND metadata->>'error' IS NOT NULL
-                ORDER BY cm.created_at DESC
-                LIMIT 1
-            """),
-            {"agent_id": agent_id},
-        )
-        err_row = last_err.mappings().first()
+    msg_count = int(stats.get("msg_count", 0))
+    err_count = int(stats.get("error_count", 0))
 
-    msg_count = msg_row["msg_count"] if msg_row else 0
-    err_count = msg_row["error_count"] if msg_row else 0
-
-    now = datetime.now(timezone.utc)
-    created = row["created_at"]
-    if created and hasattr(created, "tzinfo") and created.tzinfo is None:
+    created = agent.created_at
+    if created and created.tzinfo is None:
         created = created.replace(tzinfo=timezone.utc)
     uptime = int((now - created).total_seconds()) if created else 0
 
     return AgentMetricDetail(
-        agent_id=row["agent_id"],
-        display_name=row["display_name"] or row["agent_id"],
-        focus_type=row["focus_type"],
-        status=row["status"] or "idle",
-        pheromone_score=float(row["pheromone_score"] or 0.5),
+        agent_id=agent.agent_id,
+        display_name=agent.display_name or agent.agent_id,
+        focus_type=agent.focus_type,
+        status=agent.status or "idle",
+        pheromone_score=float(agent.pheromone_score or 0.5),
         messages_processed=msg_count,
-        total_tokens=msg_row["total_tokens"] if msg_row else 0,
-        avg_latency_ms=msg_row["avg_latency_ms"] if msg_row else 0,
+        total_tokens=int(stats.get("total_tokens", 0)),
+        avg_latency_ms=int(stats.get("avg_latency_ms", 0)),
         error_count=err_count,
-        error_rate=(
-            round(err_count / msg_count, 3) if msg_count > 0 else 0.0
-        ),
-        consecutive_failures=row["consecutive_failures"] or 0,
+        error_rate=round(err_count / msg_count, 3) if msg_count > 0 else 0.0,
+        consecutive_failures=agent.consecutive_failures or 0,
         uptime_seconds=uptime,
-        last_active_at=(
-            row["last_active_at"].isoformat()
-            if row["last_active_at"]
-            else None
-        ),
-        recent_sessions=session_row["cnt"] if session_row else 0,
-        last_error=err_row["error_msg"] if err_row else None,
+        last_active_at=agent.last_active_at.isoformat() if agent.last_active_at else None,
+        recent_sessions=recent_sessions,
+        last_error=last_error,
         score_trend=[],  # Populated by /history endpoint
     )
 
@@ -285,36 +282,49 @@ async def get_agent_score_history(
     days: int = Query(default=7, ge=1, le=90),
 ):
     """Get pheromone score history for trend charting."""
-    db = await _get_db()
+    engine = await _get_db_engine()
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=days)
 
-    async with db.begin() as conn:
-        result = await conn.execute(
-            text("""
-                SELECT
-                    DATE_TRUNC('hour', cm.created_at) AS bucket,
-                    AVG(COALESCE(
-                        (cm.metadata->>'pheromone_score')::numeric, 0.5
-                    ))::numeric(5,3) AS avg_score,
-                    COUNT(*) AS interactions
-                FROM aria_engine.chat_messages cm
-                JOIN aria_engine.chat_sessions cs ON cs.id = cm.session_id
-                WHERE cs.agent_id = :agent_id
-                  AND cm.created_at > NOW() - MAKE_INTERVAL(days => :days)
-                GROUP BY bucket
-                ORDER BY bucket
-            """),
-            {"agent_id": agent_id, "days": days},
+    # date_trunc via func
+    bucket = func.date_trunc("hour", EngineChatMessage.created_at).label("bucket")
+
+    async with AsyncSession(engine) as db:
+        result = await db.execute(
+            select(
+                bucket,
+                func.coalesce(
+                    cast(
+                        func.avg(
+                            cast(
+                                EngineChatMessage.metadata_json["pheromone_score"].as_string(),
+                                Numeric,
+                            )
+                        ),
+                        Numeric(5, 3),
+                    ),
+                    0.5,
+                ).label("avg_score"),
+                func.count().label("interactions"),
+            )
+            .join(EngineChatSession, EngineChatSession.id == EngineChatMessage.session_id)
+            .where(
+                EngineChatSession.agent_id == agent_id,
+                EngineChatMessage.created_at > cutoff,
+            )
+            .group_by(bucket)
+            .order_by(bucket)
         )
-        rows = result.mappings().all()
+        rows = result.all()
 
     return {
         "agent_id": agent_id,
         "days": days,
         "data_points": [
             {
-                "timestamp": row["bucket"].isoformat(),
-                "score": float(row["avg_score"]),
-                "interactions": row["interactions"],
+                "timestamp": row.bucket.isoformat(),
+                "score": float(row.avg_score),
+                "interactions": row.interactions,
             }
             for row in rows
         ],

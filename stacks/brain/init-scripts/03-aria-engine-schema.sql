@@ -3,6 +3,7 @@
 -- Required by: aria_engine container (agent_pool, scheduler, chat_engine, etc.)
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS vector;
 CREATE SCHEMA IF NOT EXISTS aria_engine;
 
 -- ============================================================================
@@ -49,6 +50,7 @@ CREATE TABLE IF NOT EXISTS aria_engine.chat_messages (
     tokens_output INTEGER,
     cost NUMERIC(10,6),
     latency_ms INTEGER,
+    embedding vector(1536),
     metadata JSONB DEFAULT '{}',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
