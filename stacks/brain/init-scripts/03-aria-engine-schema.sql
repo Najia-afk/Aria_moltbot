@@ -102,16 +102,24 @@ CREATE INDEX IF NOT EXISTS idx_ae_cj_next_run ON aria_engine.cron_jobs(next_run_
 CREATE TABLE IF NOT EXISTS aria_engine.agent_state (
     agent_id VARCHAR(100) PRIMARY KEY,
     display_name VARCHAR(200),
+    agent_type VARCHAR(30) DEFAULT 'agent',
+    parent_agent_id VARCHAR(100),
     model VARCHAR(200) NOT NULL,
+    fallback_model VARCHAR(200),
     temperature FLOAT DEFAULT 0.7,
     max_tokens INTEGER DEFAULT 4096,
     system_prompt TEXT,
     focus_type VARCHAR(50),
     status VARCHAR(20) DEFAULT 'idle',
+    enabled BOOLEAN DEFAULT true,
+    skills JSONB DEFAULT '[]',
+    capabilities JSONB DEFAULT '[]',
     current_session_id UUID,
     current_task TEXT,
     consecutive_failures INTEGER DEFAULT 0,
     pheromone_score NUMERIC(5,3) DEFAULT 0.500,
+    timeout_seconds INTEGER DEFAULT 600,
+    rate_limit JSONB DEFAULT '{}',
     last_active_at TIMESTAMP WITH TIME ZONE,
     metadata JSONB DEFAULT '{}',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -144,6 +152,117 @@ CREATE TABLE IF NOT EXISTS aria_engine.agent_tools (
 );
 
 CREATE INDEX IF NOT EXISTS idx_ae_at_agent ON aria_engine.agent_tools(agent_id);
+
+-- ============================================================================
+-- Rate Limits
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS aria_engine.rate_limits (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    skill VARCHAR(100) NOT NULL UNIQUE,
+    last_action TIMESTAMP WITH TIME ZONE,
+    action_count INTEGER DEFAULT 0,
+    window_start TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    last_post TIMESTAMP WITH TIME ZONE,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ae_rl_skill ON aria_engine.rate_limits(skill);
+
+-- ============================================================================
+-- API Key Rotations
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS aria_engine.api_key_rotations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    service VARCHAR(100) NOT NULL,
+    rotated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    reason TEXT,
+    rotated_by VARCHAR(100) DEFAULT 'system',
+    metadata JSONB DEFAULT '{}'
+);
+
+CREATE INDEX IF NOT EXISTS idx_ae_akr_service ON aria_engine.api_key_rotations(service);
+
+-- ============================================================================
+-- Schedule Tick (singleton)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS aria_engine.schedule_tick (
+    id INTEGER PRIMARY KEY,
+    last_tick TIMESTAMP WITH TIME ZONE,
+    tick_count INTEGER DEFAULT 0,
+    heartbeat_interval INTEGER DEFAULT 3600,
+    enabled BOOLEAN DEFAULT true,
+    jobs_total INTEGER DEFAULT 0,
+    jobs_successful INTEGER DEFAULT 0,
+    jobs_failed INTEGER DEFAULT 0,
+    last_job_name VARCHAR(255),
+    last_job_status VARCHAR(50),
+    next_job_at TIMESTAMP WITH TIME ZONE,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================================================
+-- Scheduled Jobs
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS aria_engine.scheduled_jobs (
+    id VARCHAR(50) PRIMARY KEY,
+    agent_id VARCHAR(50) DEFAULT 'main',
+    name VARCHAR(100) NOT NULL,
+    enabled BOOLEAN DEFAULT true,
+    schedule_kind VARCHAR(20) DEFAULT 'cron',
+    schedule_expr VARCHAR(50) NOT NULL,
+    session_target VARCHAR(50),
+    wake_mode VARCHAR(50),
+    payload_kind VARCHAR(50),
+    payload_text TEXT,
+    next_run_at TIMESTAMP WITH TIME ZONE,
+    last_run_at TIMESTAMP WITH TIME ZONE,
+    last_status VARCHAR(20),
+    last_duration_ms INTEGER,
+    run_count INTEGER DEFAULT 0,
+    success_count INTEGER DEFAULT 0,
+    fail_count INTEGER DEFAULT 0,
+    created_at_ms INTEGER,
+    updated_at_ms INTEGER,
+    synced_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ae_sj_name    ON aria_engine.scheduled_jobs(name);
+CREATE INDEX IF NOT EXISTS idx_ae_sj_enabled ON aria_engine.scheduled_jobs(enabled);
+CREATE INDEX IF NOT EXISTS idx_ae_sj_next    ON aria_engine.scheduled_jobs(next_run_at);
+
+-- ============================================================================
+-- LLM Model Catalog
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS aria_engine.llm_models (
+    id VARCHAR(100) PRIMARY KEY,
+    name VARCHAR(300) NOT NULL,
+    provider VARCHAR(50) NOT NULL DEFAULT 'litellm',
+    tier VARCHAR(30) NOT NULL DEFAULT 'free',
+    reasoning BOOLEAN DEFAULT false,
+    vision BOOLEAN DEFAULT false,
+    tool_calling BOOLEAN DEFAULT false,
+    input_types JSONB DEFAULT '["text"]',
+    context_window INTEGER DEFAULT 8192,
+    max_tokens INTEGER DEFAULT 4096,
+    cost_input NUMERIC(12, 6) DEFAULT 0,
+    cost_output NUMERIC(12, 6) DEFAULT 0,
+    cost_cache_read NUMERIC(12, 6) DEFAULT 0,
+    litellm_model VARCHAR(300),
+    litellm_api_key VARCHAR(500),
+    litellm_api_base VARCHAR(500),
+    route_skill VARCHAR(100),
+    aliases JSONB DEFAULT '[]',
+    enabled BOOLEAN DEFAULT true,
+    sort_order INTEGER DEFAULT 100,
+    extra JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ae_lm_provider ON aria_engine.llm_models(provider);
+CREATE INDEX IF NOT EXISTS idx_ae_lm_tier     ON aria_engine.llm_models(tier);
+CREATE INDEX IF NOT EXISTS idx_ae_lm_enabled  ON aria_engine.llm_models(enabled);
 
 -- ============================================================================
 -- Seed default agent (main)
