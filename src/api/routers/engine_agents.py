@@ -69,10 +69,10 @@ def get_pool() -> AgentPool:
 
     config = EngineConfig()
     db_url = config.database_url
-    # Ensure we use asyncpg driver for async operations
-    for prefix in ("postgresql://", "postgresql+psycopg://", "postgres://"):
+    # Ensure we use psycopg async driver
+    for prefix in ("postgresql://", "postgresql+asyncpg://", "postgres://"):
         if db_url.startswith(prefix):
-            db_url = db_url.replace(prefix, "postgresql+asyncpg://", 1)
+            db_url = db_url.replace(prefix, "postgresql+psycopg://", 1)
             break
     db = create_async_engine(db_url, pool_size=5, max_overflow=10, pool_pre_ping=True)
     _fallback_pool = AgentPool(config, db)
