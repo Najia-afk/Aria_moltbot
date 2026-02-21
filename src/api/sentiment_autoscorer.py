@@ -244,7 +244,17 @@ async def _sync_engine_messages(db: AsyncSession) -> int:
     if not rows:
         return 0
 
-    inserted = 0
+    # Also fetch all existing content_hashes to avoid DB queries inside loop
+    all_hashes_q = select(SessionMessage.content_hash).where(
+        SessionMessage.content_hash.isnot(None),
+    )
+    all_existing_hashes = set(
+        row for row in (await db.execute(all_hashes_q)).scalars().all() if row
+    )
+    existing.update(all_existing_hashes)
+
+    # Collect new messages first (avoid autoflush issues)
+    to_insert: list[SessionMessage] = []
     for msg in rows:
         text = _normalize(msg.content or "")
         if len(text) < MIN_CHARS or _is_noise(text):
@@ -258,16 +268,6 @@ async def _sync_engine_messages(db: AsyncSession) -> int:
             continue
         existing.add(dedup_key)
         existing.add(text_sha1)
-
-        # Check DB dedup
-        dup = (await db.execute(
-            select(SessionMessage.id)
-            .where(SessionMessage.content_hash == text_sha1)
-            .where(SessionMessage.role == msg.role)
-            .limit(1)
-        )).scalar_one_or_none()
-        if dup:
-            continue
 
         new_msg = SessionMessage(
             session_id=None,  # engine session is in different schema
@@ -288,15 +288,18 @@ async def _sync_engine_messages(db: AsyncSession) -> int:
         if msg.created_at:
             new_msg.created_at = msg.created_at
 
-        db.add(new_msg)
-        inserted += 1
+        to_insert.append(new_msg)
 
-        if inserted >= BATCH_SIZE * 4:
+        if len(to_insert) >= BATCH_SIZE * 4:
             break
 
-    if inserted:
+    # Bulk add after loop to avoid autoflush on intermediate queries
+    for obj in to_insert:
+        db.add(obj)
+
+    if to_insert:
         await db.commit()
-    return inserted
+    return len(to_insert)
 
 
 # ── Phase 2: session_messages → sentiment_events ─────────────────────────────
