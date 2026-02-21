@@ -228,6 +228,9 @@ class StreamManager:
 
             accumulator.model = session.model or self.config.default_model
 
+            # Signal frontend to create streaming message bubble
+            await self._send_json(websocket, {"type": "stream_start"})
+
             # Persist user message
             user_msg_id = uuid.uuid4()
             user_msg = EngineChatMessage(
@@ -272,7 +275,7 @@ class StreamManager:
                         if chunk.content:
                             accumulator.content += chunk.content
                             await self._send_json(websocket, {
-                                "type": "token",
+                                "type": "content",
                                 "content": chunk.content,
                             })
 
@@ -424,18 +427,15 @@ class StreamManager:
 
             await db.commit()
 
-            # ── Send usage + done ─────────────────────────────────────────
+            # ── Send stream_end (combines usage + done for frontend) ────
             await self._send_json(websocket, {
-                "type": "usage",
-                "input_tokens": accumulator.input_tokens,
-                "output_tokens": accumulator.output_tokens,
-                "cost": accumulator.cost_usd,
-            })
-
-            await self._send_json(websocket, {
-                "type": "done",
+                "type": "stream_end",
                 "message_id": str(assistant_msg_id),
                 "finish_reason": accumulator.finish_reason,
+                "model": accumulator.model,
+                "tokens_input": accumulator.input_tokens,
+                "tokens_output": accumulator.output_tokens,
+                "cost": accumulator.cost_usd,
             })
 
     async def _validate_session(self, session_id: str) -> None:

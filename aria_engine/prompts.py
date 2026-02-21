@@ -139,6 +139,33 @@ class PromptAssembler:
                 priority=90,
             ))
 
+        # ── Section 2b: Skill Knowledge ──────────────────────────────────
+        skills_md = self._load_soul_file("SKILLS.md")
+        if skills_md:
+            sections.append(PromptSection(
+                name="skills",
+                content=skills_md,
+                priority=85,
+            ))
+
+        # ── Section 2c: Tools Quick Reference ────────────────────────────
+        tools_md = self._load_soul_file("TOOLS.md")
+        if tools_md:
+            sections.append(PromptSection(
+                name="tools_reference",
+                content=tools_md,
+                priority=84,
+            ))
+
+        # ── Section 2d: Memory System ────────────────────────────────────
+        memory_md = self._load_soul_file("MEMORY.md")
+        if memory_md:
+            sections.append(PromptSection(
+                name="memory",
+                content=memory_md,
+                priority=83,
+            ))
+
         # ── Section 3: Agent-specific prompt ──────────────────────────────
         if agent_prompt:
             sections.append(PromptSection(

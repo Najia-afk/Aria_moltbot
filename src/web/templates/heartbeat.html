@@ -127,13 +127,13 @@
 <div class="toast" id="toast"></div>
 
 <!-- Add / Edit Job Modal -->
-<div id="jobModal" class="cron-modal-overlay" style="display:none;" onclick="if(event.target===this)closeJobModal()">
+<div id="cronJobModal" class="cron-modal-overlay" onclick="if(event.target===this)closeJobModal()">
 <div class="cron-modal-card" style="max-width:640px;max-height:90vh;overflow-y:auto;">
     <div class="cron-modal-header">
-        <h3 id="jobModalTitle">Add Cron Job</h3>
+        <h3 id="cronModalTitle">Add Cron Job</h3>
         <button class="cron-btn-icon" onclick="closeJobModal()">&times;</button>
     </div>
-    <form id="jobForm" onsubmit="return saveCronJob(event)">
+    <form id="cronJobForm" onsubmit="return saveCronJob(event)">
         <div class="cron-form-grid">
             <div class="cron-form-group">
                 <label for="jId">Job ID</label>
@@ -533,7 +533,10 @@
 /* Cron Job Modal */
 .cron-modal-overlay {
     position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,.6);
-    display: flex; align-items: center; justify-content: center; padding: 16px;
+    display: none; align-items: center; justify-content: center; padding: 16px;
+}
+.cron-modal-overlay.active {
+    display: flex;
 }
 .cron-modal-card {
     background: var(--bg-secondary, #1e1e2e); border: 1px solid var(--border-subtle, #333);
@@ -584,6 +587,28 @@
 // Scheduled Jobs - fetched from API
 let scheduledJobs = [];
 let allLogs = [];
+
+// Utility: relative time formatting
+function formatRelativeTime(date) {
+    if (!date || isNaN(date.getTime())) return '-';
+    const now = new Date();
+    const diffMs = now - date;
+    const absDiff = Math.abs(diffMs);
+    const isFuture = diffMs < 0;
+
+    const seconds = Math.floor(absDiff / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    let text;
+    if (seconds < 60) text = `${seconds}s`;
+    else if (minutes < 60) text = `${minutes}m`;
+    else if (hours < 24) text = `${hours}h ${minutes % 60}m`;
+    else text = `${days}d ${hours % 24}h`;
+
+    return isFuture ? `in ${text}` : `${text} ago`;
+}
 
 // Icon mapping for job names
 const jobIcons = {

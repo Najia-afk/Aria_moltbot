@@ -1221,6 +1221,7 @@
     let allSessions = [];
     let sidebarVisible = true;
     let modelsData = [];
+    let pendingMessage = null;  // buffer first message until WS opens
     const API = '{{ api_base_url }}';
 
     // ── Marked config ───────────────────────────────────────────
@@ -1597,6 +1598,12 @@
             wsAttempts = 0;  // reset on successful connection
             setStatus('connected');
             console.log('WebSocket connected to session:', sessionId);
+            // Flush any pending message that was waiting for connection
+            if (pendingMessage) {
+                const msg = pendingMessage;
+                pendingMessage = null;
+                ws.send(JSON.stringify(msg));
+            }
         };
 
         ws.onmessage = (event) => {
@@ -1861,8 +1868,20 @@
         const text = input.value.trim();
         if (!text || isStreaming) return;
 
+        const msgPayload = {
+            type: 'message',
+            content: text,
+            model: currentModel || undefined,
+        };
+
         if (!sessionId) {
+            // Buffer the message so it gets sent once WS opens
+            pendingMessage = msgPayload;
+            addMessage('user', text);
+            input.value = '';
+            autoResizeInput();
             await createSession();
+            return;
         }
 
         addMessage('user', text);
@@ -1870,24 +1889,22 @@
         autoResizeInput();
 
         if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
-                type: 'message',
-                content: text,
-                model: currentModel || undefined,
-            }));
+            ws.send(JSON.stringify(msgPayload));
         } else {
-            showError('Not connected. Attempting to reconnect…');
+            // Buffer and reconnect
+            pendingMessage = msgPayload;
             connectWS();
         }
     }
 
     async function createSession() {
+        const selectedAgent = document.getElementById('agentSelector').value || 'main';
         try {
             const resp = await fetch('/api/engine/chat/sessions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    agent_id: 'main',
+                    agent_id: selectedAgent,
                     model: currentModel || undefined,
                 }),
             });

@@ -160,6 +160,10 @@ class EngineScheduler:
         self._scheduler: AsyncScheduler | None = None
         self._running = False
         self._job_semaphore = asyncio.Semaphore(MAX_CONCURRENT_JOBS)
+        # ORM session maker for queries that need mapped instances
+        self._session_factory = async_sessionmaker(
+            self._db_engine, expire_on_commit=False,
+        )
         self._active_executions: dict[str, asyncio.Task] = {}
 
     async def start(self) -> None:
@@ -611,8 +615,8 @@ class EngineScheduler:
 
     async def get_job(self, job_id: str) -> dict[str, Any] | None:
         """Get a single job by ID."""
-        async with self._db_engine.begin() as conn:
-            result = await conn.execute(
+        async with self._session_factory() as session:
+            result = await session.execute(
                 select(EngineCronJob)
                 .where(EngineCronJob.id == job_id)
             )
@@ -637,8 +641,8 @@ class EngineScheduler:
 
     async def list_jobs(self) -> list[dict[str, Any]]:
         """List all cron jobs with current state."""
-        async with self._db_engine.begin() as conn:
-            result = await conn.execute(
+        async with self._session_factory() as session:
+            result = await session.execute(
                 select(EngineCronJob).order_by(EngineCronJob.name)
             )
             rows = result.scalars().all()
@@ -678,8 +682,8 @@ class EngineScheduler:
             .limit(limit)
         )
 
-        async with self._db_engine.begin() as conn:
-            result = await conn.execute(stmt)
+        async with self._session_factory() as session:
+            result = await session.execute(stmt)
             rows = result.scalars().all()
 
         return [
