@@ -395,7 +395,6 @@
 // ── Globals ─────────────────────────────────────────────────────────────────
 let _statsData = null;     // /model-usage/stats response
 let _usageData = null;     // /model-usage response (recent records)
-let _llmUsageData = null;  // /model-usage?source=litellm response
 let _skillInsights = null; // /skills/insights response (real skill invocations)
 let _charts = {};          // Chart.js instances
 let usagePager;
@@ -454,31 +453,15 @@ async function loadUsage(page = 1, limit = 50) {
     try {
         const hours = document.getElementById('hours-filter').value;
         const cacheBust = Date.now();
-        const [allResp, llmResp] = await Promise.all([
-            fetchAriaData(`${API_BASE_URL}/model-usage?hours=${hours}&limit=${limit}&page=${page}&_ts=${cacheBust}`),
-            fetchAriaData(`${API_BASE_URL}/model-usage?hours=${hours}&source=litellm&limit=25&page=1&_ts=${cacheBust}`),
-        ]);
+        const resp = await fetchAriaData(
+            `${API_BASE_URL}/model-usage?hours=${hours}&limit=${limit}&page=${page}&_ts=${cacheBust}`
+        );
 
         if (requestSeq !== _usageRequestSeq) return;
 
-        _usageData = allResp;
-        _llmUsageData = llmResp;
-
+        _usageData = resp;
         const items = _usageData.items || _usageData.usage || [];
         _usageData._allItems = items;
-
-        const llmItems = _llmUsageData.items || _llmUsageData.usage || [];
-        const llmRequestsInWindow = safeNumber(_statsData?.sources?.litellm?.requests || 0);
-        let effectiveLlmItems = llmItems;
-        if (llmItems.length === 0 && llmRequestsInWindow > 0) {
-            const retryResp = await fetchAriaData(
-                `${API_BASE_URL}/model-usage?hours=${hours}&source=litellm&limit=50&page=1&_ts=${Date.now()}`
-            );
-            if (requestSeq !== _usageRequestSeq) return;
-            _llmUsageData = retryResp;
-            effectiveLlmItems = _llmUsageData.items || _llmUsageData.usage || [];
-        }
-        _llmUsageData._allItems = effectiveLlmItems;
 
         renderRecentLLM();
         renderRecentSkills();
@@ -499,27 +482,29 @@ function renderModelUsageOverview() {
     const s = _statsData;
     const src = s.sources || {};
 
+    const eng = src.engine || {};
+    const skillTotal = _skillInsights?.summary?.total_invocations || 0;
+
     // Tab badges
     document.getElementById('tab-badge-total').textContent = formatNumber(s.total_requests);
-    document.getElementById('tab-badge-llm').textContent = formatNumber(src.litellm?.requests || 0);
-    const skillTotal = _skillInsights?.summary?.total_invocations || src.skills?.requests || 0;
+    document.getElementById('tab-badge-llm').textContent = formatNumber(eng.requests || s.total_requests);
     document.getElementById('tab-badge-skills').textContent = formatNumber(skillTotal);
 
     // Stats cards
     document.getElementById('stat-requests').textContent = formatNumber(s.total_requests);
     document.getElementById('stat-requests-sub').textContent =
-        `LLM: ${src.litellm?.requests || 0} | Skills: ${skillTotal}`;
+        `LLM: ${eng.requests || s.total_requests} | Skills: ${skillTotal}`;
     document.getElementById('stat-tokens').textContent = formatNumber(s.total_tokens);
     document.getElementById('stat-tokens-sub').textContent =
-        `LLM: ${formatNumber(src.litellm?.tokens || 0)} | Skills: ${formatNumber(_skillInsights?.summary?.total_tokens || src.skills?.tokens || 0)}`;
+        `LLM: ${formatNumber(eng.tokens || s.total_tokens)} | Skills: ${formatNumber(_skillInsights?.summary?.total_tokens || 0)}`;
     document.getElementById('stat-cost').textContent = formatCost(s.total_cost);
     document.getElementById('stat-cost-sub').textContent =
-        `LLM: ${formatCost(src.litellm?.cost || 0)} | Skills: ${formatCost(src.skills?.cost || 0)}`;
-    document.getElementById('stat-latency').textContent = `${_skillInsights?.summary?.avg_duration_ms ? Math.round(_skillInsights.summary.avg_duration_ms) : (s.avg_latency_ms || 0)}ms`;
+        `LLM: ${formatCost(eng.cost || s.total_cost)} | Skills: -`;
+    document.getElementById('stat-latency').textContent = `${s.avg_latency_ms || 0}ms`;
 
     // ── Chart: Source Split (doughnut) ──
-    const llmReq = src.litellm?.requests || 0;
-    const skillReq = _skillInsights?.summary?.total_invocations || src.skills?.requests || 0;
+    const llmReq = eng.requests || s.total_requests;
+    const skillReq = skillTotal;
     ARIAChartHelpers.renderChart(_charts, 'chart-source-split', 'doughnut', {
         labels: ['LLM Calls', 'Skill Executions'],
         datasets: [{
@@ -530,7 +515,7 @@ function renderModelUsageOverview() {
     });
 
     // ── Chart: Token Usage by Provider (bar) ──
-    const llmModels = (s.by_model || []).filter(m => m.source !== 'skills');
+    const llmModels = s.by_model || [];
     const providerTokens = {};
     llmModels.forEach(m => {
         const prov = m.provider || 'unknown';
@@ -549,7 +534,7 @@ function renderModelUsageOverview() {
     }, { indexAxis: 'y', maxTicksLimit: 10 });
 
     // ── Top LLM Models (overview) ──
-    const topLLM = (s.by_model || []).filter(m => m.source !== 'skills').slice(0, 8);
+    const topLLM = (s.by_model || []).slice(0, 8);
     const overviewLLMBody = document.getElementById('overview-llm-body');
     if (topLLM.length > 0) {
         overviewLLMBody.innerHTML = topLLM.map(m => `
@@ -590,7 +575,7 @@ function renderModelUsageOverview() {
 function renderLLMTab() {
     if (!_statsData) return;
     const s = _statsData;
-    const llmModels = (s.by_model || []).filter(m => m.source !== 'skills');
+    const llmModels = s.by_model || [];
 
     // Stats
     const llmRequests = llmModels.reduce((a, m) => a + safeNumber(m.requests), 0);
@@ -656,8 +641,8 @@ function renderLLMTab() {
 }
 
 function renderRecentLLM() {
-    if (!_llmUsageData) return;
-    const llmRecent = (_llmUsageData._allItems || _llmUsageData.usage || []).slice(0, 25);
+    if (!_usageData) return;
+    const llmRecent = (_usageData._allItems || _usageData.usage || []).slice(0, 25);
     const body = document.getElementById('llm-recent-body');
     if (llmRecent.length > 0) {
         body.innerHTML = llmRecent.map(u => `

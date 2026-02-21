@@ -11,13 +11,6 @@
 <!-- Quick Stats -->
 <div class="stats-row" id="stats-row">
     <div class="stat-card">
-        <div class="stat-icon">🔢</div>
-        <div class="stat-content">
-            <div class="stat-value" id="stat-models">--</div>
-            <div class="stat-label">Available Models</div>
-        </div>
-    </div>
-    <div class="stat-card">
         <div class="stat-icon">💰</div>
         <div class="stat-content">
             <div class="stat-value" id="stat-balance">--</div>
@@ -127,43 +120,6 @@
         <div class="chart-container">
             <h3 class="chart-title">Cost Breakdown</h3>
             <canvas id="cost-breakdown-chart"></canvas>
-        </div>
-    </div>
-</div>
-
-<!-- Models by Provider -->
-<div class="section-card" id="kimi">
-    <div class="section-header">
-        <h2 class="section-title">🤖 Available Models</h2>
-        <button class="btn btn-secondary btn-sm" onclick="loadModels()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-            </svg>
-            Refresh
-        </button>
-    </div>
-    
-    <!-- Filter Tabs -->
-    <div class="filter-tabs" id="provider-tabs">
-        <button class="filter-tab active" data-provider="all">All</button>
-        <button class="filter-tab" data-provider="kimi">🌙 Kimi</button>
-        <button class="filter-tab" data-provider="openrouter">🔀 OpenRouter</button>
-        <button class="filter-tab" data-provider="local">🏠 Local</button>
-    </div>
-    
-    <div class="models-grid" id="models-grid">
-        <!-- Skeleton cards -->
-        <div class="model-card skeleton-card">
-            <div class="skeleton skeleton-text" style="width: 70%; height: 20px;"></div>
-            <div class="skeleton skeleton-text" style="width: 40%; height: 16px; margin-top: 8px;"></div>
-        </div>
-        <div class="model-card skeleton-card">
-            <div class="skeleton skeleton-text" style="width: 70%; height: 20px;"></div>
-            <div class="skeleton skeleton-text" style="width: 40%; height: 16px; margin-top: 8px;"></div>
-        </div>
-        <div class="model-card skeleton-card">
-            <div class="skeleton skeleton-text" style="width: 70%; height: 20px;"></div>
-            <div class="skeleton skeleton-text" style="width: 40%; height: 16px; margin-top: 8px;"></div>
         </div>
     </div>
 </div>
@@ -406,110 +362,6 @@
     margin-top: var(--space-xs);
 }
 
-/* Filter Tabs */
-.filter-tabs {
-    display: flex;
-    gap: var(--space-sm);
-    margin-bottom: var(--space-lg);
-    flex-wrap: wrap;
-}
-
-.filter-tab {
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-full);
-    padding: 8px 16px;
-    font-size: 0.875rem;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    color: var(--text-secondary);
-}
-
-.filter-tab:hover {
-    background: var(--bg-hover);
-    border-color: var(--accent-primary);
-}
-
-.filter-tab.active {
-    background: var(--accent-primary);
-    border-color: var(--accent-primary);
-    color: white;
-}
-
-/* Models Grid */
-.models-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: var(--space-md);
-}
-
-.model-card {
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg);
-    padding: var(--space-md);
-    transition: all 0.2s ease;
-}
-
-.model-card:hover {
-    border-color: var(--accent-primary);
-    transform: translateY(-2px);
-}
-
-.model-card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: var(--space-sm);
-}
-
-.model-name {
-    font-weight: 600;
-    color: var(--text-primary);
-    font-size: 0.9rem;
-    word-break: break-all;
-}
-
-.model-provider {
-    font-size: 0.75rem;
-    padding: 2px 8px;
-    border-radius: var(--radius-full);
-    font-weight: 500;
-}
-
-.model-provider.kimi { background: rgba(139, 92, 246, 0.2); color: #a78bfa; }
-.model-provider.openrouter { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
-.model-provider.local { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
-.model-provider.openai { background: rgba(16, 163, 127, 0.2); color: #10a37f; }
-.model-provider.anthropic { background: rgba(217, 119, 87, 0.2); color: #d97757; }
-
-.model-meta {
-    display: flex;
-    gap: var(--space-md);
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    margin-top: var(--space-sm);
-}
-
-.model-pricing {
-    display: flex;
-    gap: var(--space-sm);
-    margin-top: var(--space-sm);
-}
-
-.price-tag {
-    font-size: 0.7rem;
-    padding: 2px 6px;
-    background: var(--bg-secondary);
-    border-radius: var(--radius-sm);
-    color: var(--text-muted);
-}
-
-.price-tag.free {
-    background: rgba(34, 197, 94, 0.2);
-    color: #22c55e;
-}
-
 /* Select */
 .select-small {
     background: var(--bg-tertiary);
@@ -569,7 +421,6 @@
 const API_URL = window.ARIA_API_BASE_URL;
 
 // Global data stores
-let allModels = [];
 let spendData = null;
 let balanceData = null;
 
@@ -770,97 +621,6 @@ async function loadGlobalSpend() {
             </div>
         `;
     }
-}
-
-// Load models
-async function loadModels() {
-    const grid = document.getElementById('models-grid');
-    
-    try {
-        const data = await fetchWithTimeout(`${API_URL}/litellm/models`);
-        const rawModels = Array.isArray(data?.data)
-            ? data.data
-            : Array.isArray(data?.models)
-                ? data.models
-                : Array.isArray(data)
-                    ? data
-                    : [];
-
-        allModels = rawModels
-            .map(entry => {
-                if (typeof entry === 'string') {
-                    return { id: entry, max_tokens: null };
-                }
-                const id = entry?.id || entry?.model || entry?.name || entry?.model_name || '';
-                if (!id) return null;
-                return {
-                    ...entry,
-                    id,
-                    max_tokens: entry?.max_tokens ?? entry?.maxTokens ?? null,
-                };
-            })
-            .filter(Boolean);
-        
-        // Update stat
-        document.getElementById('stat-models').textContent = allModels.length;
-        
-        renderModels('all');
-        updateCharts();
-        
-    } catch (error) {
-        console.error('Error loading models:', error);
-        grid.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-state-icon">⚠️</div>
-                <p>Could not load models from LiteLLM</p>
-                <button class="btn btn-secondary" onclick="loadModels()" style="margin-top: 1rem;">Retry</button>
-            </div>
-        `;
-    }
-}
-
-// Render models by filter
-function renderModels(filter) {
-    const grid = document.getElementById('models-grid');
-    
-    let models = allModels;
-    if (filter !== 'all') {
-        models = allModels.filter(m => getProvider((m && m.id) || '') === filter);
-    }
-    
-    if (models.length === 0) {
-        grid.innerHTML = `
-            <div class="empty-state" style="grid-column: span 3;">
-                <div class="empty-state-icon">🤖</div>
-                <p>No models found for this provider</p>
-            </div>
-        `;
-        return;
-    }
-    
-    grid.innerHTML = models.map(model => {
-        const modelId = (model && model.id) || 'unknown';
-        const provider = getProvider(modelId);
-        const pricing = getModelPricing(modelId);
-        const isFree = pricing.input === 0 && pricing.output === 0;
-        
-        return `
-            <div class="model-card" data-provider="${provider}">
-                <div class="model-card-header">
-                    <span class="model-name">${modelId}</span>
-                    <span class="model-provider ${provider}">${provider}</span>
-                </div>
-                <div class="model-pricing">
-                    ${isFree 
-                        ? '<span class="price-tag free">FREE</span>'
-                        : `<span class="price-tag">In: $${pricing.input}/M</span>
-                           <span class="price-tag">Out: $${pricing.output}/M</span>`
-                    }
-                </div>
-                ${model.max_tokens ? `<div class="model-meta"><span>Max: ${formatNumber(model.max_tokens)} tokens</span></div>` : ''}
-            </div>
-        `;
-    }).join('');
 }
 
 // Load spend logs
@@ -1222,21 +982,12 @@ async function updateCharts() {
     }
 }
 
-// Provider filter tabs
-document.querySelectorAll('.filter-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-        document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        renderModels(tab.dataset.provider);
-    });
-});
-
 // Initialize on load
 document.addEventListener('DOMContentLoaded', async () => {
     await AriaModels.init();
     loadModelBalances();
     await loadGlobalSpend();  // must complete before charts use cached logs
-    loadModels();
+    updateCharts();
     loadSpendLogs();
 });
 </script>

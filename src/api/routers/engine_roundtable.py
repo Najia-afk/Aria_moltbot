@@ -124,6 +124,54 @@ def _get_roundtable() -> Roundtable:
     return _roundtable
 
 
+async def _validate_requested_agents(agent_ids: list[str]) -> None:
+    """Ensure all requested agents are active/enabled before execution."""
+    if _db_session is None:
+        return
+
+    normalized = [str(a).strip() for a in agent_ids if str(a).strip()]
+    if not normalized:
+        raise HTTPException(status_code=400, detail="No valid agent_ids provided")
+
+    async with _db_session() as session:
+        stmt = select(EngineAgentState).where(EngineAgentState.agent_id.in_(normalized))
+        result = await session.execute(stmt)
+        rows = result.scalars().all()
+
+    by_id = {row.agent_id: row for row in rows}
+    missing = [agent_id for agent_id in normalized if agent_id not in by_id]
+    disabled = []
+    unavailable = []
+
+    for agent_id in normalized:
+        row = by_id.get(agent_id)
+        if row is None:
+            continue
+        status = (row.status or "").lower()
+        enabled = row.enabled is not False
+        if not enabled or status in {"disabled", "terminated"}:
+            disabled.append(agent_id)
+        elif status in {"error"}:
+            unavailable.append(agent_id)
+
+    if missing or disabled or unavailable:
+        problems: list[str] = []
+        if missing:
+            problems.append(f"missing: {', '.join(missing)}")
+        if disabled:
+            problems.append(f"disabled: {', '.join(disabled)}")
+        if unavailable:
+            problems.append(f"unavailable: {', '.join(unavailable)}")
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Requested agents are not runnable ("
+                + "; ".join(problems)
+                + "). Enable/fix them in Agents DB before starting roundtable/swarm."
+            ),
+        )
+
+
 # ── Background task runner ───────────────────────────────────────────────────
 
 async def _run_roundtable_task(
@@ -171,6 +219,7 @@ async def start_roundtable(
     For large discussions, use the /async endpoint instead.
     """
     try:
+        await _validate_requested_agents(body.agent_ids)
         result = await roundtable.discuss(
             topic=body.topic,
             agent_ids=body.agent_ids,
@@ -219,6 +268,7 @@ async def start_roundtable_async(
     Returns immediately with a tracking key. Poll /status/{key} to check.
     """
     import hashlib
+    await _validate_requested_agents(body.agent_ids)
     key = hashlib.sha256(f"{body.topic}:{','.join(body.agent_ids)}".encode()).hexdigest()[:16]
 
     background_tasks.add_task(_run_roundtable_task, body, roundtable)
@@ -291,7 +341,12 @@ async def get_available_agents():
         async with _db_session() as session:
             stmt = (
                 select(EngineAgentState)
-                .where(EngineAgentState.status != "terminated")
+                .where(
+                    and_(
+                        EngineAgentState.status.notin_(["terminated", "disabled"]),
+                        EngineAgentState.enabled.is_(True),
+                    )
+                )
                 .order_by(EngineAgentState.pheromone_score.desc())
             )
             result = await session.execute(stmt)
@@ -583,6 +638,7 @@ async def start_swarm(body: StartSwarmRequest):
     """Start a synchronous swarm decision process."""
     swarm = _get_swarm()
     try:
+        await _validate_requested_agents(body.agent_ids)
         result = await swarm.execute(
             topic=body.topic,
             agent_ids=body.agent_ids,
@@ -607,6 +663,7 @@ async def start_swarm_async(
     """Start a swarm in the background."""
     import hashlib
     swarm = _get_swarm()
+    await _validate_requested_agents(body.agent_ids)
     key = hashlib.sha256(
         f"swarm:{body.topic}:{','.join(body.agent_ids)}".encode()
     ).hexdigest()[:16]

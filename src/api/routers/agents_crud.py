@@ -9,9 +9,12 @@ Endpoints:
   DELETE /agents/db/{agent_id}         — delete an agent
   POST   /agents/db/{agent_id}/enable  — enable agent
   POST   /agents/db/{agent_id}/disable — disable agent
+    POST   /agents/db/enable-core        — enable core agents (aria/devops/analyst/memory/creator/aria_talk)
+    POST   /agents/db/enable-all         — enable all non-terminated agents
   POST   /agents/db/sync              — re-sync from AGENTS.md → DB
 """
 import logging
+import os
 from datetime import datetime, timezone
 from typing import Any
 
@@ -22,6 +25,20 @@ from sqlalchemy import select, func
 logger = logging.getLogger("aria.api.agents_crud")
 
 router = APIRouter(tags=["Agents DB"])
+DEFAULT_CORE_AGENT_IDS = ("aria", "devops", "analyst", "memory", "creator", "aria_talk")
+
+
+def _resolve_core_agent_ids() -> set[str]:
+    """Resolve core agent IDs from env, fallback to sensible defaults."""
+    raw = os.getenv("ARIA_CORE_AGENT_IDS", "")
+    if raw.strip():
+        ids = {part.strip() for part in raw.split(",") if part.strip()}
+        if ids:
+            return ids
+    return set(DEFAULT_CORE_AGENT_IDS)
+
+
+CORE_AGENT_IDS = _resolve_core_agent_ids()
 
 
 # ── Pydantic Schemas ─────────────────────────────────────────────────────────
@@ -293,6 +310,64 @@ async def disable_agent(agent_id: str):
         row.updated_at = datetime.now(timezone.utc)
         await db.commit()
         return {"status": "disabled", "agent_id": agent_id}
+
+
+@router.post("/agents/db/enable-core")
+async def enable_core_agents():
+    """Enable the default core agents in one operation."""
+    from db.models import EngineAgentState
+
+    async for db in _get_db():
+        result = await db.execute(
+            select(EngineAgentState).where(EngineAgentState.agent_id.in_(CORE_AGENT_IDS))
+        )
+        rows = result.scalars().all()
+
+        now = datetime.now(timezone.utc)
+        enabled_ids: list[str] = []
+        missing_ids = sorted(CORE_AGENT_IDS.difference({row.agent_id for row in rows}))
+
+        for row in rows:
+            row.enabled = True
+            row.status = "idle"
+            row.updated_at = now
+            enabled_ids.append(row.agent_id)
+
+        await db.commit()
+        return {
+            "status": "enabled_core",
+            "enabled_count": len(enabled_ids),
+            "enabled_agents": sorted(enabled_ids),
+            "missing_agents": missing_ids,
+        }
+
+
+@router.post("/agents/db/enable-all")
+async def enable_all_agents():
+    """Enable all agents except explicitly terminated ones."""
+    from db.models import EngineAgentState
+
+    async for db in _get_db():
+        result = await db.execute(
+            select(EngineAgentState).where(EngineAgentState.status != "terminated")
+        )
+        rows = result.scalars().all()
+
+        now = datetime.now(timezone.utc)
+        enabled_ids: list[str] = []
+
+        for row in rows:
+            row.enabled = True
+            row.status = "idle"
+            row.updated_at = now
+            enabled_ids.append(row.agent_id)
+
+        await db.commit()
+        return {
+            "status": "enabled_all",
+            "enabled_count": len(enabled_ids),
+            "enabled_agents": sorted(enabled_ids),
+        }
 
 
 @router.post("/agents/db/sync")

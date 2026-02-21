@@ -585,6 +585,7 @@ let currentRoundtable = null;
 let rtNetwork = null;
 let charts = {};
 let currentMode = 'roundtable';  // 'roundtable' or 'swarm'
+const MAX_RENDER_ROUNDS = 50;
 
 // ── Mode Toggle ──────────────────────────────────────────────────────────
 
@@ -623,6 +624,21 @@ function fmtDate(iso) {
     return isNaN(dt) ? '—' : dt.toLocaleString();
 }
 
+function clampPositiveInt(value, fallback = 1, max = MAX_RENDER_ROUNDS) {
+    const n = Number.parseInt(value, 10);
+    if (!Number.isFinite(n) || n <= 0) return fallback;
+    return Math.min(n, max);
+}
+
+function getRenderableRounds(turns, configuredRounds) {
+    const highestRoundInTurns = turns.reduce((maxRound, turn) => {
+        const n = Number.parseInt(turn?.round, 10);
+        return Number.isFinite(n) && n > maxRound ? n : maxRound;
+    }, 0);
+    const inferred = Math.max(highestRoundInTurns, 1);
+    return clampPositiveInt(configuredRounds, inferred, MAX_RENDER_ROUNDS);
+}
+
 const AGENT_COLORS = [
     '#8b5cf6', '#3b82f6', '#22c55e', '#f59e0b', '#ef4444',
     '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16'
@@ -649,7 +665,11 @@ async function loadAgents() {
     try {
         const r = await fetch(`${API_BASE}/engine/roundtable/agents/available`);
         const data = await r.json();
-        availableAgents = data.agents || [];
+        availableAgents = (data.agents || []).filter(a => {
+            const status = String(a?.status || '').toLowerCase();
+            const enabled = a?.enabled;
+            return status !== 'disabled' && status !== 'terminated' && enabled !== false;
+        });
         document.getElementById('stat-agents').textContent = availableAgents.length;
         renderAgentPicker();
     } catch (err) {
@@ -663,6 +683,16 @@ function renderAgentPicker() {
     const container = document.getElementById('agent-picker');
     const synthSelect = document.getElementById('rt-synthesizer');
 
+    selectedAgents.clear();
+
+    if (!availableAgents.length) {
+        container.innerHTML =
+            '<div class="empty-state" style="padding:0.5rem;">No active agents available. Enable agents in Agent Manager first.</div>';
+        synthSelect.innerHTML = '<option value="main">main (default)</option>';
+        document.getElementById('btn-start').disabled = true;
+        return;
+    }
+
     container.innerHTML = availableAgents.map(a => {
         const color = agentColor(a.agent_id);
         return `<div class="agent-chip" data-id="${esc(a.agent_id)}" onclick="toggleAgent('${esc(a.agent_id)}')">
@@ -675,6 +705,8 @@ function renderAgentPicker() {
     synthSelect.innerHTML = availableAgents.map(a =>
         `<option value="${esc(a.agent_id)}" ${a.agent_id === 'aria' ? 'selected' : ''}>${esc(a.display_name || a.agent_id)}</option>`
     ).join('');
+
+    document.getElementById('btn-start').disabled = true;
 }
 
 function toggleAgent(agentId) {
@@ -817,9 +849,9 @@ function renderRoundtableDetail(rt) {
 
 function renderRoundtableGraph(rt) {
     const container = document.getElementById('roundtable-graph');
-    const turns = rt.turns || [];
+    const turns = (rt.turns || []).filter(t => Number.isFinite(Number.parseInt(t?.round, 10)));
     const participants = rt.participants || [];
-    const maxRound = rt.rounds || Math.max(...turns.map(t => t.round), 1);
+    const maxRound = getRenderableRounds(turns, rt.rounds);
 
     const nodes = [];
     const edges = [];
@@ -1003,9 +1035,9 @@ function renderParticipationChart(rt) {
 }
 
 function renderDurationChart(rt) {
-    const turns = rt.turns || [];
+    const turns = (rt.turns || []).filter(t => Number.isFinite(Number.parseInt(t?.round, 10)));
     const agents = rt.participants || [];
-    const maxRound = rt.rounds || Math.max(...turns.map(t => t.round), 1);
+    const maxRound = getRenderableRounds(turns, rt.rounds);
 
     const datasets = agents.map(a => ({
         label: a,
@@ -1028,8 +1060,8 @@ function renderDurationChart(rt) {
 
 function renderTimeline(rt) {
     const container = document.getElementById('turn-timeline');
-    const turns = rt.turns || [];
-    const maxRound = rt.rounds || Math.max(...turns.map(t => t.round), 1);
+    const turns = (rt.turns || []).filter(t => Number.isFinite(Number.parseInt(t?.round, 10)));
+    const maxRound = getRenderableRounds(turns, rt.rounds);
 
     let html = '';
     const phases = { 1: 'EXPLORE', 2: 'WORK' };
