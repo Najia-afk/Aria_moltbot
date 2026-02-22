@@ -5,6 +5,7 @@
 
 from flask import Flask, render_template, make_response, request, Response, send_from_directory
 import os
+import time
 import requests as http_requests
 
 def create_app():
@@ -23,12 +24,16 @@ def create_app():
     # WebSocket base URL (browser-accessible) — used for WS chat connections
     _ws_base_url = os.environ.get('WS_BASE_URL', '')
 
+    # Computed once at startup — used as ?v= cache-buster for static assets
+    _build_ts = int(time.time())
+
     @app.context_processor
     def inject_config():
         return {
             'service_host': service_host,
             'api_base_url': api_base_url,
             'ws_base_url': _ws_base_url,
+            'build_ts': _build_ts,
             # REMOVED: legacy bot proxy config
         }
     
