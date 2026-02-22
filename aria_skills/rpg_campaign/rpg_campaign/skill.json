@@ -1,0 +1,262 @@
+{
+  "name": "aria-rpg-campaign",
+  "version": "1.0.0",
+  "description": "Campaign state management — sessions, world state, encounters, NPCs, party, and calendar for Aria's Pathfinder 2e RPG system.",
+  "author": "Aria Team",
+  "layer": 3,
+  "dependencies": ["api_client"],
+  "focus_affinity": ["rpg_master", "orchestrator"],
+  "tools": [
+    {
+      "name": "create_campaign",
+      "description": "Create a new Pathfinder 2e campaign with world state, NPC roster, and session tracking.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "campaign_id": { "type": "string", "description": "Unique campaign slug" },
+          "title": { "type": "string", "description": "Campaign display title" },
+          "setting": { "type": "string", "description": "World setting (default: Golarion)" },
+          "description": { "type": "string", "description": "Campaign summary" },
+          "dm_notes": { "type": "string", "description": "DM-only notes" },
+          "starting_level": { "type": "integer", "description": "Party starting level" }
+        },
+        "required": ["campaign_id", "title"]
+      }
+    },
+    {
+      "name": "load_campaign",
+      "description": "Load an existing campaign as the active campaign.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "campaign_id": { "type": "string", "description": "Campaign slug to load" }
+        },
+        "required": ["campaign_id"]
+      }
+    },
+    {
+      "name": "list_campaigns",
+      "description": "List all available RPG campaigns.",
+      "input_schema": { "type": "object", "properties": {}, "required": [] }
+    },
+    {
+      "name": "add_to_party",
+      "description": "Add a character sheet to the active campaign's party.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "character_file": { "type": "string", "description": "Character YAML filename" }
+        },
+        "required": ["character_file"]
+      }
+    },
+    {
+      "name": "get_party_status",
+      "description": "Get full HP, AC, conditions, and level for all party members.",
+      "input_schema": { "type": "object", "properties": {}, "required": [] }
+    },
+    {
+      "name": "start_session",
+      "description": "Start a new numbered game session.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "recap": { "type": "string", "description": "Recap of previous session" }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "log_event",
+      "description": "Log a narrative, combat, social, exploration, loot, or milestone event to the session.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "event": { "type": "string", "description": "Event description" },
+          "event_type": { "type": "string", "description": "narrative, combat, social, exploration, loot, milestone" }
+        },
+        "required": ["event"]
+      }
+    },
+    {
+      "name": "end_session",
+      "description": "End the current game session and save notes.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "notes": { "type": "string", "description": "DM closing notes" }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "update_location",
+      "description": "Move the party to a new location, adding it to known locations if new.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "location": { "type": "string", "description": "New location name" },
+          "description": { "type": "string", "description": "Location description" }
+        },
+        "required": ["location"]
+      }
+    },
+    {
+      "name": "add_npc",
+      "description": "Add a named NPC to the campaign roster with role and optional stats.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "npc_name": { "type": "string" },
+          "role": { "type": "string", "description": "friendly, neutral, hostile, boss" },
+          "description": { "type": "string" },
+          "location": { "type": "string" },
+          "stats": { "type": "object", "description": "Optional combat stats" }
+        },
+        "required": ["npc_name"]
+      }
+    },
+    {
+      "name": "list_npcs",
+      "description": "List NPCs in the active campaign, optionally filtered by role.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "role_filter": { "type": "string", "description": "Filter by role" }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "create_encounter",
+      "description": "Create a pre-built encounter with enemies, environment, loot, and XP.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "encounter_id": { "type": "string" },
+          "title": { "type": "string" },
+          "threat_level": { "type": "string", "description": "trivial, low, moderate, severe, extreme" },
+          "description": { "type": "string" },
+          "enemies": { "type": "array", "description": "Enemy combatant list" },
+          "environment": { "type": "string" },
+          "loot": { "type": "array", "description": "Treasure items" },
+          "xp_reward": { "type": "integer" }
+        },
+        "required": ["encounter_id", "title"]
+      }
+    },
+    {
+      "name": "list_encounters",
+      "description": "List encounters for the active campaign.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "status_filter": { "type": "string", "description": "Filter: prepared, active, completed" }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "advance_time",
+      "description": "Advance the in-game Golarion calendar by N days.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "days": { "type": "integer", "description": "Days to advance" },
+          "event": { "type": "string", "description": "Event during this period" }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "get_world_state",
+      "description": "Get the full world state: location, calendar, factions, events.",
+      "input_schema": { "type": "object", "properties": {}, "required": [] }
+    },
+    {
+      "name": "generate_quest",
+      "description": "Generate a reusable quest template YAML with encounters, NPCs, boss, loot, and DM instructions. Aria uses this to build a full quest that she can run as DM.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "quest_id": { "type": "string", "description": "Unique quest slug (e.g., 'goblin_warrens')" },
+          "title": { "type": "string", "description": "Quest display title" },
+          "hook": { "type": "string", "description": "Story hook — why the party is here" },
+          "setting_location": { "type": "string", "description": "Starting location" },
+          "target_level_start": { "type": "integer", "description": "Expected party level at start" },
+          "target_level_end": { "type": "integer", "description": "Expected party level at end" },
+          "tone": { "type": "string", "description": "Narrative tone (dark fantasy, heroic, horror, etc.)" },
+          "party_characters": { "type": "array", "items": { "type": "string" }, "description": "Character YAML filenames for player characters" },
+          "companion_characters": { "type": "array", "items": { "type": "string" }, "description": "Character YAML filenames for NPC companions" },
+          "encounter_sequence": {
+            "type": "array",
+            "description": "Ordered encounters. Each: {id, title, type (combat|social|exploration|puzzle|boss), threat_level, description, enemies: [{name, level, hp, ac, attack_bonus, damage, perception}], environment, xp_reward, loot: [], special_rules}",
+            "items": { "type": "object" }
+          },
+          "npcs": {
+            "type": "array",
+            "description": "Named NPCs. Each: {name, role (friendly|neutral|hostile|boss), description, location, stats: {}}",
+            "items": { "type": "object" }
+          },
+          "boss": {
+            "type": "object",
+            "description": "Boss encounter (same format as encounter_sequence entry)"
+          },
+          "loot_table": {
+            "type": "array",
+            "description": "Loot rewards. Each: {item, value_gp, source}",
+            "items": { "type": "object" }
+          },
+          "dm_instructions": { "type": "string", "description": "Free-form DM guidance for running this quest" }
+        },
+        "required": ["quest_id", "title", "hook", "setting_location"]
+      }
+    },
+    {
+      "name": "load_quest",
+      "description": "Load a quest template and get a full DM briefing with encounters, NPCs, and instructions.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "quest_id": { "type": "string", "description": "Quest slug to load" }
+        },
+        "required": ["quest_id"]
+      }
+    },
+    {
+      "name": "list_quests",
+      "description": "List all quest templates for the active campaign.",
+      "input_schema": { "type": "object", "properties": {}, "required": [] }
+    },
+    {
+      "name": "complete_encounter_in_quest",
+      "description": "Mark an encounter as completed in a quest and track progress toward quest completion.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "quest_id": { "type": "string", "description": "Quest slug" },
+          "encounter_id": { "type": "string", "description": "Encounter ID within the quest" },
+          "xp_awarded": { "type": "integer", "description": "XP actually awarded" },
+          "loot_found": { "type": "array", "items": { "type": "string" }, "description": "Items found" },
+          "notes": { "type": "string", "description": "How the encounter went" }
+        },
+        "required": ["quest_id", "encounter_id"]
+      }
+    },
+    {
+      "name": "save_session_transcript",
+      "description": "Save a formatted session transcript markdown to aria_memories/rpg/sessions/.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string", "description": "Transcript title / campaign slug" },
+          "content": { "type": "string", "description": "Full markdown transcript content" },
+          "player_name": { "type": "string", "description": "Player character name" },
+          "companion_name": { "type": "string", "description": "Companion NPC name" },
+          "dm_name": { "type": "string", "description": "DM name (default: Aria)" }
+        },
+        "required": ["title", "content"]
+      }
+    }
+  ]
+}

@@ -1590,13 +1590,9 @@
         // Hide cron/swarm/agent session types unless toggle is on
         if (!showAgentSessions) {
             filtered = filtered.filter(s => !AGENT_SESSION_TYPES.has(s.session_type));
-        } else {
-            // When showing all types, sort interactive/roundtable before cron/swarm
-            filtered = [
-                ...filtered.filter(s => !AGENT_SESSION_TYPES.has(s.session_type)),
-                ...filtered.filter(s => AGENT_SESSION_TYPES.has(s.session_type)),
-            ];
         }
+        // When showAgentSessions is on, keep all sessions in server-side
+        // time order (updated_at desc) — no client-side grouping.
 
         if (agentFilter) {
             filtered = filtered.filter(s => (s.agent_id || 'main') === agentFilter);

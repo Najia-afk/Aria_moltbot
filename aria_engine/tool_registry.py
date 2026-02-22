@@ -169,7 +169,7 @@ class ToolRegistry:
                     self._tools[tool_name] = ToolDefinition(
                         name=tool_name,
                         description=tool_def.get("description", ""),
-                        parameters=tool_def.get("parameters", {
+                        parameters=tool_def.get("parameters") or tool_def.get("input_schema", {
                             "type": "object", "properties": {},
                         }),
                         skill_name=skill_dir.name,

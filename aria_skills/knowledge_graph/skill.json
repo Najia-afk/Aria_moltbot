@@ -22,7 +22,7 @@
             "type": "string",
             "description": "Entity name"
           },
-          "type": {
+          "entity_type": {
             "type": "string",
             "description": "Entity type (person, place, concept, event, organization, skill, topic)"
           },
@@ -33,7 +33,7 @@
         },
         "required": [
           "name",
-          "type"
+          "entity_type"
         ]
       }
     },
@@ -51,7 +51,7 @@
             "type": "string",
             "description": "Target entity name"
           },
-          "relation_type": {
+          "relation": {
             "type": "string",
             "description": "Relationship type (created, owns, uses, knows, works_with, located_in, part_of, related_to, interested_in)"
           },
@@ -62,8 +62,8 @@
         },
         "required": [
           "from_entity",
-          "to_entity",
-          "relation_type"
+          "relation",
+          "to_entity"
         ]
       }
     },
