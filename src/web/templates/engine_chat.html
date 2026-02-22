@@ -1323,6 +1323,8 @@
         if (window.innerWidth <= 768) {
             toggleSidebar();
         }
+        // Refresh relative timestamps ("2h ago") every 60 s without a full reload
+        setInterval(() => filterSessions(), 60_000);
     });
 
     // ── Model Selector (S6-04) ──────────────────────────────────
