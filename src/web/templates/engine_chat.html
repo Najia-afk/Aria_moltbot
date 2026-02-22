@@ -607,13 +607,13 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px;
+    padding: 14px 16px;
     border-bottom: 1px solid var(--border-color, #2a2a3e);
 }
 
 .sidebar-header h3 {
     margin: 0;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     font-weight: 600;
     color: var(--text-primary, #e0e0e0);
 }
@@ -634,38 +634,27 @@
     background: var(--bg-tertiary, #2a2a3e);
 }
 
-.sidebar-section {
-    padding: 8px 16px;
+.sidebar-controls {
+    padding: 10px 12px 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border-bottom: 1px solid var(--border-color, #2a2a3e);
 }
 
-.sidebar-label {
-    display: block;
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    color: var(--text-muted, #888);
-    margin-bottom: 4px;
-    letter-spacing: 0.05em;
-}
-
-.sidebar-select {
-    width: 100%;
-    background: var(--bg-primary, #0d0d1a);
-    border: 1px solid var(--border-color, #3a3a5e);
-    border-radius: 6px;
-    padding: 8px 10px;
-    color: var(--text-primary, #e0e0e0);
-    font-size: 0.85rem;
-    font-family: inherit;
+.sidebar-search-row {
+    display: flex;
+    gap: 6px;
 }
 
 .sidebar-search {
-    width: 100%;
+    flex: 1;
     background: var(--bg-primary, #0d0d1a);
     border: 1px solid var(--border-color, #3a3a5e);
-    border-radius: 6px;
-    padding: 8px 10px;
+    border-radius: 8px;
+    padding: 7px 10px;
     color: var(--text-primary, #e0e0e0);
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     font-family: inherit;
     outline: none;
     transition: border-color 0.2s;
@@ -680,29 +669,63 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    margin: 8px 16px;
-    padding: 10px;
+    gap: 6px;
+    padding: 8px 12px;
     background: var(--accent-primary, #6c5ce7);
     border: none;
     border-radius: 8px;
     color: white;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     font-weight: 500;
     cursor: pointer;
     transition: background 0.2s;
     font-family: inherit;
+    white-space: nowrap;
 }
 
 .sidebar-new-btn:hover {
     background: #5a4bd6;
 }
 
+.sidebar-filters {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.sidebar-select {
+    flex: 1;
+    background: var(--bg-primary, #0d0d1a);
+    border: 1px solid var(--border-color, #3a3a5e);
+    border-radius: 6px;
+    padding: 5px 8px;
+    color: var(--text-primary, #e0e0e0);
+    font-size: 0.75rem;
+    font-family: inherit;
+}
+
+.sidebar-toggle-label {
+    font-size: 0.68rem;
+    color: var(--text-muted, #888);
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.sidebar-toggle-label input[type="checkbox"] {
+    accent-color: var(--accent-primary, #6c5ce7);
+    width: 13px;
+    height: 13px;
+}
+
 /* ── Session List ────────────────────────────────────────────── */
 .session-list {
     flex: 1;
     overflow-y: auto;
-    padding: 8px;
+    padding: 4px 8px 8px;
 }
 
 .session-list::-webkit-scrollbar {
@@ -721,13 +744,33 @@
     font-size: 0.85rem;
 }
 
+/* Time group headers */
+.session-group-header {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted, #666);
+    padding: 12px 8px 4px;
+    position: sticky;
+    top: 0;
+    background: var(--bg-secondary, #1a1a2e);
+    z-index: 1;
+}
+
+.session-group-header:first-child {
+    padding-top: 6px;
+}
+
+/* Session item card */
 .session-item {
-    padding: 10px 12px;
+    padding: 8px 10px;
     border-radius: 8px;
     cursor: pointer;
     transition: background 0.15s;
-    margin-bottom: 2px;
+    margin-bottom: 1px;
     position: relative;
+    border: 1px solid transparent;
 }
 
 .session-item:hover {
@@ -735,61 +778,84 @@
 }
 
 .session-item.active {
-    background: rgba(108, 92, 231, 0.15);
-    border: 1px solid rgba(108, 92, 231, 0.3);
+    background: rgba(108, 92, 231, 0.12);
+    border-color: rgba(108, 92, 231, 0.3);
 }
 
 .session-item-title {
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     font-weight: 500;
     color: var(--text-primary, #e0e0e0);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    margin-bottom: 3px;
+    line-height: 1.3;
+}
+
+.session-item-preview {
+    font-size: 0.72rem;
+    color: var(--text-muted, #777);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     margin-bottom: 4px;
+    line-height: 1.2;
 }
 
 .session-item-meta {
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 0.7rem;
+    gap: 6px;
+    font-size: 0.68rem;
     color: var(--text-muted, #888);
 }
 
 .session-item-meta .agent-badge {
-    background: rgba(108, 92, 231, 0.2);
+    background: rgba(108, 92, 231, 0.15);
     color: var(--accent-primary, #6c5ce7);
-    padding: 1px 6px;
+    padding: 1px 5px;
     border-radius: 4px;
-    font-size: 0.65rem;
-    font-weight: 500;
+    font-size: 0.62rem;
+    font-weight: 600;
+}
+
+.session-item-meta .msg-count {
+    color: var(--text-muted, #666);
+}
+
+.session-item-meta .time-label {
+    margin-left: auto;
+    color: var(--text-muted, #666);
 }
 
 /* Session type badges */
 .session-type-badge {
     padding: 1px 5px;
     border-radius: 4px;
-    font-size: 0.6rem;
+    font-size: 0.58rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.03em;
 }
-.session-type-badge.interactive { background: rgba(72,199,142,0.15); color: #48c78e; }
-.session-type-badge.roundtable  { background: rgba(103,126,234,0.18); color: #677eea; }
-.session-type-badge.cron        { background: rgba(136,136,136,0.15); color: #888; }
-.session-type-badge.swarm       { background: rgba(255,182,72,0.15);  color: #ffb648; }
-.session-type-badge.subagent    { background: rgba(255,182,72,0.12);  color: #e6a030; }
+.session-type-badge.interactive { background: rgba(72,199,142,0.12); color: #48c78e; }
+.session-type-badge.roundtable  { background: rgba(103,126,234,0.15); color: #677eea; }
+.session-type-badge.cron        { background: rgba(136,136,136,0.12); color: #888; }
+.session-type-badge.swarm       { background: rgba(255,182,72,0.12); color: #ffb648; }
+.session-type-badge.subagent    { background: rgba(255,182,72,0.10); color: #e6a030; }
 
-/* Ghost session label */
-.session-item-title.ghost-label em { color: var(--text-muted,#888); font-size:0.75rem; }
+/* Ghost session */
+.session-item.ghost-session { opacity: 0.5; }
+.session-item.ghost-session:hover { opacity: 0.8; }
+.session-item-title.ghost-label { color: var(--text-muted,#888); font-style: italic; }
 
+/* Session action buttons */
 .session-item-actions {
     position: absolute;
-    top: 8px;
-    right: 8px;
+    top: 6px;
+    right: 6px;
     display: none;
-    gap: 4px;
+    gap: 3px;
 }
 
 .session-item:hover .session-item-actions {
@@ -800,11 +866,11 @@
     background: var(--bg-secondary, #1a1a2e);
     border: 1px solid var(--border-color, #3a3a5e);
     color: var(--text-muted, #888);
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -828,19 +894,14 @@
     border-color: rgba(102, 126, 234, 0.3);
 }
 
-.session-item.archived {
-    opacity: 0.6;
-}
-
-.session-item.archived .session-item-title {
-    font-style: italic;
-}
+.session-item.archived { opacity: 0.5; }
+.session-item.archived .session-item-title { font-style: italic; }
 
 .session-empty {
     text-align: center;
-    padding: 40px 20px;
+    padding: 40px 16px;
     color: var(--text-muted, #888);
-    font-size: 0.85rem;
+    font-size: 0.82rem;
 }
 
 /* ── Model Selector Enhancements (S6-04) ─────────────────────── */
@@ -921,36 +982,27 @@
             <button class="sidebar-close-btn" onclick="toggleSidebar()" title="Close sidebar">✕</button>
         </div>
 
-        <!-- Agent Selector -->
-        <div class="sidebar-section">
-            <label class="sidebar-label">Agent</label>
-            <select id="agentSelector" class="sidebar-select" onchange="filterSessions()">
-                <option value="">All Agents</option>
-            </select>
+        <div class="sidebar-controls">
+            <div class="sidebar-search-row">
+                <input type="text" id="sessionSearch" class="sidebar-search"
+                       placeholder="Search sessions…" oninput="filterSessions()">
+                <button class="sidebar-new-btn" onclick="createNewSession()" title="New chat">
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+                    </svg>
+                    New
+                </button>
+            </div>
+            <div class="sidebar-filters">
+                <select id="agentSelector" class="sidebar-select" onchange="filterSessions()">
+                    <option value="">All Agents</option>
+                </select>
+                <label class="sidebar-toggle-label">
+                    <input type="checkbox" id="showAgentSessions" onchange="loadSessions()">
+                    Cron/RT
+                </label>
+            </div>
         </div>
-
-        <!-- Search -->
-        <div class="sidebar-section">
-            <input type="text" id="sessionSearch" class="sidebar-search"
-                   placeholder="Search sessions…" oninput="filterSessions()">
-        </div>
-
-        <!-- Session type toggle -->
-        <div class="sidebar-section" style="display:flex;align-items:center;gap:8px;padding:4px 12px">
-            <label style="font-size:11px;color:var(--text-muted);user-select:none;display:flex;align-items:center;gap:6px;cursor:pointer;">
-                <input type="checkbox" id="showAgentSessions" onchange="loadSessions()"
-                       style="accent-color:var(--accent-primary);">
-                Show agent sessions
-            </label>
-        </div>
-
-        <!-- New Session Button -->
-        <button class="sidebar-new-btn" onclick="createNewSession()">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-                <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
-            </svg>
-            New Chat
-        </button>
 
         <!-- Session List -->
         <div class="session-list" id="sessionList">
@@ -1514,22 +1566,86 @@
         }
     }
 
-    // Returns relative time string ("just now", "5m ago", "2h ago", etc.)
+    // ── Time helpers ──────────────────────────────────────────
     function timeAgo(dateStr) {
         if (!dateStr) return '';
         const d = new Date(dateStr);
         if (isNaN(d)) return '';
         const now = Date.now();
         const diff = now - d.getTime();
-        if (diff < 60000)   return 'just now';
-        if (diff < 3600000) return `${Math.floor(diff/60000)}m ago`;
-        if (diff < 86400000) return `${Math.floor(diff/3600000)}h ago`;
-        if (diff < 604800000) return `${Math.floor(diff/86400000)}d ago`;
-        return d.toLocaleDateString();
+        if (diff < 60000)    return 'now';
+        if (diff < 3600000)  return `${Math.floor(diff/60000)}m`;
+        if (diff < 86400000) return `${Math.floor(diff/3600000)}h`;
+        if (diff < 604800000) return `${Math.floor(diff/86400000)}d`;
+        return d.toLocaleDateString('en', { month: 'short', day: 'numeric' });
+    }
+
+    function getTimeGroup(dateStr) {
+        if (!dateStr) return 'Older';
+        const d = new Date(dateStr);
+        if (isNaN(d)) return 'Older';
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+        const weekAgo = new Date(today); weekAgo.setDate(weekAgo.getDate() - 7);
+        const monthAgo = new Date(today); monthAgo.setDate(monthAgo.getDate() - 30);
+
+        if (d >= today) return 'Today';
+        if (d >= yesterday) return 'Yesterday';
+        if (d >= weekAgo) return 'This Week';
+        if (d >= monthAgo) return 'This Month';
+        return 'Older';
     }
 
     // Short human-readable session type
     const TYPE_LABELS = { interactive: null, cron: 'cron', roundtable: 'rt', swarm: 'swarm', subagent: 'sub' };
+    const TYPE_ICONS = { interactive: '💬', cron: '⏱', roundtable: '🗣', swarm: '🐝', subagent: '🔗' };
+
+    function renderSessionItem(s) {
+        const isGhost = (s.message_count === 0);
+        const rawTitle = s.title || s.label || '';
+        const stype = s.session_type || 'interactive';
+        const icon = TYPE_ICONS[stype] || '💬';
+        let title;
+        if (rawTitle) {
+            title = rawTitle;
+        } else if (isGhost) {
+            title = '— empty —';
+        } else {
+            // Try to generate a useful fallback title
+            const typeNames = { roundtable: 'Roundtable', cron: 'Cron Job', swarm: 'Swarm', subagent: 'Sub-agent' };
+            title = typeNames[stype] || `Chat · ${(s.id || '').substring(0, 8)}`;
+        }
+
+        const agent = s.agent_id || 'main';
+        const dateRaw = s.last_message_at || s.updated_at || s.created_at;
+        const dateStr = timeAgo(dateRaw);
+        const dateFull = dateRaw ? new Date(dateRaw).toLocaleString() : '';
+        const msgCount = s.message_count || 0;
+        const isActive = s.id === sessionId;
+        const isArchived = (s.status === 'archived');
+        const titleClass = isGhost ? 'session-item-title ghost-label' : 'session-item-title';
+        const typeLabel = TYPE_LABELS[stype] !== undefined ? TYPE_LABELS[stype] : stype;
+        const typeBadge = typeLabel ? `<span class="session-type-badge ${escapeAttr(stype)}">${escapeHtml(typeLabel)}</span>` : '';
+
+        return `
+            <div class="session-item ${isActive ? 'active' : ''} ${isArchived ? 'archived' : ''} ${isGhost ? 'ghost-session' : ''}"
+                 onclick="switchSession('${s.id}')" data-id="${s.id}"
+                 data-agent="${agent}" data-title="${escapeAttr(rawTitle || title)}">
+                <div class="${titleClass}">${isArchived ? '📦 ' : ''}${isGhost ? `<em>${escapeHtml(title)}</em>` : escapeHtml(title)}</div>
+                <div class="session-item-meta">
+                    <span class="agent-badge">${escapeHtml(agent)}</span>
+                    ${typeBadge}
+                    <span class="msg-count">${msgCount ? msgCount + ' msg' : ''}</span>
+                    <span class="time-label" title="${escapeAttr(dateFull)}">${dateStr}</span>
+                </div>
+                <div class="session-item-actions">
+                    ${!isArchived ? `<button class="session-action-btn archive" onclick="event.stopPropagation(); archiveSession('${s.id}')" title="Archive">📦</button>` : ''}
+                    <button class="session-action-btn delete" onclick="event.stopPropagation(); deleteSession('${s.id}')" title="Delete">🗑</button>
+                </div>
+            </div>
+        `;
+    }
 
     function renderSessionList(sessions) {
         const container = document.getElementById('sessionList');
@@ -1539,42 +1655,25 @@
             return;
         }
 
-        container.innerHTML = sessions.map(s => {
-            const isGhost = (s.message_count === 0);
-            const rawTitle = s.title || s.label || '';
-            const title = rawTitle || (isGhost ? '— empty —' : `Untitled · ${(s.id || '').substring(0, 8)}`);
-            const agent = s.agent_id || 'main';
-            const dateRaw = s.updated_at || s.created_at;
-            const dateStr = timeAgo(dateRaw);
-            const dateFull = dateRaw ? new Date(dateRaw).toLocaleString() : '';
-            const msgCount = s.message_count || 0;
-            const model = s.model || '';
-            const stype = s.session_type || 'interactive';
-            const isActive = s.id === sessionId;
-            const isArchived = (s.status === 'archived');
-            const titleClass = isGhost ? 'session-item-title ghost-label' : 'session-item-title';
-            const typeLabel = TYPE_LABELS[stype] !== undefined ? TYPE_LABELS[stype] : stype;
-            const typeBadge = typeLabel ? `<span class="session-type-badge ${escapeAttr(stype)}">${escapeHtml(typeLabel)}</span>` : '';
+        // Group sessions by time period using last_message_at or updated_at
+        const groups = {};
+        const groupOrder = ['Today', 'Yesterday', 'This Week', 'This Month', 'Older'];
+        sessions.forEach(s => {
+            const dateKey = s.last_message_at || s.updated_at || s.created_at;
+            const group = getTimeGroup(dateKey);
+            if (!groups[group]) groups[group] = [];
+            groups[group].push(s);
+        });
 
-            return `
-                <div class="session-item ${isActive ? 'active' : ''} ${isArchived ? 'archived' : ''} ${isGhost ? 'ghost-session' : ''}"
-                     onclick="switchSession('${s.id}')" data-id="${s.id}"
-                     data-agent="${agent}" data-title="${escapeAttr(rawTitle || title)}">
-                    <div class="${titleClass}">${isArchived ? '📦 ' : ''}${isGhost ? `<em>${escapeHtml(title)}</em>` : escapeHtml(title)}</div>
-                    <div class="session-item-meta">
-                        <span class="agent-badge">${escapeHtml(agent)}</span>
-                        ${typeBadge}
-                        <span title="${escapeAttr(dateFull)}">${dateStr}</span>
-                        ${msgCount ? `<span>${msgCount} msgs</span>` : ''}
-                        ${model ? `<span title="${escapeAttr(model)}">${escapeHtml(model.split('/').pop())}</span>` : ''}
-                    </div>
-                    <div class="session-item-actions">
-                        ${!isArchived ? `<button class="session-action-btn archive" onclick="event.stopPropagation(); archiveSession('${s.id}')" title="Archive">📦</button>` : ''}
-                        <button class="session-action-btn delete" onclick="event.stopPropagation(); deleteSession('${s.id}')" title="Delete">🗑</button>
-                    </div>
-                </div>
-            `;
-        }).join('');
+        let html = '';
+        groupOrder.forEach(groupName => {
+            const items = groups[groupName];
+            if (!items || items.length === 0) return;
+            html += `<div class="session-group-header">${groupName}</div>`;
+            items.forEach(s => { html += renderSessionItem(s); });
+        });
+
+        container.innerHTML = html;
     }
 
     // Session types treated as "agent/background" — hidden by default
@@ -1591,8 +1690,11 @@
         if (!showAgentSessions) {
             filtered = filtered.filter(s => !AGENT_SESSION_TYPES.has(s.session_type));
         }
-        // When showAgentSessions is on, keep all sessions in server-side
-        // time order (updated_at desc) — no client-side grouping.
+
+        // Hide ghost sessions (0 messages) unless searching
+        if (!searchQuery) {
+            filtered = filtered.filter(s => s.message_count > 0 || s.id === sessionId);
+        }
 
         if (agentFilter) {
             filtered = filtered.filter(s => (s.agent_id || 'main') === agentFilter);
@@ -1603,9 +1705,18 @@
                 const title = (s.title || s.label || '').toLowerCase();
                 const agent = (s.agent_id || '').toLowerCase();
                 const model = (s.model || '').toLowerCase();
-                return title.includes(searchQuery) || agent.includes(searchQuery) || model.includes(searchQuery);
+                const sid = (s.id || '').toLowerCase();
+                return title.includes(searchQuery) || agent.includes(searchQuery)
+                    || model.includes(searchQuery) || sid.includes(searchQuery);
             });
         }
+
+        // Sort by last_message_at (or updated_at) desc to ensure proper time ordering
+        filtered.sort((a, b) => {
+            const da = new Date(a.last_message_at || a.updated_at || a.created_at || 0);
+            const db = new Date(b.last_message_at || b.updated_at || b.created_at || 0);
+            return db - da;
+        });
 
         renderSessionList(filtered);
     }
