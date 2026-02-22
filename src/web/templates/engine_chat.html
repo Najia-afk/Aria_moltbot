@@ -2131,6 +2131,27 @@
     }
 
     async function loadSession(sid) {
+        // Determine session type from allSessions cache (avoid extra fetch)
+        const sessMeta = allSessions.find(s => s.id === sid);
+        const stype = sessMeta?.session_type || 'interactive';
+        const isAgentSession = AGENT_SESSION_TYPES.has(stype);
+
+        // Show/hide read-only banner for cron/swarm/subagent sessions
+        let readOnlyBanner = document.getElementById('readOnlyBanner');
+        if (!readOnlyBanner) {
+            readOnlyBanner = document.createElement('div');
+            readOnlyBanner.id = 'readOnlyBanner';
+            readOnlyBanner.style.cssText = 'padding:6px 16px;background:var(--bg-tertiary,#2a2a2a);color:var(--text-muted,#888);font-size:11px;text-align:center;border-bottom:1px solid var(--border-color,#333);';
+            const chatMessages = document.getElementById('chatMessages');
+            chatMessages.parentNode.insertBefore(readOnlyBanner, chatMessages);
+        }
+        if (isAgentSession) {
+            readOnlyBanner.textContent = `📖 Read-only — ${stype} session (Aria's internal work log)`;
+            readOnlyBanner.style.display = 'block';
+        } else {
+            readOnlyBanner.style.display = 'none';
+        }
+
         try {
             // Use the NativeSessionManager endpoint (direct DB) — never 404s for valid sessions
             const resp = await fetch(`/api/engine/sessions/${sid}/messages?limit=200`);
@@ -2143,7 +2164,8 @@
                     if (_e) _e.style.display = 'none';
                 }
                 messages.forEach(m => {
-                    addMessage(m.role, m.content, {
+                    const content = typeof m.content === 'string' ? m.content : JSON.stringify(m.content || '');
+                    addMessage(m.role, content, {
                         thinking: m.thinking,
                         tool_calls: m.tool_calls,
                         model: m.model,
@@ -2152,10 +2174,22 @@
             } else {
                 console.warn(`Messages load returned ${resp.status} for session ${sid}`);
             }
-            connectWS();
+            // Only open a live WebSocket for interactive sessions — cron/swarm sessions
+            // are completed work logs; connecting WS to them causes retry storms.
+            if (!isAgentSession) {
+                document.getElementById('chatInput').disabled = false;
+                document.getElementById('chatInput').placeholder = 'Send a message to Aria…';
+                document.getElementById('sendBtn').disabled = false;
+                connectWS();
+            } else {
+                document.getElementById('chatInput').disabled = true;
+                document.getElementById('chatInput').placeholder = 'Read-only — agent work log';
+                document.getElementById('sendBtn').disabled = true;
+                setStatus('connected');  // show green — session loaded OK, just read-only
+            }
         } catch(e) {
             console.error('Failed to load session:', e);
-            connectWS();
+            if (!isAgentSession) connectWS();
         }
     }
 
