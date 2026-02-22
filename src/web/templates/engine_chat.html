@@ -153,6 +153,26 @@
     color: var(--text-muted, #888);
 }
 
+/* RT-06: responder model badge */
+.msg-model-badge {
+    font-size: 0.7rem;
+    color: var(--text-muted, #888);
+    background: rgba(103,126,234,0.12);
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    margin-left: 4px;
+}
+
+/* RT-09 ghost session label in sidebar */
+.session-item.ghost-session {
+    opacity: 0.6;
+}
+.session-item.ghost-session:hover {
+    opacity: 1;
+}
+
 .message-content {
     font-size: 0.9rem;
     line-height: 1.7;
@@ -897,6 +917,15 @@
                    placeholder="Search sessions…" oninput="filterSessions()">
         </div>
 
+        <!-- Session type toggle -->
+        <div class="sidebar-section" style="display:flex;align-items:center;gap:8px;padding:4px 12px">
+            <label style="font-size:11px;color:var(--text-muted);user-select:none;display:flex;align-items:center;gap:6px;cursor:pointer;">
+                <input type="checkbox" id="showAgentSessions" onchange="filterSessions()"
+                       style="accent-color:var(--accent-primary);">
+                Show agent sessions
+            </label>
+        </div>
+
         <!-- New Session Button -->
         <button class="sidebar-new-btn" onclick="createNewSession()">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
@@ -1470,7 +1499,9 @@
         }
 
         container.innerHTML = sessions.map(s => {
-            const title = s.title || s.label || `Chat ${(s.id || '').substring(0, 8)}`;
+            const isGhost = (s.message_count === 0);
+            const rawTitle = s.title || s.label || '';
+            const title = rawTitle || (isGhost ? '— empty —' : `Chat ${(s.id || '').substring(0, 8)}`);
             const agent = s.agent_id || 'main';
             const date = s.updated_at || s.created_at;
             const dateStr = date ? new Date(date).toLocaleDateString() : '';
@@ -1478,12 +1509,13 @@
             const model = s.model || '';
             const isActive = s.id === sessionId;
             const isArchived = (s.status === 'archived');
+            const titleClass = isGhost ? 'session-item-title ghost-label' : 'session-item-title';
 
             return `
-                <div class="session-item ${isActive ? 'active' : ''} ${isArchived ? 'archived' : ''}"
+                <div class="session-item ${isActive ? 'active' : ''} ${isArchived ? 'archived' : ''} ${isGhost ? 'ghost-session' : ''}"
                      onclick="switchSession('${s.id}')" data-id="${s.id}"
-                     data-agent="${agent}" data-title="${escapeAttr(title)}">
-                    <div class="session-item-title">${isArchived ? '📦 ' : ''}${escapeHtml(title)}</div>
+                     data-agent="${agent}" data-title="${escapeAttr(rawTitle || title)}">
+                    <div class="${titleClass}">${isArchived ? '📦 ' : ''}${isGhost ? `<em style="color:var(--text-muted);font-size:12px">${escapeHtml(title)}</em>` : escapeHtml(title)}</div>
                     <div class="session-item-meta">
                         <span class="agent-badge">${escapeHtml(agent)}</span>
                         <span>${dateStr}</span>
@@ -1499,11 +1531,20 @@
         }).join('');
     }
 
+    // Session types treated as "agent/background" — hidden by default
+    const AGENT_SESSION_TYPES = new Set(['cron', 'swarm', 'roundtable', 'subagent']);
+
     function filterSessions() {
         const agentFilter = document.getElementById('agentSelector').value;
         const searchQuery = document.getElementById('sessionSearch').value.toLowerCase().trim();
+        const showAgentSessions = document.getElementById('showAgentSessions')?.checked;
 
         let filtered = allSessions;
+
+        // Hide cron/swarm/agent session types unless toggle is on
+        if (!showAgentSessions) {
+            filtered = filtered.filter(s => !AGENT_SESSION_TYPES.has(s.session_type));
+        }
 
         if (agentFilter) {
             filtered = filtered.filter(s => (s.agent_id || 'main') === agentFilter);
@@ -1841,6 +1882,25 @@
             if (indicator) indicator.remove();
             renderStreamContent();
 
+            // RT-06: inject model badge into message header once model is known
+            if (msg && msg.model) {
+                const header = streamingMessageEl.querySelector('.message-header');
+                if (header && !header.querySelector('.msg-model-badge')) {
+                    const shortModel = msg.model.split('/').pop();
+                    const badge = document.createElement('span');
+                    badge.className = 'msg-model-badge';
+                    badge.title = msg.model;
+                    badge.textContent = '🤖 ' + shortModel;
+                    // Insert after the role span
+                    const roleSpan = header.querySelector('.message-role');
+                    if (roleSpan && roleSpan.nextSibling) {
+                        header.insertBefore(badge, roleSpan.nextSibling);
+                    } else {
+                        header.appendChild(badge);
+                    }
+                }
+            }
+
             if (msg && (msg.tokens_input || msg.tokens_output)) {
                 const meta = document.createElement('div');
                 meta.className = 'message-time';
@@ -1913,11 +1973,19 @@
         const renderedContent = content ? marked.parse(content) : '';
         const time = new Date().toLocaleTimeString();
 
+        // RT-06: model/agent badge for assistant messages
+        let modelBadgeHTML = '';
+        if (role === 'assistant' && opts.model) {
+            const shortModel = opts.model.split('/').pop();
+            modelBadgeHTML = `<span class="msg-model-badge" title="${escapeHtml(opts.model)}">🤖 ${escapeHtml(shortModel)}</span>`;
+        }
+
         msg.innerHTML = `
             <div class="message-avatar">${avatarText}</div>
             <div class="message-body">
                 <div class="message-header">
                     <span class="message-role">${role}</span>
+                    ${modelBadgeHTML}
                     <span class="message-time">${time}</span>
                 </div>
                 ${thinkingHTML}

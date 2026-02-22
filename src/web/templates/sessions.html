@@ -85,6 +85,10 @@
     </label>
     <span class="sync-meta" id="sync-meta">Data sync: —</span>
     <input type="text" class="search-box" id="search-input" placeholder="Search by session or agent...">
+    <button class="btn btn-danger" onclick="cleanGhosts()" id="clean-ghosts-btn"
+            title="Delete all empty sessions (0 messages)" style="background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3)">
+        🧹 Clean Ghosts
+    </button>
     <button class="btn btn-primary" onclick="loadSessionDashboard()">Refresh</button>
 </div>
 
@@ -128,6 +132,11 @@
             <h4>Errors</h4>
             <div class="value" id="stat-errors">-</div>
             <div class="stats-sub" id="stat-errors-sub"></div>
+        </div>
+        <div class="stat-card" id="ghost-stat-card" style="border-color:rgba(239,68,68,0.3)">
+            <h4 style="color:#f87171">Ghost Sessions</h4>
+            <div class="value" id="stat-ghosts" style="color:#f87171">-</div>
+            <div class="stats-sub">0-msg, purgeable</div>
         </div>
     </div>
 
@@ -385,6 +394,21 @@ function renderSessionOverview() {
     document.getElementById('stat-errors').textContent = errorCount;
     document.getElementById('stat-errors-sub').textContent = `${errorRate}% error rate`;
 
+    // Ghost sessions count (0-message sessions)
+    const ghostCount = (s.by_status || []).reduce((acc, x) => acc, 0);
+    // Fetch ghost count from engine sessions API
+    fetch('/api/engine/sessions?limit=0&message_count_max=0')
+        .then(r => r.ok ? r.json() : null)
+        .then(d => {
+            if (d && typeof d.total === 'number') {
+                const gc = document.getElementById('stat-ghosts');
+                if (gc) gc.textContent = d.total;
+                const card = document.getElementById('ghost-stat-card');
+                if (card) card.style.opacity = d.total > 0 ? '1' : '0.5';
+            }
+        })
+        .catch(() => {});
+
     // ── Chart: 24h Activity by Agent (stacked bar) ──
     // Rendered from loadSessions → renderHourlyChart() below
 
@@ -557,6 +581,33 @@ function renderHourlyChart() {
 // ════════════════════════════════════════════════════════════════════════════
 // INIT
 // ════════════════════════════════════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════════════════════════════════════
+async function cleanGhosts() {
+    const btn = document.getElementById('clean-ghosts-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Cleaning…'; }
+    try {
+        const res = await fetch('/api/engine/sessions/ghosts?older_than_minutes=0', { method: 'DELETE' });
+        const data = await res.json();
+        const n = data.deleted || 0;
+        // Show result
+        if (n > 0) {
+            const msg = document.createElement('div');
+            msg.style.cssText='position:fixed;top:20px;right:20px;background:#22c55e;color:#fff;padding:12px 20px;border-radius:8px;z-index:9999;font-weight:600';
+            msg.textContent = `✅ Cleaned ${n} ghost session${n !== 1 ? 's' : ''}`;
+            document.body.appendChild(msg);
+            setTimeout(() => msg.remove(), 3500);
+        }
+        const gc = document.getElementById('stat-ghosts');
+        if (gc) gc.textContent = '0';
+        loadSessionDashboard();
+    } catch(e) {
+        alert('Ghost cleanup failed: ' + e.message);
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '🧹 Clean Ghosts'; }
+    }
+}
+
 async function loadSessionDashboard() {
     await AriaModels.init();
     loadSessionStats();

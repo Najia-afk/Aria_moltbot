@@ -78,7 +78,7 @@ jobs:
   # ── Daily (main, comprehensive) ─────────────────────────────────
 
   - name: morning_checkin
-    cron: "0 0 16 * * *"
+    cron: "0 0 6 * * *"
     text: "Read HEARTBEAT.md morning_checkin section. Good morning! Review overnight changes, set today priorities. Use api_client for all data reads."
     agent: aria
     session: isolated

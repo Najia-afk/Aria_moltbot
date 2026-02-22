@@ -3,13 +3,15 @@ Session History API — browse, search, and filter chat sessions.
 
 Provides:
 - GET /api/engine/sessions — paginated list with search/filter
+- GET /api/engine/sessions/stats — aggregate statistics
 - GET /api/engine/sessions/{session_id} — single session detail
 - GET /api/engine/sessions/{session_id}/messages — session messages
 - DELETE /api/engine/sessions/{session_id} — delete session
+- DELETE /api/engine/sessions/ghosts — purge 0-message ghost sessions
 - PATCH /api/engine/sessions/{session_id}/title — update session title
-- POST /api/engine/sessions/{session_id}/archive — archive session
+- POST /api/engine/sessions/{session_id}/archive — physically archive session
 - POST /api/engine/sessions/{session_id}/end — end session
-- GET /api/engine/sessions/stats — aggregate statistics
+- POST /api/engine/sessions/cleanup — prune old sessions (>N days)
 """
 import logging
 from datetime import datetime, timezone
@@ -367,37 +369,40 @@ async def update_session_title(session_id: str, body: TitleUpdateRequest):
 @router.post("/{session_id}/archive")
 async def archive_session(session_id: str):
     """
-    Archive a session (set status='archived').
+    Physically archive a session.
 
-    Data is preserved — only the status changes.  The frontend hides or
-    dims archived sessions. Uses SQLAlchemy ORM — no raw SQL.
+    Copies session + all messages to archive tables, then removes from working
+    tables. Archived sessions no longer appear in GET /sessions by default.
+    Uses NativeSessionManager.archive_session() — ORM only, no raw SQL.
     """
-    engine = await _get_db_engine()
-
-    try:
-        from db.models import EngineChatSession
-    except ImportError:
-        from .db.models import EngineChatSession
-
-    from sqlalchemy.ext.asyncio import AsyncSession as _AS
-    from sqlalchemy import select as _sel
-
-    async with _AS(engine) as db:
-        async with db.begin():
-            result = await db.execute(
-                _sel(EngineChatSession).where(
-                    EngineChatSession.id == session_id
-                )
-            )
-            session = result.scalar_one_or_none()
-            if not session:
-                raise HTTPException(404, f"Session {session_id} not found")
-
-            session.status = "archived"
-            session.updated_at = datetime.now(timezone.utc)
-
-    logger.info("Archived session %s", session_id)
+    mgr = await _get_manager()
+    archived = await mgr.archive_session(session_id)
+    if not archived:
+        raise HTTPException(404, f"Session {session_id} not found")
+    logger.info("Physically archived session %s", session_id)
     return {"status": "archived", "session_id": session_id}
+
+
+@router.delete("/ghosts")
+async def purge_ghost_sessions(
+    older_than_minutes: int = Query(
+        default=15,
+        ge=0,
+        le=1440,
+        description="Delete sessions with 0 messages older than N minutes (0 = all ghosts)",
+    ),
+):
+    """
+    Delete all sessions with 0 messages older than N minutes.
+
+    Ghost sessions are created by cron tasks or page visits that never
+    received a message. They are safe to purge — no data is lost.
+    The background task runs this automatically every 10 minutes.
+    """
+    mgr = await _get_manager()
+    deleted = await mgr.delete_ghost_sessions(older_than_minutes=older_than_minutes)
+    logger.info("Ghost purge via API: deleted %d sessions (>%d min)", deleted, older_than_minutes)
+    return {"status": "ok", "deleted": deleted, "older_than_minutes": older_than_minutes}
 
 
 @router.post("/cleanup")

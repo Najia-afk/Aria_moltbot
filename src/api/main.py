@@ -221,19 +221,59 @@ async def lifespan(app: FastAPI):
             except Exception as exc:
                 _logger.warning("Session cleanup error: %s", exc)
 
+    # Ghost session purge: delete 0-message sessions older than 60 min every 10 min
+    # RT-01 decision: 1 hour TTL (15 min was too aggressive for slow typers)
+    async def _ghost_purge_loop():
+        """Delete ghost sessions (message_count=0, >60 min old) every 10 minutes."""
+        from aria_engine.session_manager import NativeSessionManager
+        mgr = NativeSessionManager(async_engine)
+        while True:
+            try:
+                await asyncio.sleep(10 * 60)  # 10 minutes
+                deleted = await mgr.delete_ghost_sessions(older_than_minutes=60)
+                if deleted:
+                    _logger.info("Ghost purge: removed %d empty sessions", deleted)
+            except asyncio.CancelledError:
+                break
+            except Exception as exc:
+                _logger.warning("Ghost purge error: %s", exc)
+
+    # Cron session purge: delete cron/swarm sessions older than 7 days (every 6 hours)
+    # RT-02 decision: 7-day TTL for cron sessions (need window for debugging)
+    async def _cron_session_cleanup_loop():
+        """Prune cron/swarm/subagent sessions older than 7 days every 6 hours."""
+        from aria_engine.session_manager import NativeSessionManager
+        mgr = NativeSessionManager(async_engine)
+        while True:
+            try:
+                await asyncio.sleep(6 * 3600)  # 6 hours
+                for stype in ("cron", "swarm", "subagent"):
+                    result = await mgr.prune_sessions_by_type(stype, days=7, dry_run=False)
+                    if result["pruned_count"] > 0:
+                        _logger.info(
+                            "Cron cleanup: pruned %d '%s' sessions",
+                            result["pruned_count"], stype,
+                        )
+            except asyncio.CancelledError:
+                break
+            except Exception as exc:
+                _logger.warning("Cron session cleanup error: %s", exc)
+
     cleanup_task = asyncio.create_task(_session_cleanup_loop())
-    print("🧹 Session auto-cleanup background task launched (every 6h, >30d)")
+    ghost_task = asyncio.create_task(_ghost_purge_loop())
+    cron_cleanup_task = asyncio.create_task(_cron_session_cleanup_loop())
+    print("🧹 Session auto-cleanup launched (every 6h, >30d) + ghost purge (every 10m, 0-msg >60m) + cron TTL (every 6h, >7d)")
 
     yield
 
     # Graceful shutdown
-    for task in (scorer_task, cleanup_task):
+    for task in (scorer_task, cleanup_task, ghost_task, cron_cleanup_task):
         task.cancel()
         try:
             await task
         except asyncio.CancelledError:
             pass
-    print("🛑 Background tasks stopped (auto-scorer + session-cleanup)")
+    print("🛑 Background tasks stopped (auto-scorer + session-cleanup + ghost-purge + cron-cleanup)")
 
     await async_engine.dispose()
     print("🔌 Database engine disposed")

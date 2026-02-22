@@ -112,3 +112,52 @@
 - **Security middleware can block realistic payloads.** For cron and similar endpoints, treat explicit security-filter responses as valid environment behavior and skip those paths in integration tests.
 - **Vector endpoints require exact dimensions.** `search-by-vector` must use the model’s actual embedding size (768 here), otherwise tests induce avoidable 500s.
 - **CI needs two lanes.** Keep a baseline lane for deterministic runs and an optional external-integration lane wired to secrets (`ARIA_TEST_API_URL`, etc.) so skipped paths can be exercised in managed environments.
+
+
+## Session Hygiene & Model Routing (2026-02-22)
+- **Ghost sessions are created on every page load.** /chat page visit without typing creates a DB row instantly. Prune TTL of 30 days is useless for seconds-old ghosts. Fix: defer session creation to first message; add a 15-min ghost purge background task.
+- **`routing.primary` in models.yaml is a global override, not a preference.** Setting `primary: "litellm/kimi"` means 100% of traffic goes to kimi regardless of tier_order fallback chain. Only failures trigger the fallback. Change primary to a free model to restore diversity.
+- **Archive endpoint is not physical archive.** `POST /archive` sets `status='archived'` (soft-delete). `EngineChatSessionArchive` only gets data from `prune_old_sessions`. Wire `archive_session` to the physical COPY+DELETE flow.
+- **Cron sessions pollute chat UX.** Chat sidebar must use `?session_type=chat` to exclude cron/swarm sessions from conversation history.
+- **agent_aliases in models.yaml are the source of display names.** Wire them into the chat model picker grouped by tier (local → free → paid).
+- **Daily souvenir roundtables are effective PO/SM rituals.** 10 focused 5-min sessions produce actionable AA+ tickets faster than long planning ceremonies. Document in `aria_souvenirs/aria_vX_DDMMYY/roundtable/`.
+
+
+## 2026-02-22 — v3 Production Audit Sprint (Roundtable with Aria as PO)
+
+**Context:** SSH'd into production Mac Mini (192.168.1.53) and ran 10 live chat sessions
+with Aria as PO. She responded with full acceptance criteria for each issue.
+
+**Lessons:**
+
+1. **Ghost sessions are created by page navigation, not just lazy creation.**
+   Every /chat page load creates a DB row. Until lazy creation is implemented,
+   the ghost purge loop (60-min TTL) is the mitigation.
+
+2. **Aria's routing.primary = "litellm/kimi" in models.yaml is a global override.**
+   It bypasses all tier_order logic. Other agents (analyst, devops, coder) won't fire
+   until this override is removed or scoped by agent_type.
+
+3. **"Archive" in the UI did not mean archive in the DB.**
+   The POST /{id}/archive endpoint previously only set status='archived'.
+   The physical copy to EngineChatSessionArchive was only done by prune_old_sessions.
+   Fixed by routing the button through archive_session().
+
+4. **TTL conflicts happen when the same concept is asked in different frames.**
+   RT-01 (ghost-focused) said 1 hour. RT-05 (TTL list) said 15 minutes.
+   Resolution: use the context-specific answer (RT-01 — ghost session discussion) 
+   when the TTL was the primary topic.
+
+5. **Cron sessions will always dominate session count if TTL == interactive TTL.**
+   With 88/94 sessions being cron at 30-day retention, the DB is ~15x heavier than needed.
+   Type-specific TTL (cron=7d, ghost=1h, interactive=30d) is the only sustainable path.
+
+6. **SSH + Python scripts are more reliable than PowerShell one-liners for JSON payloads.**
+   PS 5.1 lacks -SkipCertificateCheck. SCP the script then run via SSH.
+
+7. **When Aria says "it's P0" in her own words, log it verbatim in the ticket.**
+   The quote is the acceptance criterion — not a paraphrase.
+
+8. **morning_checkin at 16:00 UTC = 4pm in most timezones — completely wrong.**
+   Always verify cron times against user's actual timezone before deploying.
+   Shiva wakes at ~06:00 UTC; moved to 0 0 6 * * *.
