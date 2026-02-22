@@ -766,6 +766,24 @@
     font-weight: 500;
 }
 
+/* Session type badges */
+.session-type-badge {
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 0.6rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+.session-type-badge.interactive { background: rgba(72,199,142,0.15); color: #48c78e; }
+.session-type-badge.roundtable  { background: rgba(103,126,234,0.18); color: #677eea; }
+.session-type-badge.cron        { background: rgba(136,136,136,0.15); color: #888; }
+.session-type-badge.swarm       { background: rgba(255,182,72,0.15);  color: #ffb648; }
+.session-type-badge.subagent    { background: rgba(255,182,72,0.12);  color: #e6a030; }
+
+/* Ghost session label */
+.session-item-title.ghost-label em { color: var(--text-muted,#888); font-size:0.75rem; }
+
 .session-item-actions {
     position: absolute;
     top: 8px;
@@ -1480,7 +1498,7 @@
     async function loadSessions() {
         const loading = document.getElementById('sessionListLoading');
         try {
-            const resp = await fetch('/api/engine/sessions?limit=100&sort=updated_at:desc');
+            const resp = await fetch('/api/engine/sessions?limit=200&sort=updated_at:desc');
             const data = await resp.json();
             allSessions = data.sessions || data.items || data || [];
             renderSessionList(allSessions);
@@ -1489,6 +1507,23 @@
             if (loading) loading.textContent = 'Failed to load sessions';
         }
     }
+
+    // Returns relative time string ("just now", "5m ago", "2h ago", etc.)
+    function timeAgo(dateStr) {
+        if (!dateStr) return '';
+        const d = new Date(dateStr);
+        if (isNaN(d)) return '';
+        const now = Date.now();
+        const diff = now - d.getTime();
+        if (diff < 60000)   return 'just now';
+        if (diff < 3600000) return `${Math.floor(diff/60000)}m ago`;
+        if (diff < 86400000) return `${Math.floor(diff/3600000)}h ago`;
+        if (diff < 604800000) return `${Math.floor(diff/86400000)}d ago`;
+        return d.toLocaleDateString();
+    }
+
+    // Short human-readable session type
+    const TYPE_LABELS = { interactive: null, cron: 'cron', roundtable: 'rt', swarm: 'swarm', subagent: 'sub' };
 
     function renderSessionList(sessions) {
         const container = document.getElementById('sessionList');
@@ -1501,26 +1536,31 @@
         container.innerHTML = sessions.map(s => {
             const isGhost = (s.message_count === 0);
             const rawTitle = s.title || s.label || '';
-            const title = rawTitle || (isGhost ? '— empty —' : `Chat ${(s.id || '').substring(0, 8)}`);
+            const title = rawTitle || (isGhost ? '— empty —' : `Untitled · ${(s.id || '').substring(0, 8)}`);
             const agent = s.agent_id || 'main';
-            const date = s.updated_at || s.created_at;
-            const dateStr = date ? new Date(date).toLocaleDateString() : '';
+            const dateRaw = s.updated_at || s.created_at;
+            const dateStr = timeAgo(dateRaw);
+            const dateFull = dateRaw ? new Date(dateRaw).toLocaleString() : '';
             const msgCount = s.message_count || 0;
             const model = s.model || '';
+            const stype = s.session_type || 'interactive';
             const isActive = s.id === sessionId;
             const isArchived = (s.status === 'archived');
             const titleClass = isGhost ? 'session-item-title ghost-label' : 'session-item-title';
+            const typeLabel = TYPE_LABELS[stype] !== undefined ? TYPE_LABELS[stype] : stype;
+            const typeBadge = typeLabel ? `<span class="session-type-badge ${escapeAttr(stype)}">${escapeHtml(typeLabel)}</span>` : '';
 
             return `
                 <div class="session-item ${isActive ? 'active' : ''} ${isArchived ? 'archived' : ''} ${isGhost ? 'ghost-session' : ''}"
                      onclick="switchSession('${s.id}')" data-id="${s.id}"
                      data-agent="${agent}" data-title="${escapeAttr(rawTitle || title)}">
-                    <div class="${titleClass}">${isArchived ? '📦 ' : ''}${isGhost ? `<em style="color:var(--text-muted);font-size:12px">${escapeHtml(title)}</em>` : escapeHtml(title)}</div>
+                    <div class="${titleClass}">${isArchived ? '📦 ' : ''}${isGhost ? `<em>${escapeHtml(title)}</em>` : escapeHtml(title)}</div>
                     <div class="session-item-meta">
                         <span class="agent-badge">${escapeHtml(agent)}</span>
-                        <span>${dateStr}</span>
+                        ${typeBadge}
+                        <span title="${escapeAttr(dateFull)}">${dateStr}</span>
                         ${msgCount ? `<span>${msgCount} msgs</span>` : ''}
-                        ${model ? `<span>${escapeHtml(model.split('/').pop())}</span>` : ''}
+                        ${model ? `<span title="${escapeAttr(model)}">${escapeHtml(model.split('/').pop())}</span>` : ''}
                     </div>
                     <div class="session-item-actions">
                         ${!isArchived ? `<button class="session-action-btn archive" onclick="event.stopPropagation(); archiveSession('${s.id}')" title="Archive">📦</button>` : ''}
