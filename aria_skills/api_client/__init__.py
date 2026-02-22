@@ -568,6 +568,41 @@ class AriaAPIClient(BaseSkill):
         except Exception as e:
             return SkillResult.fail(f"Failed to search graph: {e}")
 
+    async def kg_traverse(
+        self,
+        start: str,
+        relation_type: str | None = None,
+        max_depth: int = 2,
+        direction: str = "both",
+    ) -> SkillResult:
+        """BFS traversal on the organic knowledge graph (not skill graph)."""
+        try:
+            params: dict[str, Any] = {"start": start, "max_depth": max_depth, "direction": direction}
+            if relation_type:
+                params["relation_type"] = relation_type
+            resp = await self._client.get("/knowledge-graph/kg-traverse", params=params)
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to traverse KG: {e}")
+
+    async def kg_search(
+        self,
+        query: str,
+        entity_type: str | None = None,
+        limit: int = 25,
+    ) -> SkillResult:
+        """ILIKE text search on the organic knowledge graph."""
+        try:
+            params: dict[str, Any] = {"q": query, "limit": limit}
+            if entity_type:
+                params["entity_type"] = entity_type
+            resp = await self._client.get("/knowledge-graph/kg-search", params=params)
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to search KG: {e}")
+
     async def find_skill_for_task(self, task: str, limit: int = 5) -> SkillResult:
         """Find the best skill for a given task description. ~100-200 tokens."""
         try:

@@ -64,10 +64,76 @@ class EntityCreate(BaseModel):
     properties: dict = Field(default_factory=dict)
 
 class RelationCreate(BaseModel):
-    from_entity: uuid.UUID
-    to_entity: uuid.UUID
+    from_entity: str = Field(..., min_length=1, max_length=500)
+    to_entity: str = Field(..., min_length=1, max_length=500)
     relation_type: str = Field(..., min_length=1, max_length=100)
     properties: dict = Field(default_factory=dict)
+
+
+async def _resolve_entity_id(db: AsyncSession, ref: str) -> uuid.UUID:
+    """Resolve an entity reference (UUID string or name) to its database UUID.
+
+    Resolution order:
+      1. Valid UUID that exists in DB → return it
+      2. Exact name match → return id
+      3. Case-insensitive name match → return id
+      4. Auto-create entity (infer type from 'type:name' format or default to 'concept')
+    """
+    # 1. Try as UUID
+    try:
+        entity_uuid = uuid.UUID(ref)
+        result = await db.execute(
+            select(KnowledgeEntity.id).where(KnowledgeEntity.id == entity_uuid)
+        )
+        if result.scalar_one_or_none() is not None:
+            return entity_uuid
+    except ValueError:
+        pass
+
+    # 2. Exact name match
+    result = await db.execute(
+        select(KnowledgeEntity.id).where(KnowledgeEntity.name == ref).limit(1)
+    )
+    eid = result.scalar_one_or_none()
+    if eid is not None:
+        return eid
+
+    # 3. Case-insensitive name match
+    result = await db.execute(
+        select(KnowledgeEntity.id).where(
+            func.lower(KnowledgeEntity.name) == ref.lower()
+        ).limit(1)
+    )
+    eid = result.scalar_one_or_none()
+    if eid is not None:
+        return eid
+
+    # 4. Auto-create: infer type from "type:name" format, else "concept"
+    if ":" in ref and len(ref.split(":", 1)[0]) < 30:
+        parts = ref.split(":", 1)
+        entity_type = parts[0].strip()
+        entity_name = parts[1].strip().replace("_", " ").title()
+    else:
+        entity_type = "concept"
+        entity_name = ref
+
+    new_id = uuid.uuid4()
+    entity = KnowledgeEntity(
+        id=new_id,
+        name=entity_name,
+        type=entity_type,
+        properties={"auto_created": True, "original_ref": ref},
+    )
+    db.add(entity)
+    try:
+        await db.flush()
+    except Exception:
+        await db.rollback()
+        raise HTTPException(
+            status_code=404,
+            detail=f"Entity not found and could not be auto-created: '{ref}'",
+        )
+    return new_id
 
 
 # ── S4-05: Query logging helper ──────────────────────────────────────────────
@@ -260,10 +326,13 @@ async def create_knowledge_relation(body: RelationCreate, db: AsyncSession = Dep
     if _is_test_kg_payload(body.relation_type, json_lib.dumps(body.properties or {}, default=str)):
         return {"created": False, "skipped": True, "reason": "test_or_noise_payload"}
 
+    from_uuid = await _resolve_entity_id(db, body.from_entity)
+    to_uuid = await _resolve_entity_id(db, body.to_entity)
+
     relation = KnowledgeRelation(
         id=uuid.uuid4(),
-        from_entity=body.from_entity,
-        to_entity=body.to_entity,
+        from_entity=from_uuid,
+        to_entity=to_uuid,
         relation_type=body.relation_type,
         properties=body.properties,
     )
@@ -489,4 +558,124 @@ async def get_query_log(
     result = await db.execute(stmt)
     logs = [log.to_dict() for log in result.scalars().all()]
     return {"logs": logs, "count": len(logs)}
+
+
+# ── Knowledge Graph traversal (organic knowledge) ────────────────────────────
+
+@router.get("/knowledge-graph/kg-traverse")
+async def kg_traverse(
+    start: str = Query(..., description="Starting entity UUID, name, or 'type:name' ref"),
+    relation_type: str | None = Query(None, description="Filter by relation type"),
+    max_depth: int = Query(2, ge=1, le=5),
+    direction: str = Query("both", regex="^(outgoing|incoming|both)$"),
+    db: AsyncSession = Depends(get_db),
+):
+    """BFS traversal on the organic knowledge graph (knowledge_entities / knowledge_relations)."""
+    # Resolve start entity
+    start_entity = None
+    try:
+        start_uuid = uuid.UUID(start)
+        result = await db.execute(select(KnowledgeEntity).where(KnowledgeEntity.id == start_uuid))
+        start_entity = result.scalar_one_or_none()
+    except ValueError:
+        pass
+    if not start_entity:
+        result = await db.execute(select(KnowledgeEntity).where(KnowledgeEntity.name == start).limit(1))
+        start_entity = result.scalar_one_or_none()
+    if not start_entity:
+        result = await db.execute(
+            select(KnowledgeEntity).where(func.lower(KnowledgeEntity.name) == start.lower()).limit(1)
+        )
+        start_entity = result.scalar_one_or_none()
+    if not start_entity:
+        return {"error": f"Entity not found: {start}", "nodes": [], "edges": []}
+
+    # BFS
+    visited: set[str] = set()
+    queue: deque[tuple[uuid.UUID, int]] = deque()
+    queue.append((start_entity.id, 0))
+    visited.add(str(start_entity.id))
+
+    nodes: list[dict] = [start_entity.to_dict()]
+    edges: list[dict] = []
+
+    while queue:
+        current_id, depth = queue.popleft()
+        if depth >= max_depth:
+            continue
+
+        stmts = []
+        if direction in ("outgoing", "both"):
+            stmt = select(KnowledgeRelation).where(KnowledgeRelation.from_entity == current_id)
+            if relation_type:
+                stmt = stmt.where(KnowledgeRelation.relation_type == relation_type)
+            stmts.append(("outgoing", stmt))
+        if direction in ("incoming", "both"):
+            stmt = select(KnowledgeRelation).where(KnowledgeRelation.to_entity == current_id)
+            if relation_type:
+                stmt = stmt.where(KnowledgeRelation.relation_type == relation_type)
+            stmts.append(("incoming", stmt))
+
+        for dir_label, stmt in stmts:
+            result = await db.execute(stmt)
+            for rel in result.scalars().all():
+                edge_data = rel.to_dict()
+                # Annotate with entity names for readability
+                if rel.source_entity:
+                    edge_data["from_name"] = rel.source_entity.name
+                if rel.target_entity:
+                    edge_data["to_name"] = rel.target_entity.name
+                edges.append(edge_data)
+                next_id = rel.to_entity if dir_label == "outgoing" else rel.from_entity
+                next_id_str = str(next_id)
+                if next_id_str not in visited:
+                    visited.add(next_id_str)
+                    node_result = await db.execute(
+                        select(KnowledgeEntity).where(KnowledgeEntity.id == next_id)
+                    )
+                    node = node_result.scalar_one_or_none()
+                    if node:
+                        nodes.append(node.to_dict())
+                        queue.append((next_id, depth + 1))
+
+    await _log_query(
+        db, "kg_traverse",
+        {"start": start, "relation_type": relation_type, "max_depth": max_depth, "direction": direction},
+        len(nodes),
+    )
+    return {
+        "nodes": nodes,
+        "edges": edges,
+        "traversal_depth": max_depth,
+        "total_nodes": len(nodes),
+        "total_edges": len(edges),
+    }
+
+
+# ── Knowledge Graph entity search ────────────────────────────────────────────
+
+@router.get("/knowledge-graph/kg-search")
+async def kg_search(
+    q: str = Query(..., min_length=1, description="Search query (name substring)"),
+    entity_type: str | None = Query(None, description="Filter by entity type"),
+    limit: int = Query(25, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+):
+    """ILIKE text search for entities in the organic knowledge graph."""
+    pattern = f"%{q}%"
+    stmt = select(KnowledgeEntity).where(
+        or_(
+            KnowledgeEntity.name.ilike(pattern),
+            KnowledgeEntity.properties["description"].astext.ilike(pattern),
+        )
+    )
+    if entity_type:
+        stmt = stmt.where(KnowledgeEntity.type == entity_type)
+    stmt = stmt.order_by(KnowledgeEntity.created_at.desc()).limit(limit)
+
+    result = await db.execute(stmt)
+    entities = [e.to_dict() for e in result.scalars().all()]
+
+    await _log_query(db, "kg_search", {"q": q, "entity_type": entity_type}, len(entities))
+    return {"results": entities, "query": q, "count": len(entities)}
 

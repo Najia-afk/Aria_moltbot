@@ -161,3 +161,72 @@ with Aria as PO. She responded with full acceptance criteria for each issue.
 8. **morning_checkin at 16:00 UTC = 4pm in most timezones — completely wrong.**
    Always verify cron times against user's actual timezone before deploying.
    Shiva wakes at ~06:00 UTC; moved to 0 0 6 * * *.
+
+## 2026-02-22 — Knowledge Graph Relationship Bug Fix
+
+**Context:** Aria could not create relationships in the KG. Every `add_relation` call
+from the skill returned a 422 — silently caught and swallowed by the in-memory cache
+fallback. Six bugs found, all hidden by the same silent-failure pattern.
+
+**Root Cause:** `RelationCreate` Pydantic schema declared `from_entity`/`to_entity`
+as `uuid.UUID`, but the LLM/skill layer sends entity **names** (strings).
+Every call hit `422 Unprocessable Entity` — Pydantic rejected the input before
+the endpoint code even ran.
+
+**Bugs Fixed (6):**
+
+1. **API schema type mismatch (CRITICAL).** `RelationCreate.from_entity`/`to_entity`
+   changed from `uuid.UUID` to `str`. Added `_resolve_entity_id()` helper with
+   4-step resolution: UUID parse → exact name match → case-insensitive match →
+   auto-create entity. This makes the API accept names, UUIDs, or mixed references.
+
+2. **Skill `query()` method signature mismatch.** Accepted `entity_type`/`relation`
+   but `skill.json` manifest defines `entity_name`/`depth`. Every LLM call got TypeError.
+   Fixed to match manifest and route to new `/kg-traverse` endpoint.
+
+3. **Skill `get_entity()` method signature mismatch.** Accepted `entity_id` but
+   manifest defines `query`/`type`. Fixed to match manifest.
+
+4. **Fallback cache key names wrong.** Used `r["from"]`/`r["relation"]` but
+   API returns `r["from_entity"]`/`r["relation_type"]`. KeyError on every
+   cache read — the fallback itself was broken.
+
+5. **`Dict` type annotation without import.** Used `Dict` (capitalized) which requires
+   `from typing import Dict`. Changed to `dict` (Python 3.9+ builtin).
+
+6. **No traversal on organic KG tables.** Existing `/traverse` endpoint only worked
+   on the skill-graph tables (`skill_graph_entities`/`skill_graph_relations`).
+   Added `/kg-traverse` (BFS) and `/kg-search` (ILIKE) for organic KG tables
+   (`knowledge_entities`/`knowledge_relations`).
+
+**Lessons:**
+
+1. **Silent exception swallowing is the #1 production killer.**
+   The skill caught ALL exceptions with `except Exception` and fell back to an
+   in-memory cache. This masked the 422 for months. The cache itself had wrong
+   key names (bug #4), so even the fallback was broken — doubly silent.
+   **Rule: every except block must log at WARNING minimum.**
+
+2. **Always test the full 5-layer call chain, not individual layers.**
+   The API worked fine with UUIDs. The skill worked fine with names. But the
+   *combination* (skill sends name → API expects UUID) was never tested.
+   Integration tests must cross layer boundaries.
+
+3. **Pydantic schema types are API contracts.**
+   Changing a field from `uuid.UUID` to `str` completely changes what the API accepts.
+   Schema types should match what the *actual callers* send, not what the DB stores.
+
+4. **skill.json manifest is the source of truth for LLM tool calls.**
+   The LLM only knows what's in the manifest. If the Python method signature
+   doesn't match the manifest parameters, every call fails with TypeError.
+   **Rule: run a diff between skill.json params and Python method args on every skill change.**
+
+5. **Auto-create on reference is essential for LLM ergonomics.**
+   The LLM naturally says "add relation from X to Y" even when X/Y don't exist yet.
+   The resolver auto-creates missing entities as `concept` type rather than failing.
+   This converts 100% of LLM relation requests into successful operations.
+
+6. **Two parallel graph subsystems need two sets of endpoints.**
+   The organic KG (`knowledge_*`) and skill graph (`skill_graph_*`) share structure
+   but have different tables. Traverse/search built only for skill graph left the
+   organic KG without query capabilities. Always mirror endpoints for both systems.

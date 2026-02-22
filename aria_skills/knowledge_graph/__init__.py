@@ -25,8 +25,8 @@ class KnowledgeGraphSkill(BaseSkill):
     
     def __init__(self, config: SkillConfig):
         super().__init__(config)
-        self._entities: dict[str, Dict] = {}  # fallback cache
-        self._relations: list[Dict] = []  # fallback cache
+        self._entities: dict[str, dict] = {}  # fallback cache
+        self._relations: list[dict] = []  # fallback cache
         self._api = None
     
     @property
@@ -52,7 +52,7 @@ class KnowledgeGraphSkill(BaseSkill):
         self,
         name: str,
         entity_type: str,
-        properties: Dict | None = None,
+        properties: dict | None = None,
     ) -> SkillResult:
         """Add an entity to the knowledge graph."""
         entity_id = f"{entity_type}:{name}".lower().replace(" ", "_")
@@ -80,7 +80,7 @@ class KnowledgeGraphSkill(BaseSkill):
         from_entity: str,
         relation: str,
         to_entity: str,
-        properties: Dict | None = None,
+        properties: dict | None = None,
     ) -> SkillResult:
         """Add a relationship between entities."""
         rel = {
@@ -97,40 +97,122 @@ class KnowledgeGraphSkill(BaseSkill):
             api_data = resp.json()
             return SkillResult.ok(api_data if api_data else rel)
         except Exception as e:
-            self.logger.warning(f"API add_relation failed, using fallback: {e}")
+            detail = ""
+            if hasattr(e, "response") and e.response is not None:
+                try:
+                    detail = f" — API response: {e.response.text[:500]}"
+                except Exception:
+                    pass
+            self.logger.warning(f"API add_relation failed, using fallback: {e}{detail}")
             self._relations.append(rel)
             return SkillResult.ok(rel)
     
-    async def get_entity(self, entity_id: str) -> SkillResult:
-        """Get an entity by ID."""
+    async def get_entity(
+        self,
+        query: str | None = None,
+        type: str | None = None,
+        entity_id: str | None = None,
+    ) -> SkillResult:
+        """Search for and retrieve an entity by name/query, type, or ID."""
+        lookup = entity_id or query
+        if not lookup:
+            return SkillResult.fail("Provide 'query' or 'entity_id'")
+        
         try:
-            resp = await self._api._client.get(f"/knowledge-graph/entities/{entity_id}")
+            params: dict[str, Any] = {}
+            if type:
+                params["type"] = type
+            resp = await self._api._client.get("/knowledge-graph/entities", params=params)
             resp.raise_for_status()
-            return SkillResult.ok(resp.json())
+            data = resp.json()
+            entities = data.get("entities", data if isinstance(data, list) else [])
+            # Filter by name match
+            matches = [e for e in entities if lookup.lower() in e.get("name", "").lower()]
+            if matches:
+                return SkillResult.ok({"entity": matches[0], "relations": []})
+            return SkillResult.fail(f"Entity not found: {lookup}")
         except Exception as e:
             self.logger.warning(f"API get_entity failed, using fallback: {e}")
-            if entity_id not in self._entities:
-                return SkillResult.fail(f"Entity not found: {entity_id}")
-            entity = self._entities[entity_id]
-            relations = [r for r in self._relations if r["from"] == entity_id or r["to"] == entity_id]
+            lookup_key = lookup.lower().replace(" ", "_")
+            entity_keys = [k for k in self._entities if lookup_key in k]
+            if not entity_keys:
+                return SkillResult.fail(f"Entity not found: {lookup}")
+            entity = self._entities[entity_keys[0]]
+            relations = [
+                r for r in self._relations
+                if r["from_entity"] == entity_keys[0] or r["to_entity"] == entity_keys[0]
+            ]
             return SkillResult.ok({"entity": entity, "relations": relations})
     
     async def query(
         self,
+        entity_name: str | None = None,
+        depth: int = 1,
         entity_type: str | None = None,
         relation: str | None = None,
     ) -> SkillResult:
-        """Query the knowledge graph."""
+        """Query the knowledge graph. Find entities related to a given entity.
+        
+        When entity_name + depth are given, performs a BFS traversal.
+        When only entity_type/relation are given, lists matching entities.
+        """
+        # --- Path A: Traverse from a named entity ---
+        if entity_name:
+            try:
+                params: dict[str, Any] = {
+                    "start": entity_name,
+                    "max_depth": depth,
+                    "direction": "both",
+                }
+                if relation:
+                    params["relation_type"] = relation
+                resp = await self._api._client.get("/knowledge-graph/kg-traverse", params=params)
+                resp.raise_for_status()
+                data = resp.json()
+                # If traverse found the entity, return subgraph
+                if not data.get("error"):
+                    return SkillResult.ok({
+                        "entities": data.get("nodes", []),
+                        "relations": data.get("edges", []),
+                        "total_entities": data.get("total_nodes", 0),
+                        "total_relations": data.get("total_edges", 0),
+                    })
+                # If entity not found via traverse, fall through to search
+            except Exception as e:
+                self.logger.warning(f"API kg-traverse failed: {e}")
+
+            # Fallback: search by name
+            try:
+                params = {"q": entity_name, "limit": 50}
+                if entity_type:
+                    params["entity_type"] = entity_type
+                resp = await self._api._client.get("/knowledge-graph/kg-search", params=params)
+                resp.raise_for_status()
+                data = resp.json()
+                entities = data.get("results", [])
+                return SkillResult.ok({
+                    "entities": entities,
+                    "relations": [],
+                    "total_entities": len(entities),
+                    "total_relations": 0,
+                })
+            except Exception as e:
+                self.logger.warning(f"API kg-search failed: {e}")
+
+        # --- Path B: List entities by type/relation ---
         try:
-            params: dict[str, Any] = {}
+            params = {}
             if entity_type:
                 params["type"] = entity_type
-            if relation:
-                params["relation"] = relation
             resp = await self._api._client.get("/knowledge-graph/entities", params=params)
             resp.raise_for_status()
             api_data = resp.json()
             entities = api_data if isinstance(api_data, list) else api_data.get("entities", [])
+            if entity_name:
+                entities = [
+                    e for e in entities
+                    if entity_name.lower() in e.get("name", "").lower()
+                ]
             return SkillResult.ok({
                 "entities": entities,
                 "relations": [],
@@ -142,9 +224,14 @@ class KnowledgeGraphSkill(BaseSkill):
             entities = list(self._entities.values())
             if entity_type:
                 entities = [ent for ent in entities if ent["type"] == entity_type]
+            if entity_name:
+                entities = [
+                    ent for ent in entities
+                    if entity_name.lower() in ent.get("name", "").lower()
+                ]
             relations = self._relations
             if relation:
-                relations = [r for r in relations if r["relation"] == relation]
+                relations = [r for r in relations if r["relation_type"] == relation]
             return SkillResult.ok({
                 "entities": entities,
                 "relations": relations,
