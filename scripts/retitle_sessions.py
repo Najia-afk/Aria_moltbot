@@ -11,6 +11,7 @@ Run on the server:
 import asyncio
 import re
 import httpx
+import time
 
 BASE = "http://localhost:8000"
 UUID_RE = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', re.I)
@@ -65,7 +66,9 @@ async def main():
                     skipped += 1
                     continue
                 msgs_resp.raise_for_status()
-                msgs = msgs_resp.json().get("messages", [])
+                body = msgs_resp.json()
+                # engine_sessions returns a plain list; engine_chat returns {"messages": [...]}
+                msgs = body if isinstance(body, list) else (body.get("messages") or [])
                 # Find first user message
                 first_user = next(
                     (m for m in msgs if (m.get("role") or "").lower() == "user"),
@@ -86,9 +89,18 @@ async def main():
                     json={"title": title},
                     timeout=10,
                 )
+                if patch.status_code == 429:
+                    # Rate limited — wait and retry once
+                    await asyncio.sleep(2)
+                    patch = await client.patch(
+                        f"{BASE}/api/engine/sessions/{sid}/title",
+                        json={"title": title},
+                        timeout=10,
+                    )
                 if patch.status_code in (200, 204):
                     print(f"  ✓ {sid[:8]}…  →  {title!r}")
                     ok += 1
+                    await asyncio.sleep(0.35)   # ~3 req/s stays under burst limit
                 else:
                     print(f"  ✗ {sid[:8]}… PATCH {patch.status_code}: {patch.text[:80]}")
                     skipped += 1
