@@ -938,7 +938,7 @@
         <!-- Session type toggle -->
         <div class="sidebar-section" style="display:flex;align-items:center;gap:8px;padding:4px 12px">
             <label style="font-size:11px;color:var(--text-muted);user-select:none;display:flex;align-items:center;gap:6px;cursor:pointer;">
-                <input type="checkbox" id="showAgentSessions" onchange="filterSessions()"
+                <input type="checkbox" id="showAgentSessions" onchange="loadSessions()"
                        style="accent-color:var(--accent-primary);">
                 Show agent sessions
             </label>
@@ -1500,10 +1500,14 @@
     async function loadSessions() {
         const loading = document.getElementById('sessionListLoading');
         try {
-            const resp = await fetch('/api/engine/sessions?limit=200&sort=updated_at&order=desc');
+            const showAgent = document.getElementById('showAgentSessions')?.checked;
+            const qs = showAgent
+                ? 'limit=200&sort=updated_at&order=desc'
+                : 'limit=200&sort=updated_at&order=desc&exclude_agent_sessions=true';
+            const resp = await fetch(`/api/engine/sessions?${qs}`);
             const data = await resp.json();
             allSessions = data.sessions || data.items || data || [];
-            renderSessionList(allSessions);
+            filterSessions();
         } catch(e) {
             console.error('Failed to load sessions:', e);
             if (loading) loading.textContent = 'Failed to load sessions';

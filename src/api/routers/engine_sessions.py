@@ -130,6 +130,10 @@ async def list_sessions(
         default=None,
         description="Filter by type (chat, roundtable, cron)",
     ),
+    exclude_agent_sessions: bool = Query(
+        default=False,
+        description="When true, exclude cron/swarm/subagent sessions (show only interactive+roundtable)",
+    ),
     search: str | None = Query(
         default=None,
         max_length=200,
@@ -168,9 +172,11 @@ async def list_sessions(
     mgr = await _get_manager()
 
     # Pass standard filters to manager
+    _AGENT_TYPES = ["cron", "swarm", "subagent"]
     result = await mgr.list_sessions(
         agent_id=agent_id,
         session_type=session_type,
+        exclude_types=_AGENT_TYPES if exclude_agent_sessions else None,
         search=search,
         limit=limit,
         offset=offset,

@@ -238,17 +238,28 @@ async def lifespan(app: FastAPI):
             except Exception as exc:
                 _logger.warning("Ghost purge error: %s", exc)
 
-    # Cron session purge: delete cron/swarm sessions older than 7 days (every 6 hours)
-    # RT-02 decision: 7-day TTL for cron sessions (need window for debugging)
+    # Cron session purge: delete cron/swarm sessions older than 1 day (every 1 hour)
+    # RT-02/05: 1-day TTL keeps only today's cron sessions; runs hourly to bound accumulation
     async def _cron_session_cleanup_loop():
-        """Prune cron/swarm/subagent sessions older than 7 days every 6 hours."""
+        """Prune cron/swarm/subagent sessions older than 1 day every hour."""
         from aria_engine.session_manager import NativeSessionManager
         mgr = NativeSessionManager(async_engine)
+        # Run once immediately on startup to clear any existing backlog
+        try:
+            for stype in ("cron", "swarm", "subagent"):
+                result = await mgr.prune_sessions_by_type(stype, days=1, dry_run=False)
+                if result["pruned_count"] > 0:
+                    _logger.info(
+                        "Cron startup cleanup: pruned %d '%s' sessions",
+                        result["pruned_count"], stype,
+                    )
+        except Exception as exc:
+            _logger.warning("Cron startup cleanup error: %s", exc)
         while True:
             try:
-                await asyncio.sleep(6 * 3600)  # 6 hours
+                await asyncio.sleep(3600)  # 1 hour
                 for stype in ("cron", "swarm", "subagent"):
-                    result = await mgr.prune_sessions_by_type(stype, days=7, dry_run=False)
+                    result = await mgr.prune_sessions_by_type(stype, days=1, dry_run=False)
                     if result["pruned_count"] > 0:
                         _logger.info(
                             "Cron cleanup: pruned %d '%s' sessions",
@@ -262,7 +273,7 @@ async def lifespan(app: FastAPI):
     cleanup_task = asyncio.create_task(_session_cleanup_loop())
     ghost_task = asyncio.create_task(_ghost_purge_loop())
     cron_cleanup_task = asyncio.create_task(_cron_session_cleanup_loop())
-    print("🧹 Session auto-cleanup launched (every 6h, >30d) + ghost purge (every 10m, 0-msg >60m) + cron TTL (every 6h, >7d)")
+    print("🧹 Session auto-cleanup launched (every 6h, >30d) + ghost purge (every 10m, 0-msg >60m) + cron TTL (every 1h, >1d, runs on startup)")
 
     yield
 

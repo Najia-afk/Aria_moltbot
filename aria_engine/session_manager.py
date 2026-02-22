@@ -184,6 +184,7 @@ class NativeSessionManager:
         self,
         agent_id: str | None = None,
         session_type: str | None = None,
+        exclude_types: list[str] | None = None,
         search: str | None = None,
         limit: int = DEFAULT_PAGE_SIZE,
         offset: int = 0,
@@ -196,6 +197,7 @@ class NativeSessionManager:
         Args:
             agent_id: Filter by agent.
             session_type: Filter by type ('chat', 'roundtable', 'cron').
+            exclude_types: Exclude sessions with these session_type values.
             search: Full-text search in title and messages.
             limit: Page size (max 100).
             offset: Offset for pagination.
@@ -220,6 +222,8 @@ class NativeSessionManager:
             filters.append(EngineChatSession.agent_id == agent_id)
         if session_type:
             filters.append(EngineChatSession.session_type == session_type)
+        if exclude_types:
+            filters.append(EngineChatSession.session_type.not_in(exclude_types))
         if search:
             pattern = f"%{search}%"
             search_in_messages = (
