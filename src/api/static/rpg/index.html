@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aria RPG Dashboard — The Crystal Ball</title>
+<style>
+/* ── Reset & Theme ───────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg-primary:   #0D1117;
+  --bg-secondary: #161B22;
+  --bg-card:      #1C2128;
+  --bg-hover:     #21262D;
+  --border:       #30363D;
+  --text-primary: #E6EDF3;
+  --text-secondary:#8B949E;
+  --accent-blue:  #58A6FF;
+  --accent-green: #3FB950;
+  --accent-gold:  #D29922;
+  --accent-red:   #F85149;
+  --accent-purple:#BC8CFF;
+  --accent-teal:  #39D2C0;
+  --font-main:    'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-mono:    'SF Mono', 'Fira Code', 'Consolas', monospace;
+  --radius:       8px;
+  --shadow:       0 2px 8px rgba(0,0,0,0.3);
+}
+html, body { height: 100%; font-family: var(--font-main); background: var(--bg-primary); color: var(--text-primary); }
+
+/* ── Layout ──────────────────────────────────────────────────────────── */
+#app { display: flex; flex-direction: column; height: 100vh; }
+header {
+  background: var(--bg-secondary); border-bottom: 1px solid var(--border);
+  padding: 12px 24px; display: flex; align-items: center; gap: 16px; flex-shrink: 0;
+}
+header h1 { font-size: 1.25rem; font-weight: 600; }
+header h1 span { color: var(--accent-gold); }
+.campaign-select {
+  background: var(--bg-card); border: 1px solid var(--border); color: var(--text-primary);
+  padding: 6px 12px; border-radius: var(--radius); font-size: 0.875rem; cursor: pointer;
+}
+.campaign-select:focus { outline: 2px solid var(--accent-blue); }
+.header-status { margin-left: auto; font-size: 0.8rem; color: var(--text-secondary); }
+
+/* ── Tab Navigation ──────────────────────────────────────────────────── */
+.tabs {
+  display: flex; gap: 2px; background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border); padding: 0 24px; flex-shrink: 0;
+}
+.tab-btn {
+  background: none; border: none; color: var(--text-secondary); padding: 10px 16px;
+  font-size: 0.875rem; cursor: pointer; border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+}
+.tab-btn:hover { color: var(--text-primary); background: var(--bg-hover); }
+.tab-btn.active { color: var(--accent-blue); border-bottom-color: var(--accent-blue); }
+
+/* ── Main Content ────────────────────────────────────────────────────── */
+main { flex: 1; overflow: auto; padding: 20px 24px; }
+.panel { display: none; }
+.panel.active { display: block; }
+
+/* ── Cards ───────────────────────────────────────────────────────────── */
+.card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px; margin-bottom: 16px;
+  box-shadow: var(--shadow);
+}
+.card h3 { font-size: 1rem; margin-bottom: 8px; color: var(--accent-blue); }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+
+/* ── Stats Row ───────────────────────────────────────────────────────── */
+.stats { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 16px; }
+.stat { text-align: center; }
+.stat-value { font-size: 1.75rem; font-weight: 700; color: var(--accent-blue); }
+.stat-label { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
+
+/* ── Party Table ─────────────────────────────────────────────────────── */
+table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+th { text-align: left; color: var(--text-secondary); font-weight: 500; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+td { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+tr:hover td { background: var(--bg-hover); }
+
+/* ── KG Visualization ────────────────────────────────────────────────── */
+#kg-container { width: 100%; height: calc(100vh - 200px); min-height: 400px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-card); }
+.kg-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+.kg-legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--text-secondary); }
+.kg-legend-dot { width: 12px; height: 12px; border-radius: 50%; }
+
+/* ── Transcript ──────────────────────────────────────────────────────── */
+.msg { padding: 12px 16px; border-radius: var(--radius); margin-bottom: 8px; }
+.msg-user { background: #1a2744; border-left: 3px solid var(--accent-blue); }
+.msg-assistant { background: #1a3329; border-left: 3px solid var(--accent-green); }
+.msg-role { font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px; text-transform: uppercase; }
+.msg-content { white-space: pre-wrap; line-height: 1.5; font-size: 0.9rem; }
+.msg-time { font-size: 0.7rem; color: var(--text-secondary); margin-top: 4px; }
+
+/* ── Resume Panel ────────────────────────────────────────────────────── */
+.resume-btn {
+  background: linear-gradient(135deg, var(--accent-gold), #B8860B);
+  color: #000; border: none; padding: 14px 28px; border-radius: var(--radius);
+  font-size: 1rem; font-weight: 600; cursor: pointer; transition: transform 0.1s;
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.resume-btn:hover { transform: scale(1.03); }
+.resume-btn:active { transform: scale(0.98); }
+
+/* ── Combat State ────────────────────────────────────────────────────── */
+.hp-bar { height: 8px; border-radius: 4px; background: var(--bg-hover); overflow: hidden; }
+.hp-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+.hp-green { background: var(--accent-green); }
+.hp-yellow { background: var(--accent-gold); }
+.hp-red { background: var(--accent-red); }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; background: var(--bg-hover); color: var(--text-secondary); margin: 2px; }
+.badge-active { background: #2a1f3d; color: var(--accent-purple); }
+
+/* ── Loading / Error ─────────────────────────────────────────────────── */
+.loading { text-align: center; padding: 40px; color: var(--text-secondary); }
+.loading::after { content: ''; display: inline-block; width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--accent-blue); border-radius: 50%; animation: spin 0.8s linear infinite; margin-left: 8px; vertical-align: middle; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.error { color: var(--accent-red); padding: 16px; background: #2d1518; border-radius: var(--radius); }
+
+/* ── Modal ───────────────────────────────────────────────────────────── */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; z-index: 100; align-items: center; justify-content: center; }
+.modal-overlay.visible { display: flex; }
+.modal { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+.modal h2 { margin-bottom: 12px; color: var(--accent-gold); }
+.modal-close { float: right; background: none; border: none; color: var(--text-secondary); font-size: 1.5rem; cursor: pointer; }
+.modal-close:hover { color: var(--text-primary); }
+
+/* ── Responsive ──────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  header { flex-wrap: wrap; }
+  .stats { gap: 12px; }
+  .stat-value { font-size: 1.3rem; }
+  .tabs { overflow-x: auto; }
+  #kg-container { height: 300px; min-height: 300px; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ── Header ─────────────────────────────────────────────────────────── -->
+<header>
+  <h1>🔮 <span>Aria</span> RPG Dashboard</h1>
+  <select id="campaignSelect" class="campaign-select" title="Select Campaign">
+    <option value="">Loading campaigns…</option>
+  </select>
+  <div class="header-status" id="headerStatus">Connecting…</div>
+</header>
+
+<!-- ── Tabs ────────────────────────────────────────────────────────────── -->
+<nav class="tabs">
+  <button class="tab-btn active" data-tab="overview">Overview</button>
+  <button class="tab-btn" data-tab="kg">Knowledge Graph</button>
+  <button class="tab-btn" data-tab="transcript">Transcript</button>
+  <button class="tab-btn" data-tab="resume">Resume</button>
+</nav>
+
+<!-- ── Main Content ───────────────────────────────────────────────────── -->
+<main>
+
+  <!-- OVERVIEW PANEL -->
+  <section id="panel-overview" class="panel active">
+    <div class="stats" id="campaignStats">
+      <div class="stat"><div class="stat-value" id="statParty">—</div><div class="stat-label">Party Members</div></div>
+      <div class="stat"><div class="stat-value" id="statSessions">—</div><div class="stat-label">Sessions</div></div>
+      <div class="stat"><div class="stat-value" id="statEntities">—</div><div class="stat-label">KG Entities</div></div>
+      <div class="stat"><div class="stat-value" id="statStatus">—</div><div class="stat-label">Status</div></div>
+    </div>
+    <div class="card">
+      <h3>Campaign Details</h3>
+      <div id="campaignInfo"><div class="loading">Select a campaign</div></div>
+    </div>
+    <div class="card">
+      <h3>Party Roster</h3>
+      <div id="partyRoster"><div class="loading">Select a campaign</div></div>
+    </div>
+  </section>
+
+  <!-- KG PANEL -->
+  <section id="panel-kg" class="panel">
+    <div id="kg-container"></div>
+    <div class="kg-legend" id="kgLegend"></div>
+  </section>
+
+  <!-- TRANSCRIPT PANEL -->
+  <section id="panel-transcript" class="panel">
+    <div class="card">
+      <h3>Session Transcript</h3>
+      <select id="sessionSelect" class="campaign-select" style="margin-bottom:12px">
+        <option value="">Select a session…</option>
+      </select>
+      <div id="transcriptContent"><div class="loading">Select a session to view</div></div>
+    </div>
+  </section>
+
+  <!-- RESUME PANEL -->
+  <section id="panel-resume" class="panel">
+    <div class="card" style="text-align:center; padding: 40px;">
+      <h3 style="font-size:1.5rem; margin-bottom: 16px;">⚔️ Resume Campaign</h3>
+      <p style="color: var(--text-secondary); margin-bottom: 24px;">
+        Pick up where you left off. Aria will generate a "Previously on…" recap
+        and restore your combat state.
+      </p>
+      <button class="resume-btn" id="resumeBtn" onclick="resumeCampaign()">
+        🎲 Resume Session
+      </button>
+      <div id="resumeStatus" style="margin-top: 16px;"></div>
+    </div>
+    <div class="card" id="combatStateCard" style="display:none;">
+      <h3>⚔️ Combat State</h3>
+      <div id="combatState"></div>
+    </div>
+    <div class="card" id="previouslyOnCard" style="display:none;">
+      <h3>📜 Previously On…</h3>
+      <div id="previouslyOn"></div>
+    </div>
+  </section>
+
+</main>
+</div>
+
+<!-- ── Entity Modal ───────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="entityModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()">&times;</button>
+    <h2 id="modalTitle">Entity</h2>
+    <div id="modalContent"></div>
+  </div>
+</div>
+
+<!-- ── vis-network (CDN with local fallback) ─────────────────────────── -->
+<script src="https://unpkg.com/vis-network@9.1.6/standalone/umd/vis-network.min.js"></script>
+<script>
+if (typeof vis === 'undefined') {
+  const s = document.createElement('script');
+  s.src = 'vendor/vis-network.min.js';
+  document.head.appendChild(s);
+}
+</script>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════
+   Aria RPG Dashboard — Vanilla JS Application
+   All API calls use relative paths derived from window.location.origin.
+   ZERO hardcoded IPs, ports, or URLs.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+// ── Config (from environment / current origin) ──────────────────────────
+const API_BASE = `${window.location.origin}/api`;
+let currentCampaign = null;
+let kgNetwork = null;
+let kgData = null;
+
+// ── Utility ─────────────────────────────────────────────────────────────
+function $(sel) { return document.querySelector(sel); }
+function $$(sel) { return document.querySelectorAll(sel); }
+
+async function apiFetch(path) {
+  const resp = await fetch(`${API_BASE}${path}`);
+  if (!resp.ok) {
+    const txt = await resp.text();
+    throw new Error(`API ${resp.status}: ${txt.slice(0, 200)}`);
+  }
+  return resp.json();
+}
+
+function timeAgo(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  const now = new Date();
+  const diff = Math.floor((now - d) / 1000);
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+  return `${Math.floor(diff/86400)}d ago`;
+}
+
+function esc(s) {
+  if (!s) return '';
+  const d = document.createElement('div');
+  d.textContent = String(s);
+  return d.innerHTML;
+}
+
+// ── Tab Navigation ──────────────────────────────────────────────────────
+$$('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    $$('.tab-btn').forEach(b => b.classList.remove('active'));
+    $$('.panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    const panel = $(`#panel-${btn.dataset.tab}`);
+    if (panel) panel.classList.add('active');
+
+    // Lazy-load KG on first switch
+    if (btn.dataset.tab === 'kg' && currentCampaign && !kgData) {
+      loadKG(currentCampaign.id);
+    }
+  });
+});
+
+// ── Campaign Loading ────────────────────────────────────────────────────
+async function loadCampaigns() {
+  try {
+    const campaigns = await apiFetch('/rpg/campaigns');
+    const sel = $('#campaignSelect');
+    sel.innerHTML = '<option value="">— Select Campaign —</option>';
+    campaigns.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = `${c.title} (${c.status})`;
+      sel.appendChild(opt);
+    });
+
+    // Auto-select first campaign
+    if (campaigns.length > 0) {
+      sel.value = campaigns[0].id;
+      await selectCampaign(campaigns[0].id);
+    }
+    $('#headerStatus').textContent = `${campaigns.length} campaign(s)`;
+  } catch (err) {
+    $('#headerStatus').textContent = '⚠ API Error';
+    console.error('Failed to load campaigns:', err);
+  }
+}
+
+$('#campaignSelect').addEventListener('change', (e) => {
+  if (e.target.value) selectCampaign(e.target.value);
+});
+
+async function selectCampaign(campaignId) {
+  try {
+    const detail = await apiFetch(`/rpg/campaign/${campaignId}`);
+    currentCampaign = detail;
+    kgData = null; // Reset KG cache
+
+    // Update stats
+    $('#statParty').textContent = (detail.party || []).length;
+    $('#statSessions').textContent = detail.sessions?.length || 0;
+    $('#statEntities').textContent = detail.kg_entity_count || '—';
+    $('#statStatus').textContent = detail.status;
+
+    // Campaign info
+    $('#campaignInfo').innerHTML = `
+      <table>
+        <tr><th>Title</th><td>${esc(detail.title)}</td></tr>
+        <tr><th>Setting</th><td>${esc(detail.setting)}</td></tr>
+        <tr><th>Status</th><td><span class="badge badge-active">${esc(detail.status)}</span></td></tr>
+        <tr><th>Description</th><td>${esc(detail.description) || '<em>No description</em>'}</td></tr>
+      </table>
+    `;
+
+    // Party roster
+    const party = detail.party || [];
+    if (party.length > 0) {
+      let rows = party.map(p => {
+        const name = typeof p === 'string' ? p : (p.name || p.character_id || JSON.stringify(p));
+        const cls = typeof p === 'object' ? (p.class || p.ancestry || '') : '';
+        const level = typeof p === 'object' ? (p.level || '') : '';
+        return `<tr><td>${esc(name)}</td><td>${esc(cls)}</td><td>${esc(level)}</td></tr>`;
+      }).join('');
+      $('#partyRoster').innerHTML = `<table><thead><tr><th>Name</th><th>Class</th><th>Level</th></tr></thead><tbody>${rows}</tbody></table>`;
+    } else {
+      $('#partyRoster').innerHTML = '<div style="color:var(--text-secondary)">No party members found</div>';
+    }
+
+    // Populate session selector
+    populateSessionSelector(detail);
+
+    // If KG tab is active, load KG
+    if ($('.tab-btn[data-tab="kg"]').classList.contains('active')) {
+      loadKG(campaignId);
+    }
+
+  } catch (err) {
+    console.error('Campaign load error:', err);
+    $('#campaignInfo').innerHTML = `<div class="error">Failed to load: ${esc(err.message)}</div>`;
+  }
+}
+
+// ── Session Selector ────────────────────────────────────────────────────
+function populateSessionSelector(detail) {
+  const sel = $('#sessionSelect');
+  sel.innerHTML = '<option value="">— Select Session —</option>';
+
+  // Use sessions from campaign detail
+  (detail.sessions || []).forEach((s, i) => {
+    const opt = document.createElement('option');
+    opt.value = s.session_id || s.file || `session-${i}`;
+    opt.textContent = s.title || s.file || `Session ${i + 1}`;
+    sel.appendChild(opt);
+  });
+}
+
+$('#sessionSelect').addEventListener('change', (e) => {
+  if (e.target.value) loadTranscript(e.target.value);
+});
+
+// ── Transcript Loading ──────────────────────────────────────────────────
+async function loadTranscript(sessionId) {
+  const container = $('#transcriptContent');
+  container.innerHTML = '<div class="loading">Loading transcript…</div>';
+
+  try {
+    const data = await apiFetch(`/rpg/session/${sessionId}/transcript`);
+    if (!data.messages || data.messages.length === 0) {
+      container.innerHTML = '<div style="color:var(--text-secondary)">No messages in this session</div>';
+      return;
+    }
+
+    container.innerHTML = data.messages.map(msg => {
+      const roleClass = msg.role === 'user' ? 'msg-user' : 'msg-assistant';
+      const roleLabel = msg.role === 'user' ? '🎮 Player' : '🎲 Aria DM';
+      const content = esc(msg.content).replace(/\n/g, '<br>');
+      const time = msg.timestamp ? `<div class="msg-time">${timeAgo(msg.timestamp)}</div>` : '';
+      return `<div class="msg ${roleClass}">
+        <div class="msg-role">${roleLabel}</div>
+        <div class="msg-content">${content}</div>
+        ${time}
+      </div>`;
+    }).join('');
+  } catch (err) {
+    container.innerHTML = `<div class="error">Failed to load transcript: ${esc(err.message)}</div>`;
+  }
+}
+
+// ── KG Visualization (vis-network) ──────────────────────────────────────
+const TYPE_COLORS = {
+  player_character: '#4A90D9', npc: '#27AE60', npc_companion: '#2ECC71',
+  location: '#F39C12', city: '#E67E22', tavern: '#D35400',
+  dungeon_room: '#8E44AD', monster: '#E74C3C', enemy: '#C0392B',
+  campaign: '#3498DB', session: '#1ABC9C', quest: '#9B59B6',
+  artifact: '#F1C40F', magical_construct: '#16A085', divine_event: '#E8D44D',
+  concept: '#95A5A6', character: '#5DADE2', person: '#48C9B0',
+};
+
+async function loadKG(campaignId) {
+  const container = $('#kg-container');
+  container.innerHTML = '<div class="loading" style="padding-top:40vh">Loading knowledge graph…</div>';
+
+  try {
+    const data = await apiFetch(`/rpg/campaign/${campaignId}/kg`);
+    kgData = data;
+
+    if (!data.nodes || data.nodes.length === 0) {
+      container.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-secondary)">No KG data for this campaign</div>';
+      return;
+    }
+
+    // Clear loading
+    container.innerHTML = '';
+
+    // Prepare vis-network data
+    const nodes = new vis.DataSet(data.nodes.map(n => ({
+      id: n.id,
+      label: n.label,
+      group: n.group,
+      color: { background: n.color || '#BDC3C7', border: '#555', highlight: { background: '#FFF', border: n.color || '#BDC3C7' } },
+      font: { color: '#E6EDF3', size: 14 },
+      title: n.title || n.label,
+      shape: n.group === 'campaign' ? 'diamond' : (n.group === 'location' || n.group === 'city' || n.group === 'tavern' || n.group === 'dungeon_room' ? 'square' : 'dot'),
+      size: n.group === 'campaign' ? 30 : (n.group === 'player_character' || n.group === 'monster' ? 22 : 16),
+    })));
+
+    const edges = new vis.DataSet(data.edges.map((e, i) => ({
+      id: `edge-${i}`,
+      from: e.from,
+      to: e.to,
+      label: e.label || '',
+      arrows: e.arrows || 'to',
+      color: { color: '#555', opacity: 0.6 },
+      font: { color: '#8B949E', size: 9, strokeWidth: 0 },
+      smooth: { type: 'continuous' },
+    })));
+
+    const options = {
+      physics: {
+        stabilization: { iterations: 150 },
+        barnesHut: { gravitationalConstant: -3000, springLength: 120, springConstant: 0.02 },
+      },
+      interaction: { hover: true, tooltipDelay: 200, navigationButtons: true, keyboard: true },
+      layout: { improvedLayout: true },
+      nodes: { borderWidth: 2, shadow: true },
+      edges: { width: 1.5, shadow: false },
+    };
+
+    kgNetwork = new vis.Network(container, { nodes, edges }, options);
+
+    // Click → show entity modal
+    kgNetwork.on('click', (params) => {
+      if (params.nodes.length > 0) {
+        const nodeId = params.nodes[0];
+        const node = data.nodes.find(n => n.id === nodeId);
+        if (node) showEntityModal(node);
+      }
+    });
+
+    // Build legend
+    buildKGLegend(data.nodes);
+
+  } catch (err) {
+    container.innerHTML = `<div class="error" style="margin:40px">Failed to load KG: ${esc(err.message)}</div>`;
+  }
+}
+
+function buildKGLegend(nodes) {
+  const types = new Set(nodes.map(n => n.group));
+  const legend = $('#kgLegend');
+  legend.innerHTML = '';
+  types.forEach(t => {
+    const color = TYPE_COLORS[t] || '#BDC3C7';
+    legend.innerHTML += `<div class="kg-legend-item"><span class="kg-legend-dot" style="background:${color}"></span>${t.replace(/_/g, ' ')}</div>`;
+  });
+}
+
+// ── Entity Modal ────────────────────────────────────────────────────────
+function showEntityModal(node) {
+  $('#modalTitle').textContent = node.label;
+  let html = `<p><strong>Type:</strong> ${esc(node.group)}</p>`;
+  if (node.title) {
+    html += `<pre style="margin-top:12px;padding:12px;background:var(--bg-primary);border-radius:var(--radius);font-size:0.85rem;white-space:pre-wrap;color:var(--text-secondary)">${esc(node.title)}</pre>`;
+  }
+  if (node.properties && Object.keys(node.properties).length > 0) {
+    html += '<h4 style="margin-top:12px;color:var(--accent-teal)">Properties</h4>';
+    html += '<table>';
+    for (const [k, v] of Object.entries(node.properties)) {
+      html += `<tr><th>${esc(k)}</th><td>${esc(typeof v === 'object' ? JSON.stringify(v) : String(v))}</td></tr>`;
+    }
+    html += '</table>';
+  }
+  $('#modalContent').innerHTML = html;
+  $('#entityModal').classList.add('visible');
+}
+
+function closeModal() {
+  $('#entityModal').classList.remove('visible');
+}
+
+// Close modal on overlay click or Escape
+$('#entityModal').addEventListener('click', (e) => {
+  if (e.target === $('#entityModal')) closeModal();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeModal();
+});
+
+// ── Resume Campaign ─────────────────────────────────────────────────────
+async function resumeCampaign() {
+  if (!currentCampaign) {
+    $('#resumeStatus').innerHTML = '<div class="error">Select a campaign first</div>';
+    return;
+  }
+
+  const btn = $('#resumeBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Loading…';
+  $('#resumeStatus').innerHTML = '<div class="loading">Preparing session…</div>';
+
+  try {
+    // Try to get the last active session for this campaign
+    const detail = currentCampaign;
+    const sessions = detail.sessions || [];
+
+    if (sessions.length === 0) {
+      $('#resumeStatus').innerHTML = `
+        <div style="color:var(--accent-gold);margin-top:16px;">
+          No previous sessions found. Start a new campaign session with Aria via chat!
+        </div>`;
+      return;
+    }
+
+    // Show "Previously On..." from KG
+    await loadPreviouslyOn(detail.id);
+
+    $('#resumeStatus').innerHTML = `
+      <div style="color:var(--accent-green);margin-top:16px;">
+        ✅ Campaign ready! ${sessions.length} session(s) found.
+        Resume via <code>POST /api/engine/chat/sessions/{session_id}/messages</code>
+        or use Aria's chat interface.
+      </div>`;
+
+  } catch (err) {
+    $('#resumeStatus').innerHTML = `<div class="error">Resume failed: ${esc(err.message)}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🎲 Resume Session';
+  }
+}
+
+async function loadPreviouslyOn(campaignId) {
+  try {
+    const data = await apiFetch(`/rpg/campaign/${campaignId}/kg?max_depth=2`);
+    if (!data.nodes || data.nodes.length === 0) return;
+
+    // Deduce scene/event nodes
+    const scenes = data.nodes.filter(n =>
+      ['session', 'divine_event', 'dungeon_room'].includes(n.group)
+    );
+
+    if (scenes.length > 0) {
+      const card = $('#previouslyOnCard');
+      card.style.display = 'block';
+      $('#previouslyOn').innerHTML = scenes.map(s => `
+        <div class="card" style="margin:8px 0;padding:12px;">
+          <strong style="color:var(--accent-gold)">${esc(s.label)}</strong>
+          <span class="badge">${esc(s.group)}</span>
+          ${s.title ? `<p style="margin-top:6px;color:var(--text-secondary);font-size:0.85rem">${esc(s.title)}</p>` : ''}
+        </div>
+      `).join('');
+    }
+  } catch (err) {
+    console.warn('Previously On failed:', err);
+  }
+}
+
+// ── Init ────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  loadCampaigns();
+});
+</script>
+</body>
+</html>

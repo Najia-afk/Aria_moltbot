@@ -36,8 +36,14 @@
     },
     {
       "name": "list_campaigns",
-      "description": "List all available RPG campaigns.",
-      "input_schema": { "type": "object", "properties": {}, "required": [] }
+      "description": "List all available RPG campaigns, optionally filtered by status.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "Filter by status: active, completed, paused. Empty = all." }
+        },
+        "required": []
+      }
     },
     {
       "name": "add_to_party",
@@ -256,6 +262,30 @@
           "dm_name": { "type": "string", "description": "DM name (default: Aria)" }
         },
         "required": ["title", "content"]
+      }
+    }
+    ,
+    {
+      "name": "get_campaign_detail",
+      "description": "Get full campaign detail for dashboard display — party roster, sessions, world state, encounter summary.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "campaign_id": { "type": "string", "description": "Campaign slug to retrieve" }
+        },
+        "required": ["campaign_id"]
+      }
+    },
+    {
+      "name": "get_session_transcript",
+      "description": "Retrieve a session transcript by id or filename.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "session_id": { "type": "string", "description": "Session identifier or transcript filename" },
+          "campaign_id": { "type": "string", "description": "Optional campaign slug to scope the search" }
+        },
+        "required": ["session_id"]
       }
     }
   ],

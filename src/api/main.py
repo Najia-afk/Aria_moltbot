@@ -21,6 +21,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from prometheus_fastapi_instrumentator import Instrumentator
 
 # Import-path compatibility for mixed absolute/relative imports across src/api.
@@ -467,6 +468,7 @@ try:
     from .routers.engine_roundtable import router as engine_roundtable_router, configure_roundtable, configure_swarm, register_roundtable
     from .routers.engine_chat import register_engine_chat, configure_engine
     from .routers.artifacts import router as artifacts_router
+    from .routers.rpg import router as rpg_router
 except ImportError:
     from routers.health import router as health_router
     from routers.activities import router as activities_router
@@ -498,6 +500,7 @@ except ImportError:
     from routers.engine_roundtable import router as engine_roundtable_router, configure_roundtable, configure_swarm, register_roundtable
     from routers.engine_chat import register_engine_chat, configure_engine
     from routers.artifacts import router as artifacts_router
+    from routers.rpg import router as rpg_router
 
 app.include_router(health_router)
 app.include_router(activities_router)
@@ -527,6 +530,15 @@ app.include_router(engine_agent_metrics_router)
 app.include_router(engine_agents_router)
 app.include_router(agents_crud_router)
 app.include_router(artifacts_router)
+app.include_router(rpg_router)
+
+# ── Static file serving (RPG Dashboard at /rpg/) ─────────────────────────────
+# Mounted AFTER API routers so /api/* takes priority.
+# Path resolved relative to src/api/static/ — bind-mounted in Docker.
+_STATIC_DIR = Path(__file__).resolve().parent / "static"
+_RPG_STATIC = _STATIC_DIR / "rpg"
+if _RPG_STATIC.exists():
+    app.mount("/rpg", StaticFiles(directory=str(_RPG_STATIC), html=True), name="rpg-dashboard")
 
 # Engine Roundtable + Swarm — REST + WebSocket
 register_roundtable(app)

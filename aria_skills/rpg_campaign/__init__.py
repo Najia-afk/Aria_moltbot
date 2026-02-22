@@ -163,8 +163,13 @@ class RPGCampaignSkill(BaseSkill):
             return SkillResult.fail(str(e))
 
     @logged_method()
-    async def list_campaigns(self) -> SkillResult:
-        """List all available campaigns."""
+    async def list_campaigns(self, status: str = "") -> SkillResult:
+        """
+        List all available campaigns, optionally filtered by status.
+
+        Args:
+            status: Filter by campaign status (active, completed, paused). Empty = all.
+        """
         try:
             _ensure_dirs()
             campaigns = []
@@ -172,14 +177,121 @@ class RPGCampaignSkill(BaseSkill):
                 if d.is_dir():
                     camp = _load_yaml(d / "campaign.yaml")
                     if camp:
+                        camp_status = camp.get("status", "unknown")
+                        if status and camp_status != status:
+                            continue
                         campaigns.append({
                             "id": camp.get("id", d.name),
                             "title": camp.get("title", "Unknown"),
-                            "status": camp.get("status", "unknown"),
+                            "status": camp_status,
                             "session": camp.get("current_session", 0),
                             "party_size": len(camp.get("party", [])),
+                            "setting": camp.get("setting", "Unknown"),
+                            "created_at": camp.get("created_at", ""),
                         })
             return SkillResult.ok({"campaigns": campaigns, "count": len(campaigns)})
+        except Exception as e:
+            return SkillResult.fail(str(e))
+
+    @logged_method()
+    async def get_campaign_detail(self, campaign_id: str) -> SkillResult:
+        """
+        Get full campaign detail for dashboard display — includes party roster,
+        session list, world state, and encounter summary.
+
+        Args:
+            campaign_id: Campaign slug to retrieve.
+        """
+        try:
+            campaign_dir = CAMPAIGNS_DIR / campaign_id
+            campaign = _load_yaml(campaign_dir / "campaign.yaml")
+            if not campaign:
+                return SkillResult.fail(f"Campaign not found: {campaign_id}")
+
+            world = _load_yaml(campaign_dir / "world.yaml")
+            npcs = _load_yaml(campaign_dir / "npcs.yaml")
+
+            # Resolve party character details
+            party_details = []
+            for ref in campaign.get("party", []):
+                char_path = CHARACTERS_DIR / ref
+                if not char_path.suffix:
+                    char_path = CHARACTERS_DIR / f"{ref}.yaml"
+                char_data = _load_yaml(char_path)
+                ch = char_data.get("character", char_data)
+                party_details.append({
+                    "file": ref,
+                    "name": ch.get("name", ref),
+                    "class": ch.get("class", ""),
+                    "ancestry": ch.get("ancestry", ""),
+                    "level": ch.get("level", ""),
+                })
+
+            # List session YAML files
+            sessions_dir = campaign_dir / "sessions"
+            sessions = []
+            if sessions_dir.exists():
+                for sf in sorted(sessions_dir.glob("*.yaml")):
+                    sd = _load_yaml(sf)
+                    sessions.append({
+                        "file": sf.name,
+                        "number": sd.get("number", 0),
+                        "title": sd.get("title", sf.stem),
+                        "status": sd.get("status", ""),
+                    })
+
+            # Count encounters
+            enc_dir = campaign_dir / "encounters"
+            encounter_count = sum(1 for _ in enc_dir.glob("*.yaml")) if enc_dir.exists() else 0
+
+            return SkillResult.ok({
+                "campaign": campaign,
+                "world": world,
+                "party": party_details,
+                "sessions": sessions,
+                "npc_count": len(npcs.get("npcs", [])),
+                "encounter_count": encounter_count,
+                "summary": (
+                    f"📜 **{campaign.get('title')}** — {campaign.get('status', 'unknown')} | "
+                    f"Party: {len(party_details)} | Sessions: {len(sessions)} | "
+                    f"NPCs: {len(npcs.get('npcs', []))} | Encounters: {encounter_count}"
+                ),
+            })
+        except Exception as e:
+            return SkillResult.fail(str(e))
+
+    @logged_method()
+    async def get_session_transcript(self, session_id: str = "", campaign_id: str = "") -> SkillResult:
+        """
+        Retrieve a session transcript. Searches sessions directory by id or filename.
+
+        Args:
+            session_id: Session identifier or transcript filename.
+            campaign_id: Optional campaign slug to scope the search.
+        """
+        try:
+            # Search in campaign-specific sessions first
+            search_dirs = []
+            if campaign_id:
+                search_dirs.append(CAMPAIGNS_DIR / campaign_id / "sessions")
+            if self._active_campaign:
+                search_dirs.append(CAMPAIGNS_DIR / self._active_campaign / "sessions")
+            search_dirs.append(SESSIONS_DIR)
+
+            for sdir in search_dirs:
+                if not sdir.exists():
+                    continue
+                for f in sorted(sdir.glob("*")):
+                    if session_id in f.stem or session_id in f.name:
+                        content = f.read_text(encoding="utf-8")
+                        return SkillResult.ok({
+                            "file": str(f),
+                            "filename": f.name,
+                            "content": content,
+                            "lines": len(content.splitlines()),
+                        })
+
+            return SkillResult.fail(f"Transcript not found for session: {session_id}")
         except Exception as e:
             return SkillResult.fail(str(e))
 
