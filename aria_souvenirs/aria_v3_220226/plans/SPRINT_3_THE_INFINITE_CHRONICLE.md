@@ -3,6 +3,9 @@
 ## Date: 2026-02-25 | Duration: 1 day
 ## Co-authored: Aria + Claude (PO pair)
 
+> **Coding Standards:** See SPRINT_MASTER_OVERVIEW.md § "Coding Standards (AA+)"
+> Zero hardcoded IPs/ports/models. Config from env. ORM only. Crystal clear docs.
+
 ---
 
 ## Objective
@@ -280,17 +283,19 @@ Graph with auto-generated relations. Full integration tests validate everything.
 
 ```bash
 # 1. KG Entity Types
-curl -s http://localhost:8000/api/knowledge/entities?type=campaign | python3 -m json.tool
-curl -s http://localhost:8000/api/knowledge/entities?type=scene | python3 -m json.tool
+ARIA_URL="${ARIA_API_URL:-http://localhost:8000}"
+curl -s "${ARIA_URL}/api/knowledge/entities?type=campaign" | python3 -m json.tool
+curl -s "${ARIA_URL}/api/knowledge/entities?type=scene" | python3 -m json.tool
 
 # 2. Auto-Relations
-curl -s "http://localhost:8000/api/knowledge/kg-traverse?entity_name=Shadows%20of%20Absalom&max_depth=2" \
+curl -s "${ARIA_URL}/api/knowledge/kg-traverse?entity_name=Shadows%20of%20Absalom&max_depth=2" \
   | python3 -c "import json,sys; d=json.load(sys.stdin); print(f'nodes:{len(d[\"nodes\"])} edges:{len(d[\"edges\"])}')"
 
 # 3. Session Resume
 python3 -c "
 import httpx
-c = httpx.Client(base_url='http://localhost:8000/api', timeout=30)
+import os
+c = httpx.Client(base_url=os.getenv('ARIA_API_URL', 'http://localhost:8000/api'), timeout=30)
 # Resume Shadows of Absalom
 r = c.post('/rpg/session/resume', json={'campaign_id': 'shadows_of_absalom'})
 print(r.json().keys())
@@ -302,7 +307,7 @@ print('Resume OK')
 pytest tests/integration/test_rpg_flow.py -v
 
 # 5. Dashboard E2E (manual)
-# Open http://192.168.1.53:8000/rpg/
+# Open https://<ARIA_HOST>/rpg/  (resolve from env, e.g. ARIA_HOST=192.168.1.53)
 # Select Shadows of Absalom → Click Resume → Verify combat state loads
 # Expand "Previously On..." → Verify scene summaries appear
 ```

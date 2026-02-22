@@ -39,6 +39,67 @@ file served by FastAPI, calling `/api/rpg/*` endpoints.
 
 ---
 
+## Coding Standards (AA+ — Mandatory for All Tickets)
+
+### 1. Zero Hardcoding Policy
+
+| What | Wrong ❌ | Right ✅ | Source |
+|------|---------|---------|--------|
+| IP addresses | `http://192.168.1.53:8000` | `os.getenv("ARIA_API_URL")` | `src/api/config.py` → `SERVICE_URLS` |
+| Ports | `:8000`, `:5432` | `os.getenv("DB_PORT", "5432")` | `src/api/config.py`, `aria_engine/config.py` |
+| Database URLs | `postgresql://admin:admin@localhost:5432/aria_warehouse` | `os.getenv("DATABASE_URL")` | `src/api/config.py` → `DATABASE_URL` |
+| Model names | `"kimi"`, `"gpt-4"` | `EngineConfig.default_model` / `models.yaml` | `aria_models/loader.py` → `load_catalog()` |
+| API base URLs | `"http://aria-api:8000/api"` | `os.getenv("ARIA_API_URL", ...)` | `aria_skills/api_client/__init__.py` |
+| File paths | `"/app/agents"` | `os.getenv("ARIA_AGENTS_ROOT", "/app/agents")` | `src/api/config.py` |
+| Service URLs | `"http://litellm:4000"` | `SERVICE_URLS["litellm"][0]` | `src/api/config.py` → `SERVICE_URLS` |
+
+### 2. Configuration Pattern
+
+```python
+# All config flows from environment → dataclass/module constants → code
+# NEVER inline magic strings in business logic
+
+# Engine: aria_engine/config.py → EngineConfig (dataclass, from_env())
+# API:    src/api/config.py → module-level constants (DATABASE_URL, SERVICE_URLS, etc.)
+# Skills: skill config via api_client, which reads ARIA_API_URL from env
+# Models: aria_models/models.yaml → load_catalog() with 5-min TTL cache
+```
+
+### 3. Database Access
+
+- **API layer** (`src/api/`): SQLAlchemy ORM only. No raw SQL strings.
+- **Skills** (`aria_skills/`): NEVER import SQLAlchemy. All DB access via `api_client` HTTP calls.
+- **Migrations**: Alembic only. All DDL in migration files, never in application code.
+- **Queries**: Use ORM query builder. Parameterized queries if raw SQL is ever unavoidable.
+
+### 4. Frontend (Dashboard HTML)
+
+```javascript
+// API base URL derived from current window location — NEVER hardcoded
+const API_BASE = `${window.location.origin}/api`;
+
+// All fetch() calls use relative paths
+fetch(`${API_BASE}/rpg/campaigns`)  // ✅
+fetch('http://192.168.1.53:8000/api/rpg/campaigns')  // ❌ NEVER
+```
+
+### 5. Documentation Standards
+
+- Every new file gets a module docstring explaining purpose + layer placement
+- Every public function/method gets a docstring with params + return type
+- Every new API endpoint documented in `API.md` with request/response examples
+- Every new config variable documented in `DEPLOYMENT.md`
+- Inline comments for non-obvious logic only (no `# increment i` style)
+- Mermaid diagrams for any architectural flow spanning 3+ components
+
+### 6. Error Handling
+
+- No silent `except: pass` — always log or re-raise
+- All API errors return structured JSON with `detail`, `suggestion`, `trace_id`
+- Skills log errors via `self.logger` with context (entity name, operation, etc.)
+
+---
+
 ## Context: Why These Sprints
 
 On 2026-02-22, Shiva + Claude + Aria completed:
@@ -131,8 +192,9 @@ aria_memories/
 - Static files served from `src/api/static/` via FastAPI `StaticFiles`
 - Docker bind-mount already includes `src/` — no compose changes needed
 - After each sprint: `docker restart aria-api aria-engine`
-- RPG Dashboard accessible at: `http://192.168.1.53:8000/rpg/`
+- RPG Dashboard accessible at: `https://<ARIA_HOST>/rpg/` (resolve via env or Traefik)
 - All new endpoints under `/api/rpg/` prefix
+- **No hardcoded IPs/ports in code** — use `src/api/config.py` patterns (see Coding Standards)
 
 ## Rollback Procedures
 

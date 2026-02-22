@@ -3,6 +3,9 @@
 ## Date: 2026-02-24 | Duration: 1 day
 ## Co-authored: Aria + Claude (PO pair)
 
+> **Coding Standards:** See SPRINT_MASTER_OVERVIEW.md § "Coding Standards (AA+)"
+> Zero hardcoded IPs/ports/models. Config from env. ORM only. Crystal clear docs.
+
 ---
 
 ## Objective
@@ -230,7 +233,8 @@ that never loses data — even on crash.
 python3 scripts/validate_skills.py --all 2>&1 | tail -20
 
 # 2. Error Enrichment
-curl -s -X POST http://localhost:8000/api/knowledge/entities \
+ARIA_URL="${ARIA_API_URL:-http://localhost:8000}"
+curl -s -X POST "${ARIA_URL}/api/knowledge/entities" \
   -H "Content-Type: application/json" \
   -d '{"name": ""}' | python3 -m json.tool
 # → Should include "suggestion" field

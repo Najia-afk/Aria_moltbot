@@ -3,6 +3,9 @@
 ## Date: 2026-02-23 | Duration: 1 day
 ## Co-authored: Aria + Claude (PO pair)
 
+> **Coding Standards:** See SPRINT_MASTER_OVERVIEW.md § "Coding Standards (AA+)"
+> Zero hardcoded IPs/ports/models. Config from env. ORM only. Crystal clear docs.
+
 ---
 
 ## Objective
@@ -17,7 +20,7 @@ button. This requires static file serving infrastructure and new API endpoints.
 ## Architecture
 
 ```
-Browser (http://192.168.1.53:8000/rpg/)
+Browser (https://<ARIA_HOST>/rpg/)  ← resolved from env, NEVER hardcoded
     ↓
 FastAPI StaticFiles mount (/rpg/ → src/api/static/rpg/)
     ↓
@@ -52,8 +55,8 @@ PostgreSQL (rpg tables + KG tables)
       app.mount("/rpg", StaticFiles(directory=static_dir / "rpg", html=True), name="rpg")
   ```
 - **Acceptance Criteria:**
-  - [ ] `GET http://localhost:8000/rpg/` returns 200 with `index.html`
-  - [ ] `GET http://localhost:8000/rpg/index.html` returns 200 with correct MIME type
+  - [ ] `GET /rpg/` returns 200 with `index.html`
+  - [ ] `GET /rpg/index.html` returns 200 with correct MIME type
   - [ ] Directory listing disabled (security)
   - [ ] Survives `docker restart aria-api`
   - [ ] CORS headers configured for development access
@@ -62,7 +65,8 @@ PostgreSQL (rpg tables + KG tables)
 - **Note:** Vendor `vis-network.min.js` locally in `src/api/static/rpg/vendor/` as CDN fallback
 - **Test:**
   ```bash
-  curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/rpg/
+  ARIA_URL="${ARIA_API_URL:-http://localhost:8000}"
+  curl -s -o /dev/null -w "%{http_code}" "${ARIA_URL}/rpg/"
   # Expected: 200
   ```
 
@@ -79,6 +83,13 @@ PostgreSQL (rpg tables + KG tables)
   - CDN: `vis-network` for KG visualization, `marked` for markdown rendering
   - Vanilla JS (no build step, no React/Vue)
   - Dark theme matching Aria's aesthetic
+- **API Access Pattern (mandatory):**
+  ```javascript
+  // API_BASE derived from window.location — NEVER hardcoded
+  const API_BASE = `${window.location.origin}/api`;
+  // All fetch calls:
+  const resp = await fetch(`${API_BASE}/rpg/campaigns`);
+  ```
 - **Views/Panels:**
   1. **Campaign Selector** — Dropdown populated from `/api/rpg/campaigns`
   2. **Campaign Overview** — Party roster, current location, active quests, world state
@@ -136,8 +147,8 @@ PostgreSQL (rpg tables + KG tables)
 - **Dependencies:** TICKET-004 (skill queries)
 - **Test:**
   ```bash
-  curl -s http://localhost:8000/api/rpg/campaigns | python3 -m json.tool
-  curl -s http://localhost:8000/api/rpg/campaign/shadows_of_absalom/kg | python3 -c "
+  curl -s "${ARIA_URL}/api/rpg/campaigns" | python3 -m json.tool
+  curl -s "${ARIA_URL}/api/rpg/campaign/shadows_of_absalom/kg" | python3 -c "
   import json,sys; d=json.load(sys.stdin); print(f'nodes:{len(d[\"nodes\"])} edges:{len(d[\"edges\"])}')"
   ```
 
@@ -171,7 +182,7 @@ PostgreSQL (rpg tables + KG tables)
 
 ## Definition of Done
 
-- [ ] Dashboard accessible at `http://192.168.1.53:8000/rpg/` with all 5 views functional
+- [ ] Dashboard accessible at `/rpg/` with all 5 views functional (no hardcoded IP/port in code)
 - [ ] API endpoints tested with curl and return < 200ms
 - [ ] Static files survive `docker restart aria-api`
 - [ ] Shadows of Absalom campaign loads correctly in dashboard
@@ -192,18 +203,19 @@ PostgreSQL (rpg tables + KG tables)
 
 ```bash
 # 1. Static serving
-curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/rpg/
+ARIA_URL="${ARIA_API_URL:-http://localhost:8000}"
+curl -s -o /dev/null -w "%{http_code}" "${ARIA_URL}/rpg/"
 # → 200
 
 # 2. API endpoints
-curl -s http://localhost:8000/api/rpg/campaigns | python3 -m json.tool
-curl -s http://localhost:8000/api/rpg/campaign/shadows_of_absalom | python3 -m json.tool
-curl -s http://localhost:8000/api/rpg/campaign/shadows_of_absalom/kg | python3 -c "
+curl -s "${ARIA_URL}/api/rpg/campaigns" | python3 -m json.tool
+curl -s "${ARIA_URL}/api/rpg/campaign/shadows_of_absalom" | python3 -m json.tool
+curl -s "${ARIA_URL}/api/rpg/campaign/shadows_of_absalom/kg" | python3 -c "
 import json,sys; d=json.load(sys.stdin)
 print(f'Nodes: {len(d[\"nodes\"])}, Edges: {len(d[\"edges\"])}')"
 
 # 3. Dashboard E2E (manual in browser)
-# Open http://192.168.1.53:8000/rpg/
+# Open https://<ARIA_HOST>/rpg/  (resolve from env, e.g. ARIA_HOST=192.168.1.53)
 # - Select "Shadows of Absalom" from dropdown
 # - Verify KG graph renders with colored nodes
 # - Click "Thorin Ashveil" node → character sheet modal
