@@ -749,15 +749,15 @@ class NativeSessionManager:
     async def prune_sessions_by_type(
         self,
         session_type: str,
-        days: int = 7,
+        days: int = 1,
         dry_run: bool = False,
     ) -> dict[str, Any]:
         """
-        Delete sessions of a specific type older than N days.
+        Archive then delete sessions of a specific type older than N days.
 
-        Designed for short-TTL housekeeping of cron/swarm/subagent sessions that
-        don't need long retention.  Unlike ``prune_old_sessions`` this does **not**
-        copy to archive tables — these sessions are considered ephemeral.
+        All pruned sessions (cron/swarm/subagent) are copied to the archive tables
+        first so the full audit trail is preserved.  They are not visible in the
+        normal session list — only accessible via roundtable/swarm audit queries.
 
         Args:
             session_type: Session type to target (e.g. ``"cron"``, ``"swarm"``).
@@ -765,8 +765,10 @@ class NativeSessionManager:
             dry_run: If True, only count without deleting.
 
         Returns:
-            Dict with ``pruned_count`` and ``dry_run`` keys.
+            Dict with ``pruned_count``, ``archived_count``, ``message_count`` and ``dry_run`` keys.
         """
+        await self._ensure_archive_tables()
+
         cutoff = func.now() - func.make_interval(0, 0, 0, days)
 
         where_clause = and_(
@@ -776,27 +778,109 @@ class NativeSessionManager:
 
         async with self._async_session() as session:
             async with session.begin():
-                if dry_run:
-                    count_result = await session.execute(
-                        select(func.count(EngineChatSession.id))
-                        .where(where_clause)
-                    )
-                    count = count_result.scalar() or 0
-                    return {"pruned_count": count, "dry_run": True}
-
-                result = await session.execute(
-                    delete(EngineChatSession)
-                    .where(where_clause)
-                    .returning(EngineChatSession.id)
+                # Get IDs to prune
+                id_result = await session.execute(
+                    select(EngineChatSession.id).where(where_clause)
                 )
-                deleted = len(result.all())
+                stale_ids = [r[0] for r in id_result.all()]
 
-        if deleted:
-            logger.info(
-                "Type purge: deleted %d '%s' sessions (older_than=%d days)",
-                deleted, session_type, days,
-            )
-        return {"pruned_count": deleted, "dry_run": False}
+                if not stale_ids:
+                    return {"pruned_count": 0, "archived_count": 0, "message_count": 0, "dry_run": dry_run}
+
+                if dry_run:
+                    return {"pruned_count": len(stale_ids), "archived_count": 0, "message_count": 0, "dry_run": True}
+
+                # Archive sessions → EngineChatSessionArchive
+                session_archive_select = (
+                    select(
+                        EngineChatSession.id,
+                        EngineChatSession.agent_id,
+                        EngineChatSession.session_type,
+                        EngineChatSession.title,
+                        EngineChatSession.system_prompt,
+                        EngineChatSession.model,
+                        EngineChatSession.temperature,
+                        EngineChatSession.max_tokens,
+                        EngineChatSession.context_window,
+                        EngineChatSession.status,
+                        EngineChatSession.message_count,
+                        EngineChatSession.total_tokens,
+                        EngineChatSession.total_cost,
+                        EngineChatSession.metadata_json,
+                        EngineChatSession.created_at,
+                        EngineChatSession.updated_at,
+                        EngineChatSession.ended_at,
+                        func.now(),
+                    )
+                    .where(EngineChatSession.id.in_(stale_ids))
+                )
+                await session.execute(
+                    pg_insert(EngineChatSessionArchive)
+                    .from_select(
+                        [
+                            "id", "agent_id", "session_type", "title", "system_prompt", "model",
+                            "temperature", "max_tokens", "context_window", "status", "message_count",
+                            "total_tokens", "total_cost", "metadata", "created_at", "updated_at",
+                            "ended_at", "archived_at",
+                        ],
+                        session_archive_select,
+                    )
+                    .on_conflict_do_nothing(index_elements=["id"])
+                )
+
+                # Archive messages → EngineChatMessageArchive
+                message_archive_select = (
+                    select(
+                        EngineChatMessage.id,
+                        EngineChatMessage.session_id,
+                        EngineChatMessage.agent_id,
+                        EngineChatMessage.role,
+                        EngineChatMessage.content,
+                        EngineChatMessage.thinking,
+                        EngineChatMessage.tool_calls,
+                        EngineChatMessage.tool_results,
+                        EngineChatMessage.model,
+                        EngineChatMessage.tokens_input,
+                        EngineChatMessage.tokens_output,
+                        EngineChatMessage.cost,
+                        EngineChatMessage.latency_ms,
+                        EngineChatMessage.embedding,
+                        EngineChatMessage.metadata_json,
+                        EngineChatMessage.created_at,
+                        func.now(),
+                    )
+                    .where(EngineChatMessage.session_id.in_(stale_ids))
+                )
+                await session.execute(
+                    pg_insert(EngineChatMessageArchive)
+                    .from_select(
+                        [
+                            "id", "session_id", "agent_id", "role", "content", "thinking",
+                            "tool_calls", "tool_results", "model", "tokens_input", "tokens_output",
+                            "cost", "latency_ms", "embedding", "metadata", "created_at", "archived_at",
+                        ],
+                        message_archive_select,
+                    )
+                    .on_conflict_do_nothing(index_elements=["id"])
+                )
+
+                # Delete messages then sessions
+                msg_result = await session.execute(
+                    delete(EngineChatMessage)
+                    .where(EngineChatMessage.session_id.in_(stale_ids))
+                )
+                msg_count = msg_result.rowcount or 0
+
+                await session.execute(
+                    delete(EngineChatSession)
+                    .where(EngineChatSession.id.in_(stale_ids))
+                )
+
+        logger.info(
+            "Type purge: archived+deleted %d '%s' sessions (%d messages, >%d days old)",
+            len(stale_ids), session_type, msg_count, days,
+        )
+        return {"pruned_count": len(stale_ids), "archived_count": len(stale_ids), "message_count": msg_count, "dry_run": False}
 
     async def archive_session(self, session_id: str) -> bool:
         """
