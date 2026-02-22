@@ -151,7 +151,7 @@ async def list_sessions(
         default="desc",
         description="Sort order (asc, desc)",
     ),
-    limit: int = Query(default=20, ge=1, le=100),
+    limit: int = Query(default=20, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
 ):
     """

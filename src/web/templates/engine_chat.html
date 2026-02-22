@@ -1498,7 +1498,7 @@
     async function loadSessions() {
         const loading = document.getElementById('sessionListLoading');
         try {
-            const resp = await fetch('/api/engine/sessions?limit=200&sort=updated_at:desc');
+            const resp = await fetch('/api/engine/sessions?limit=200&sort=updated_at&order=desc');
             const data = await resp.json();
             allSessions = data.sessions || data.items || data || [];
             renderSessionList(allSessions);

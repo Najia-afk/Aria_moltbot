@@ -37,7 +37,7 @@ def make_title(text: str) -> str:
 async def main():
     async with httpx.AsyncClient(timeout=30) as client:
         # Fetch all sessions (up to 500 recent)
-        resp = await client.get(f"{BASE}/api/engine/sessions?limit=500&sort=updated_at:desc")
+        resp = await client.get(f"{BASE}/api/engine/sessions?limit=200&sort=updated_at&order=desc")
         resp.raise_for_status()
         sessions = resp.json().get("sessions") or resp.json().get("items") or []
 
