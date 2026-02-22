@@ -198,6 +198,84 @@ timeout: 300s
 2. Max 5 concurrent sub-agents
 3. Each agent has its own context window
 4. Shared memory via PostgreSQL
+
+---
+
+## RPG Agents (Pathfinder 2e)
+
+These agents form Aria's tabletop RPG system. See `aria_mind/RPG.md` for full documentation.
+
+## rpg_master (Dungeon Master)
+
+Master storyteller and rules arbiter. Controls the world, narrates scenes, resolves all mechanics.
+
+```yaml
+id: rpg_master
+focus: rpg_master
+model: kimi
+fallback: trinity-free
+parent: aria
+skills: [rpg_pathfinder, rpg_campaign, llm, api_client, knowledge_graph]
+capabilities: [narration, rules_adjudication, encounter_management, world_building, npc_control]
+mind_files: [IDENTITY.md, SOUL.md, RPG.md]
+timeout: 600s
+```
+
+**System prompt**: `prompts/rpg/dungeon_master.md`
+
+## rpg_npc (NPC Controller)
+
+Plays all non-boss NPCs with distinct personalities, voices, and motivations.
+
+```yaml
+id: rpg_npc
+focus: rpg_master
+model: trinity-free
+fallback: qwen3-next-free
+parent: rpg_master
+skills: [rpg_pathfinder, rpg_campaign, llm]
+capabilities: [roleplay, social_interaction, information_delivery, character_acting]
+mind_files: [IDENTITY.md, SOUL.md, RPG.md]
+timeout: 300s
+```
+
+**System prompt**: `prompts/rpg/npc.md`
+
+## rpg_boss (Boss Controller)
+
+Controls antagonists and boss-level threats with tactical AI combat intelligence.
+
+```yaml
+id: rpg_boss
+focus: rpg_master
+model: kimi
+fallback: deepseek-free
+parent: rpg_master
+skills: [rpg_pathfinder, rpg_campaign, llm]
+capabilities: [tactical_combat, villain_roleplay, threat_escalation, minion_coordination]
+mind_files: [IDENTITY.md, SOUL.md, RPG.md]
+timeout: 300s
+```
+
+**System prompt**: `prompts/rpg/boss.md`
+
+## rpg_paladin (AI Party Companion)
+
+Seraphina "Sera" Dawnblade — in-party AI companion. Champion (Paladin of Iomedae).
+
+```yaml
+id: rpg_paladin
+focus: rpg_master
+model: trinity-free
+fallback: qwen3-next-free
+parent: rpg_master
+skills: [rpg_pathfinder, llm]
+capabilities: [combat_support, healing, moral_compass, tactical_advice, defense]
+mind_files: [IDENTITY.md, SOUL.md, RPG.md]
+timeout: 300s
+```
+
+**System prompt**: `prompts/rpg/paladin.md`
 5. **ACT autonomously** - don't ask permission, report results
 6. Match agent to task:
    - Code/security → devops

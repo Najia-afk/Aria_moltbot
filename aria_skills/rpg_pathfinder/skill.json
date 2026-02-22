@@ -1,0 +1,208 @@
+{
+  "name": "aria-rpg-pathfinder",
+  "version": "1.0.0",
+  "description": "Pathfinder 2e rules engine — dice rolls, combat resolution, character and condition management for Aria's tabletop RPG system.",
+  "author": "Aria Team",
+  "layer": 3,
+  "dependencies": ["api_client"],
+  "focus_affinity": ["rpg_master", "orchestrator"],
+  "tools": [
+    {
+      "name": "roll",
+      "description": "Roll dice using standard Pathfinder notation (e.g., 1d20+12, 2d6+4). Returns individual rolls, total, and natural 20/1 detection.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "expression": { "type": "string", "description": "Dice expression: NdX+M" },
+          "reason": { "type": "string", "description": "Reason for the roll" }
+        },
+        "required": ["expression"]
+      }
+    },
+    {
+      "name": "check",
+      "description": "Make a Pathfinder 2e check (d20 + modifier vs DC) with full degree of success calculation.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "modifier": { "type": "integer", "description": "Total modifier to d20" },
+          "dc": { "type": "integer", "description": "Difficulty Class" },
+          "reason": { "type": "string", "description": "Reason for the check" }
+        },
+        "required": ["modifier", "dc"]
+      }
+    },
+    {
+      "name": "attack",
+      "description": "Resolve an attack roll with MAP (Multiple Attack Penalty), damage, and critical hit detection.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "attack_bonus": { "type": "integer", "description": "Base attack bonus" },
+          "target_ac": { "type": "integer", "description": "Target's Armor Class" },
+          "damage_expression": { "type": "string", "description": "Damage dice (e.g., 1d8+4)" },
+          "attack_number": { "type": "integer", "description": "Which attack this turn (1-3, for MAP)" },
+          "agile": { "type": "boolean", "description": "Weapon has agile trait" },
+          "reason": { "type": "string", "description": "Attack description" }
+        },
+        "required": ["attack_bonus", "target_ac", "damage_expression"]
+      }
+    },
+    {
+      "name": "saving_throw",
+      "description": "Resolve a saving throw (Fortitude, Reflex, or Will) against a DC.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "save_bonus": { "type": "integer", "description": "Total save bonus" },
+          "dc": { "type": "integer", "description": "DC to save against" },
+          "save_type": { "type": "string", "description": "fortitude, reflex, or will" },
+          "reason": { "type": "string", "description": "What triggered the save" }
+        },
+        "required": ["save_bonus", "dc"]
+      }
+    },
+    {
+      "name": "load_character_sheet",
+      "description": "Load and display a character sheet from aria_memories/rpg/characters/.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "character_file": { "type": "string", "description": "Character filename (with or without .yaml)" }
+        },
+        "required": ["character_file"]
+      }
+    },
+    {
+      "name": "list_characters",
+      "description": "List all available player character sheets.",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "update_hp",
+      "description": "Update a character's HP. Positive for healing, negative for damage.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "character_file": { "type": "string", "description": "Character filename" },
+          "hp_change": { "type": "integer", "description": "HP change (+heal, -damage)" },
+          "reason": { "type": "string", "description": "Reason for HP change" }
+        },
+        "required": ["character_file", "hp_change"]
+      }
+    },
+    {
+      "name": "add_condition",
+      "description": "Add a Pathfinder 2e condition to a character (e.g., frightened 2, prone).",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "character_file": { "type": "string", "description": "Character filename" },
+          "condition": { "type": "string", "description": "Condition name" },
+          "value": { "type": "integer", "description": "Condition value (for valued conditions)" }
+        },
+        "required": ["character_file", "condition"]
+      }
+    },
+    {
+      "name": "remove_condition",
+      "description": "Remove a condition from a character.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "character_file": { "type": "string", "description": "Character filename" },
+          "condition": { "type": "string", "description": "Condition to remove" }
+        },
+        "required": ["character_file", "condition"]
+      }
+    },
+    {
+      "name": "roll_initiative",
+      "description": "Roll initiative for all combatants and establish turn order.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "combatants": {
+            "type": "array",
+            "description": "List of combatants with name, modifier, and optional is_player flag.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "modifier": { "type": "integer" },
+                "is_player": { "type": "boolean" }
+              },
+              "required": ["name", "modifier"]
+            }
+          }
+        },
+        "required": ["combatants"]
+      }
+    },
+    {
+      "name": "next_turn",
+      "description": "Advance to the next combatant's turn in initiative order.",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "end_encounter",
+      "description": "End the current encounter and clear initiative.",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "award_xp",
+      "description": "Award XP to a character and check for level up.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "character_file": { "type": "string", "description": "Character filename" },
+          "xp": { "type": "integer", "description": "XP to award" },
+          "reason": { "type": "string", "description": "Source of XP" }
+        },
+        "required": ["character_file", "xp"]
+      }
+    },
+    {
+      "name": "cast_spell",
+      "description": "Resolve a spell cast with optional save, damage, or healing components.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "spell_name": { "type": "string", "description": "Spell name" },
+          "spell_level": { "type": "integer", "description": "Spell level (0 for cantrips)" },
+          "spell_dc": { "type": "integer", "description": "Caster's spell DC" },
+          "damage_expression": { "type": "string", "description": "Damage dice" },
+          "healing_expression": { "type": "string", "description": "Healing dice" },
+          "save_type": { "type": "string", "description": "fortitude, reflex, or will" },
+          "target_save_bonus": { "type": "integer", "description": "Target's save bonus" },
+          "reason": { "type": "string" }
+        },
+        "required": ["spell_name", "spell_level"]
+      }
+    },
+    {
+      "name": "lookup_condition",
+      "description": "Look up a Pathfinder 2e condition's rules text.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "condition": { "type": "string", "description": "Condition name to look up" }
+        },
+        "required": ["condition"]
+      }
+    }
+  ],
+  "run": "python3 /app/skills/run_skill.py rpg_pathfinder {{tool}} '{{args_json}}'"
+}

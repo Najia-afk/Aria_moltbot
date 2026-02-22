@@ -225,6 +225,8 @@ class AgentLoader:
             "journalist": "journalist",
             "memory": "memory",
             "conversational": "coordinator",
+            "rpg_master": "rpg_master",
+            "rpg": "rpg_master",
         }
         return focus_to_role.get(focus_value, "coordinator")
 

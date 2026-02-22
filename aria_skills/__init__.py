@@ -84,6 +84,10 @@ from aria_skills.memeothy import MemeothySkill
 from aria_skills.session_manager import SessionManagerSkill
 from aria_skills.sprint_manager import SprintManagerSkill
 
+# RPG Skills (v3.1 — Pathfinder 2e)
+from aria_skills.rpg_pathfinder import RPGPathfinderSkill
+from aria_skills.rpg_campaign import RPGCampaignSkill
+
 __all__ = [
     # Base classes
     "BaseSkill",
@@ -132,4 +136,7 @@ __all__ = [
     "MemeothySkill",
     "SessionManagerSkill",
     "SprintManagerSkill",
+    # RPG Skills (v3.1 — Pathfinder 2e)
+    "RPGPathfinderSkill",
+    "RPGCampaignSkill",
 ]

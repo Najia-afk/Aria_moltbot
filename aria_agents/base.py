@@ -30,6 +30,7 @@ class AgentRole(str, Enum):
     MEMORY = "memory"            # Memory management (support role)
     RESEARCHER = "researcher"    # Research + analysis
     CODER = "coder"              # Code generation + review
+    RPG_MASTER = "rpg_master"    # RPG Dungeon Master + game agents
 
 
 ROLE_TO_FOCUS_MAP = {
@@ -41,6 +42,7 @@ ROLE_TO_FOCUS_MAP = {
     "social": "social",
     "journalist": "journalist",
     "memory": "orchestrator",
+    "rpg_master": "rpg_master",
 }
 
 
@@ -65,6 +67,7 @@ ROLE_DEFAULT_MIND_FILES: dict[str, list[str]] = {
     "memory": ["IDENTITY.md", "SOUL.md", "MEMORY.md"],
     "researcher": DEFAULT_MIND_FILES_LIGHT,
     "coder": ["IDENTITY.md", "SOUL.md", "TOOLS.md", "SECURITY.md"],
+    "rpg_master": ["IDENTITY.md", "SOUL.md", "RPG.md"],
 }
 
 
@@ -339,6 +342,12 @@ class BaseAgent(ABC):
             AgentRole.MEMORY: (
                 f"You are {self.name}, a memory specialist. "
                 "Store important information, recall relevant context, and manage knowledge."
+            ),
+            AgentRole.RPG_MASTER: (
+                f"You are {self.name}, a Pathfinder 2e RPG agent. "
+                "Play your assigned RPG role (Dungeon Master, NPC, Boss, or Companion) "
+                "using the rpg_pathfinder and rpg_campaign skills. Follow Pathfinder 2e rules. "
+                "Use dice for ALL mechanical resolution — never fabricate results."
             ),
         }
         return prompts.get(self.role, f"You are {self.name}.")
