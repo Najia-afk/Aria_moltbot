@@ -1590,6 +1590,12 @@
         // Hide cron/swarm/agent session types unless toggle is on
         if (!showAgentSessions) {
             filtered = filtered.filter(s => !AGENT_SESSION_TYPES.has(s.session_type));
+        } else {
+            // When showing all types, sort interactive/roundtable before cron/swarm
+            filtered = [
+                ...filtered.filter(s => !AGENT_SESSION_TYPES.has(s.session_type)),
+                ...filtered.filter(s => AGENT_SESSION_TYPES.has(s.session_type)),
+            ];
         }
 
         if (agentFilter) {
