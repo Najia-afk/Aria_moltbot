@@ -35,7 +35,7 @@ logger = logging.getLogger("aria.engine.session_manager")
 
 # Defaults
 DEFAULT_PAGE_SIZE = 20
-MAX_PAGE_SIZE = 100
+MAX_PAGE_SIZE = 200
 MAX_TITLE_LENGTH = 200
 MAX_MESSAGE_LENGTH = 100_000  # 100KB per message
 
