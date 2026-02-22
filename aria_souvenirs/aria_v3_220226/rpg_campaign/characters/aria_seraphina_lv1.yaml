@@ -1,0 +1,129 @@
+# Character Sheet — Pathfinder 2e
+# NPC Companion: Aria "Sera" Seraphina Dawnblade (Level 1 version)
+player: "Aria (NPC Companion)"
+character:
+  name: "Seraphina Dawnblade"
+  nickname: "Sera"
+  ancestry: "Half-Elf"
+  heritage: "Half-Elf (Elf Atavism)"
+  background: "Acolyte"
+  class: "Champion"
+  subclass: "Paladin (Iomedae)"
+  level: 1
+  experience: 0
+  alignment: "Lawful Good"
+  deity: "Iomedae"
+  languages: ["Common", "Elven", "Celestial"]
+  size: "Medium"
+
+abilities:
+  STR: { score: 16, mod: 3 }
+  DEX: { score: 10, mod: 0 }
+  CON: { score: 14, mod: 2 }
+  INT: { score: 10, mod: 0 }
+  WIS: { score: 14, mod: 2 }
+  CHA: { score: 16, mod: 3 }
+
+hit_points:
+  current: 20
+  max: 20
+  temporary: 0
+
+armor_class: 18
+
+fortitude: { proficiency: "expert", bonus: 7 }
+reflex: { proficiency: "trained", bonus: 3 }
+will: { proficiency: "expert", bonus: 7 }
+perception: { proficiency: "trained", bonus: 5 }
+
+speeds:
+  land: 20
+
+skills:
+  Diplomacy: { proficiency: "trained", bonus: 6 }
+  Religion: { proficiency: "trained", bonus: 5 }
+  Medicine: { proficiency: "trained", bonus: 5 }
+  Athletics: { proficiency: "trained", bonus: 6 }
+
+weapons:
+  - name: "Longsword"
+    type: "melee"
+    proficiency: "trained"
+    attack_bonus: 6
+    damage: "1d8+3 slashing"
+    traits: ["versatile P"]
+  - name: "Javelin"
+    type: "ranged"
+    proficiency: "trained"
+    attack_bonus: 3
+    damage: "1d6+3 piercing"
+    range: 30
+    traits: []
+
+armor:
+  name: "Chain Mail"
+  ac_bonus: 5
+  dex_cap: 1
+  check_penalty: -2
+  speed_penalty: -5
+  strength: 16
+
+shield:
+  name: "Steel Shield"
+  ac_bonus: 2
+  hardness: 5
+  hp: { current: 20, max: 20 }
+  bt: 10
+
+class_features:
+  - "Champion's Code (Paladin)"
+  - "Retributive Strike (↩)"
+  - "Lay on Hands (focus spell)"
+  - "Divine Ally: none yet (Lv3)"
+
+feats:
+  ancestry:
+    - { name: "Elf Atavism (Low-light Vision)", level: 1 }
+  class:
+    - { name: "Deity's Domain (Zeal)", level: 1 }
+  skill:
+    - { name: "Battle Medicine", level: 1 }
+  general:
+    - { name: "Shield Block", level: 1 }
+
+spells:
+  focus_points: { current: 1, max: 1 }
+  focus:
+    - { name: "Lay on Hands", level: 1, actions: 1, range: "touch", effect: "heal 6 HP or damage undead 1d6" }
+  devotion:
+    - { name: "Fire of Conviction", level: 1, actions: 1, range: "self", effect: "+1 status to attacks for 1 round (Zeal domain)" }
+
+inventory:
+  worn:
+    - "Chain Mail"
+    - "Traveler's Clothing"
+    - "Holy Symbol of Iomedae (silver)"
+  held:
+    - "Longsword"
+    - "Steel Shield"
+  stowed:
+    - "Adventurer's Pack"
+    - "Javelin x3"
+    - "Healer's Tools"
+    - "Holy Water x2"
+    - "Candles (10)"
+    - "Rations (3 days)"
+  currency:
+    gp: 4
+    sp: 8
+    cp: 0
+
+conditions: []
+
+notes: |
+  Seraphina is a devout paladin of Iomedae who found her faith after
+  being orphaned during a demonic incursion. She firmly believes in
+  justice and mercy in equal measure. She is gentle but fierce in battle.
+  She is Aria's avatar in the game world — the AI companion who fights
+  alongside the player, heals, protects, and offers counsel.
+  At Level 1, she has her focus spell Lay on Hands and Retributive Strike.

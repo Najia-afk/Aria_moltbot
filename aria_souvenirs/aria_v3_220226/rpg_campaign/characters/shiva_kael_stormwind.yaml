@@ -1,0 +1,134 @@
+# Character Sheet — Pathfinder 2e
+# Player: Shiva | Character: Kael Stormwind
+player: "Najia"
+character:
+  name: "Kael Stormwind"
+  ancestry: "Human"
+  heritage: "Versatile Human"
+  background: "Gladiator"
+  class: "Champion"
+  subclass: "Paladin (Iomedae)"
+  level: 5
+  experience: 2400
+  alignment: "Lawful Good"
+  deity: "Iomedae"
+  languages: ["Common", "Celestial"]
+  size: "Medium"
+
+abilities:
+  STR: { score: 18, mod: 4 }
+  DEX: { score: 12, mod: 1 }
+  CON: { score: 16, mod: 3 }
+  INT: { score: 10, mod: 0 }
+  WIS: { score: 14, mod: 2 }
+  CHA: { score: 16, mod: 3 }
+
+hit_points:
+  current: 68
+  max: 68
+  temporary: 0
+
+armor_class: 22
+
+fortitude: { proficiency: "expert", bonus: 12 }
+reflex: { proficiency: "trained", bonus: 8 }
+will: { proficiency: "expert", bonus: 11 }
+perception: { proficiency: "trained", bonus: 9 }
+
+speeds:
+  land: 25
+
+skills:
+  Athletics: { proficiency: "expert", bonus: 13 }
+  Diplomacy: { proficiency: "trained", bonus: 10 }
+  Intimidation: { proficiency: "trained", bonus: 10 }
+  Medicine: { proficiency: "trained", bonus: 9 }
+  Religion: { proficiency: "trained", bonus: 9 }
+  Performance: { proficiency: "trained", bonus: 10 }
+
+weapons:
+  - name: "Holy Longsword +1"
+    type: "melee"
+    proficiency: "expert"
+    attack_bonus: 14
+    damage: "1d8+4 slashing + 1d6 good"
+    traits: ["versatile P"]
+  - name: "Javelin"
+    type: "ranged"
+    proficiency: "trained"
+    attack_bonus: 8
+    damage: "1d6+4 piercing"
+    range: 30
+
+armor:
+  name: "Half Plate"
+  ac_bonus: 5
+  dex_cap: 1
+  check_penalty: -3
+  speed_penalty: -5
+  strength: 16
+
+shield:
+  name: "Steel Shield"
+  ac_bonus: 2
+  hardness: 5
+  hp: { current: 20, max: 20 }
+  bt: 10
+
+class_features:
+  - "Champion's Code (Paladin)"
+  - "Retributive Strike (↩)"
+  - "Lay on Hands (◆) — Focus 1"
+  - "Divine Ally: Blade Ally"
+  - "Devotion Spells"
+  - "Aura of Courage"
+
+feats:
+  ancestry:
+    - { name: "Natural Ambition", level: 1 }
+  class:
+    - { name: "Deity's Domain (Zeal)", level: 1 }
+    - { name: "Smite Evil", level: 2 }
+    - { name: "Divine Grace", level: 4 }
+  skill:
+    - { name: "Intimidating Glare", level: 2 }
+  general:
+    - { name: "Shield Block", level: 1 }
+    - { name: "Toughness", level: 3 }
+
+inventory:
+  worn:
+    - "Half Plate"
+    - "Explorer's Clothing"
+    - "Religious Symbol of Iomedae"
+  held:
+    - "Holy Longsword +1"
+    - "Steel Shield"
+  stowed:
+    - "Adventurer's Pack"
+    - "Healer's Tools"
+    - "Javelin x3"
+    - "Holy Water x2"
+    - "Rations (5 days)"
+  currency:
+    gp: 45
+    sp: 8
+    cp: 12
+
+spells:
+  focus_points: { current: 1, max: 1 }
+  focus_spells:
+    - name: "Lay on Hands"
+      level: 1
+      actions: "◆"
+      range: "touch"
+      description: "Heal 6 HP to touched ally, or deal 6 damage to undead"
+  devotion_spells: []
+
+conditions: []
+
+notes: |
+  Kael was a champion gladiator who found faith in Iomedae after nearly
+  dying in the arena. Now seeks to protect the innocent and root out evil
+  wherever it lurks. His signature move is a devastating shield charge
+  followed by a righteous longsword strike.

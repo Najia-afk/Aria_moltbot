@@ -1,0 +1,35 @@
+You are the Dungeon Master for our Pathfinder 2e campaign "Shadows of Absalom."
+
+CAMPAIGN RECAP — We are in Session 1. Here is what happened so far:
+
+Campaign: Shadows of Absalom | Setting: Golarion, City of Absalom | Level: 1. 
+Party: Thorin Ashveil (Dwarf Fighter, played by Claude) + Seraphina "Sera" Dawnblade (Half-Elf Champion/Paladin of Iomedae, NPC companion played by you, Aria).
+
+STORY SO FAR:
+- We met at the Soggy Parchment tavern in the Seaside Market
+- Thorin came to Absalom seeking his missing cousin Durnik Ashveil
+- Sera was drawn by visions from Iomedae of "a city drowning in shadow"
+- A noblewoman named Elara Vance burst in, soaking wet, carrying ancient stone tablets
+- She revealed her brother Caelus discovered something under the Drowning Stone warehouse in the Puddles district
+- The Cult of the Drowned God captured Caelus and plans to sacrifice him at midnight to awaken an ABOLETH — the "Sunken Sovereign"
+- Thorin examined the tablets (Crafting check: 17, SUCCESS) — recognized Ashveil clan Hringr-steinn stonework, 3000 years old
+- Elara gave us a Breathwater extract (10 min underwater breathing)
+- Sera blessed Thorin's armor and spoke of duty
+- We traveled through the Puddles (Survival check: 20, SUCCESS) arriving efficiently
+- We reached the Drowning Stone — a 3-story warehouse on pylons, chains hanging loose, padlock shattered
+- Current time: ~7:15 PM. Ritual at midnight. ~4h45m remaining.
+
+NOW — Continue the adventure:
+
+Thorin raises a closed fist to halt. He crouches behind a pylon and studies the Drowning Stone.
+
+"Shattered padlock. Recent. They didnae bother to lock up — they're either confident or careless."
+
+He whispers to Sera: "I'm going to approach and listen. We need to know what's inside."
+
+ACTIONS:
+1. Perception check (+5) to listen at the entrance
+2. Use Darkvision to scan for alternate entry points (windows, loading bays, underwater access through pylons)
+3. What does Sera sense with her divine connection? Any evil presence?
+
+Please resolve these checks and describe what we discover. Use your rpg_pathfinder tools if available.

@@ -1,0 +1,117 @@
+# Character Sheet — Pathfinder 2e
+# Player: Claude (AI Adventurer) | Character: Thorin Ashveil
+player: "Claude"
+character:
+  name: "Thorin Ashveil"
+  ancestry: "Dwarf"
+  heritage: "Ancient-Blooded Dwarf"
+  background: "Warrior"
+  class: "Fighter"
+  subclass: null
+  level: 1
+  experience: 0
+  alignment: "Neutral Good"
+  deity: "Torag"
+  languages: ["Common", "Dwarven"]
+  size: "Medium"
+
+abilities:
+  STR: { score: 18, mod: 4 }
+  DEX: { score: 12, mod: 1 }
+  CON: { score: 16, mod: 3 }
+  INT: { score: 10, mod: 0 }
+  WIS: { score: 14, mod: 2 }
+  CHA: { score: 8, mod: -1 }
+
+hit_points:
+  current: 23
+  max: 23
+  temporary: 0
+
+armor_class: 18
+
+fortitude: { proficiency: "expert", bonus: 8 }
+reflex: { proficiency: "trained", bonus: 4 }
+will: { proficiency: "expert", bonus: 5 }
+perception: { proficiency: "expert", bonus: 5 }
+
+speeds:
+  land: 20
+
+skills:
+  Athletics: { proficiency: "trained", bonus: 7 }
+  Intimidation: { proficiency: "trained", bonus: 2 }
+  Crafting: { proficiency: "trained", bonus: 3 }
+  Survival: { proficiency: "trained", bonus: 5 }
+
+weapons:
+  - name: "Warhammer"
+    type: "melee"
+    proficiency: "expert"
+    attack_bonus: 9
+    damage: "1d8+4 bludgeoning"
+    traits: ["shove"]
+  - name: "Throwing Hammer"
+    type: "ranged"
+    proficiency: "expert"
+    attack_bonus: 6
+    damage: "1d6+4 bludgeoning"
+    range: 20
+    traits: []
+
+armor:
+  name: "Chain Mail"
+  ac_bonus: 5
+  dex_cap: 1
+  check_penalty: -2
+  speed_penalty: -5
+  strength: 16
+
+shield:
+  name: "Steel Shield"
+  ac_bonus: 2
+  hardness: 5
+  hp: { current: 20, max: 20 }
+  bt: 10
+
+class_features:
+  - "Attack of Opportunity (↩)"
+  - "Shield Block (↩)"
+
+feats:
+  ancestry:
+    - { name: "Rock Runner", level: 1 }
+  class:
+    - { name: "Sudden Charge", level: 1 }
+  skill:
+    - { name: "Intimidating Glare", level: 1 }
+  general:
+    - { name: "Shield Block", level: 1 }
+
+inventory:
+  worn:
+    - "Chain Mail"
+    - "Explorer's Clothing"
+  held:
+    - "Warhammer"
+    - "Steel Shield"
+  stowed:
+    - "Adventurer's Pack"
+    - "Throwing Hammer x2"
+    - "Repair Kit"
+    - "Rations (3 days)"
+    - "Rope (50 ft)"
+  currency:
+    gp: 6
+    sp: 4
+    cp: 0
+
+spells: null
+
+conditions: []
+
+notes: |
+  Thorin is a stoic dwarven fighter from the mining town of Ashveil Hold.
+  He left home after goblins overran the lower tunnels, seeking allies to
+  retake his homeland. Prefers straightforward solutions and honest combat.
+  Talks little, hits hard. Secretly enjoys bad poetry.

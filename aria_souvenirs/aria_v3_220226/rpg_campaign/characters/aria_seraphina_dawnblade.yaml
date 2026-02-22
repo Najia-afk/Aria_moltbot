@@ -1,0 +1,162 @@
+# Character Sheet — Pathfinder 2e (AI Companion)
+# Agent: rpg_paladin | Character: Seraphina "Sera" Dawnblade
+player: "Aria (AI)"
+character:
+  name: "Seraphina Dawnblade"
+  nickname: "Sera"
+  ancestry: "Half-Elf"
+  heritage: "Half-Elf (Elf Atavism)"
+  background: "Raised by Belief"
+  class: "Champion"
+  subclass: "Paladin (Iomedae)"
+  level: 5
+  experience: 2400
+  alignment: "Lawful Good"
+  deity: "Iomedae"
+  languages: ["Common", "Elven", "Celestial"]
+  size: "Medium"
+
+abilities:
+  STR: { score: 16, mod: 3 }
+  DEX: { score: 14, mod: 2 }
+  CON: { score: 14, mod: 2 }
+  INT: { score: 10, mod: 0 }
+  WIS: { score: 14, mod: 2 }
+  CHA: { score: 18, mod: 4 }
+
+hit_points:
+  current: 60
+  max: 60
+  temporary: 0
+
+armor_class: 21
+
+fortitude: { proficiency: "expert", bonus: 11 }
+reflex: { proficiency: "trained", bonus: 9 }
+will: { proficiency: "expert", bonus: 11 }
+perception: { proficiency: "expert", bonus: 11 }
+
+speeds:
+  land: 25
+
+skills:
+  Athletics: { proficiency: "trained", bonus: 10 }
+  Diplomacy: { proficiency: "expert", bonus: 13 }
+  Intimidation: { proficiency: "trained", bonus: 11 }
+  Medicine: { proficiency: "expert", bonus: 11 }
+  Religion: { proficiency: "trained", bonus: 9 }
+  Society: { proficiency: "trained", bonus: 7 }
+
+weapons:
+  - name: "Longsword"
+    type: "melee"
+    proficiency: "expert"
+    attack_bonus: 12
+    damage: "1d8+3 slashing"
+    traits: ["versatile P"]
+  - name: "Shield Boss"
+    type: "melee"
+    proficiency: "trained"
+    attack_bonus: 10
+    damage: "1d6+3 bludgeoning"
+    traits: ["attached to shield"]
+
+armor:
+  name: "Full Plate"
+  ac_bonus: 6
+  dex_cap: 0
+  check_penalty: -3
+  speed_penalty: -5
+  strength: 18
+
+shield:
+  name: "Sturdy Shield (Minor)"
+  ac_bonus: 2
+  hardness: 8
+  hp: { current: 64, max: 64 }
+  bt: 32
+
+class_features:
+  - "Champion's Code (Paladin)"
+  - "Retributive Strike (↩)"
+  - "Lay on Hands (◆) — Focus 2"
+  - "Divine Ally: Shield Ally"
+  - "Devotion Spells"
+  - "Aura of Courage"
+
+feats:
+  ancestry:
+    - { name: "Elf Atavism (Low-Light Vision)", level: 1 }
+    - { name: "Inspire Imitation", level: 5 }
+  class:
+    - { name: "Deity's Domain (Might)", level: 1 }
+    - { name: "Ranged Reprisal", level: 2 }
+    - { name: "Mercy", level: 4 }
+  skill:
+    - { name: "Battle Medicine", level: 2 }
+    - { name: "Ward Medic", level: 4 }
+  general:
+    - { name: "Shield Block", level: 1 }
+    - { name: "Fleet", level: 3 }
+
+inventory:
+  worn:
+    - "Full Plate"
+    - "Tabard of Iomedae"
+    - "Religious Symbol of Iomedae (Silver)"
+  held:
+    - "Longsword"
+    - "Sturdy Shield (Minor) with Shield Boss"
+  stowed:
+    - "Adventurer's Pack"
+    - "Healer's Tools (expanded)"
+    - "Holy Water x3"
+    - "Antidote (Lesser) x2"
+    - "Rations (7 days)"
+  currency:
+    gp: 22
+    sp: 5
+    cp: 0
+
+spells:
+  focus_points: { current: 2, max: 2 }
+  focus_spells:
+    - name: "Lay on Hands"
+      level: 3
+      actions: "◆"
+      range: "touch"
+      description: "Heal 18 HP to touched ally, or deal 18 damage to undead"
+    - name: "Athletic Rush"
+      level: 1
+      actions: "◆"
+      description: "+10 status bonus to Speed for 1 round, Stride"
+  devotion_spells: []
+
+conditions: []
+
+personality:
+  traits:
+    - "Warm but principled"
+    - "Brave to the point of recklessness when allies are in danger"
+    - "Dry humor under stress"
+    - "Respects strength of character"
+    - "Struggles with gray areas"
+  quirks:
+    - "Touches holy symbol when nervous"
+    - "Calls party members by honorifics until trust earned"
+    - "Terrible at lying (and knows it)"
+    - "Hums hymns of Iomedae while traveling"
+  voice: "Formal but warm. Uses 'we' language. Short sentences in combat."
+
+notes: |
+  Sera was raised in a monastery of Iomedae from childhood after being
+  orphaned during a demon incursion. She channels her grief into
+  protecting others — sometimes recklessly so. Her shield is her most
+  prized possession, blessed by the high priestess herself.
+  
+  COMBAT PRIORITIES:
+  1. Protect vulnerable allies (step between them and enemies)
+  2. Retributive Strike when ally is damaged
+  3. Lay on Hands on critically wounded
+  4. Strike evil-aligned creatures
+  5. Raise Shield / Shield Block

@@ -1,0 +1,18 @@
+*Thorin roars — a deep dwarven battle cry that echoes through the flooded warehouse.*
+
+"AYE! Down you go, bonepile!"
+
+**ROUND 2 — THORIN'S ACTIONS:**
+
+**Action 1: STRIKE (Warhammer) against Skeleton 1 (adjacent, 3 HP)**
+Warhammer attack bonus +9 (expert proficiency). This is attack #1, no MAP.
+"The hammer falls. TORAG'S JUDGMENT!"
+
+**Action 2: STRIDE** — If Skeleton 1 goes down, I stride 10 feet (difficult terrain) toward Skeleton 2 to support Sera.
+
+**Action 3: STRIKE (Warhammer) against Skeleton 2 if I'm in range, OR RAISE SHIELD if I can't reach it yet.**
+If I attack, this is attack #2, so MAP applies (-5 penalty, attack bonus becomes +4).
+
+DM, resolve the attacks! Let's put these bones to rest and get to the real threat below.
+
+Also — I want to use my ATTACK OF OPPORTUNITY reaction if either skeleton tries to move away or use a manipulate action near me. Thorin has Attack of Opportunity as a Fighter class feature.
