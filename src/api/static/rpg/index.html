@@ -1,625 +1,648 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Aria RPG Dashboard — The Crystal Ball</title>
-<style>
-/* ── Reset & Theme ───────────────────────────────────────────────────── */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-:root {
-  --bg-primary:   #0D1117;
-  --bg-secondary: #161B22;
-  --bg-card:      #1C2128;
-  --bg-hover:     #21262D;
-  --border:       #30363D;
-  --text-primary: #E6EDF3;
-  --text-secondary:#8B949E;
-  --accent-blue:  #58A6FF;
-  --accent-green: #3FB950;
-  --accent-gold:  #D29922;
-  --accent-red:   #F85149;
-  --accent-purple:#BC8CFF;
-  --accent-teal:  #39D2C0;
-  --font-main:    'Segoe UI', system-ui, -apple-system, sans-serif;
-  --font-mono:    'SF Mono', 'Fira Code', 'Consolas', monospace;
-  --radius:       8px;
-  --shadow:       0 2px 8px rgba(0,0,0,0.3);
-}
-html, body { height: 100%; font-family: var(--font-main); background: var(--bg-primary); color: var(--text-primary); }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+    <meta http-equiv="Pragma" content="no-cache">
+    <title>RPG Dashboard &#x2014; Aria Blue</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <link rel="shortcut icon" href="/favicon.ico">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/variables.css">
+    <link rel="stylesheet" href="/static/css/base.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+    <style>
+    /* Dropdown Menu Styles (inline, same as all Aria pages) */
+    .nav-dropdown { position: relative; display: inline-block; }
+    .nav-dropdown-toggle {
+        display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem;
+        color: var(--text-secondary); text-decoration: none; border-radius: var(--radius-md);
+        transition: all 0.2s; cursor: pointer; background: none; border: none;
+        font-size: inherit; font-family: inherit;
+    }
+    .nav-dropdown-toggle:hover { color: var(--text-primary); background: var(--bg-tertiary); }
+    .nav-dropdown-toggle.active { color: var(--accent-primary); }
+    .nav-dropdown-toggle svg.chevron { width: 12px; height: 12px; transition: transform 0.2s; }
+    .nav-dropdown:hover .nav-dropdown-toggle svg.chevron { transform: rotate(180deg); }
+    .nav-dropdown-menu {
+        position: absolute; top: 100%; left: 0; min-width: 200px;
+        background: var(--bg-secondary); border: 1px solid var(--border-default);
+        border-radius: var(--radius-md); box-shadow: var(--shadow-lg);
+        opacity: 0; visibility: hidden; transform: translateY(-10px);
+        transition: all 0.2s; z-index: 1000; padding: 0.5rem 0;
+    }
+    .nav-dropdown:hover .nav-dropdown-menu { opacity: 1; visibility: visible; transform: translateY(0); }
+    .nav-dropdown-menu a {
+        display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 1rem;
+        color: var(--text-secondary); text-decoration: none; transition: all 0.15s;
+    }
+    .nav-dropdown-menu a:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+    .nav-dropdown-menu a.active { color: var(--accent-primary); background: rgba(124, 58, 237, 0.1); }
+    .nav-dropdown-menu .divider { height: 1px; background: var(--border-default); margin: 0.5rem 0; }
 
-/* ── Layout ──────────────────────────────────────────────────────────── */
-#app { display: flex; flex-direction: column; height: 100vh; }
-header {
-  background: var(--bg-secondary); border-bottom: 1px solid var(--border);
-  padding: 12px 24px; display: flex; align-items: center; gap: 16px; flex-shrink: 0;
-}
-header h1 { font-size: 1.25rem; font-weight: 600; }
-header h1 span { color: var(--accent-gold); }
-.campaign-select {
-  background: var(--bg-card); border: 1px solid var(--border); color: var(--text-primary);
-  padding: 6px 12px; border-radius: var(--radius); font-size: 0.875rem; cursor: pointer;
-}
-.campaign-select:focus { outline: 2px solid var(--accent-blue); }
-.header-status { margin-left: auto; font-size: 0.8rem; color: var(--text-secondary); }
+    /* ── RPG Page-specific styles ── */
+    .rpg-toolbar {
+        display: flex; align-items: center; gap: var(--space-md);
+        flex-wrap: wrap; margin-bottom: var(--space-lg);
+    }
+    .rpg-toolbar label { font-size: 0.875rem; font-weight: 500; color: var(--text-secondary); }
+    .rpg-toolbar select {
+        padding: var(--space-sm) var(--space-md); background: var(--bg-tertiary);
+        border: 1px solid var(--border-default); border-radius: var(--radius-md);
+        color: var(--text-primary); font-size: 0.875rem; font-family: var(--font-sans);
+        cursor: pointer; transition: all 0.2s; min-width: 220px;
+    }
+    .rpg-toolbar select:focus { outline: none; border-color: var(--accent-primary); box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2); }
+    .rpg-toolbar .toolbar-status { margin-left: auto; font-size: 0.8rem; color: var(--text-muted); }
 
-/* ── Tab Navigation ──────────────────────────────────────────────────── */
-.tabs {
-  display: flex; gap: 2px; background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border); padding: 0 24px; flex-shrink: 0;
-}
-.tab-btn {
-  background: none; border: none; color: var(--text-secondary); padding: 10px 16px;
-  font-size: 0.875rem; cursor: pointer; border-bottom: 2px solid transparent;
-  transition: all 0.15s;
-}
-.tab-btn:hover { color: var(--text-primary); background: var(--bg-hover); }
-.tab-btn.active { color: var(--accent-blue); border-bottom-color: var(--accent-blue); }
+    .rpg-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border-subtle); margin-bottom: var(--space-lg); }
+    .rpg-tab {
+        display: flex; align-items: center; gap: var(--space-sm); background: none; border: none;
+        color: var(--text-secondary); padding: var(--space-sm) var(--space-lg);
+        font-size: 0.875rem; font-weight: 500; font-family: var(--font-sans);
+        cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s;
+    }
+    .rpg-tab:hover { color: var(--text-primary); background: var(--bg-hover); }
+    .rpg-tab.active { color: var(--accent-primary); border-bottom-color: var(--accent-primary); }
 
-/* ── Main Content ────────────────────────────────────────────────────── */
-main { flex: 1; overflow: auto; padding: 20px 24px; }
-.panel { display: none; }
-.panel.active { display: block; }
+    .rpg-panel { display: none; }
+    .rpg-panel.active { display: block; }
 
-/* ── Cards ───────────────────────────────────────────────────────────── */
-.card {
-  background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 16px; margin-bottom: 16px;
-  box-shadow: var(--shadow);
-}
-.card h3 { font-size: 1rem; margin-bottom: 8px; color: var(--accent-blue); }
-.card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+    .rpg-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-lg); margin-bottom: var(--space-xl); }
+    @media (max-width: 768px) { .rpg-stats { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 480px) { .rpg-stats { grid-template-columns: 1fr; } }
 
-/* ── Stats Row ───────────────────────────────────────────────────────── */
-.stats { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 16px; }
-.stat { text-align: center; }
-.stat-value { font-size: 1.75rem; font-weight: 700; color: var(--accent-blue); }
-.stat-label { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
+    .rpg-card table th {
+        color: var(--text-muted); font-weight: 500; text-transform: uppercase;
+        font-size: 0.75rem; letter-spacing: 0.05em; padding: var(--space-sm) var(--space-md);
+        border-bottom: 1px solid var(--border-subtle);
+    }
+    .rpg-card table td { padding: var(--space-sm) var(--space-md); border-bottom: 1px solid var(--border-subtle); font-size: 0.875rem; }
+    .rpg-card table tr:hover td { background: var(--bg-hover); }
 
-/* ── Party Table ─────────────────────────────────────────────────────── */
-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
-th { text-align: left; color: var(--text-secondary); font-weight: 500; padding: 8px 12px; border-bottom: 1px solid var(--border); }
-td { padding: 8px 12px; border-bottom: 1px solid var(--border); }
-tr:hover td { background: var(--bg-hover); }
+    #kg-container {
+        width: 100%; height: calc(100vh - 340px); min-height: 400px;
+        border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--bg-secondary);
+    }
+    .kg-legend { display: flex; flex-wrap: wrap; gap: var(--space-md); margin-top: var(--space-md); }
+    .kg-legend-item { display: flex; align-items: center; gap: var(--space-xs); font-size: 0.8rem; color: var(--text-muted); }
+    .kg-legend-dot { width: 12px; height: 12px; border-radius: 50%; }
 
-/* ── KG Visualization ────────────────────────────────────────────────── */
-#kg-container { width: 100%; height: calc(100vh - 200px); min-height: 400px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-card); }
-.kg-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
-.kg-legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--text-secondary); }
-.kg-legend-dot { width: 12px; height: 12px; border-radius: 50%; }
+    .msg { padding: var(--space-md) var(--space-lg); border-radius: var(--radius-md); margin-bottom: var(--space-sm); }
+    .msg-user { background: rgba(99, 102, 241, 0.08); border-left: 3px solid var(--accent-primary); }
+    .msg-assistant { background: rgba(16, 185, 129, 0.08); border-left: 3px solid var(--success); }
+    .msg-role { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+    .msg-content { white-space: pre-wrap; line-height: 1.6; font-size: 0.9rem; color: var(--text-primary); }
+    .msg-time { font-size: 0.7rem; color: var(--text-dim); margin-top: 4px; }
 
-/* ── Transcript ──────────────────────────────────────────────────────── */
-.msg { padding: 12px 16px; border-radius: var(--radius); margin-bottom: 8px; }
-.msg-user { background: #1a2744; border-left: 3px solid var(--accent-blue); }
-.msg-assistant { background: #1a3329; border-left: 3px solid var(--accent-green); }
-.msg-role { font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px; text-transform: uppercase; }
-.msg-content { white-space: pre-wrap; line-height: 1.5; font-size: 0.9rem; }
-.msg-time { font-size: 0.7rem; color: var(--text-secondary); margin-top: 4px; }
+    .resume-btn {
+        background: var(--accent-gradient); color: white; border: none;
+        padding: var(--space-md) var(--space-xl); border-radius: var(--radius-md);
+        font-size: 1rem; font-weight: 600; font-family: var(--font-sans);
+        cursor: pointer; transition: all 0.15s; display: inline-flex;
+        align-items: center; gap: var(--space-sm); box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+    }
+    .resume-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4); }
+    .resume-btn:active { transform: scale(0.98); }
+    .resume-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
-/* ── Resume Panel ────────────────────────────────────────────────────── */
-.resume-btn {
-  background: linear-gradient(135deg, var(--accent-gold), #B8860B);
-  color: #000; border: none; padding: 14px 28px; border-radius: var(--radius);
-  font-size: 1rem; font-weight: 600; cursor: pointer; transition: transform 0.1s;
-  display: inline-flex; align-items: center; gap: 8px;
-}
-.resume-btn:hover { transform: scale(1.03); }
-.resume-btn:active { transform: scale(0.98); }
+    .rpg-badge { display: inline-block; padding: 2px 10px; border-radius: var(--radius-full); font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+    .rpg-badge-active { background: rgba(99, 102, 241, 0.15); color: var(--accent-primary); }
+    .rpg-badge-type { background: var(--bg-tertiary); color: var(--text-muted); }
 
-/* ── Combat State ────────────────────────────────────────────────────── */
-.hp-bar { height: 8px; border-radius: 4px; background: var(--bg-hover); overflow: hidden; }
-.hp-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
-.hp-green { background: var(--accent-green); }
-.hp-yellow { background: var(--accent-gold); }
-.hp-red { background: var(--accent-red); }
-.badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; background: var(--bg-hover); color: var(--text-secondary); margin: 2px; }
-.badge-active { background: #2a1f3d; color: var(--accent-purple); }
+    .rpg-loading { text-align: center; padding: 40px; color: var(--text-muted); }
+    .rpg-loading::after {
+        content: ''; display: inline-block; width: 18px; height: 18px;
+        border: 2px solid var(--border-default); border-top-color: var(--accent-primary);
+        border-radius: 50%; animation: rpg-spin 0.8s linear infinite; margin-left: 8px; vertical-align: middle;
+    }
+    @keyframes rpg-spin { to { transform: rotate(360deg); } }
+    .rpg-error { color: var(--danger); padding: var(--space-lg); background: rgba(239, 68, 68, 0.08); border-radius: var(--radius-md); border: 1px solid rgba(239, 68, 68, 0.15); }
 
-/* ── Loading / Error ─────────────────────────────────────────────────── */
-.loading { text-align: center; padding: 40px; color: var(--text-secondary); }
-.loading::after { content: ''; display: inline-block; width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--accent-blue); border-radius: 50%; animation: spin 0.8s linear infinite; margin-left: 8px; vertical-align: middle; }
-@keyframes spin { to { transform: rotate(360deg); } }
-.error { color: var(--accent-red); padding: 16px; background: #2d1518; border-radius: var(--radius); }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; z-index: 2000; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+    .modal-overlay.visible { display: flex; }
+    .modal-box {
+        background: var(--bg-elevated); border: 1px solid var(--border-default);
+        border-radius: var(--radius-lg); padding: var(--space-xl); max-width: 520px; width: 90%;
+        max-height: 80vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+    .modal-box h2 { margin-bottom: var(--space-md); background: var(--accent-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .modal-close { float: right; background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer; transition: color 0.15s; }
+    .modal-close:hover { color: var(--text-primary); }
 
-/* ── Modal ───────────────────────────────────────────────────────────── */
-.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; z-index: 100; align-items: center; justify-content: center; }
-.modal-overlay.visible { display: flex; }
-.modal { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
-.modal h2 { margin-bottom: 12px; color: var(--accent-gold); }
-.modal-close { float: right; background: none; border: none; color: var(--text-secondary); font-size: 1.5rem; cursor: pointer; }
-.modal-close:hover { color: var(--text-primary); }
-
-/* ── Responsive ──────────────────────────────────────────────────────── */
-@media (max-width: 768px) {
-  header { flex-wrap: wrap; }
-  .stats { gap: 12px; }
-  .stat-value { font-size: 1.3rem; }
-  .tabs { overflow-x: auto; }
-  #kg-container { height: 300px; min-height: 300px; }
-}
-</style>
+    .session-select-row { margin-bottom: var(--space-lg); }
+    .session-select-row select {
+        padding: var(--space-sm) var(--space-md); background: var(--bg-tertiary);
+        border: 1px solid var(--border-default); border-radius: var(--radius-md);
+        color: var(--text-primary); font-size: 0.875rem; font-family: var(--font-sans); cursor: pointer; min-width: 280px;
+    }
+    .session-select-row select:focus { outline: none; border-color: var(--accent-primary); box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2); }
+    </style>
 </head>
 <body>
-<div id="app">
+    <header>
+        <div class="container">
+            <nav>
+                <a href="/" class="logo">
+                    <div class="logo-icon">&#x1F31F;</div>
+                    <div class="logo-text"><span>Aria Blue</span></div>
+                </a>
+                <div class="nav-links" id="nav-links">
+                    <a href="/"><svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8.354 1.146a.5.5 0 0 0-.708 0l-6 6A.5.5 0 0 0 1.5 7.5v7a.5.5 0 0 0 .5.5h4.5a.5.5 0 0 0 .5-.5v-4h2v4a.5.5 0 0 0 .5.5H14a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.146-.354L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293L8.354 1.146z"/></svg> Home</a>
+                    <div class="nav-dropdown">
+                        <button class="nav-dropdown-toggle"><svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5 4a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1H5zm-.5 2.5A.5.5 0 0 1 5 6h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zM5 8a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1H5zm0 2a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1H5z"/><path d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2zm10-1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1z"/></svg> Overview <svg class="chevron" viewBox="0 0 16 16" fill="currentColor"><path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg></button>
+                        <div class="nav-dropdown-menu">
+                            <a href="/activities">&#x26A1; Activities</a>
+                            <a href="/thoughts">&#x1F9E0; Thoughts</a>
+                            <a href="/memories">&#x1F4BE; Memories</a>
+                            <a href="/records">&#x1F5C3;&#xFE0F; Records</a>
+                            <a href="/search">&#x1F50D; Search</a>
+                        </div>
+                    </div>
+                    <div class="nav-dropdown">
+                        <button class="nav-dropdown-toggle">Intelligence <svg class="chevron" viewBox="0 0 16 16" fill="currentColor"><path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg></button>
+                        <div class="nav-dropdown-menu">
+                            <a href="/sprint-board">&#x1F4CB; Sprint Board</a>
+                            <a href="/knowledge">&#x1F578;&#xFE0F; Knowledge</a>
+                            <a href="/skill-graph">&#x1F517; Skill Graph</a>
+                            <a href="/working-memory">&#x1F9E0; Working Memory</a>
+                            <a href="/sentiment">&#x1F4AD; Sentiment</a>
+                            <a href="/patterns">&#x1F50D; Patterns</a>
+                            <a href="/skills">&#x1F527; Skills</a>
+                            <a href="/creative-pulse">&#x2728; Creative Pulse</a>
+                            <div class="divider"></div>
+                            <a href="/proposals">&#x1F4A1; Proposals</a>
+                            <a href="/skill-stats">&#x1F4CA; Skill Stats</a>
+                            <a href="/skill-health">&#x1FA7A; Skill Health</a>
+                        </div>
+                    </div>
+                    <div class="nav-dropdown">
+                        <button class="nav-dropdown-toggle">Social <svg class="chevron" viewBox="0 0 16 16" fill="currentColor"><path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg></button>
+                        <div class="nav-dropdown-menu">
+                            <a href="/social">&#x1F4F1; Social</a>
+                            <a href="#" class="disabled" style="opacity:0.5;pointer-events:none;">&#x1F4D3; Moltbook (coming soon)</a>
+                        </div>
+                    </div>
+                    <div class="nav-dropdown">
+                        <button class="nav-dropdown-toggle"><svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M9.405 1.05c-.413-1.4-2.397-1.4-2.81 0l-.1.34a1.464 1.464 0 0 1-2.105.872l-.31-.17c-1.283-.698-2.686.705-1.987 1.987l.169.311c.446.82.023 1.841-.872 2.105l-.34.1c-1.4.413-1.4 2.397 0 2.81l.34.1a1.464 1.464 0 0 1 .872 2.105l-.17.31c-.698 1.283.705 2.686 1.987 1.987l.311-.169a1.464 1.464 0 0 1 2.105.872l.1.34c.413 1.4 2.397 1.4 2.81 0l.1-.34a1.464 1.464 0 0 1 2.105-.872l.31.17c1.283.698 2.686-.705 1.987-1.987l-.169-.311a1.464 1.464 0 0 1 .872-2.105l.34-.1c1.4-.413 1.4-2.397 0-2.81l-.34-.1a1.464 1.464 0 0 1-.872-2.105l.17-.31c.698-1.283-.705-2.686-1.987-1.987l-.311.169a1.464 1.464 0 0 1-2.105-.872l-.1-.34zM8 10.93a2.929 2.929 0 1 1 0-5.86 2.929 2.929 0 0 1 0 5.858z"/></svg> Operations <svg class="chevron" viewBox="0 0 16 16" fill="currentColor"><path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg></button>
+                        <div class="nav-dropdown-menu">
+                            <a href="/chat/">&#x1F4AC; Chat</a>
+                            <a href="/roundtable">&#x1F504; Roundtable</a>
+                            <a href="/heartbeat">&#x1F493; Heartbeat</a>
+                            <a href="/agent-manager">&#x1F916; Agent Manager</a>
+                            <a href="/sessions">&#x1F4AC; Sessions</a>
+                            <a href="/performance">&#x1F4C8; Performance</a>
+                            <a href="/services">&#x2699;&#xFE0F; Services</a>
+                            <a href="/api/docs" target="_blank">&#x1F4D6; API Docs</a>
+                            <div class="divider"></div>
+                            <a href="/api/rpg/" class="active">&#x1F3B2; RPG Dashboard</a>
+                        </div>
+                    </div>
+                    <div class="nav-dropdown">
+                        <button class="nav-dropdown-toggle"><svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M4 11a1 1 0 1 1 2 0v1a1 1 0 1 1-2 0v-1zm6-4a1 1 0 1 1 2 0v5a1 1 0 1 1-2 0V7zM7 9a1 1 0 0 1 2 0v3a1 1 0 1 1-2 0V9z"/><path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/></svg> Models <svg class="chevron" viewBox="0 0 16 16" fill="currentColor"><path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg></button>
+                        <div class="nav-dropdown-menu">
+                            <a href="/models">&#x1F916; Models &amp; Pricing</a>
+                            <a href="/model-manager">&#x2699;&#xFE0F; Model Manager</a>
+                            <a href="/model-usage">&#x1F4CA; Model Usage</a>
+                            <a href="/rate-limits">&#x23F1;&#xFE0F; Rate Limits</a>
+                        </div>
+                    </div>
+                    <div class="nav-dropdown">
+                        <button class="nav-dropdown-toggle">Security <svg class="chevron" viewBox="0 0 16 16" fill="currentColor"><path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg></button>
+                        <div class="nav-dropdown-menu">
+                            <a href="/security">&#x1F6E1;&#xFE0F; Security Events</a>
+                            <a href="/api-key-rotations">&#x1F511; API Key Rotations</a>
+                        </div>
+                    </div>
+                    <div class="nav-dropdown">
+                        <button class="nav-dropdown-toggle">Identity <svg class="chevron" viewBox="0 0 16 16" fill="currentColor"><path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg></button>
+                        <div class="nav-dropdown-menu">
+                            <a href="/soul">&#x2728; Soul &amp; Identity</a>
+                        </div>
+                    </div>
+                    <div class="api-status" id="api-status">
+                        <span class="status-dot"></span>
+                        <span>Loading...</span>
+                    </div>
+                </div>
+                <button class="menu-toggle" onclick="toggleMenu()" aria-label="Toggle menu">
+                    <svg width="24" height="24" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/></svg>
+                </button>
+            </nav>
+        </div>
+    </header>
 
-<!-- ── Header ─────────────────────────────────────────────────────────── -->
-<header>
-  <h1>🔮 <span>Aria</span> RPG Dashboard</h1>
-  <select id="campaignSelect" class="campaign-select" title="Select Campaign">
-    <option value="">Loading campaigns…</option>
-  </select>
-  <div class="header-status" id="headerStatus">Connecting…</div>
-</header>
+    <main>
+        <div class="page-header">
+            <h1>&#x1F52E; RPG Dashboard</h1>
+            <p>Campaign management, knowledge graph visualization, and session transcripts</p>
+        </div>
 
-<!-- ── Tabs ────────────────────────────────────────────────────────────── -->
-<nav class="tabs">
-  <button class="tab-btn active" data-tab="overview">Overview</button>
-  <button class="tab-btn" data-tab="kg">Knowledge Graph</button>
-  <button class="tab-btn" data-tab="transcript">Transcript</button>
-  <button class="tab-btn" data-tab="resume">Resume</button>
-</nav>
+        <div class="rpg-toolbar">
+            <label for="campaignSelect">Campaign</label>
+            <select id="campaignSelect"><option value="">Loading campaigns...</option></select>
+            <div class="toolbar-status" id="headerStatus">Connecting...</div>
+        </div>
 
-<!-- ── Main Content ───────────────────────────────────────────────────── -->
-<main>
+        <nav class="rpg-tabs">
+            <button class="rpg-tab active" data-tab="overview">&#x1F4CA; Overview</button>
+            <button class="rpg-tab" data-tab="kg">&#x1F578;&#xFE0F; Knowledge Graph</button>
+            <button class="rpg-tab" data-tab="transcript">&#x1F4DC; Transcript</button>
+            <button class="rpg-tab" data-tab="resume">&#x2694;&#xFE0F; Resume</button>
+        </nav>
 
-  <!-- OVERVIEW PANEL -->
-  <section id="panel-overview" class="panel active">
-    <div class="stats" id="campaignStats">
-      <div class="stat"><div class="stat-value" id="statParty">—</div><div class="stat-label">Party Members</div></div>
-      <div class="stat"><div class="stat-value" id="statSessions">—</div><div class="stat-label">Sessions</div></div>
-      <div class="stat"><div class="stat-value" id="statEntities">—</div><div class="stat-label">KG Entities</div></div>
-      <div class="stat"><div class="stat-value" id="statStatus">—</div><div class="stat-label">Status</div></div>
+        <section id="panel-overview" class="rpg-panel active">
+            <div class="rpg-stats" id="campaignStats">
+                <div class="stat-card">
+                    <div class="stat-icon">&#x1F465;</div>
+                    <div class="stat-info">
+                        <div class="stat-value" id="statParty">&mdash;</div>
+                        <div class="stat-label">Party Members</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">&#x1F3AD;</div>
+                    <div class="stat-info">
+                        <div class="stat-value" id="statSessions">&mdash;</div>
+                        <div class="stat-label">Sessions</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">&#x1F578;&#xFE0F;</div>
+                    <div class="stat-info">
+                        <div class="stat-value" id="statEntities">&mdash;</div>
+                        <div class="stat-label">KG Entities</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">&#x26A1;</div>
+                    <div class="stat-info">
+                        <div class="stat-value" id="statStatus">&mdash;</div>
+                        <div class="stat-label">Status</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card rpg-card">
+                <div class="card-header"><div class="card-title">Campaign Details</div></div>
+                <div id="campaignInfo"><div class="rpg-loading">Select a campaign</div></div>
+            </div>
+
+            <div class="card rpg-card" style="margin-top: var(--space-lg);">
+                <div class="card-header"><div class="card-title">Party Roster</div></div>
+                <div id="partyRoster"><div class="rpg-loading">Select a campaign</div></div>
+            </div>
+        </section>
+
+        <section id="panel-kg" class="rpg-panel">
+            <div id="kg-container"></div>
+            <div class="kg-legend" id="kgLegend"></div>
+        </section>
+
+        <section id="panel-transcript" class="rpg-panel">
+            <div class="card rpg-card">
+                <div class="card-header"><div class="card-title">Session Transcript</div></div>
+                <div class="session-select-row">
+                    <select id="sessionSelect"><option value="">Select a session...</option></select>
+                </div>
+                <div id="transcriptContent"><div class="rpg-loading">Select a session to view</div></div>
+            </div>
+        </section>
+
+        <section id="panel-resume" class="rpg-panel">
+            <div class="card rpg-card" style="text-align: center; padding: var(--space-2xl);">
+                <h3 style="font-size: 1.5rem; margin-bottom: var(--space-md);">&#x2694;&#xFE0F; Resume Campaign</h3>
+                <p style="color: var(--text-secondary); margin-bottom: var(--space-lg); max-width: 500px; margin-left: auto; margin-right: auto;">
+                    Pick up where you left off. Aria will generate a recap and restore your combat state.
+                </p>
+                <button class="resume-btn" id="resumeBtn" onclick="resumeCampaign()">&#x1F3B2; Resume Session</button>
+                <div id="resumeStatus" style="margin-top: var(--space-lg);"></div>
+            </div>
+            <div class="card rpg-card" id="combatStateCard" style="display:none; margin-top: var(--space-lg);">
+                <div class="card-header"><div class="card-title">&#x2694;&#xFE0F; Combat State</div></div>
+                <div id="combatState"></div>
+            </div>
+            <div class="card rpg-card" id="previouslyOnCard" style="display:none; margin-top: var(--space-lg);">
+                <div class="card-header"><div class="card-title">&#x1F4DC; Previously On&hellip;</div></div>
+                <div id="previouslyOn"></div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>Aria Blue &mdash; RPG Dashboard</p>
+            <div class="tech-badges">
+                <span class="tech-badge">vis-network</span>
+                <span class="tech-badge">Knowledge Graph</span>
+                <span class="tech-badge">FastAPI</span>
+            </div>
+        </div>
+    </footer>
+
+    <div class="modal-overlay" id="entityModal">
+        <div class="modal-box">
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+            <h2 id="modalTitle">Entity</h2>
+            <div id="modalContent"></div>
+        </div>
     </div>
-    <div class="card">
-      <h3>Campaign Details</h3>
-      <div id="campaignInfo"><div class="loading">Select a campaign</div></div>
-    </div>
-    <div class="card">
-      <h3>Party Roster</h3>
-      <div id="partyRoster"><div class="loading">Select a campaign</div></div>
-    </div>
-  </section>
 
-  <!-- KG PANEL -->
-  <section id="panel-kg" class="panel">
-    <div id="kg-container"></div>
-    <div class="kg-legend" id="kgLegend"></div>
-  </section>
+    <script src="https://unpkg.com/vis-network@9.1.6/standalone/umd/vis-network.min.js"></script>
+    <script>if(typeof vis==='undefined'){var s=document.createElement('script');s.src='vendor/vis-network.min.js';document.head.appendChild(s);}</script>
 
-  <!-- TRANSCRIPT PANEL -->
-  <section id="panel-transcript" class="panel">
-    <div class="card">
-      <h3>Session Transcript</h3>
-      <select id="sessionSelect" class="campaign-select" style="margin-bottom:12px">
-        <option value="">Select a session…</option>
-      </select>
-      <div id="transcriptContent"><div class="loading">Select a session to view</div></div>
-    </div>
-  </section>
+    <script>
+    /* Aria RPG Dashboard - AA+ compliant: ZERO hardcoded IPs/ports/URLs */
+    var API_BASE = window.location.origin + '/api';
+    var currentCampaign = null;
+    var kgNetwork = null;
+    var kgData = null;
 
-  <!-- RESUME PANEL -->
-  <section id="panel-resume" class="panel">
-    <div class="card" style="text-align:center; padding: 40px;">
-      <h3 style="font-size:1.5rem; margin-bottom: 16px;">⚔️ Resume Campaign</h3>
-      <p style="color: var(--text-secondary); margin-bottom: 24px;">
-        Pick up where you left off. Aria will generate a "Previously on…" recap
-        and restore your combat state.
-      </p>
-      <button class="resume-btn" id="resumeBtn" onclick="resumeCampaign()">
-        🎲 Resume Session
-      </button>
-      <div id="resumeStatus" style="margin-top: 16px;"></div>
-    </div>
-    <div class="card" id="combatStateCard" style="display:none;">
-      <h3>⚔️ Combat State</h3>
-      <div id="combatState"></div>
-    </div>
-    <div class="card" id="previouslyOnCard" style="display:none;">
-      <h3>📜 Previously On…</h3>
-      <div id="previouslyOn"></div>
-    </div>
-  </section>
+    function $(sel) { return document.querySelector(sel); }
+    function $$(sel) { return document.querySelectorAll(sel); }
 
-</main>
-</div>
-
-<!-- ── Entity Modal ───────────────────────────────────────────────────── -->
-<div class="modal-overlay" id="entityModal">
-  <div class="modal">
-    <button class="modal-close" onclick="closeModal()">&times;</button>
-    <h2 id="modalTitle">Entity</h2>
-    <div id="modalContent"></div>
-  </div>
-</div>
-
-<!-- ── vis-network (CDN with local fallback) ─────────────────────────── -->
-<script src="https://unpkg.com/vis-network@9.1.6/standalone/umd/vis-network.min.js"></script>
-<script>
-if (typeof vis === 'undefined') {
-  const s = document.createElement('script');
-  s.src = 'vendor/vis-network.min.js';
-  document.head.appendChild(s);
-}
-</script>
-
-<script>
-/* ═══════════════════════════════════════════════════════════════════════
-   Aria RPG Dashboard — Vanilla JS Application
-   All API calls use relative paths derived from window.location.origin.
-   ZERO hardcoded IPs, ports, or URLs.
-   ═══════════════════════════════════════════════════════════════════════ */
-
-// ── Config (from environment / current origin) ──────────────────────────
-const API_BASE = `${window.location.origin}/api`;
-let currentCampaign = null;
-let kgNetwork = null;
-let kgData = null;
-
-// ── Utility ─────────────────────────────────────────────────────────────
-function $(sel) { return document.querySelector(sel); }
-function $$(sel) { return document.querySelectorAll(sel); }
-
-async function apiFetch(path) {
-  const resp = await fetch(`${API_BASE}${path}`);
-  if (!resp.ok) {
-    const txt = await resp.text();
-    throw new Error(`API ${resp.status}: ${txt.slice(0, 200)}`);
-  }
-  return resp.json();
-}
-
-function timeAgo(ts) {
-  if (!ts) return '—';
-  const d = new Date(ts);
-  const now = new Date();
-  const diff = Math.floor((now - d) / 1000);
-  if (diff < 60) return 'just now';
-  if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
-  return `${Math.floor(diff/86400)}d ago`;
-}
-
-function esc(s) {
-  if (!s) return '';
-  const d = document.createElement('div');
-  d.textContent = String(s);
-  return d.innerHTML;
-}
-
-// ── Tab Navigation ──────────────────────────────────────────────────────
-$$('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    $$('.tab-btn').forEach(b => b.classList.remove('active'));
-    $$('.panel').forEach(p => p.classList.remove('active'));
-    btn.classList.add('active');
-    const panel = $(`#panel-${btn.dataset.tab}`);
-    if (panel) panel.classList.add('active');
-
-    // Lazy-load KG on first switch
-    if (btn.dataset.tab === 'kg' && currentCampaign && !kgData) {
-      loadKG(currentCampaign.id);
+    async function apiFetch(path) {
+        var resp = await fetch(API_BASE + path);
+        if (!resp.ok) { var txt = await resp.text(); throw new Error('API ' + resp.status + ': ' + txt.slice(0, 200)); }
+        return resp.json();
     }
-  });
-});
 
-// ── Campaign Loading ────────────────────────────────────────────────────
-async function loadCampaigns() {
-  try {
-    const campaigns = await apiFetch('/rpg/campaigns');
-    const sel = $('#campaignSelect');
-    sel.innerHTML = '<option value="">— Select Campaign —</option>';
-    campaigns.forEach(c => {
-      const opt = document.createElement('option');
-      opt.value = c.id;
-      opt.textContent = `${c.title} (${c.status})`;
-      sel.appendChild(opt);
+    function timeAgo(ts) {
+        if (!ts) return '\u2014';
+        var d = new Date(ts), now = new Date(), diff = Math.floor((now - d) / 1000);
+        if (diff < 60) return 'just now';
+        if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+        if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+        return Math.floor(diff / 86400) + 'd ago';
+    }
+
+    function esc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
+
+    /* Header: Mobile menu + Dropdown toggles */
+    function toggleMenu() { document.getElementById('nav-links').classList.toggle('active'); }
+    document.querySelectorAll('.nav-dropdown-toggle').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            if (window.innerWidth <= 768) {
+                e.preventDefault();
+                var dd = this.closest('.nav-dropdown');
+                document.querySelectorAll('.nav-dropdown.open').forEach(function(d) { if (d !== dd) d.classList.remove('open'); });
+                dd.classList.toggle('open');
+            }
+        });
     });
 
-    // Auto-select first campaign
-    if (campaigns.length > 0) {
-      sel.value = campaigns[0].id;
-      await selectCampaign(campaigns[0].id);
-    }
-    $('#headerStatus').textContent = `${campaigns.length} campaign(s)`;
-  } catch (err) {
-    $('#headerStatus').textContent = '⚠ API Error';
-    console.error('Failed to load campaigns:', err);
-  }
-}
-
-$('#campaignSelect').addEventListener('change', (e) => {
-  if (e.target.value) selectCampaign(e.target.value);
-});
-
-async function selectCampaign(campaignId) {
-  try {
-    const detail = await apiFetch(`/rpg/campaign/${campaignId}`);
-    currentCampaign = detail;
-    kgData = null; // Reset KG cache
-
-    // Update stats
-    $('#statParty').textContent = (detail.party || []).length;
-    $('#statSessions').textContent = detail.sessions?.length || 0;
-    $('#statEntities').textContent = detail.kg_entity_count || '—';
-    $('#statStatus').textContent = detail.status;
-
-    // Campaign info
-    $('#campaignInfo').innerHTML = `
-      <table>
-        <tr><th>Title</th><td>${esc(detail.title)}</td></tr>
-        <tr><th>Setting</th><td>${esc(detail.setting)}</td></tr>
-        <tr><th>Status</th><td><span class="badge badge-active">${esc(detail.status)}</span></td></tr>
-        <tr><th>Description</th><td>${esc(detail.description) || '<em>No description</em>'}</td></tr>
-      </table>
-    `;
-
-    // Party roster
-    const party = detail.party || [];
-    if (party.length > 0) {
-      let rows = party.map(p => {
-        const name = typeof p === 'string' ? p : (p.name || p.character_id || JSON.stringify(p));
-        const cls = typeof p === 'object' ? (p.class || p.ancestry || '') : '';
-        const level = typeof p === 'object' ? (p.level || '') : '';
-        return `<tr><td>${esc(name)}</td><td>${esc(cls)}</td><td>${esc(level)}</td></tr>`;
-      }).join('');
-      $('#partyRoster').innerHTML = `<table><thead><tr><th>Name</th><th>Class</th><th>Level</th></tr></thead><tbody>${rows}</tbody></table>`;
-    } else {
-      $('#partyRoster').innerHTML = '<div style="color:var(--text-secondary)">No party members found</div>';
+    /* API status indicator */
+    async function checkApiStatus() {
+        try {
+            var resp = await fetch(API_BASE + '/health', { signal: AbortSignal.timeout(5000) });
+            var dot = document.querySelector('#api-status .status-dot');
+            var label = document.querySelector('#api-status span:last-child');
+            if (resp.ok) { dot.className = 'status-dot online'; label.textContent = 'Online'; }
+            else { dot.className = 'status-dot offline'; label.textContent = 'Error'; }
+        } catch(e) {
+            var d2 = document.querySelector('#api-status .status-dot');
+            var l2 = document.querySelector('#api-status span:last-child');
+            if (d2) d2.className = 'status-dot offline';
+            if (l2) l2.textContent = 'Offline';
+        }
     }
 
-    // Populate session selector
-    populateSessionSelector(detail);
+    /* Tab Navigation */
+    $$('.rpg-tab').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            $$('.rpg-tab').forEach(function(b) { b.classList.remove('active'); });
+            $$('.rpg-panel').forEach(function(p) { p.classList.remove('active'); });
+            btn.classList.add('active');
+            var panel = $('#panel-' + btn.dataset.tab);
+            if (panel) panel.classList.add('active');
+            if (btn.dataset.tab === 'kg' && currentCampaign && !kgData) loadKG(currentCampaign.id);
+        });
+    });
 
-    // If KG tab is active, load KG
-    if ($('.tab-btn[data-tab="kg"]').classList.contains('active')) {
-      loadKG(campaignId);
+    /* Campaign Loading */
+    async function loadCampaigns() {
+        try {
+            var campaigns = await apiFetch('/rpg/campaigns');
+            var sel = $('#campaignSelect');
+            sel.innerHTML = '<option value="">\u2014 Select Campaign \u2014</option>';
+            campaigns.forEach(function(c) {
+                var opt = document.createElement('option');
+                opt.value = c.id; opt.textContent = c.title + ' (' + c.status + ')';
+                sel.appendChild(opt);
+            });
+            if (campaigns.length > 0) { sel.value = campaigns[0].id; await selectCampaign(campaigns[0].id); }
+            $('#headerStatus').textContent = campaigns.length + ' campaign(s)';
+        } catch(err) {
+            $('#headerStatus').textContent = '\u26A0 API Error';
+            console.error('Failed to load campaigns:', err);
+        }
     }
 
-  } catch (err) {
-    console.error('Campaign load error:', err);
-    $('#campaignInfo').innerHTML = `<div class="error">Failed to load: ${esc(err.message)}</div>`;
-  }
-}
+    $('#campaignSelect').addEventListener('change', function(e) { if (e.target.value) selectCampaign(e.target.value); });
 
-// ── Session Selector ────────────────────────────────────────────────────
-function populateSessionSelector(detail) {
-  const sel = $('#sessionSelect');
-  sel.innerHTML = '<option value="">— Select Session —</option>';
+    async function selectCampaign(campaignId) {
+        try {
+            var detail = await apiFetch('/rpg/campaign/' + campaignId);
+            currentCampaign = detail; kgData = null;
+            $('#statParty').textContent = (detail.party || []).length;
+            $('#statSessions').textContent = (detail.sessions ? detail.sessions.length : 0);
+            $('#statEntities').textContent = detail.kg_entity_count || '\u2014';
+            $('#statStatus').textContent = detail.status;
 
-  // Use sessions from campaign detail
-  (detail.sessions || []).forEach((s, i) => {
-    const opt = document.createElement('option');
-    opt.value = s.session_id || s.file || `session-${i}`;
-    opt.textContent = s.title || s.file || `Session ${i + 1}`;
-    sel.appendChild(opt);
-  });
-}
+            $('#campaignInfo').innerHTML =
+                '<table>' +
+                '<tr><th>Title</th><td>' + esc(detail.title) + '</td></tr>' +
+                '<tr><th>Setting</th><td>' + esc(detail.setting) + '</td></tr>' +
+                '<tr><th>Status</th><td><span class="rpg-badge rpg-badge-active">' + esc(detail.status) + '</span></td></tr>' +
+                '<tr><th>Description</th><td>' + (esc(detail.description) || '<em style="color:var(--text-dim)">No description</em>') + '</td></tr>' +
+                '</table>';
 
-$('#sessionSelect').addEventListener('change', (e) => {
-  if (e.target.value) loadTranscript(e.target.value);
-});
+            var party = detail.party || [];
+            if (party.length > 0) {
+                var rows = party.map(function(p) {
+                    var name = typeof p === 'string' ? p : (p.name || p.character_id || JSON.stringify(p));
+                    var cls = typeof p === 'object' ? (p.class || p.ancestry || '') : '';
+                    var level = typeof p === 'object' ? (p.level || '') : '';
+                    return '<tr><td>' + esc(name) + '</td><td>' + esc(cls) + '</td><td>' + esc(level) + '</td></tr>';
+                }).join('');
+                $('#partyRoster').innerHTML = '<table><thead><tr><th>Name</th><th>Class</th><th>Level</th></tr></thead><tbody>' + rows + '</tbody></table>';
+            } else {
+                $('#partyRoster').innerHTML = '<div style="color:var(--text-muted);padding:var(--space-md)">No party members found</div>';
+            }
 
-// ── Transcript Loading ──────────────────────────────────────────────────
-async function loadTranscript(sessionId) {
-  const container = $('#transcriptContent');
-  container.innerHTML = '<div class="loading">Loading transcript…</div>';
-
-  try {
-    const data = await apiFetch(`/rpg/session/${sessionId}/transcript`);
-    if (!data.messages || data.messages.length === 0) {
-      container.innerHTML = '<div style="color:var(--text-secondary)">No messages in this session</div>';
-      return;
+            populateSessionSelector(detail);
+            if ($('.rpg-tab[data-tab="kg"]').classList.contains('active')) loadKG(campaignId);
+        } catch(err) {
+            console.error('Campaign load error:', err);
+            $('#campaignInfo').innerHTML = '<div class="rpg-error">Failed to load: ' + esc(err.message) + '</div>';
+        }
     }
 
-    container.innerHTML = data.messages.map(msg => {
-      const roleClass = msg.role === 'user' ? 'msg-user' : 'msg-assistant';
-      const roleLabel = msg.role === 'user' ? '🎮 Player' : '🎲 Aria DM';
-      const content = esc(msg.content).replace(/\n/g, '<br>');
-      const time = msg.timestamp ? `<div class="msg-time">${timeAgo(msg.timestamp)}</div>` : '';
-      return `<div class="msg ${roleClass}">
-        <div class="msg-role">${roleLabel}</div>
-        <div class="msg-content">${content}</div>
-        ${time}
-      </div>`;
-    }).join('');
-  } catch (err) {
-    container.innerHTML = `<div class="error">Failed to load transcript: ${esc(err.message)}</div>`;
-  }
-}
-
-// ── KG Visualization (vis-network) ──────────────────────────────────────
-const TYPE_COLORS = {
-  player_character: '#4A90D9', npc: '#27AE60', npc_companion: '#2ECC71',
-  location: '#F39C12', city: '#E67E22', tavern: '#D35400',
-  dungeon_room: '#8E44AD', monster: '#E74C3C', enemy: '#C0392B',
-  campaign: '#3498DB', session: '#1ABC9C', quest: '#9B59B6',
-  artifact: '#F1C40F', magical_construct: '#16A085', divine_event: '#E8D44D',
-  concept: '#95A5A6', character: '#5DADE2', person: '#48C9B0',
-};
-
-async function loadKG(campaignId) {
-  const container = $('#kg-container');
-  container.innerHTML = '<div class="loading" style="padding-top:40vh">Loading knowledge graph…</div>';
-
-  try {
-    const data = await apiFetch(`/rpg/campaign/${campaignId}/kg`);
-    kgData = data;
-
-    if (!data.nodes || data.nodes.length === 0) {
-      container.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-secondary)">No KG data for this campaign</div>';
-      return;
+    function populateSessionSelector(detail) {
+        var sel = $('#sessionSelect');
+        sel.innerHTML = '<option value="">\u2014 Select Session \u2014</option>';
+        (detail.sessions || []).forEach(function(s, i) {
+            var opt = document.createElement('option');
+            opt.value = s.session_id || s.file || ('session-' + i);
+            opt.textContent = s.title || s.file || ('Session ' + (i + 1));
+            sel.appendChild(opt);
+        });
     }
 
-    // Clear loading
-    container.innerHTML = '';
+    $('#sessionSelect').addEventListener('change', function(e) { if (e.target.value) loadTranscript(e.target.value); });
 
-    // Prepare vis-network data
-    const nodes = new vis.DataSet(data.nodes.map(n => ({
-      id: n.id,
-      label: n.label,
-      group: n.group,
-      color: { background: n.color || '#BDC3C7', border: '#555', highlight: { background: '#FFF', border: n.color || '#BDC3C7' } },
-      font: { color: '#E6EDF3', size: 14 },
-      title: n.title || n.label,
-      shape: n.group === 'campaign' ? 'diamond' : (n.group === 'location' || n.group === 'city' || n.group === 'tavern' || n.group === 'dungeon_room' ? 'square' : 'dot'),
-      size: n.group === 'campaign' ? 30 : (n.group === 'player_character' || n.group === 'monster' ? 22 : 16),
-    })));
+    /* Transcript Loading */
+    async function loadTranscript(sessionId) {
+        var container = $('#transcriptContent');
+        container.innerHTML = '<div class="rpg-loading">Loading transcript\u2026</div>';
+        try {
+            var data = await apiFetch('/rpg/session/' + sessionId + '/transcript');
+            if (!data.messages || data.messages.length === 0) {
+                container.innerHTML = '<div style="color:var(--text-muted);padding:var(--space-md)">No messages in this session</div>';
+                return;
+            }
+            container.innerHTML = data.messages.map(function(msg) {
+                var rc = msg.role === 'user' ? 'msg-user' : 'msg-assistant';
+                var rl = msg.role === 'user' ? '\uD83C\uDFAE Player' : '\uD83C\uDFB2 Aria DM';
+                var content = esc(msg.content).replace(/\n/g, '<br>');
+                var time = msg.timestamp ? '<div class="msg-time">' + timeAgo(msg.timestamp) + '</div>' : '';
+                return '<div class="msg ' + rc + '"><div class="msg-role">' + rl + '</div><div class="msg-content">' + content + '</div>' + time + '</div>';
+            }).join('');
+        } catch(err) {
+            container.innerHTML = '<div class="rpg-error">Failed to load transcript: ' + esc(err.message) + '</div>';
+        }
+    }
 
-    const edges = new vis.DataSet(data.edges.map((e, i) => ({
-      id: `edge-${i}`,
-      from: e.from,
-      to: e.to,
-      label: e.label || '',
-      arrows: e.arrows || 'to',
-      color: { color: '#555', opacity: 0.6 },
-      font: { color: '#8B949E', size: 9, strokeWidth: 0 },
-      smooth: { type: 'continuous' },
-    })));
-
-    const options = {
-      physics: {
-        stabilization: { iterations: 150 },
-        barnesHut: { gravitationalConstant: -3000, springLength: 120, springConstant: 0.02 },
-      },
-      interaction: { hover: true, tooltipDelay: 200, navigationButtons: true, keyboard: true },
-      layout: { improvedLayout: true },
-      nodes: { borderWidth: 2, shadow: true },
-      edges: { width: 1.5, shadow: false },
+    /* KG Visualization (vis-network) */
+    var TYPE_COLORS = {
+        player_character: '#6366f1', npc: '#10b981', npc_companion: '#34d399',
+        location: '#f59e0b', city: '#f97316', tavern: '#ea580c',
+        dungeon_room: '#8b5cf6', monster: '#ef4444', enemy: '#dc2626',
+        campaign: '#3b82f6', session: '#06b6d4', quest: '#a855f7',
+        artifact: '#eab308', magical_construct: '#14b8a6', divine_event: '#fbbf24',
+        concept: '#64748b', character: '#818cf8', person: '#2dd4bf'
     };
 
-    kgNetwork = new vis.Network(container, { nodes, edges }, options);
-
-    // Click → show entity modal
-    kgNetwork.on('click', (params) => {
-      if (params.nodes.length > 0) {
-        const nodeId = params.nodes[0];
-        const node = data.nodes.find(n => n.id === nodeId);
-        if (node) showEntityModal(node);
-      }
-    });
-
-    // Build legend
-    buildKGLegend(data.nodes);
-
-  } catch (err) {
-    container.innerHTML = `<div class="error" style="margin:40px">Failed to load KG: ${esc(err.message)}</div>`;
-  }
-}
-
-function buildKGLegend(nodes) {
-  const types = new Set(nodes.map(n => n.group));
-  const legend = $('#kgLegend');
-  legend.innerHTML = '';
-  types.forEach(t => {
-    const color = TYPE_COLORS[t] || '#BDC3C7';
-    legend.innerHTML += `<div class="kg-legend-item"><span class="kg-legend-dot" style="background:${color}"></span>${t.replace(/_/g, ' ')}</div>`;
-  });
-}
-
-// ── Entity Modal ────────────────────────────────────────────────────────
-function showEntityModal(node) {
-  $('#modalTitle').textContent = node.label;
-  let html = `<p><strong>Type:</strong> ${esc(node.group)}</p>`;
-  if (node.title) {
-    html += `<pre style="margin-top:12px;padding:12px;background:var(--bg-primary);border-radius:var(--radius);font-size:0.85rem;white-space:pre-wrap;color:var(--text-secondary)">${esc(node.title)}</pre>`;
-  }
-  if (node.properties && Object.keys(node.properties).length > 0) {
-    html += '<h4 style="margin-top:12px;color:var(--accent-teal)">Properties</h4>';
-    html += '<table>';
-    for (const [k, v] of Object.entries(node.properties)) {
-      html += `<tr><th>${esc(k)}</th><td>${esc(typeof v === 'object' ? JSON.stringify(v) : String(v))}</td></tr>`;
-    }
-    html += '</table>';
-  }
-  $('#modalContent').innerHTML = html;
-  $('#entityModal').classList.add('visible');
-}
-
-function closeModal() {
-  $('#entityModal').classList.remove('visible');
-}
-
-// Close modal on overlay click or Escape
-$('#entityModal').addEventListener('click', (e) => {
-  if (e.target === $('#entityModal')) closeModal();
-});
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') closeModal();
-});
-
-// ── Resume Campaign ─────────────────────────────────────────────────────
-async function resumeCampaign() {
-  if (!currentCampaign) {
-    $('#resumeStatus').innerHTML = '<div class="error">Select a campaign first</div>';
-    return;
-  }
-
-  const btn = $('#resumeBtn');
-  btn.disabled = true;
-  btn.textContent = '⏳ Loading…';
-  $('#resumeStatus').innerHTML = '<div class="loading">Preparing session…</div>';
-
-  try {
-    // Try to get the last active session for this campaign
-    const detail = currentCampaign;
-    const sessions = detail.sessions || [];
-
-    if (sessions.length === 0) {
-      $('#resumeStatus').innerHTML = `
-        <div style="color:var(--accent-gold);margin-top:16px;">
-          No previous sessions found. Start a new campaign session with Aria via chat!
-        </div>`;
-      return;
+    async function loadKG(campaignId) {
+        var container = $('#kg-container');
+        container.innerHTML = '<div class="rpg-loading" style="padding-top:40vh">Loading knowledge graph\u2026</div>';
+        try {
+            var data = await apiFetch('/rpg/campaign/' + campaignId + '/kg');
+            kgData = data;
+            if (!data.nodes || data.nodes.length === 0) {
+                container.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted)">No KG data for this campaign</div>';
+                return;
+            }
+            container.innerHTML = '';
+            var nodes = new vis.DataSet(data.nodes.map(function(n) {
+                return {
+                    id: n.id, label: n.label, group: n.group,
+                    color: { background: TYPE_COLORS[n.group] || n.color || '#64748b', border: 'rgba(255,255,255,0.1)', highlight: { background: '#f8fafc', border: TYPE_COLORS[n.group] || n.color || '#64748b' } },
+                    font: { color: '#f8fafc', size: 14, face: 'Inter' },
+                    title: n.title || n.label,
+                    shape: n.group === 'campaign' ? 'diamond' : (['location','city','tavern','dungeon_room'].indexOf(n.group) >= 0 ? 'square' : 'dot'),
+                    size: n.group === 'campaign' ? 30 : (['player_character','monster'].indexOf(n.group) >= 0 ? 22 : 16)
+                };
+            }));
+            var edges = new vis.DataSet(data.edges.map(function(e, i) {
+                return {
+                    id: 'edge-' + i, from: e.from, to: e.to, label: e.label || '', arrows: e.arrows || 'to',
+                    color: { color: 'rgba(255,255,255,0.15)', opacity: 0.6 },
+                    font: { color: '#64748b', size: 9, strokeWidth: 0, face: 'Inter' },
+                    smooth: { type: 'continuous' }
+                };
+            }));
+            var options = {
+                physics: { stabilization: { iterations: 150 }, barnesHut: { gravitationalConstant: -3000, springLength: 120, springConstant: 0.02 } },
+                interaction: { hover: true, tooltipDelay: 200, navigationButtons: true, keyboard: true },
+                layout: { improvedLayout: true },
+                nodes: { borderWidth: 2, shadow: { enabled: true, color: 'rgba(0,0,0,0.3)', size: 8 } },
+                edges: { width: 1.5, shadow: false }
+            };
+            kgNetwork = new vis.Network(container, { nodes: nodes, edges: edges }, options);
+            kgNetwork.on('click', function(params) {
+                if (params.nodes.length > 0) {
+                    var nodeId = params.nodes[0];
+                    var node = data.nodes.find(function(n) { return n.id === nodeId; });
+                    if (node) showEntityModal(node);
+                }
+            });
+            buildKGLegend(data.nodes);
+        } catch(err) {
+            container.innerHTML = '<div class="rpg-error" style="margin:40px">Failed to load KG: ' + esc(err.message) + '</div>';
+        }
     }
 
-    // Show "Previously On..." from KG
-    await loadPreviouslyOn(detail.id);
-
-    $('#resumeStatus').innerHTML = `
-      <div style="color:var(--accent-green);margin-top:16px;">
-        ✅ Campaign ready! ${sessions.length} session(s) found.
-        Resume via <code>POST /api/engine/chat/sessions/{session_id}/messages</code>
-        or use Aria's chat interface.
-      </div>`;
-
-  } catch (err) {
-    $('#resumeStatus').innerHTML = `<div class="error">Resume failed: ${esc(err.message)}</div>`;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '🎲 Resume Session';
-  }
-}
-
-async function loadPreviouslyOn(campaignId) {
-  try {
-    const data = await apiFetch(`/rpg/campaign/${campaignId}/kg?max_depth=2`);
-    if (!data.nodes || data.nodes.length === 0) return;
-
-    // Deduce scene/event nodes
-    const scenes = data.nodes.filter(n =>
-      ['session', 'divine_event', 'dungeon_room'].includes(n.group)
-    );
-
-    if (scenes.length > 0) {
-      const card = $('#previouslyOnCard');
-      card.style.display = 'block';
-      $('#previouslyOn').innerHTML = scenes.map(s => `
-        <div class="card" style="margin:8px 0;padding:12px;">
-          <strong style="color:var(--accent-gold)">${esc(s.label)}</strong>
-          <span class="badge">${esc(s.group)}</span>
-          ${s.title ? `<p style="margin-top:6px;color:var(--text-secondary);font-size:0.85rem">${esc(s.title)}</p>` : ''}
-        </div>
-      `).join('');
+    function buildKGLegend(nodes) {
+        var types = []; nodes.forEach(function(n) { if (types.indexOf(n.group) < 0) types.push(n.group); });
+        var legend = $('#kgLegend'); legend.innerHTML = '';
+        types.forEach(function(t) {
+            var color = TYPE_COLORS[t] || '#64748b';
+            legend.innerHTML += '<div class="kg-legend-item"><span class="kg-legend-dot" style="background:' + color + '"></span>' + t.replace(/_/g, ' ') + '</div>';
+        });
     }
-  } catch (err) {
-    console.warn('Previously On failed:', err);
-  }
-}
 
-// ── Init ────────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  loadCampaigns();
-});
-</script>
+    /* Entity Modal */
+    function showEntityModal(node) {
+        $('#modalTitle').textContent = node.label;
+        var html = '<p><strong>Type:</strong> <span class="rpg-badge rpg-badge-type">' + esc(node.group) + '</span></p>';
+        if (node.title) {
+            html += '<pre style="margin-top:12px;padding:12px;background:var(--bg-primary);border-radius:var(--radius-md);font-size:0.85rem;white-space:pre-wrap;color:var(--text-secondary);font-family:var(--font-mono)">' + esc(node.title) + '</pre>';
+        }
+        if (node.properties && Object.keys(node.properties).length > 0) {
+            html += '<h4 style="margin-top:12px;color:var(--accent-cyan)">Properties</h4><table>';
+            for (var k in node.properties) {
+                var v = node.properties[k];
+                html += '<tr><th>' + esc(k) + '</th><td>' + esc(typeof v === 'object' ? JSON.stringify(v) : String(v)) + '</td></tr>';
+            }
+            html += '</table>';
+        }
+        $('#modalContent').innerHTML = html;
+        $('#entityModal').classList.add('visible');
+    }
+
+    function closeModal() { $('#entityModal').classList.remove('visible'); }
+    $('#entityModal').addEventListener('click', function(e) { if (e.target === $('#entityModal')) closeModal(); });
+    document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeModal(); });
+
+    /* Resume Campaign */
+    async function resumeCampaign() {
+        if (!currentCampaign) { $('#resumeStatus').innerHTML = '<div class="rpg-error">Select a campaign first</div>'; return; }
+        var btn = $('#resumeBtn'); btn.disabled = true; btn.textContent = '\u23F3 Loading\u2026';
+        $('#resumeStatus').innerHTML = '<div class="rpg-loading">Preparing session\u2026</div>';
+        try {
+            var sessions = currentCampaign.sessions || [];
+            if (sessions.length === 0) {
+                $('#resumeStatus').innerHTML = '<div style="color:var(--warning);margin-top:var(--space-lg)">No previous sessions found. Start a new campaign session with Aria via chat!</div>';
+                return;
+            }
+            await loadPreviouslyOn(currentCampaign.id);
+            $('#resumeStatus').innerHTML = '<div style="color:var(--success);margin-top:var(--space-lg)">\u2705 Campaign ready! ' + sessions.length + ' session(s) found. Resume via chat or the API.</div>';
+        } catch(err) {
+            $('#resumeStatus').innerHTML = '<div class="rpg-error">Resume failed: ' + esc(err.message) + '</div>';
+        } finally {
+            btn.disabled = false; btn.textContent = '\uD83C\uDFB2 Resume Session';
+        }
+    }
+
+    async function loadPreviouslyOn(campaignId) {
+        try {
+            var data = await apiFetch('/rpg/campaign/' + campaignId + '/kg?max_depth=2');
+            if (!data.nodes || data.nodes.length === 0) return;
+            var scenes = data.nodes.filter(function(n) { return ['session','divine_event','dungeon_room'].indexOf(n.group) >= 0; });
+            if (scenes.length > 0) {
+                $('#previouslyOnCard').style.display = 'block';
+                $('#previouslyOn').innerHTML = scenes.map(function(s) {
+                    return '<div class="card" style="margin:8px 0;padding:12px"><strong style="color:var(--accent-primary)">' + esc(s.label) + '</strong> <span class="rpg-badge rpg-badge-type">' + esc(s.group) + '</span>' + (s.title ? '<p style="margin-top:6px;color:var(--text-secondary);font-size:0.85rem">' + esc(s.title) + '</p>' : '') + '</div>';
+                }).join('');
+            }
+        } catch(err) { console.warn('Previously On failed:', err); }
+    }
+
+    /* Init */
+    document.addEventListener('DOMContentLoaded', function() { checkApiStatus(); loadCampaigns(); });
+    </script>
 </body>
 </html>
