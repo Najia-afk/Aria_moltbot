@@ -290,6 +290,11 @@ def create_app():
     def chat(session_id=None):
         return render_template('engine_chat.html', session_id=session_id)
 
+    @app.route('/rpg')
+    @app.route('/rpg/')
+    def rpg():
+        return render_template('rpg.html')
+
     # Flask remains UI-only. All data access goes through the FastAPI service.
 
     return app
