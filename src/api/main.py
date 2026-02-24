@@ -24,6 +24,13 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from prometheus_fastapi_instrumentator import Instrumentator
 
+# S-103: Authentication dependencies
+from fastapi import Depends
+try:
+    from .auth import require_api_key, require_admin_key
+except ImportError:
+    from auth import require_api_key, require_admin_key
+
 # Import-path compatibility for mixed absolute/relative imports across src/api.
 _API_DIR = str(Path(__file__).resolve().parent)
 if _API_DIR not in sys.path:
@@ -502,35 +509,38 @@ except ImportError:
     from routers.artifacts import router as artifacts_router
     from routers.rpg import router as rpg_router
 
-app.include_router(health_router)
-app.include_router(activities_router)
-app.include_router(thoughts_router)
-app.include_router(memories_router)
-app.include_router(goals_router)
-app.include_router(sessions_router)
-app.include_router(model_usage_router)
-app.include_router(litellm_router)
-app.include_router(providers_router)
-app.include_router(security_router)
-app.include_router(knowledge_router)
-app.include_router(social_router)
-app.include_router(operations_router)
-app.include_router(records_router)
-app.include_router(admin_router)
-app.include_router(models_config_router)
-app.include_router(models_crud_router)
-app.include_router(working_memory_router)
-app.include_router(skills_router)
-app.include_router(lessons_router)
-app.include_router(proposals_router)
-app.include_router(analysis_router)
-app.include_router(engine_cron_router)
-app.include_router(engine_sessions_router)
-app.include_router(engine_agent_metrics_router)
-app.include_router(engine_agents_router)
-app.include_router(agents_crud_router)
-app.include_router(artifacts_router)
-app.include_router(rpg_router)
+app.include_router(health_router)  # S-103: Health exempt from auth (monitoring)
+# S-103: All data routers require API key
+_api_deps = [Depends(require_api_key)]
+_admin_deps = [Depends(require_admin_key)]
+app.include_router(activities_router, dependencies=_api_deps)
+app.include_router(thoughts_router, dependencies=_api_deps)
+app.include_router(memories_router, dependencies=_api_deps)
+app.include_router(goals_router, dependencies=_api_deps)
+app.include_router(sessions_router, dependencies=_api_deps)
+app.include_router(model_usage_router, dependencies=_api_deps)
+app.include_router(litellm_router, dependencies=_api_deps)
+app.include_router(providers_router, dependencies=_api_deps)
+app.include_router(security_router, dependencies=_api_deps)
+app.include_router(knowledge_router, dependencies=_api_deps)
+app.include_router(social_router, dependencies=_api_deps)
+app.include_router(operations_router, dependencies=_api_deps)
+app.include_router(records_router, dependencies=_api_deps)
+app.include_router(admin_router, dependencies=_admin_deps)  # Admin needs elevated key
+app.include_router(models_config_router, dependencies=_api_deps)
+app.include_router(models_crud_router, dependencies=_api_deps)
+app.include_router(working_memory_router, dependencies=_api_deps)
+app.include_router(skills_router, dependencies=_api_deps)
+app.include_router(lessons_router, dependencies=_api_deps)
+app.include_router(proposals_router, dependencies=_api_deps)
+app.include_router(analysis_router, dependencies=_api_deps)
+app.include_router(engine_cron_router, dependencies=_api_deps)
+app.include_router(engine_sessions_router, dependencies=_api_deps)
+app.include_router(engine_agent_metrics_router, dependencies=_api_deps)
+app.include_router(engine_agents_router, dependencies=_api_deps)
+app.include_router(agents_crud_router, dependencies=_api_deps)
+app.include_router(artifacts_router, dependencies=_api_deps)
+app.include_router(rpg_router, dependencies=_api_deps)
 
 # ── Static file serving (RPG Dashboard at /rpg/) ─────────────────────────────
 # Mounted AFTER API routers so /api/* takes priority.

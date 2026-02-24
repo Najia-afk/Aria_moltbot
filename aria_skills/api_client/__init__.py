@@ -14,6 +14,7 @@ from typing import Any
 from datetime import datetime
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
+from aria_skills.latency import log_latency
 from aria_skills.registry import SkillRegistry
 
 try:
@@ -62,10 +63,16 @@ class AriaAPIClient(BaseSkill):
         
         timeout = self.config.config.get("timeout", 30)
         
+        # S-103: Include API key header for authenticated endpoints
+        _headers = {"Content-Type": "application/json"}
+        _api_key = os.environ.get("ARIA_API_KEY", "")
+        if _api_key:
+            _headers["X-API-Key"] = _api_key
+
         self._client = httpx.AsyncClient(
             base_url=self._api_url,
             timeout=timeout,
-            headers={"Content-Type": "application/json"}
+            headers=_headers,
         )
         
         self._status = SkillStatus.AVAILABLE
@@ -116,7 +123,7 @@ class AriaAPIClient(BaseSkill):
         self, 
         action: str, 
         skill: str | None = None,
-        details: Dict | None = None,
+        details: dict | None = None,
         success: bool = True,
         error_message: str | None = None
     ) -> SkillResult:
@@ -166,7 +173,7 @@ class AriaAPIClient(BaseSkill):
         source: str = "api",
         user_id: str | None = None,
         blocked: bool = False,
-        details: Dict | None = None
+        details: dict | None = None
     ) -> SkillResult:
         """Log a security event."""
         try:
@@ -211,7 +218,7 @@ class AriaAPIClient(BaseSkill):
         self, 
         content: str, 
         category: str = "general",
-        metadata: Dict | None = None
+        metadata: dict | None = None
     ) -> SkillResult:
         """Create a thought."""
         try:
@@ -418,13 +425,15 @@ class AriaAPIClient(BaseSkill):
     # ========================================
     # Hourly Goals
     # ========================================
-    async def get_hourly_goals(self, status: str | None = None) -> SkillResult:
-        """Get hourly goals."""
+    async def get_hourly_goals(self, status: str | None = None, hour: int | None = None) -> SkillResult:
+        """Get hourly goals, optionally filtered by status or hour."""
         try:
-            url = "/hourly-goals"
+            params: dict[str, Any] = {}
             if status:
-                url += f"?status={status}"
-            resp = await self._client.get(url)
+                params["status"] = status
+            if hour is not None:
+                params["hour"] = hour
+            resp = await self._client.get("/hourly-goals", params=params)
             resp.raise_for_status()
             data = resp.json()
             return SkillResult.ok(data.get("goals", data))
@@ -499,7 +508,7 @@ class AriaAPIClient(BaseSkill):
         self,
         name: str,
         entity_type: str,
-        properties: Dict | None = None
+        properties: dict | None = None
     ) -> SkillResult:
         """Create a knowledge entity."""
         try:
@@ -518,7 +527,7 @@ class AriaAPIClient(BaseSkill):
         from_entity: str,
         to_entity: str,
         relation_type: str,
-        properties: Dict | None = None
+        properties: dict | None = None
     ) -> SkillResult:
         """Create a knowledge relation."""
         try:
@@ -671,7 +680,7 @@ class AriaAPIClient(BaseSkill):
         post_id: str | None = None,
         reply_to: str | None = None,
         url: str | None = None,
-        metadata: Dict | None = None
+        metadata: dict | None = None
     ) -> SkillResult:
         """Create a social post."""
         try:
@@ -721,7 +730,7 @@ class AriaAPIClient(BaseSkill):
         self,
         beat_number: int = 0,
         status: str = "healthy",
-        details: Dict | None = None
+        details: dict | None = None
     ) -> SkillResult:
         """Log a heartbeat."""
         try:
@@ -891,7 +900,7 @@ class AriaAPIClient(BaseSkill):
         self,
         agent_id: str,
         session_type: str = "interactive",
-        metadata: Dict | None = None,
+        metadata: dict | None = None,
     ) -> SkillResult:
         """Start a new agent session."""
         try:
@@ -1168,7 +1177,8 @@ class AriaAPIClient(BaseSkill):
 
         raise RuntimeError(f"request failed: {last_error}")
 
-    async def get(self, path: str, params: Dict | None = None) -> SkillResult:
+    @log_latency
+    async def get(self, path: str, params: dict | None = None) -> SkillResult:
         """Generic GET request."""
         try:
             resp = await self._request_with_retry("GET", path, params=params)
@@ -1176,7 +1186,8 @@ class AriaAPIClient(BaseSkill):
         except Exception as e:
             return SkillResult.fail(f"GET {path} failed: {e}")
     
-    async def post(self, path: str, data: Dict | None = None) -> SkillResult:
+    @log_latency
+    async def post(self, path: str, data: dict | None = None) -> SkillResult:
         """Generic POST request."""
         try:
             resp = await self._request_with_retry("POST", path, json=data)
@@ -1184,7 +1195,7 @@ class AriaAPIClient(BaseSkill):
         except Exception as e:
             return SkillResult.fail(f"POST {path} failed: {e}")
     
-    async def patch(self, path: str, data: Dict | None = None) -> SkillResult:
+    async def patch(self, path: str, data: dict | None = None) -> SkillResult:
         """Generic PATCH request."""
         try:
             resp = await self._request_with_retry("PATCH", path, json=data)
@@ -1192,7 +1203,7 @@ class AriaAPIClient(BaseSkill):
         except Exception as e:
             return SkillResult.fail(f"PATCH {path} failed: {e}")
 
-    async def put(self, path: str, data: Dict | None = None) -> SkillResult:
+    async def put(self, path: str, data: dict | None = None) -> SkillResult:
         """Generic PUT request."""
         try:
             resp = await self._request_with_retry("PUT", path, json=data)
@@ -1207,6 +1218,44 @@ class AriaAPIClient(BaseSkill):
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"DELETE {path} failed: {e}")
+
+    # ── Batch Operations (S-167) ────────────────────────────────────
+
+    async def batch_get(
+        self, operations: list[dict[str, Any]]
+    ) -> list[SkillResult]:
+        """Execute multiple GET requests concurrently.
+
+        Args:
+            operations: List of dicts with "path" and optional "params" keys.
+                Example: [{"path": "/goals"}, {"path": "/activities", "params": {"limit": 5}}]
+
+        Returns:
+            List of SkillResult in the same order as the input operations.
+        """
+        tasks = [
+            self.get(op["path"], params=op.get("params"))
+            for op in operations
+        ]
+        return list(await asyncio.gather(*tasks, return_exceptions=False))
+
+    async def batch_post(
+        self, operations: list[dict[str, Any]]
+    ) -> list[SkillResult]:
+        """Execute multiple POST requests concurrently.
+
+        Args:
+            operations: List of dicts with "path" and optional "data" keys.
+                Example: [{"path": "/activities", "data": {"action": "x"}}]
+
+        Returns:
+            List of SkillResult in the same order as the input operations.
+        """
+        tasks = [
+            self.post(op["path"], data=op.get("data"))
+            for op in operations
+        ]
+        return list(await asyncio.gather(*tasks, return_exceptions=False))
 
     # ── Performance logging (S-21) ──────────────────────────────────
 
@@ -1251,7 +1300,7 @@ class AriaAPIClient(BaseSkill):
     async def store_memory_semantic(
         self, content: str, category: str = "general",
         importance: float = 0.5, source: str = "aria",
-        summary: str = None, metadata: Dict | None = None,
+        summary: str = None, metadata: dict | None = None,
     ) -> SkillResult:
         """Store a memory with vector embedding for semantic search."""
         try:
@@ -1276,7 +1325,7 @@ class AriaAPIClient(BaseSkill):
         self, message: str, session_id: str = None,
         external_session_id: str = None, agent_id: str = None,
         source_channel: str = None, store_semantic: bool = True,
-        metadata: Dict | None = None,
+        metadata: dict | None = None,
     ) -> SkillResult:
         """Analyze and persist sentiment for a user message via /analysis/sentiment/reply."""
         try:
@@ -1354,7 +1403,7 @@ class AriaAPIClient(BaseSkill):
     async def record_lesson(
         self, error_pattern: str, error_type: str,
         resolution: str, skill_name: str = None,
-        context: Dict | None = None,
+        context: dict | None = None,
     ) -> SkillResult:
         """Record a lesson learned from an error."""
         try:
@@ -1571,6 +1620,335 @@ class AriaAPIClient(BaseSkill):
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to delete artifact: {e}")
+
+    # ========================================
+    # Convenience Aliases & CRUD Shortcuts (S-112)
+    # ========================================
+
+    # -- Goals ---------------------------------------------------------------
+
+    async def get_goal(self, goal_id: str) -> SkillResult:
+        """Get a single goal by ID."""
+        try:
+            resp = await self._client.get(f"/goals/{goal_id}")
+            if resp.status_code == 404:
+                return SkillResult.fail(f"Goal not found: {goal_id}")
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to get goal: {e}")
+
+    async def list_goals(
+        self, limit: int = 25, page: int = 1, status: str | None = None
+    ) -> SkillResult:
+        """List goals (alias for get_goals)."""
+        return await self.get_goals(limit=limit, page=page, status=status)
+
+    # -- Activities ----------------------------------------------------------
+
+    async def list_activities(self, limit: int = 50, page: int = 1) -> SkillResult:
+        """List activities (alias for get_activities)."""
+        return await self.get_activities(limit=limit, page=page)
+
+    # -- Agents --------------------------------------------------------------
+
+    async def list_agents(self, limit: int = 50, page: int = 1) -> SkillResult:
+        """List registered agents."""
+        try:
+            resp = await self._client.get(f"/agents?limit={limit}&page={page}")
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to list agents: {e}")
+
+    async def get_agent(self, agent_id: str) -> SkillResult:
+        """Get agent details by ID."""
+        try:
+            resp = await self._client.get(f"/agents/{agent_id}")
+            if resp.status_code == 404:
+                return SkillResult.fail(f"Agent not found: {agent_id}")
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to get agent: {e}")
+
+    async def spawn_agent(
+        self,
+        agent_type: str,
+        config: dict | None = None,
+        name: str | None = None,
+    ) -> SkillResult:
+        """Spawn (create) a new agent."""
+        try:
+            data: dict[str, Any] = {"agent_type": agent_type}
+            if config:
+                data["config"] = config
+            if name:
+                data["name"] = name
+            resp = await self._client.post("/agents", json=data)
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to spawn agent: {e}")
+
+    async def terminate_agent(self, agent_id: str) -> SkillResult:
+        """Terminate (delete) an agent."""
+        try:
+            resp = await self._client.delete(f"/agents/{agent_id}")
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to terminate agent: {e}")
+
+    # -- Knowledge Graph convenience -----------------------------------------
+
+    async def kg_add_entity(
+        self,
+        name: str,
+        entity_type: str,
+        properties: dict | None = None,
+    ) -> SkillResult:
+        """Add a knowledge-graph entity (alias for create_entity)."""
+        return await self.create_entity(
+            name=name, entity_type=entity_type, properties=properties,
+        )
+
+    async def kg_add_relation(
+        self,
+        from_entity: str,
+        to_entity: str,
+        relation_type: str,
+        properties: dict | None = None,
+    ) -> SkillResult:
+        """Add a knowledge-graph relation (alias for create_relation)."""
+        return await self.create_relation(
+            from_entity=from_entity,
+            to_entity=to_entity,
+            relation_type=relation_type,
+            properties=properties,
+        )
+
+    async def kg_query(
+        self,
+        entity_name: str | None = None,
+        entity_type: str | None = None,
+        relation_type: str | None = None,
+        depth: int = 2,
+    ) -> SkillResult:
+        """Query the knowledge graph.
+
+        When *entity_name* is provided a BFS traversal is performed.
+        Otherwise entities are listed by *entity_type*.
+        """
+        if entity_name:
+            return await self.kg_traverse(
+                start=entity_name,
+                relation_type=relation_type,
+                max_depth=depth,
+            )
+        return await self.get_entities(entity_type=entity_type)
+
+    async def kg_get_entity(
+        self,
+        name: str,
+        entity_type: str | None = None,
+    ) -> SkillResult:
+        """Get a single knowledge-graph entity by name."""
+        try:
+            params: dict[str, Any] = {"q": name, "limit": 1}
+            if entity_type:
+                params["entity_type"] = entity_type
+            resp = await self._client.get("/knowledge-graph/kg-search", params=params)
+            resp.raise_for_status()
+            data = resp.json()
+            results = data.get("results", [])
+            if results:
+                return SkillResult.ok(results[0])
+            return SkillResult.fail(f"Entity not found: {name}")
+        except Exception as e:
+            return SkillResult.fail(f"Failed to get KG entity: {e}")
+
+    # -- Schedule CRUD -------------------------------------------------------
+
+    async def create_job(self, job: dict) -> SkillResult:
+        """Create a scheduled job."""
+        try:
+            resp = await self._client.post("/schedule", json=job)
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to create job: {e}")
+
+    async def get_job(self, job_id: str) -> SkillResult:
+        """Get a scheduled job by ID."""
+        try:
+            resp = await self._client.get(f"/schedule/{job_id}")
+            if resp.status_code == 404:
+                return SkillResult.fail(f"Job not found: {job_id}")
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to get job: {e}")
+
+    async def list_jobs(
+        self, enabled: bool | None = None, due: bool = False,
+    ) -> SkillResult:
+        """List scheduled jobs with optional filters."""
+        try:
+            params: dict[str, Any] = {}
+            if enabled is not None:
+                params["enabled"] = enabled
+            if due:
+                params["due"] = True
+            resp = await self._client.get("/schedule", params=params)
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to list jobs: {e}")
+
+    async def update_job(self, job_id: str, data: dict) -> SkillResult:
+        """Update a scheduled job."""
+        try:
+            resp = await self._client.put(f"/schedule/{job_id}", json=data)
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to update job: {e}")
+
+    async def delete_job(self, job_id: str) -> SkillResult:
+        """Delete a scheduled job."""
+        try:
+            resp = await self._client.delete(f"/schedule/{job_id}")
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to delete job: {e}")
+
+    # -- Working Memory convenience ------------------------------------------
+
+    async def checkpoint(self) -> SkillResult:
+        """Snapshot working memory (alias for working_memory_checkpoint)."""
+        return await self.working_memory_checkpoint()
+
+    async def forget(self, item_id: str) -> SkillResult:
+        """Forget a working memory item (alias for forget_working_memory)."""
+        return await self.forget_working_memory(item_id)
+
+    # -- Performance convenience ---------------------------------------------
+
+    async def log_review(
+        self,
+        period: str,
+        successes: str | None = None,
+        failures: str | None = None,
+        improvements: str | None = None,
+    ) -> SkillResult:
+        """Log a performance review."""
+        try:
+            resp = await self._client.post("/performance", json={
+                "period": period,
+                "successes": successes,
+                "failures": failures,
+                "improvements": improvements,
+            })
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to log review: {e}")
+
+    async def get_reviews(self, limit: int = 25) -> SkillResult:
+        """Get performance reviews."""
+        try:
+            resp = await self._client.get("/performance", params={"limit": limit})
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to get reviews: {e}")
+
+    # -- Sprint convenience --------------------------------------------------
+
+    async def sprint_status(self, sprint: str = "current") -> SkillResult:
+        """Get sprint status (alias for get_sprint_summary)."""
+        return await self.get_sprint_summary(sprint=sprint)
+
+    async def sprint_plan(
+        self, sprint_name: str, goal_ids: list[str],
+    ) -> SkillResult:
+        """Assign goals to a sprint (batch update)."""
+        results: list[dict] = []
+        for gid in goal_ids:
+            try:
+                resp = await self._client.patch(f"/goals/{gid}", json={
+                    "sprint": sprint_name,
+                    "board_column": "todo",
+                })
+                resp.raise_for_status()
+                results.append({"goal_id": gid, "success": True})
+            except Exception as e:
+                results.append({"goal_id": gid, "success": False, "error": str(e)})
+        return SkillResult.ok({"sprint": sprint_name, "assigned": results})
+
+    async def update_sprint(
+        self, goal_id: str, board_column: str, position: int = 0,
+    ) -> SkillResult:
+        """Move a goal within a sprint board (alias for move_goal)."""
+        return await self.move_goal(
+            goal_id=goal_id, board_column=board_column, position=position,
+        )
+
+    # -- Hourly Goals convenience --------------------------------------------
+
+    async def set_hourly_goal(
+        self,
+        hour: int,
+        goal: str,
+        priority: str = "normal",
+    ) -> SkillResult:
+        """Set an hourly goal."""
+        try:
+            resp = await self._client.post("/hourly-goals", json={
+                "hour": hour,
+                "goal": goal,
+                "priority": priority,
+                "status": "pending",
+            })
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to set hourly goal: {e}")
+
+    async def complete_hourly_goal(self, goal_id: str) -> SkillResult:
+        """Mark an hourly goal as completed."""
+        try:
+            resp = await self._client.patch(f"/hourly-goals/{goal_id}", json={
+                "status": "completed",
+            })
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to complete hourly goal: {e}")
+
+    # -- Social CRUD completions ---------------------------------------------
+
+    async def update_social_post(
+        self, post_id: str, data: dict,
+    ) -> SkillResult:
+        """Update a social post."""
+        try:
+            resp = await self._client.put(f"/social/{post_id}", json=data)
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to update social post: {e}")
+
+    async def delete_social_post(self, post_id: str) -> SkillResult:
+        """Delete a social post."""
+        try:
+            resp = await self._client.delete(f"/social/{post_id}")
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to delete social post: {e}")
 
 
 # Singleton instance for convenience

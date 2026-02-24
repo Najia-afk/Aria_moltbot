@@ -2,11 +2,10 @@
 
 ## Quick Start
 
-All deployment is handled from `stacks/brain/`:
+Deployment can be run from the repository root using the top-level compose file:
 
 ```bash
-cd stacks/brain
-./deploy.sh deploy
+docker compose up -d
 ```
 
 ## Deploy Commands
@@ -45,4 +44,4 @@ The `mac/` folder contains:
 ## Requirements
 
 - Docker & Docker Compose
-- `.env` file in `stacks/brain/` with required variables
+- `.env` file in repository root (copy from `stacks/brain/.env.example`)

@@ -13,6 +13,7 @@ from typing import Any
 
 from aria_skills.api_client import get_api_client
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
+from aria_skills.litellm import LiteLLMSkill
 from aria_skills.registry import SkillRegistry
 
 SUMMARIZATION_PROMPT = """\
@@ -62,11 +63,19 @@ class ConversationSummarySkill(BaseSkill):
     async def initialize(self) -> bool:
         """Initialize conversation summary skill."""
         self._api = await get_api_client()
+        # S-115: Route LLM calls through litellm skill (no direct httpx)
+        _llm_config = SkillConfig(name="litellm", config={})
+        self._litellm = LiteLLMSkill(_llm_config)
+        await self._litellm.initialize()
         self._status = SkillStatus.AVAILABLE
         self.logger.info("📝 Conversation summary skill initialized")
         return True
 
     async def close(self):
+        if hasattr(self, "_litellm") and self._litellm:
+            if hasattr(self._litellm, "_client") and self._litellm._client:
+                await self._litellm._client.aclose()
+            self._litellm = None
         self._api = None
 
     async def health_check(self) -> SkillStatus:
@@ -144,45 +153,16 @@ class ConversationSummarySkill(BaseSkill):
                 memories="\n".join(memory_texts),
             )
 
-            # Call LLM via api_client's LiteLLM proxy
-            import httpx
-            import os
-
-            litellm_url = os.getenv("LITELLM_API_BASE", "http://aria-litellm:18793")
-            litellm_key = os.getenv("LITELLM_API_KEY", "sk-aria-internal")
-            agent_id = (
-                os.getenv("ARIA_AGENT_ID")
-                or os.getenv("AGENT_ID")
-                or "main"
+            # S-115: Route LLM calls through litellm skill (no direct httpx)
+            llm_result = await self._litellm.chat_completion(
+                model="qwen3-mlx",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3,
+                max_tokens=800,
             )
-            aria_session_id = (
-                os.getenv("ARIA_SESSION_ID")
-                or os.getenv("SESSION_ID")
-                or ""
-            )
-
-            payload = {
-                "model": "qwen3-mlx",
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.3,
-                "max_tokens": 800,
-                "metadata": {
-                    "source": "aria_skills.conversation_summary",
-                    "agent_id": agent_id,
-                    "aria_session_id": aria_session_id,
-                },
-            }
-            if aria_session_id:
-                payload["session_id"] = aria_session_id
-
-            async with httpx.AsyncClient(timeout=60) as client:
-                resp = await client.post(
-                    f"{litellm_url}/v1/chat/completions",
-                    headers={"Authorization": f"Bearer {litellm_key}"},
-                    json=payload,
-                )
-                resp.raise_for_status()
-                llm_data = resp.json()
+            if not llm_result.success:
+                raise Exception(llm_result.message)
+            llm_data = llm_result.data
 
             raw_text = llm_data["choices"][0]["message"]["content"]
             parsed = json.loads(raw_text)

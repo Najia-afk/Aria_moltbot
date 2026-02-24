@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from aria_skills.api_client import get_api_client
-from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
+from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
 from aria_skills.registry import SkillRegistry
 
 
@@ -23,7 +23,7 @@ class PerformanceSkill(BaseSkill):
     
     def __init__(self, config: SkillConfig):
         super().__init__(config)
-        self._logs: list[Dict] = []  # fallback cache
+        self._logs: list[dict] = []  # fallback cache
         self._api = None
     
     @property
@@ -45,6 +45,7 @@ class PerformanceSkill(BaseSkill):
         """Check availability."""
         return self._status
     
+    @logged_method()
     async def log_review(
         self,
         period: str,
@@ -73,9 +74,10 @@ class PerformanceSkill(BaseSkill):
         }
         
         try:
-            resp = await self._api._client.post("/performance", json=log)
-            resp.raise_for_status()
-            api_data = resp.json()
+            result = await self._api.post("/performance", data=log)
+            if not result:
+                raise Exception(result.error)
+            api_data = result.data
             return SkillResult.ok(api_data if api_data else log)
         except Exception as e:
             self.logger.warning(f"API log_review failed, using fallback: {e}")
@@ -83,12 +85,14 @@ class PerformanceSkill(BaseSkill):
             self._logs.append(log)
             return SkillResult.ok(log)
     
+    @logged_method()
     async def get_reviews(self, limit: int = 10) -> SkillResult:
         """Get recent performance reviews."""
         try:
-            resp = await self._api._client.get("/performance", params={"limit": limit})
-            resp.raise_for_status()
-            api_data = resp.json()
+            result = await self._api.get("/performance", params={"limit": limit})
+            if not result:
+                raise Exception(result.error)
+            api_data = result.data
             if isinstance(api_data, list):
                 return SkillResult.ok({"reviews": api_data[-limit:], "total": len(api_data)})
             return SkillResult.ok(api_data)
@@ -99,12 +103,14 @@ class PerformanceSkill(BaseSkill):
                 "total": len(self._logs),
             })
     
+    @logged_method()
     async def get_improvement_summary(self) -> SkillResult:
         """Summarize improvement areas across reviews."""
         try:
-            resp = await self._api._client.get("/performance")
-            resp.raise_for_status()
-            api_data = resp.json()
+            result = await self._api.get("/performance")
+            if not result:
+                raise Exception(result.error)
+            api_data = result.data
             logs = api_data if isinstance(api_data, list) else api_data.get("reviews", [])
         except Exception as e:
             self.logger.warning(f"API get_improvement_summary failed, using fallback: {e}")

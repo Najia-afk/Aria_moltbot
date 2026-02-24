@@ -52,6 +52,9 @@ dev = [
     "py-spy>=0.3.14",
     "pyupgrade>=3.17.0",
     "testcontainers>=4.0.0",
+    "bandit>=1.7.0",
+    "semgrep>=1.50.0",
+    "pip-audit>=2.7.0",
 ]
 
 docker = [
@@ -197,3 +200,11 @@ exclude = [
 [[tool.mypy.overrides]]
 module = "tests.*"
 ignore_errors = true
+
+# ============================================================================
+# bandit (SAST)
+# ============================================================================
+
+[tool.bandit]
+exclude_dirs = ["tests", "aria_souvenirs", "aria_memories"]
+skips = ["B101"]  # Skip assert_used since tests use assert

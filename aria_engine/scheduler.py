@@ -429,6 +429,11 @@ class EngineScheduler:
             return {}
 
         async with aiohttp.ClientSession() as http:
+            # S-103: Build auth headers for API calls
+            _headers = {}
+            _api_key = os.getenv("ARIA_API_KEY", "")
+            if _api_key:
+                _headers["X-API-Key"] = _api_key
             # 1. Create a session via aria-api
             create_resp = await http.post(
                 f"{_API_BASE}/api/engine/chat/sessions",
@@ -437,6 +442,7 @@ class EngineScheduler:
                     "session_type": "cron",
                     "metadata": {"cron_job_id": job_id},
                 },
+                headers=_headers,
             )
             if create_resp.status != 201:
                 body = await create_resp.text()
@@ -461,6 +467,7 @@ class EngineScheduler:
                         "enable_thinking": False,
                         "enable_tools": True,
                     },
+                    headers=_headers,
                 )
                 if msg_resp.status != 200:
                     body = await msg_resp.text()
@@ -472,6 +479,7 @@ class EngineScheduler:
                 try:
                     await http.delete(
                         f"{_API_BASE}/api/engine/chat/sessions/{session_id}",
+                        headers=_headers,
                     )
                     logger.info(
                         "Job %s: cleaned up empty session %s after failure",
@@ -582,6 +590,10 @@ class EngineScheduler:
 
         try:
             async with aiohttp.ClientSession() as http:
+                _hb_headers = {}
+                _hb_key = os.getenv("ARIA_API_KEY", "")
+                if _hb_key:
+                    _hb_headers["X-API-Key"] = _hb_key
                 await http.post(
                     f"{_API_BASE}/api/heartbeat",
                     json={
@@ -591,6 +603,7 @@ class EngineScheduler:
                         "executed_at": datetime.now(timezone.utc).isoformat(),
                         "duration_ms": duration_ms,
                     },
+                    headers=_hb_headers,
                 )
         except Exception as e:
             logger.warning("Failed to write heartbeat log for %s: %s", job_name, e)

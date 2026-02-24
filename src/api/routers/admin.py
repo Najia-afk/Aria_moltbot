@@ -27,21 +27,17 @@ def _service_cmd_env(service_id: str, action: str) -> str:
 
 
 async def _run_docker_command(command: str) -> dict | None:
+    """Execute a docker container control command via docker-socket-proxy (S-100)."""
     tokens = command.strip().split()
     if len(tokens) < 3 or tokens[0] != "docker":
         return None
     action, target = tokens[1], tokens[2]
     if action not in {"restart", "stop", "start"}:
         return None
-    socket_path = "/var/run/docker.sock"
-    if not os.path.exists(socket_path):
-        return {
-            "status": "error", "code": 1,
-            "stdout": "", "stderr": "docker socket not found",
-        }
+    # S-100: Use docker-socket-proxy instead of raw Docker socket
+    docker_host = os.environ.get("DOCKER_HOST", "http://docker-socket-proxy:2375")
     endpoint = f"/containers/{target}/{action}"
-    transport = httpx.AsyncHTTPTransport(uds=socket_path)
-    async with httpx.AsyncClient(transport=transport, base_url="http://docker") as client:
+    async with httpx.AsyncClient(base_url=docker_host, timeout=30.0) as client:
         resp = await client.post(endpoint)
         if resp.status_code in {204, 200}:
             return {"status": "ok", "code": 0, "stdout": "", "stderr": ""}

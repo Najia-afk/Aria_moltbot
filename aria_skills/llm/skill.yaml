@@ -1,6 +1,0 @@
-name: llm
-layer: 2
-version: "1.0"
-status: active
-description: "LLM interaction interfaces (Moonshot/Kimi, Ollama backends)"
-dependencies: []

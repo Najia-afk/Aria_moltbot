@@ -66,9 +66,10 @@ class KnowledgeGraphSkill(BaseSkill):
         }
         
         try:
-            resp = await self._api._client.post("/knowledge-graph/entities", json=entity)
-            resp.raise_for_status()
-            api_data = resp.json()
+            result = await self._api.post("/knowledge-graph/entities", data=entity)
+            if not result:
+                raise Exception(result.error)
+            api_data = result.data
             return SkillResult.ok(api_data if api_data else entity)
         except Exception as e:
             self.logger.warning(f"API add_entity failed, using fallback: {e}")
@@ -92,9 +93,10 @@ class KnowledgeGraphSkill(BaseSkill):
         }
         
         try:
-            resp = await self._api._client.post("/knowledge-graph/relations", json=rel)
-            resp.raise_for_status()
-            api_data = resp.json()
+            result = await self._api.post("/knowledge-graph/relations", data=rel)
+            if not result:
+                raise Exception(result.error)
+            api_data = result.data
             return SkillResult.ok(api_data if api_data else rel)
         except Exception as e:
             detail = ""
@@ -122,9 +124,10 @@ class KnowledgeGraphSkill(BaseSkill):
             params: dict[str, Any] = {}
             if type:
                 params["type"] = type
-            resp = await self._api._client.get("/knowledge-graph/entities", params=params)
-            resp.raise_for_status()
-            data = resp.json()
+            result = await self._api.get("/knowledge-graph/entities", params=params)
+            if not result:
+                raise Exception(result.error)
+            data = result.data
             entities = data.get("entities", data if isinstance(data, list) else [])
             # Filter by name match
             matches = [e for e in entities if lookup.lower() in e.get("name", "").lower()]
@@ -166,9 +169,10 @@ class KnowledgeGraphSkill(BaseSkill):
                 }
                 if relation:
                     params["relation_type"] = relation
-                resp = await self._api._client.get("/knowledge-graph/kg-traverse", params=params)
-                resp.raise_for_status()
-                data = resp.json()
+                resp = await self._api.get("/knowledge-graph/kg-traverse", params=params)
+                if not resp:
+                    raise Exception(resp.error)
+                data = resp.data
                 # If traverse found the entity, return subgraph
                 if not data.get("error"):
                     return SkillResult.ok({
@@ -186,9 +190,10 @@ class KnowledgeGraphSkill(BaseSkill):
                 params = {"q": entity_name, "limit": 50}
                 if entity_type:
                     params["entity_type"] = entity_type
-                resp = await self._api._client.get("/knowledge-graph/kg-search", params=params)
-                resp.raise_for_status()
-                data = resp.json()
+                resp = await self._api.get("/knowledge-graph/kg-search", params=params)
+                if not resp:
+                    raise Exception(resp.error)
+                data = resp.data
                 entities = data.get("results", [])
                 return SkillResult.ok({
                     "entities": entities,
@@ -204,9 +209,10 @@ class KnowledgeGraphSkill(BaseSkill):
             params = {}
             if entity_type:
                 params["type"] = entity_type
-            resp = await self._api._client.get("/knowledge-graph/entities", params=params)
-            resp.raise_for_status()
-            api_data = resp.json()
+            resp = await self._api.get("/knowledge-graph/entities", params=params)
+            if not resp:
+                raise Exception(resp.error)
+            api_data = resp.data
             entities = api_data if isinstance(api_data, list) else api_data.get("entities", [])
             if entity_name:
                 entities = [

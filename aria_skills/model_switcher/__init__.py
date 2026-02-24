@@ -13,6 +13,35 @@ from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, l
 from aria_skills.registry import SkillRegistry
 
 
+def build_thinking_params(model: str, enable: bool = True) -> dict[str, Any]:
+    """Build model-specific parameters for enabling thinking mode."""
+    params: dict[str, Any] = {}
+
+    if not enable:
+        return params
+
+    model_lower = model.lower()
+
+    # Qwen3 models
+    if "qwen" in model_lower:
+        params["extra_body"] = {"enable_thinking": True}
+
+    # DeepSeek models
+    elif "deepseek" in model_lower:
+        params["extra_body"] = {"enable_thinking": True}
+
+    # Claude models (extended thinking)
+    elif "claude" in model_lower:
+        params["extra_body"] = {
+            "thinking": {
+                "type": "enabled",
+                "budget_tokens": 4096,
+            }
+        }
+
+    return params
+
+
 @SkillRegistry.register
 class ModelSwitcherSkill(BaseSkill):
     """
@@ -143,7 +172,6 @@ class ModelSwitcherSkill(BaseSkill):
         self._thinking_enabled = bool(enabled)
 
         # Build model-specific thinking params
-        from aria_engine.thinking import build_thinking_params
         params = build_thinking_params(self._current_model, enable=self._thinking_enabled)
 
         return SkillResult.ok({
@@ -157,7 +185,6 @@ class ModelSwitcherSkill(BaseSkill):
     @logged_method()
     async def get_thinking_mode(self, **kwargs) -> SkillResult:
         """Get current thinking mode status."""
-        from aria_engine.thinking import build_thinking_params
         params = build_thinking_params(self._current_model, enable=self._thinking_enabled)
         return SkillResult.ok({
             "thinking_enabled": self._thinking_enabled,

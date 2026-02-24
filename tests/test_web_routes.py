@@ -1,7 +1,7 @@
 """Web UI route tests — every Flask page must return 200 HTML."""
 import pytest
 
-pytestmark = pytest.mark.web
+pytestmark = [pytest.mark.web, pytest.mark.usefixtures("_check_web_health")]
 
 # All pages that should return 200 with HTML content
 PAGES = [

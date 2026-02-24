@@ -381,48 +381,54 @@ async def graph_traverse(
     if not start_entity:
         return {"error": f"Entity not found: {start}", "nodes": [], "edges": []}
 
-    # BFS
+    # BFS – batch by level to avoid N+1 queries (S-163)
     visited: set[str] = set()
-    queue: deque[tuple[uuid.UUID, int]] = deque()
-    queue.append((start_entity.id, 0))
+    current_level: list[uuid.UUID] = [start_entity.id]
     visited.add(str(start_entity.id))
 
     nodes: list[dict] = [start_entity.to_dict()]
     edges: list[dict] = []
 
-    while queue:
-        current_id, depth = queue.popleft()
-        if depth >= max_depth:
-            continue
+    for _depth in range(max_depth):
+        if not current_level:
+            break
 
-        # Build relation query based on direction
-        stmts = []
+        # Batch-fetch all relations for every node at this BFS level
+        all_relations = []
         if direction in ("outgoing", "both"):
-            stmt = select(SkillGraphRelation).where(SkillGraphRelation.from_entity == current_id)
+            stmt = select(SkillGraphRelation).where(SkillGraphRelation.from_entity.in_(current_level))
             if relation_type:
                 stmt = stmt.where(SkillGraphRelation.relation_type == relation_type)
-            stmts.append(("outgoing", stmt))
-        if direction in ("incoming", "both"):
-            stmt = select(SkillGraphRelation).where(SkillGraphRelation.to_entity == current_id)
-            if relation_type:
-                stmt = stmt.where(SkillGraphRelation.relation_type == relation_type)
-            stmts.append(("incoming", stmt))
-
-        for dir_label, stmt in stmts:
             result = await db.execute(stmt)
             for rel in result.scalars().all():
-                edge_data = rel.to_dict()
-                edges.append(edge_data)
-                next_id = rel.to_entity if dir_label == "outgoing" else rel.from_entity
-                next_id_str = str(next_id)
-                if next_id_str not in visited:
-                    visited.add(next_id_str)
-                    # Fetch the node
-                    node_result = await db.execute(select(SkillGraphEntity).where(SkillGraphEntity.id == next_id))
-                    node = node_result.scalar_one_or_none()
-                    if node:
-                        nodes.append(node.to_dict())
-                        queue.append((next_id, depth + 1))
+                all_relations.append(("outgoing", rel))
+        if direction in ("incoming", "both"):
+            stmt = select(SkillGraphRelation).where(SkillGraphRelation.to_entity.in_(current_level))
+            if relation_type:
+                stmt = stmt.where(SkillGraphRelation.relation_type == relation_type)
+            result = await db.execute(stmt)
+            for rel in result.scalars().all():
+                all_relations.append(("incoming", rel))
+
+        # Collect unvisited neighbour IDs
+        next_level_ids: list[uuid.UUID] = []
+        for dir_label, rel in all_relations:
+            edges.append(rel.to_dict())
+            next_id = rel.to_entity if dir_label == "outgoing" else rel.from_entity
+            next_id_str = str(next_id)
+            if next_id_str not in visited:
+                visited.add(next_id_str)
+                next_level_ids.append(next_id)
+
+        # Batch-fetch all neighbour entities in a single query
+        if next_level_ids:
+            result = await db.execute(
+                select(SkillGraphEntity).where(SkillGraphEntity.id.in_(next_level_ids))
+            )
+            for entity in result.scalars().all():
+                nodes.append(entity.to_dict())
+
+        current_level = next_level_ids
 
     await _log_query(db, "traverse", {"start": start, "relation_type": relation_type, "max_depth": max_depth, "direction": direction}, len(nodes))
     return {"nodes": nodes, "edges": edges, "traversal_depth": max_depth, "total_nodes": len(nodes), "total_edges": len(edges)}
@@ -590,53 +596,70 @@ async def kg_traverse(
     if not start_entity:
         return {"error": f"Entity not found: {start}", "nodes": [], "edges": []}
 
-    # BFS
+    # BFS – batch by level to avoid N+1 queries (S-163)
     visited: set[str] = set()
-    queue: deque[tuple[uuid.UUID, int]] = deque()
-    queue.append((start_entity.id, 0))
+    current_level: list[uuid.UUID] = [start_entity.id]
     visited.add(str(start_entity.id))
+
+    # Entity-name lookup used for edge annotation (avoids lazy-load N+1)
+    entity_names: dict[str, str] = {str(start_entity.id): start_entity.name}
 
     nodes: list[dict] = [start_entity.to_dict()]
     edges: list[dict] = []
 
-    while queue:
-        current_id, depth = queue.popleft()
-        if depth >= max_depth:
-            continue
+    for _depth in range(max_depth):
+        if not current_level:
+            break
 
-        stmts = []
+        # Batch-fetch all relations for this BFS level
+        all_relations = []
         if direction in ("outgoing", "both"):
-            stmt = select(KnowledgeRelation).where(KnowledgeRelation.from_entity == current_id)
+            stmt = select(KnowledgeRelation).where(KnowledgeRelation.from_entity.in_(current_level))
             if relation_type:
                 stmt = stmt.where(KnowledgeRelation.relation_type == relation_type)
-            stmts.append(("outgoing", stmt))
-        if direction in ("incoming", "both"):
-            stmt = select(KnowledgeRelation).where(KnowledgeRelation.to_entity == current_id)
-            if relation_type:
-                stmt = stmt.where(KnowledgeRelation.relation_type == relation_type)
-            stmts.append(("incoming", stmt))
-
-        for dir_label, stmt in stmts:
             result = await db.execute(stmt)
             for rel in result.scalars().all():
-                edge_data = rel.to_dict()
-                # Annotate with entity names for readability
-                if rel.source_entity:
-                    edge_data["from_name"] = rel.source_entity.name
-                if rel.target_entity:
-                    edge_data["to_name"] = rel.target_entity.name
-                edges.append(edge_data)
-                next_id = rel.to_entity if dir_label == "outgoing" else rel.from_entity
-                next_id_str = str(next_id)
-                if next_id_str not in visited:
-                    visited.add(next_id_str)
-                    node_result = await db.execute(
-                        select(KnowledgeEntity).where(KnowledgeEntity.id == next_id)
-                    )
-                    node = node_result.scalar_one_or_none()
-                    if node:
-                        nodes.append(node.to_dict())
-                        queue.append((next_id, depth + 1))
+                all_relations.append(("outgoing", rel))
+        if direction in ("incoming", "both"):
+            stmt = select(KnowledgeRelation).where(KnowledgeRelation.to_entity.in_(current_level))
+            if relation_type:
+                stmt = stmt.where(KnowledgeRelation.relation_type == relation_type)
+            result = await db.execute(stmt)
+            for rel in result.scalars().all():
+                all_relations.append(("incoming", rel))
+
+        # Collect unvisited neighbour IDs and prepare edge data
+        next_level_ids: list[uuid.UUID] = []
+        pending_edges = []
+        for dir_label, rel in all_relations:
+            edge_data = rel.to_dict()
+            pending_edges.append((edge_data, rel.from_entity, rel.to_entity))
+            next_id = rel.to_entity if dir_label == "outgoing" else rel.from_entity
+            next_id_str = str(next_id)
+            if next_id_str not in visited:
+                visited.add(next_id_str)
+                next_level_ids.append(next_id)
+
+        # Batch-fetch all neighbour entities in a single query
+        if next_level_ids:
+            result = await db.execute(
+                select(KnowledgeEntity).where(KnowledgeEntity.id.in_(next_level_ids))
+            )
+            for entity in result.scalars().all():
+                nodes.append(entity.to_dict())
+                entity_names[str(entity.id)] = entity.name
+
+        # Annotate edges with entity names (uses cache, no extra queries)
+        for edge_data, from_id, to_id in pending_edges:
+            from_name = entity_names.get(str(from_id))
+            to_name = entity_names.get(str(to_id))
+            if from_name:
+                edge_data["from_name"] = from_name
+            if to_name:
+                edge_data["to_name"] = to_name
+            edges.append(edge_data)
+
+        current_level = next_level_ids
 
     await _log_query(
         db, "kg_traverse",

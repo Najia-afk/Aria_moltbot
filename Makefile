@@ -1,7 +1,7 @@
 # Makefile — Aria development shortcuts
 # Usage: make test | make test-quick | make test-integration | make build | make up
 
-COMPOSE = docker compose -f stacks/brain/docker-compose.yml
+COMPOSE = docker compose
 API_CONTAINER = aria-api
 
 # ============================================================================
@@ -50,10 +50,19 @@ restart: ## Restart API container
 # Development
 # ============================================================================
 
-.PHONY: lint format check verify-deploy verify-pairing watchdog hooks
+.PHONY: lint format check verify-deploy verify-pairing watchdog hooks security-scan audit-deps
 
-lint: ## Run linting
+lint: security-scan ## Run linting + security scans
 	ruff check aria_skills/ aria_agents/ aria_models/ src/
+	@echo "Lint and security scans complete"
+
+security-scan: ## Run SAST security scan (bandit)
+	bandit -r aria_skills/ aria_engine/ src/ -c pyproject.toml -f json -o bandit-report.json || true
+	@echo "Bandit scan complete. See bandit-report.json"
+
+audit-deps: ## Run dependency vulnerability scan (pip-audit)
+	pip-audit --format json --output pip-audit-report.json || true
+	@echo "Dependency audit complete. See pip-audit-report.json"
 
 format: ## Auto-format code
 	ruff format aria_skills/ aria_agents/ aria_models/ src/

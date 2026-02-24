@@ -304,7 +304,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 #### Added
 - `CHANGELOG.md` — this file (TICKET-29)
 - Database migration script `02-migrations.sql` for v1.1 schema changes
-- 677+ tests, 0 failures — full test suite review (TICKET-31)
+- 400+ tests, 0 failures — full test suite review (TICKET-31)
 - Environment configuration centralization analysis (TICKET-37)
 
 #### Changed

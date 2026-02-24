@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
+from aria_skills.api_client import get_api_client
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
 from aria_skills.registry import SkillRegistry
 
@@ -55,10 +56,12 @@ class DataPipelineSkill(BaseSkill):
     
     async def initialize(self) -> bool:
         """Initialize data pipeline skill."""
-        # TODO: TICKET-12 - stub requires API endpoint for pipeline persistence.
-        # Currently in-memory only. Needs POST/GET /api/pipelines endpoints.
-        self.logger.warning("data_pipeline skill is in-memory only — API endpoint not yet available")
         self._pipelines: dict[str, list[PipelineStep]] = {}
+        self._api = None
+        try:
+            self._api = await get_api_client()
+        except Exception as e:
+            self.logger.info(f"API unavailable, using in-memory cache only: {e}")
         self._status = SkillStatus.AVAILABLE
         self.logger.info("📊 Data pipeline skill initialized")
         return True
@@ -98,6 +101,12 @@ class DataPipelineSkill(BaseSkill):
                 ))
             
             self._pipelines[name] = pipeline_steps
+            
+            await self._persist_activity("pipeline_defined", {
+                "pipeline_name": name,
+                "steps": len(pipeline_steps),
+                "step_names": [s.name for s in pipeline_steps],
+            })
             
             return SkillResult.ok({
                 "pipeline": name,
@@ -370,6 +379,27 @@ class DataPipelineSkill(BaseSkill):
         except Exception as e:
             return SkillResult.fail(f"Quality check failed: {str(e)}")
     
+    # === API Persistence ===
+
+    async def _persist_activity(self, action: str, details: dict) -> None:
+        """Best-effort API persistence. Disables on failure to avoid slowdowns."""
+        if not self._api:
+            return
+        try:
+            import asyncio
+            await asyncio.wait_for(
+                self._api.post("/activities", data={
+                    "action": action,
+                    "skill": self.name,
+                    "details": details,
+                    "success": True,
+                }),
+                timeout=5.0,
+            )
+        except Exception:
+            self.logger.debug("API persistence disabled (API unreachable)")
+            self._api = None
+
     # === Private Helper Methods ===
     
     def _check_type(self, value: Any, expected: str) -> bool:

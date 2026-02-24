@@ -10,6 +10,13 @@ COPY server.py /sandbox/server.py
 COPY entrypoint.sh /sandbox/entrypoint.sh
 RUN chmod +x /sandbox/entrypoint.sh
 
+# S-101: Non-root user for security
+RUN addgroup -S -g 1001 aria && \
+    adduser -S -u 1001 -G aria aria && \
+    chown -R aria:aria /sandbox
+
+USER aria
+
 EXPOSE 9999
 
 ENTRYPOINT ["/sandbox/entrypoint.sh"]

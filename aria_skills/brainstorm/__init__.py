@@ -10,6 +10,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
+from aria_skills.api_client import get_api_client
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
 from aria_skills.registry import SkillRegistry
 
@@ -98,12 +99,17 @@ class BrainstormSkill(BaseSkill):
     def __init__(self, config: SkillConfig | None = None):
         super().__init__(config or SkillConfig(name="brainstorm"))
         self._sessions: dict[str, dict] = {}
+        self._api = None
 
     @property
     def name(self) -> str:
         return "brainstorm"
 
     async def initialize(self) -> bool:
+        try:
+            self._api = await get_api_client()
+        except Exception as e:
+            self.logger.info(f"API unavailable, using in-memory cache only: {e}")
         self._status = SkillStatus.AVAILABLE
         self.logger.info("Brainstorm skill initialized")
         return True
@@ -119,7 +125,7 @@ class BrainstormSkill(BaseSkill):
         topic = topic or kwargs.get("topic", "General brainstorming")
         goal = goal or kwargs.get("goal", "")
         session_id = str(uuid.uuid4())[:8]
-        self._sessions[session_id] = {
+        session_data = {
             "id": session_id,
             "topic": topic,
             "goal": goal,
@@ -129,6 +135,14 @@ class BrainstormSkill(BaseSkill):
             "evaluations": [],
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
+        self._sessions[session_id] = session_data
+
+        await self._persist_activity("brainstorm_session_started", {
+            "session_id": session_id,
+            "topic": topic,
+            "goal": goal,
+        })
+
         return SkillResult.ok({
             "session_id": session_id,
             "topic": topic,
@@ -155,6 +169,12 @@ class BrainstormSkill(BaseSkill):
             "added_at": datetime.now(timezone.utc).isoformat(),
         }
         self._sessions[session_id]["ideas"].append(idea_entry)
+
+        await self._persist_activity("brainstorm_idea_added", {
+            "session_id": session_id,
+            "idea": idea_entry,
+        })
+
         return SkillResult.ok({
             "idea": idea_entry,
             "total_ideas": len(self._sessions[session_id]["ideas"]),
@@ -263,3 +283,24 @@ class BrainstormSkill(BaseSkill):
                 f"{len(s['connections'])} connections."
             ),
         })
+
+    # === API Persistence ===
+
+    async def _persist_activity(self, action: str, details: dict) -> None:
+        """Best-effort API persistence. Disables on failure to avoid slowdowns."""
+        if not self._api:
+            return
+        try:
+            import asyncio
+            await asyncio.wait_for(
+                self._api.post("/activities", data={
+                    "action": action,
+                    "skill": self.name,
+                    "details": details,
+                    "success": True,
+                }),
+                timeout=5.0,
+            )
+        except Exception:
+            self.logger.debug("API persistence disabled (API unreachable)")
+            self._api = None

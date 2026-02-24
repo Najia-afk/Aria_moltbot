@@ -11,6 +11,11 @@ Two-layer approach:
 
 Aria invokes this after standalone sub-agent delegations and during
 periodic cleanup cycles.
+
+S-116 ARCHITECTURE EXCEPTION: Filesystem access (sessions.json, .jsonl
+transcripts) is intentionally direct for performance — the filesystem is the
+live source of truth co-located with aria-api.  All *remote* HTTP calls now
+route through api_client.
 """
 import glob
 import json
@@ -19,8 +24,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-import httpx
-
+from aria_skills.api_client import get_api_client
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
 from aria_skills.registry import SkillRegistry
 
@@ -165,16 +169,7 @@ class SessionManagerSkill(BaseSkill):
         self._stale_threshold_minutes: int = int(
             config.config.get("stale_threshold_minutes", 60)
         )
-        self._api_url = (
-            config.config.get("api_url")
-            or os.environ.get("ARIA_API_URL")
-            or "http://aria-api:8000"
-        ).rstrip("/")
-        self._client = httpx.AsyncClient(
-            base_url=self._api_url,
-            timeout=httpx.Timeout(30.0),
-            headers={"Content-Type": "application/json"},
-        )
+        self._api = None  # initialized in initialize()
 
     @property
     def name(self) -> str:
@@ -182,10 +177,12 @@ class SessionManagerSkill(BaseSkill):
 
     async def initialize(self) -> bool:
         """Initialize session manager."""
+        # S-116: Route API calls through api_client (no direct httpx)
+        self._api = await get_api_client()
         self._status = SkillStatus.AVAILABLE
         self.logger.info(
-            "Session manager initialized  agents_dir=%s  api=%s",
-            _AGENTS_DIR, self._api_url,
+            "Session manager initialized  agents_dir=%s",
+            _AGENTS_DIR,
         )
         return True
 
@@ -305,20 +302,21 @@ class SessionManagerSkill(BaseSkill):
     async def _mark_ended_in_pg(self, session_id: str) -> bool:
         """Best-effort PATCH to aria-api to mark session as ended."""
         try:
-            resp = await self._client.get(
-                "/api/sessions",
+            result = await self._api.get(
+                "/sessions",
                 params={"limit": 200, "include_cron_events": "true", "include_runtime_events": "true"},
             )
-            if resp.status_code != 200:
+            if not result.success:
                 return False
-            for item in resp.json().get("items", []):
+            items = result.data.get("items", []) if isinstance(result.data, dict) else []
+            for item in items:
                 meta = item.get("metadata", {})
                 if meta.get("aria_session_id") == session_id:
-                    r = await self._client.patch(
-                        f"/api/sessions/{item['id']}",
-                        json={"status": "ended"},
+                    r = await self._api.patch(
+                        f"/sessions/{item['id']}",
+                        data={"status": "ended"},
                     )
-                    return r.status_code == 200
+                    return r.success
         except Exception:
             pass
         return False
@@ -537,5 +535,5 @@ class SessionManagerSkill(BaseSkill):
         })
 
     async def close(self):
-        """Close the HTTP client."""
-        await self._client.aclose()
+        """Cleanup (shared API client is managed by api_client module)."""
+        self._api = None

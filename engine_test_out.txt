@@ -1,0 +1,73 @@
+le named 'sqlalchemy'
+_______ ERROR at setup of TestSessionProtection.test_session_full_error _______
+tests\test_engine_internals.py:196: in _import
+    from aria_engine.session_protection import (
+aria_engine\session_protection.py:20: in <module>
+    from sqlalchemy import select, func
+E   ModuleNotFoundError: No module named 'sqlalchemy'
+_________ ERROR at setup of TestSessionProtection.test_allowed_roles __________
+tests\test_engine_internals.py:196: in _import
+    from aria_engine.session_protection import (
+aria_engine\session_protection.py:20: in <module>
+    from sqlalchemy import select, func
+E   ModuleNotFoundError: No module named 'sqlalchemy'
+____ ERROR at setup of TestSessionProtection.test_message_length_constants ____
+tests\test_engine_internals.py:196: in _import
+    from aria_engine.session_protection import (
+aria_engine\session_protection.py:20: in <module>
+    from sqlalchemy import select, func
+E   ModuleNotFoundError: No module named 'sqlalchemy'
+_ ERROR at setup of TestSessionProtection.test_sanitize_strips_control_chars __
+tests\test_engine_internals.py:196: in _import
+    from aria_engine.session_protection import (
+aria_engine\session_protection.py:20: in <module>
+    from sqlalchemy import select, func
+E   ModuleNotFoundError: No module named 'sqlalchemy'
+__ ERROR at setup of TestSessionProtection.test_sanitize_preserves_newlines ___
+tests\test_engine_internals.py:196: in _import
+    from aria_engine.session_protection import (
+aria_engine\session_protection.py:20: in <module>
+    from sqlalchemy import select, func
+E   ModuleNotFoundError: No module named 'sqlalchemy'
+___ ERROR at setup of TestSessionProtection.test_sanitize_strips_whitespace ___
+tests\test_engine_internals.py:196: in _import
+    from aria_engine.session_protection import (
+aria_engine\session_protection.py:20: in <module>
+    from sqlalchemy import select, func
+E   ModuleNotFoundError: No module named 'sqlalchemy'
+=========================== short test summary info ===========================
+ERROR tests/test_engine_internals.py::TestRoutingScoring::test_specialty_none_focus_returns_generalist
+ERROR tests/test_engine_internals.py::TestRoutingScoring::test_specialty_unknown_focus_returns_generalist
+ERROR tests/test_engine_internals.py::TestRoutingScoring::test_specialty_matching_social_keywords
+ERROR tests/test_engine_internals.py::TestRoutingScoring::test_specialty_no_keywords_match
+ERROR tests/test_engine_internals.py::TestRoutingScoring::test_specialty_strong_match
+ERROR tests/test_engine_internals.py::TestRoutingScoring::test_load_disabled_returns_zero
+ERROR tests/test_engine_internals.py::TestRoutingScoring::test_load_error_returns_low
+ERROR tests/test_engine_internals.py::TestRoutingScoring::test_load_busy_returns_medium
+ERROR tests/test_engine_internals.py::TestRoutingScoring::test_load_idle_no_failures_returns_one
+ERROR tests/test_engine_internals.py::TestRoutingScoring::test_load_idle_with_failures_decreases
+ERROR tests/test_engine_internals.py::TestRoutingScoring::test_load_idle_many_failures_capped
+ERROR tests/test_engine_internals.py::TestRoutingScoring::test_pheromone_empty_records
+ERROR tests/test_engine_internals.py::TestRoutingScoring::test_pheromone_recent_success
+ERROR tests/test_engine_internals.py::TestRoutingScoring::test_pheromone_old_records_decay
+ERROR tests/test_engine_internals.py::TestRoutingScoring::test_pheromone_failures_lower_score
+ERROR tests/test_engine_internals.py::TestRoutingScoring::test_pheromone_bounded_zero_to_one
+ERROR tests/test_engine_internals.py::TestAutoSession::test_simple_message - ...
+ERROR tests/test_engine_internals.py::TestAutoSession::test_multiline_takes_first_line
+ERROR tests/test_engine_internals.py::TestAutoSession::test_long_message_truncated
+ERROR tests/test_engine_internals.py::TestAutoSession::test_empty_returns_fallback
+ERROR tests/test_engine_internals.py::TestAutoSession::test_whitespace_only_returns_fallback
+ERROR tests/test_engine_internals.py::TestAutoSession::test_strips_whitespace
+ERROR tests/test_engine_internals.py::TestSessionProtection::test_sliding_window_empty
+ERROR tests/test_engine_internals.py::TestSessionProtection::test_sliding_window_add_and_count
+ERROR tests/test_engine_internals.py::TestSessionProtection::test_sliding_window_expired_entries
+ERROR tests/test_engine_internals.py::TestSessionProtection::test_rate_limit_error
+ERROR tests/test_engine_internals.py::TestSessionProtection::test_validation_error
+ERROR tests/test_engine_internals.py::TestSessionProtection::test_session_full_error
+ERROR tests/test_engine_internals.py::TestSessionProtection::test_allowed_roles
+ERROR tests/test_engine_internals.py::TestSessionProtection::test_message_length_constants
+ERROR tests/test_engine_internals.py::TestSessionProtection::test_sanitize_strips_control_chars
+ERROR tests/test_engine_internals.py::TestSessionProtection::test_sanitize_preserves_newlines
+ERROR tests/test_engine_internals.py::TestSessionProtection::test_sanitize_strips_whitespace
+
+---STDERR---

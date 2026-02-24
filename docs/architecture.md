@@ -1,26 +1,42 @@
 # Aria Blue — Architecture Reference
 
-## 5-Layer Architecture
+## System Layers
 
 All data access follows a strict layered pattern:
 
 ```
-┌─────────────────────────────────────────────────┐
-│  Layer 5: ARIA (LLM / Cognition / Agents)       │
-│  ─ Orchestrates skills, never touches DB         │
-├─────────────────────────────────────────────────┤
-│  Layer 4: Skills (aria_skills/*)                 │
-│  ─ Business logic, calls api_client for data     │
-├─────────────────────────────────────────────────┤
-│  Layer 3: API Client (aria_skills/api_client)    │
-│  ─ httpx calls to aria-api REST endpoints        │
-├─────────────────────────────────────────────────┤
-│  Layer 2: API (src/api/)                         │
-│  ─ FastAPI + SQLAlchemy ORM, the ONLY DB layer   │
-├─────────────────────────────────────────────────┤
-│  Layer 1: Database (PostgreSQL)                  │
-│  ─ Tables, indexes, migrations                   │
-└─────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│  ARIA Layer        — aria_mind (consciousness, identity, soul)         │
+├─────────────────────────────────────────────────────────────────────────┤
+│  Engine Layer      — aria_engine (coordinates skills, LLM gateway)     │
+├─────────────────────────────────────────────────────────────────────────┤
+│  Skill Layer       — aria_skills (L0–L4 skill modules)                 │
+├─────────────────────────────────────────────────────────────────────────┤
+│  Skill Client Layer— api_client (httpx → FastAPI)                      │
+├─────────────────────────────────────────────────────────────────────────┤
+│  API Layer         — FastAPI routers (src/api/routers/)                 │
+├─────────────────────────────────────────────────────────────────────────┤
+│  ORM Layer         — SQLAlchemy models (src/api/db/models.py)          │
+├─────────────────────────────────────────────────────────────────────────┤
+│  Database Layer    — PostgreSQL 16 + pgvector                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### 5-Layer Skill Hierarchy (L0–L4)
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  L4 — Orchestration: goals, schedule, agent_manager, performance       │
+├─────────────────────────────────────────────────────────────────────────┤
+│  L3 — Domain Skills: research, moltbook, social, market_data, rpg, …   │
+├─────────────────────────────────────────────────────────────────────────┤
+│  L2 — Core Services: moonshot, ollama, model_switcher, session_manager,│
+│         working_memory, sandbox                                        │
+├─────────────────────────────────────────────────────────────────────────┤
+│  L1 — Infrastructure: api_client, health, litellm, database            │
+├─────────────────────────────────────────────────────────────────────────┤
+│  L0 — Security: input_guard (runtime injection detection)              │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 **Data flows one direction:** Skills → api_client → API → SQLAlchemy → DB

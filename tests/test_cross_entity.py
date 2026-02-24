@@ -8,6 +8,7 @@ Tests that data flows properly BETWEEN different endpoints:
 5. Skill invocation failure → Lesson resolution lookup chain
 """
 import time
+import httpx
 import pytest
 
 
@@ -158,9 +159,13 @@ class TestEngineChatMessageCascade:
         TestEngineChatMessageCascade._uid = uid
 
         # Send message
-        r = api.post(f"/engine/chat/sessions/{session_id}/messages", json={
-            "content": f"Integration verification for cascade ref {uid}",
-        })
+        try:
+            r = api.post(f"/engine/chat/sessions/{session_id}/messages", json={
+                "content": f"Integration verification for cascade ref {uid}",
+            })
+        except (httpx.ReadTimeout, httpx.ConnectTimeout):
+            api.delete(f"/engine/chat/sessions/{session_id}")
+            pytest.skip("LLM timed out (no Ollama available)")
         if r.status_code in (404, 503):
             # LLM not available, skip cascade test but cleanup
             api.delete(f"/engine/chat/sessions/{session_id}")

@@ -138,6 +138,7 @@ class PaginatedRoundtables(BaseModel):
     total: int
     page: int
     page_size: int
+    has_more: bool = False
 
 
 class RoundtableStatusResponse(BaseModel):
@@ -340,7 +341,7 @@ async def start_roundtable_async(
 @router.get("", response_model=PaginatedRoundtables)
 async def list_roundtables(
     page: int = Query(default=1, ge=1),
-    page_size: int = Query(default=20, ge=1, le=100),
+    page_size: int = Query(default=50, ge=1, le=100),
     roundtable: Roundtable = Depends(_get_roundtable),
 ):
     """
@@ -367,6 +368,7 @@ async def list_roundtables(
                 total=len(rows),
                 page=page,
                 page_size=page_size,
+                has_more=len(rows) >= page_size,
             )
 
         async with _db_session() as session:
@@ -382,11 +384,19 @@ async def list_roundtables(
             archive_count_res = await session.execute(archive_count_stmt)
             total = (working_count_res.scalar() or 0) + (archive_count_res.scalar() or 0)
 
-            working_stmt = select(EngineChatSession).where(
-                EngineChatSession.session_type.in_(allowed_types)
+            # S-164: Push ORDER BY + LIMIT to DB to avoid loading all sessions
+            fetch_limit = offset + page_size
+            working_stmt = (
+                select(EngineChatSession)
+                .where(EngineChatSession.session_type.in_(allowed_types))
+                .order_by(EngineChatSession.created_at.desc())
+                .limit(fetch_limit)
             )
-            archive_stmt = select(EngineChatSessionArchive).where(
-                EngineChatSessionArchive.session_type.in_(allowed_types)
+            archive_stmt = (
+                select(EngineChatSessionArchive)
+                .where(EngineChatSessionArchive.session_type.in_(allowed_types))
+                .order_by(EngineChatSessionArchive.created_at.desc())
+                .limit(fetch_limit)
             )
 
             working_res = await session.execute(working_stmt)
@@ -423,6 +433,7 @@ async def list_roundtables(
             total=total,
             page=page,
             page_size=page_size,
+            has_more=(page * page_size) < total,
         )
     except Exception as e:
         logger.error("List roundtables failed: %s", e)

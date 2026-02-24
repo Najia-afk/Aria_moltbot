@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
+from aria_skills.latency import log_latency
 from aria_skills.registry import SkillRegistry
 
 # TICKET-36: Self-diagnostic & auto-recovery exports
@@ -79,6 +80,7 @@ class HealthMonitorSkill(BaseSkill):
         """Check own health (meta!)."""
         return self._status
     
+    @log_latency
     @logged_method()
     async def check_system(self, **kwargs) -> SkillResult:
         """

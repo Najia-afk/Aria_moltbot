@@ -12,6 +12,7 @@ from typing import Any
 
 from aria_skills.api_client import get_api_client
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
+from aria_skills.latency import log_latency
 from aria_skills.registry import SkillRegistry
 
 
@@ -45,7 +46,8 @@ class AgentManagerSkill(BaseSkill):
             self.logger.error(f"API client init failed: {e}")
             self._status = SkillStatus.UNAVAILABLE
             return False
-        if not self._api._client:
+        hc = await self._api.health_check()
+        if hc != SkillStatus.AVAILABLE:
             self.logger.error("API client not available")
             self._status = SkillStatus.UNAVAILABLE
             return False
@@ -54,11 +56,11 @@ class AgentManagerSkill(BaseSkill):
 
     async def health_check(self) -> SkillStatus:
         """Check aria-api health."""
-        if not self._api or not self._api._client:
+        if not self._api:
             return SkillStatus.UNAVAILABLE
         try:
-            resp = await self._api._client.get("/health")
-            if resp.status_code == 200:
+            result = await self._api.get("/health")
+            if result.success:
                 self._status = SkillStatus.AVAILABLE
             else:
                 self._status = SkillStatus.ERROR
@@ -68,6 +70,7 @@ class AgentManagerSkill(BaseSkill):
 
     # ── Core methods ─────────────────────────────────────────────
 
+    @log_latency
     async def list_agents(
         self,
         status: str | None = None,
@@ -75,7 +78,7 @@ class AgentManagerSkill(BaseSkill):
         limit: int = 50,
     ) -> SkillResult:
         """List agent sessions, optionally filtered by status or agent_id."""
-        if not self._api or not self._api._client:
+        if not self._api:
             return SkillResult.fail("Not initialized")
 
         params: dict[str, Any] = {"limit": limit}
@@ -85,9 +88,10 @@ class AgentManagerSkill(BaseSkill):
             params["agent_id"] = agent_id
 
         try:
-            resp = await self._api._client.get("/sessions", params=params)
-            resp.raise_for_status()
-            data = resp.json()
+            result = await self._api.get("/sessions", params=params)
+            if not result:
+                raise Exception(result.error)
+            data = result.data
             self._log_usage("list_agents", True, count=data.get("count", 0))
             return SkillResult.ok(data)
         except Exception as e:
@@ -107,7 +111,7 @@ class AgentManagerSkill(BaseSkill):
                 task, constraints, budget_tokens, deadline_seconds,
                 parent_id, priority, tools_allowed, memory_scope
         """
-        if not self._api or not self._api._client:
+        if not self._api:
             return SkillResult.fail("Not initialized")
 
         # Validate context if provided
@@ -121,9 +125,10 @@ class AgentManagerSkill(BaseSkill):
         }
 
         try:
-            resp = await self._api._client.post("/sessions", json=body)
-            resp.raise_for_status()
-            data = resp.json()
+            result = await self._api.post("/sessions", data=body)
+            if not result:
+                raise Exception(result.error)
+            data = result.data
             self._log_usage("spawn_agent", True, agent_type=agent_type)
             return SkillResult.ok(data)
         except Exception as e:
@@ -136,15 +141,16 @@ class AgentManagerSkill(BaseSkill):
         Args:
             session_id: UUID of the session to terminate
         """
-        if not self._api or not self._api._client:
+        if not self._api:
             return SkillResult.fail("Not initialized")
 
         try:
-            resp = await self._api._client.patch(
+            result = await self._api.patch(
                 f"/sessions/{session_id}",
-                json={"status": "terminated"},
+                data={"status": "terminated"},
             )
-            resp.raise_for_status()
+            if not result:
+                raise Exception(result.error)
             self._log_usage("terminate_agent", True, session_id=session_id)
             return SkillResult.ok({"session_id": session_id, "status": "terminated"})
         except Exception as e:
@@ -157,7 +163,7 @@ class AgentManagerSkill(BaseSkill):
         Args:
             session_id: Optional specific session UUID. If None, returns aggregate stats.
         """
-        if not self._api or not self._api._client:
+        if not self._api:
             return SkillResult.fail("Not initialized")
 
         try:
@@ -165,17 +171,19 @@ class AgentManagerSkill(BaseSkill):
                 # Get specific session by listing with agent filter
                 # The API doesn't have a GET /sessions/{id} endpoint,
                 # so we use the stats endpoint for aggregate and filter list for specific
-                resp = await self._api._client.get("/sessions", params={"limit": 100})
-                resp.raise_for_status()
-                sessions = resp.json().get("sessions", [])
+                result = await self._api.get("/sessions", params={"limit": 100})
+                if not result:
+                    raise Exception(result.error)
+                sessions = result.data.get("sessions", [])
                 match = [s for s in sessions if s.get("id") == session_id]
                 if not match:
                     return SkillResult.fail(f"Session {session_id} not found")
                 data = match[0]
             else:
-                resp = await self._api._client.get("/sessions/stats")
-                resp.raise_for_status()
-                data = resp.json()
+                result = await self._api.get("/sessions/stats")
+                if not result:
+                    raise Exception(result.error)
+                data = result.data
 
             self._log_usage("get_agent_stats", True)
             return SkillResult.ok(data)
@@ -189,17 +197,18 @@ class AgentManagerSkill(BaseSkill):
         Args:
             max_age_hours: Maximum age in hours before session is considered stale.
         """
-        if not self._api or not self._api._client:
+        if not self._api:
             return SkillResult.fail("Not initialized")
 
         try:
             # Fetch active sessions
-            resp = await self._api._client.get(
+            result = await self._api.get(
                 "/sessions",
                 params={"status": "active", "limit": 200},
             )
-            resp.raise_for_status()
-            sessions = resp.json().get("sessions", [])
+            if not result:
+                raise Exception(result.error)
+            sessions = result.data.get("sessions", [])
 
             cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
             pruned = []
@@ -216,11 +225,11 @@ class AgentManagerSkill(BaseSkill):
 
                 if started_dt < cutoff:
                     # Terminate stale session
-                    term_resp = await self._api._client.patch(
+                    term_result = await self._api.patch(
                         f"/sessions/{s['id']}",
-                        json={"status": "terminated"},
+                        data={"status": "terminated"},
                     )
-                    if term_resp.status_code == 200:
+                    if term_result.success:
                         pruned.append(s["id"])
 
             self._log_usage("prune_stale_sessions", True, pruned_count=len(pruned))
@@ -235,13 +244,14 @@ class AgentManagerSkill(BaseSkill):
 
     async def get_performance_report(self) -> SkillResult:
         """Generate aggregate performance report across all agents."""
-        if not self._api or not self._api._client:
+        if not self._api:
             return SkillResult.fail("Not initialized")
 
         try:
-            resp = await self._api._client.get("/sessions/stats")
-            resp.raise_for_status()
-            stats = resp.json()
+            result = await self._api.get("/sessions/stats")
+            if not result:
+                raise Exception(result.error)
+            stats = result.data
 
             report = {
                 "total_sessions": stats.get("total_sessions", 0),
@@ -261,22 +271,23 @@ class AgentManagerSkill(BaseSkill):
 
     async def get_agent_health(self) -> SkillResult:
         """Check all active agents, their status, and recent performance."""
-        if not self._api or not self._api._client:
+        if not self._api:
             return SkillResult.fail("Not initialized")
         try:
             # Get active sessions
-            sessions_resp = await self._api._client.get(
+            sessions_result = await self._api.get(
                 "/sessions", params={"status": "active", "limit": 100}
             )
-            sessions_resp.raise_for_status()
-            sessions = sessions_resp.json().get("sessions", [])
+            if not sessions_result:
+                raise Exception(sessions_result.error)
+            sessions = sessions_result.data.get("sessions", [])
 
             # Get performance stats
             stats = {}
             try:
-                stats_resp = await self._api._client.get("/sessions/stats")
-                if stats_resp.status_code == 200:
-                    stats = stats_resp.json()
+                stats_result = await self._api.get("/sessions/stats")
+                if stats_result.success:
+                    stats = stats_result.data
             except Exception:
                 pass
 
@@ -321,7 +332,7 @@ class AgentManagerSkill(BaseSkill):
             focus: Focus area (e.g. "research", "devsecops", "creative")
             tools: List of tool/skill names the sub-agent is allowed to use
         """
-        if not self._api or not self._api._client:
+        if not self._api:
             return SkillResult.fail("Not initialized")
         try:
             body = {
@@ -335,9 +346,10 @@ class AgentManagerSkill(BaseSkill):
                     "parent_id": "agent_manager",
                 },
             }
-            resp = await self._api._client.post("/sessions", json=body)
-            resp.raise_for_status()
-            data = resp.json()
+            result = await self._api.post("/sessions", data=body)
+            if not result:
+                raise Exception(result.error)
+            data = result.data
             self._log_usage("spawn_focused_agent", True, focus=focus)
             return SkillResult.ok(data)
         except Exception as e:

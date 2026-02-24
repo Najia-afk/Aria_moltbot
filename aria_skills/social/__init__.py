@@ -6,10 +6,7 @@ Manages social media content creation and posting.
 Persists via REST API (TICKET-12: eliminate in-memory stubs).
 """
 from datetime import datetime, timezone
-import os
 from typing import Any
-
-import httpx
 
 from aria_skills.api_client import get_api_client
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
@@ -28,7 +25,7 @@ class SocialSkill(BaseSkill):
     
     def __init__(self, config: SkillConfig):
         super().__init__(config)
-        self._posts: list[Dict] = []  # fallback cache
+        self._posts: list[dict] = []  # fallback cache
         self._post_counter = 0
         self._api = None
         self._platforms: dict[str, SocialPlatform] = {}
@@ -74,42 +71,15 @@ class SocialSkill(BaseSkill):
             "metadata": metadata or {},
         }
 
-        # Primary path: shared api_client session
-        if self._api and getattr(self._api, "_client", None):
+        # S-116: Route all persistence through api_client (no direct httpx)
+        if self._api:
             try:
-                resp = await self._api._client.post("/social", json=payload)
-                resp.raise_for_status()
-                return resp.json()
+                result = await self._api.post("/social", data=payload)
+                if not result:
+                    raise Exception(result.error)
+                return result.data
             except Exception as e:
-                self.logger.debug(f"_persist_social_row primary client failed: {e}")
-
-        # Fallback path: explicit URLs for local-vs-container execution compatibility
-        api_candidates: list[str] = []
-        env_url = os.environ.get("ARIA_API_URL")
-        if env_url:
-            api_candidates.append(env_url.rstrip("/"))
-        api_candidates.extend([
-            "http://localhost:8000/api",
-            "http://127.0.0.1:8000/api",
-            "http://aria-api:8000/api",
-        ])
-
-        deduped: list[str] = []
-        seen: set[str] = set()
-        for base in api_candidates:
-            if base in seen:
-                continue
-            seen.add(base)
-            deduped.append(base)
-
-        for base in deduped:
-            try:
-                async with httpx.AsyncClient(timeout=8.0) as client:
-                    resp = await client.post(f"{base}/social", json=payload)
-                    if resp.status_code < 300:
-                        return resp.json()
-            except Exception as e:
-                self.logger.debug(f"_persist_social_row fallback failed for {base}: {e}")
+                self.logger.warning(f"_persist_social_row failed: {e}")
 
         return None
     
@@ -219,9 +189,10 @@ class SocialSkill(BaseSkill):
         }
         
         try:
-            resp = await self._api._client.post("/social", json=post)
-            resp.raise_for_status()
-            api_data = resp.json()
+            result = await self._api.post("/social", data=post)
+            if not result:
+                raise Exception(result.error)
+            api_data = result.data
             return SkillResult.ok(api_data if api_data else post)
         except Exception as e:
             self.logger.warning(f"API create_post failed, using fallback: {e}")
@@ -312,15 +283,16 @@ class SocialSkill(BaseSkill):
             )
 
         try:
-            resp = await self._api._client.post("/social", json=payload)
-            resp.raise_for_status()
+            result = await self._api.post("/social", data=payload)
+            if not result:
+                raise Exception(result.error)
             return SkillResult.ok(
                 {
                     "scheduled": True,
                     "simulated": False,
                     "platform": payload["platform"],
                     "scheduled_for": scheduled_for,
-                    "record": resp.json(),
+                    "record": result.data,
                 }
             )
         except Exception as e:
@@ -334,9 +306,10 @@ class SocialSkill(BaseSkill):
             "published_at": datetime.now(timezone.utc).isoformat(),
         }
         try:
-            resp = await self._api._client.put(f"/social/{post_id}", json=update_data)
-            resp.raise_for_status()
-            return SkillResult.ok(resp.json())
+            result = await self._api.put(f"/social/{post_id}", data=update_data)
+            if not result:
+                raise Exception(result.error)
+            return SkillResult.ok(result.data)
         except Exception as e:
             self.logger.warning(f"API publish_post failed, using fallback: {e}")
             for post in self._posts:
@@ -359,9 +332,10 @@ class SocialSkill(BaseSkill):
                 params["status"] = status
             if platform:
                 params["platform"] = platform
-            resp = await self._api._client.get("/social", params=params)
-            resp.raise_for_status()
-            api_data = resp.json()
+            resp = await self._api.get("/social", params=params)
+            if not resp:
+                raise Exception(resp.error)
+            api_data = resp.data
             if isinstance(api_data, list):
                 return SkillResult.ok({"posts": api_data[-limit:], "total": len(api_data)})
             return SkillResult.ok(api_data)
@@ -377,8 +351,9 @@ class SocialSkill(BaseSkill):
     async def delete_post(self, post_id: str) -> SkillResult:
         """Delete a post."""
         try:
-            resp = await self._api._client.delete(f"/social/{post_id}")
-            resp.raise_for_status()
+            result = await self._api.delete(f"/social/{post_id}")
+            if not result:
+                raise Exception(result.error)
             return SkillResult.ok({"deleted": post_id})
         except Exception as e:
             self.logger.warning(f"API delete_post failed, using fallback: {e}")

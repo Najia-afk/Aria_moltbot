@@ -41,15 +41,15 @@ git clone https://github.com/Najia-afk/Aria_moltbot.git
 cd Aria_moltbot
 
 # Configure
-cp stacks/brain/.env.example stacks/brain/.env
-nano stacks/brain/.env  # Set API keys, DB credentials
+cp stacks/brain/.env.example .env
+nano .env  # Set API keys, DB credentials
 
 # Optional: Start MLX Server (Metal GPU, Apple Silicon)
 mlx_lm.server --model nightmedia/Qwen3-VLTO-8B-Instruct-qx86x-hi-mlx \
   --host 0.0.0.0 --port 8080 &
 
 # Deploy
-cd stacks/brain && docker compose up -d
+docker compose up -d
 
 # Verify
 docker compose ps
@@ -84,7 +84,7 @@ These canonical files contain the live, authoritative data. Don't duplicate thei
 | Skill registry | [`aria_skills/*/skill.json`](aria_skills/) |
 | API routers | [`src/api/routers/`](src/api/routers/) |
 | ORM models | [`src/api/db/models.py`](src/api/db/models.py) |
-| Docker services | [`stacks/brain/docker-compose.yml`](stacks/brain/docker-compose.yml) |
+| Docker services | [`docker-compose.yml`](docker-compose.yml) (includes [`stacks/brain/docker-compose.yml`](stacks/brain/docker-compose.yml)) |
 | Focus personas | [`aria_mind/soul/focus.py`](aria_mind/soul/focus.py) |
 | Agent roles | [`aria_agents/base.py`](aria_agents/base.py) |
 | Dashboard templates | [`src/web/templates/`](src/web/templates/) |

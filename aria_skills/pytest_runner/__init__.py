@@ -3,10 +3,12 @@
 Pytest runner skill.
 
 Executes and reports on pytest test runs.
+S-105: Input validation and sanitization for command injection prevention.
 """
 from __future__ import annotations
 
 import asyncio
+import re
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -14,6 +16,27 @@ from typing import Any
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
 from aria_skills.registry import SkillRegistry
+
+# S-105: Allowlisted test directories — only these paths can be tested
+ALLOWED_TEST_DIRS = ["tests/", "tests", "src/api/tests/", "aria_skills/"]
+
+
+def _validate_path(path: str) -> str:
+    """S-105: Validate test path against allowlist to prevent injection."""
+    path = path.strip().replace("\\", "/")
+    if ".." in path:
+        raise ValueError("Path traversal not allowed")
+    if not any(path.startswith(d) or path == d.rstrip("/") for d in ALLOWED_TEST_DIRS):
+        raise ValueError(f"Test path must start with one of: {ALLOWED_TEST_DIRS}")
+    # Remove shell metacharacters
+    if re.search(r'[;&|`$\n\r]', path):
+        raise ValueError("Path contains illegal characters")
+    return path
+
+
+def _sanitize_param(value: str) -> str:
+    """S-105: Sanitize pytest parameter (markers/keywords) to safe characters."""
+    return re.sub(r'[^a-zA-Z0-9_\-\s,]', '', value)
 
 
 @SkillRegistry.register
@@ -28,7 +51,7 @@ class PytestSkill(BaseSkill):
     
     def __init__(self, config: SkillConfig):
         super().__init__(config)
-        self._last_result: Dict | None = None
+        self._last_result: dict | None = None
     
     @property
     def name(self) -> str:
@@ -76,16 +99,23 @@ class PytestSkill(BaseSkill):
         Returns:
             SkillResult with test results
         """
-        cmd = [sys.executable, "-m", "pytest", path or self._test_dir]
+        cmd = [sys.executable, "-m", "pytest"]
+        
+        # S-105: Validate and sanitize all user inputs
+        try:
+            test_path = _validate_path(path or self._test_dir)
+        except ValueError as e:
+            return SkillResult.fail(f"Invalid test path: {e}")
+        cmd.append(test_path)
         
         if verbose:
             cmd.append("-v")
         
         if markers:
-            cmd.extend(["-m", markers])
+            cmd.extend(["-m", _sanitize_param(markers)])
         
         if keywords:
-            cmd.extend(["-k", keywords])
+            cmd.extend(["-k", _sanitize_param(keywords)])
         
         # Add summary flags
         cmd.append("--tb=short")

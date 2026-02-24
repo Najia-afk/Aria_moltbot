@@ -296,3 +296,54 @@ from the scheduler + LiteLLM in a separate database.
 5. **Init scripts only run on first volume creation.** The PostgreSQL init-scripts
    directory (`/docker-entrypoint-initdb.d/`) executes only when the data volume
    is empty. For existing databases, use `ensure_schema()` or manual migration.
+
+## 2026-02-24 — Full Project Audit (P0 Comprehensive Review)
+
+**Context:** Zero'd the entire project — SSH'd to production, read 21 work cycles +
+19 memory/work files, dispatched 4 parallel subagents to audit Docker, APIs, Skills, Docs.
+Created aria_souvenirs/aria_v3_240226 with 8 reports + 17 sprint ticket files (55 tickets).
+
+**Key Findings:**
+
+1. **ZERO authentication on 226 API endpoints.** No middleware, no API keys, no JWT.
+   Anyone on the network can read/write/delete any resource. This is the single biggest
+   security hole in the entire project.
+
+2. **Docker socket mounted into aria-sandbox.** `/var/run/docker.sock:/var/run/docker.sock`
+   gives the sandbox container full Docker daemon control — escape to host in one command.
+   Combined with root containers and no read-only filesystems, this is a container escape
+   waiting to happen.
+
+3. **11 skills access private `_client` on ApiClientSkill.** The underscore convention
+   means internal-only, but skills bypass public methods and call `_client.get/post`
+   directly. This defeats the abstraction layer and couples skills to raw HTTP.
+
+4. **14 ghost files in STRUCTURE.md.** Files referenced in documentation that don't exist
+   on disk. 50+ code modules have zero documentation. 10 contradictions between documents.
+
+5. **28 of 40 active skills have zero tests.** Only health, api_client, and a few others
+   have any test coverage. No integration tests cross layer boundaries.
+
+**Lessons:**
+
+1. **Production Aria is stable but under-monitored.** 21 work cycles, 0 crashes, 49 active
+   sessions, $38.92 spend. But no alerting, no SLA metrics, no automated health dashboards.
+   Stability ≠ observability.
+
+2. **Parallel subagent audits are the fastest way to review a large project.**
+   4 subagents (Docker, API, Skills, Docs) running in parallel covered 14 services,
+   226 endpoints, 42 skills, and 27 docs in minutes. Each subagent had a focused scope
+   and returned structured findings.
+
+3. **AA+ ticket format scales to 55 tickets.** Constraints table + dependencies +
+   verification commands + Claude-ready prompts work at scale. Grouped into 5 sprints
+   (Security → Architecture → Docs → Testing → Operations) with explicit dependency chains.
+
+4. **Cross-layer violations cluster around api_client.** The skill that exists to abstract
+   HTTP calls (api_client) is itself the most-bypassed component. 25+ public methods
+   need to be added before the 11 bypassing skills can be fixed.
+
+5. **Sprint ticket files should be grouped by theme, not 1:1.** For 55 tickets,
+   individual files per ticket creates too many files. Combine related tickets into
+   themed files (e.g., S-107-108-109 for network exposure, S-150-159 for testing).
+   Keep individual files only for complex standalone tickets.

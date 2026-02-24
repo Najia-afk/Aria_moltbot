@@ -17,6 +17,10 @@ import asyncio
 import os
 from typing import Any
 
+# S-116 ARCHITECTURE EXCEPTION: input_guard is Layer 0 (security).
+# It cannot depend on higher-layer skills (api_client is L2) for
+# security-event logging because a failure in L2 would silently
+# drop critical security telemetry.  Direct httpx is intentional.
 import httpx
 
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
@@ -116,7 +120,7 @@ class InputGuardSkill(BaseSkill):
         source: str,
         user_id: str | None,
         blocked: bool,
-        details: Dict | None = None,
+        details: dict | None = None,
     ) -> None:
         """Log security event to database via API."""
         if not self._enable_logging:
@@ -377,7 +381,7 @@ class InputGuardSkill(BaseSkill):
         
         Args:
             params: Parameters to validate
-            schema: Dict of param_name -> type (str, int, bool, list, dict)
+            schema: dict of param_name -> type (str, int, bool, list, dict)
             
         Returns:
             SkillResult with validation results
