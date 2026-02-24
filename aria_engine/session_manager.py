@@ -450,11 +450,14 @@ class NativeSessionManager:
                 session.add(msg)
                 await session.flush()
 
-                # Touch session updated_at
+                # Touch session updated_at and increment message_count
                 await session.execute(
                     update(EngineChatSession)
                     .where(EngineChatSession.id == session_id)
-                    .values(updated_at=func.now())
+                    .values(
+                        updated_at=func.now(),
+                        message_count=EngineChatSession.message_count + 1,
+                    )
                 )
 
                 return {

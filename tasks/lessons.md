@@ -230,3 +230,69 @@ the endpoint code even ran.
    The organic KG (`knowledge_*`) and skill graph (`skill_graph_*`) share structure
    but have different tables. Traverse/search built only for skill graph left the
    organic KG without query capabilities. Always mirror endpoints for both systems.
+
+## 2026-02-24 — Chat Empty-Session Bug & LiteLLM Schema Consolidation
+
+**Context:** Chat sessions were empty then pruned. Cron jobs worked fine.
+Root cause: cascade failure in `ensure_schema()` + ghost session accumulation
+from the scheduler + LiteLLM in a separate database.
+
+**Bugs Fixed (4):**
+
+1. **ensure_schema() cascade failure (CRITICAL).** All DDL ran in one transaction.
+   First failure (e.g., missing pgvector extension → CREATE TABLE fails) poisoned
+   the entire transaction with `InFailedSqlTransaction`. Result: ZERO application
+   tables created. **Fix:** Added `_run_isolated(conn, label, sql)` helper using
+   PostgreSQL SAVEPOINTs. Each DDL now isolated — one failure doesn't cascade.
+   **Rule: never batch DDL in a single transaction. Use SAVEPOINTs.**
+
+2. **Scheduler ghost sessions.** `_dispatch_to_agent()` creates a session per call.
+   If the message POST fails, the empty session lingers with `message_count=0`.
+   Each retry creates ANOTHER session. Ghost purge eventually deletes them but
+   the accumulation pollutes the DB. **Fix:** Wrapped step 2 (message POST) in
+   try/except that DELETEs the session on failure before re-raising.
+
+3. **message_count never incremented via NativeSessionManager.** `add_message()`
+   updated `updated_at` but not `message_count`. Sessions with real messages
+   appeared as ghosts (count=0) and got purged. **Fix:** Added
+   `message_count=EngineChatSession.message_count + 1` to the UPDATE.
+
+4. **LiteLLM in separate database → consolidated to same DB with schema isolation.**
+   LiteLLM had its own `litellm` database. Changed to `litellm` schema inside
+   `aria_warehouse`. Init script creates schema + extensions. Docker compose
+   passes `?options=-csearch_path%3Dlitellm,public` in LiteLLM's DATABASE_URL.
+   API's `deps.py` sets `search_path` on each session. Survives multiple reboots.
+   **Files changed:** `00-create-litellm-db.sh`, `docker-compose.yml`,
+   `src/api/db/session.py`, `src/api/deps.py`.
+
+**Verification:**
+- `docker compose up -d --build` → 10/10 services healthy
+- 3 schemas (aria_data: 26 tables, aria_engine: 13 tables, litellm: 49 tables)
+- 4 extensions (uuid-ossp, pg_trgm, vector, plpgsql)
+- Double restart → all data + schemas intact
+- Session create → 201, ghost cleanup on LLM failure → working
+
+**Lessons:**
+
+1. **PostgreSQL SAVEPOINT is the correct isolation primitive for DDL.**
+   A failed CREATE TABLE inside a transaction poisons ALL subsequent statements.
+   SAVEPOINT + ROLLBACK TO SAVEPOINT isolates each DDL statement while keeping
+   the outer transaction alive. This is idempotent and safe.
+
+2. **Schema-based isolation > separate databases for co-located services.**
+   Same PostgreSQL instance, same `aria_warehouse` DB, different schemas
+   (aria_data, aria_engine, litellm). Benefits: single backup, single connection
+   pool, cross-schema JOINs possible, simpler init scripts.
+
+3. **`options=-csearch_path%3Dschema,public` in the URL is the PostgreSQL-native
+   way to set schema per connection.** Works with Prisma, asyncpg, psycopg, and
+   any driver that passes connection options. More reliable than ORM-level schema
+   configuration.
+
+4. **macOS port 5000 is reserved by ControlCenter.** Always remap containers using
+   port 5000 to an alternative (5050) on macOS. Use `${ARIA_WEB_PORT:-5050}:5000`
+   for configurability.
+
+5. **Init scripts only run on first volume creation.** The PostgreSQL init-scripts
+   directory (`/docker-entrypoint-initdb.d/`) executes only when the data volume
+   is empty. For existing databases, use `ensure_schema()` or manual migration.

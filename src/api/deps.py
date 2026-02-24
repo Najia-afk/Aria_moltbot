@@ -4,6 +4,7 @@ FastAPI dependencies for the Aria Brain API.
 
 from typing import AsyncGenerator
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.session import AsyncSessionLocal, LiteLLMSessionLocal
@@ -20,9 +21,11 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def get_litellm_db() -> AsyncGenerator[AsyncSession, None]:
-    """Yield a read-only async session to the LiteLLM database."""
+    """Yield a read-only async session to the LiteLLM schema (same DB)."""
     async with LiteLLMSessionLocal() as session:
         try:
+            # Ensure we're reading from the litellm schema
+            await session.execute(text("SET search_path TO litellm, public"))
             yield session
         except Exception:
             await session.rollback()

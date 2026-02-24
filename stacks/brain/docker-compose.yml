@@ -8,8 +8,6 @@ services:
       POSTGRES_USER: ${DB_USER:-admin}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-admin}
       POSTGRES_DB: ${DB_NAME:-aria_warehouse}
-      # Create litellm database on init
-      POSTGRES_MULTIPLE_DATABASES: litellm
     volumes:
       - aria_pg_data:/var/lib/postgresql/data
       - ./init-scripts:/docker-entrypoint-initdb.d:ro
@@ -173,7 +171,7 @@ services:
     restart: unless-stopped
     environment:
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-change-me}
-      DATABASE_URL: postgresql://${DB_USER:-admin}:${DB_PASSWORD:-admin}@aria-db:5432/litellm
+      DATABASE_URL: postgresql://${DB_USER:-admin}:${DB_PASSWORD:-admin}@aria-db:5432/${DB_NAME:-aria_warehouse}?options=-csearch_path%3Dlitellm,public
       MOONSHOT_KIMI_KEY: ${MOONSHOT_KIMI_KEY:-}
       OPEN_ROUTER_KEY: ${OPEN_ROUTER_KEY:-}
       OPEN_ROUTER_KEY_DEEP: ${OPEN_ROUTER_KEY_DEEP:-}
@@ -340,7 +338,7 @@ services:
       - ../../src/web/static:/app/static:ro
       - ../../src/web/app.py:/app/app.py:ro
     ports:
-      - "5000:5000"
+      - "${ARIA_WEB_PORT:-5050}:5000"   # host 5050 (macOS 5000 reserved)
     depends_on:
       aria-db:
         condition: service_healthy

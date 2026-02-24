@@ -45,14 +45,14 @@ def _as_psycopg_url(url: str) -> str:
 
 
 def _litellm_url_from(url: str) -> str:
-    """Derive LiteLLM database URL from the main DATABASE_URL.
+    """Derive LiteLLM connection URL from the main DATABASE_URL.
 
-    Same host/credentials, different database name (litellm).
-    postgresql://user:pass@host:5432/aria_warehouse → …/litellm
+    Same host/credentials/database, but with search_path set to the
+    ``litellm`` schema so LiteLLM tables are transparently isolated.
     """
-    # Replace the last path segment (database name) with 'litellm'
-    base = url.rsplit("/", 1)[0]
-    return f"{base}/litellm"
+    # Strip any existing query params, then add search_path
+    base = url.split("?")[0]
+    return f"{base}?options=-csearch_path%3Dlitellm,public"
 
 
 # ── Engine + session factory ─────────────────────────────────────────────────
@@ -95,39 +95,55 @@ LiteLLMSessionLocal = async_sessionmaker(
 
 # ── Schema bootstrapping ────────────────────────────────────────────────────
 
+async def _run_isolated(conn, label: str, sql):
+    """Execute a DDL statement inside a SAVEPOINT so failures don't poison
+    the outer transaction.  Returns True on success, False on error."""
+    sp_name = f"sp_{label.replace('.', '_').replace('-', '_')[:50]}"
+    try:
+        await conn.execute(text(f"SAVEPOINT {sp_name}"))
+        if isinstance(sql, str):
+            await conn.execute(text(sql))
+        else:
+            await conn.execute(sql)
+        await conn.execute(text(f"RELEASE SAVEPOINT {sp_name}"))
+        return True
+    except Exception as e:
+        await conn.execute(text(f"ROLLBACK TO SAVEPOINT {sp_name}"))
+        logger.warning("[%s] %s", label, e)
+        return False
+
+
 async def ensure_schema() -> None:
     """Create all tables and indexes if they don't exist.
 
     Installs required extensions (uuid-ossp, pg_trgm, pgvector) first,
-    then creates each table individually so one failure doesn't cascade.
+    then creates each table individually.
+
+    Every DDL runs inside a SAVEPOINT so one failure doesn't cascade and
+    poison the whole transaction (fixes InFailedSqlTransaction cascade).
     """
     async with async_engine.begin() as conn:
         # Create named schemas — nothing in public
         for schema_name in ("aria_data", "aria_engine"):
-            try:
-                await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema_name}"))
-                logger.info("Schema '%s' ensured", schema_name)
-            except Exception as e:
-                logger.warning("Could not create %s schema: %s", schema_name, e)
+            await _run_isolated(conn, f"schema_{schema_name}",
+                                f"CREATE SCHEMA IF NOT EXISTS {schema_name}")
 
         # Extensions — pgvector MUST be installed before SemanticMemory table
         for ext in ("uuid-ossp", "pg_trgm", "vector"):
-            try:
-                await conn.execute(text(f'CREATE EXTENSION IF NOT EXISTS "{ext}"'))
+            ok = await _run_isolated(conn, f"ext_{ext}",
+                                     f'CREATE EXTENSION IF NOT EXISTS "{ext}"')
+            if ok:
                 logger.info("Extension '%s' ensured", ext)
-            except Exception as e:
-                logger.warning("Extension '%s' not available: %s", ext, e)
 
-        # Tables — create each individually so one failure doesn't block others
+        # Tables — create each individually with SAVEPOINT isolation
         created = []
         failed = []
         for table in Base.metadata.sorted_tables:
-            try:
-                await conn.execute(CreateTable(table, if_not_exists=True))
-                created.append(table.name)
-            except Exception as e:
-                failed.append(table.name)
-                logger.error("Failed to create table '%s': %s", table.name, e)
+            ok = await _run_isolated(
+                conn, f"table_{table.name}",
+                CreateTable(table, if_not_exists=True),
+            )
+            (created if ok else failed).append(table.name)
 
         # ── Column migrations (add columns to existing tables) ─────────
         _column_migrations = [
@@ -145,14 +161,12 @@ async def ensure_schema() -> None:
             ("aria_engine.agent_state", "rate_limit", "JSONB", "'{}'::jsonb"),
         ]
         for tbl, col, col_type, default in _column_migrations:
-            try:
-                ddl = f"ALTER TABLE {tbl} ADD COLUMN IF NOT EXISTS {col} {col_type}"
-                if default is not None:
-                    ddl += f" DEFAULT {default}"
-                await conn.execute(text(ddl))
+            ddl = f"ALTER TABLE {tbl} ADD COLUMN IF NOT EXISTS {col} {col_type}"
+            if default is not None:
+                ddl += f" DEFAULT {default}"
+            ok = await _run_isolated(conn, f"col_{tbl}_{col}", ddl)
+            if ok:
                 logger.info("Column '%s.%s' ensured", tbl, col)
-            except Exception as e:
-                logger.warning("Column migration '%s.%s' failed: %s", tbl, col, e)
 
         # ── Migrate data from public.engine_* to aria_engine.* ─────────
         # One-time migration for existing deployments that had data in
@@ -167,19 +181,21 @@ async def ensure_schema() -> None:
         ]
         for old_tbl, new_tbl in _migration_pairs:
             try:
+                sp = f"sp_mig_{old_tbl[:30]}"
+                await conn.execute(text(f"SAVEPOINT {sp}"))
                 # Check if old table exists and has rows
                 check = await conn.execute(text(
                     f"SELECT EXISTS (SELECT 1 FROM information_schema.tables "
                     f"WHERE table_schema='public' AND table_name='{old_tbl}')"
                 ))
                 if not check.scalar():
+                    await conn.execute(text(f"RELEASE SAVEPOINT {sp}"))
                     continue
                 cnt = await conn.execute(text(f"SELECT count(*) FROM public.{old_tbl}"))
                 row_count = cnt.scalar()
                 if row_count == 0:
+                    await conn.execute(text(f"RELEASE SAVEPOINT {sp}"))
                     continue
-                # Copy rows that don't already exist in the target
-                # Use ON CONFLICT DO NOTHING to be idempotent
                 pk_check = await conn.execute(text(
                     f"SELECT column_name FROM information_schema.key_column_usage "
                     f"WHERE table_schema='aria_engine' AND table_name='{new_tbl.split('.')[-1]}' "
@@ -190,31 +206,29 @@ async def ensure_schema() -> None:
                     f"INSERT INTO {new_tbl} SELECT * FROM public.{old_tbl} "
                     f"ON CONFLICT ({pk_col}) DO NOTHING"
                 ))
+                await conn.execute(text(f"RELEASE SAVEPOINT {sp}"))
                 logger.info("Migrated %d rows from public.%s → %s", row_count, old_tbl, new_tbl)
             except Exception as e:
+                await conn.execute(text(f"ROLLBACK TO SAVEPOINT {sp}"))
                 logger.warning("Migration public.%s → %s failed: %s", old_tbl, new_tbl, e)
 
         # ── Backfill speaker/agent_id from session_messages ──────────
-        try:
-            await conn.execute(text("""
-                UPDATE sentiment_events se
-                SET speaker  = sm.role,
-                    agent_id = sm.agent_id
-                FROM session_messages sm
-                WHERE se.message_id = sm.id
-                  AND se.speaker IS NULL
-            """))
-            logger.info("Backfilled speaker/agent_id on sentiment_events")
-        except Exception as e:
-            logger.warning("Backfill speaker/agent_id failed: %s", e)
+        await _run_isolated(conn, "backfill_speaker", """
+            UPDATE sentiment_events se
+            SET speaker  = sm.role,
+                agent_id = sm.agent_id
+            FROM session_messages sm
+            WHERE se.message_id = sm.id
+              AND se.speaker IS NULL
+        """)
 
         # Indexes — same per-index error isolation
         for table in Base.metadata.sorted_tables:
             for index in table.indexes:
-                try:
-                    await conn.execute(CreateIndex(index, if_not_exists=True))
-                except Exception as e:
-                    logger.warning("Failed to create index '%s': %s", index.name, e)
+                await _run_isolated(
+                    conn, f"idx_{index.name}",
+                    CreateIndex(index, if_not_exists=True),
+                )
 
         if failed:
             logger.warning("Schema bootstrap: %d tables created, %d failed: %s",

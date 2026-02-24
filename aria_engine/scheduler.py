@@ -452,20 +452,37 @@ class EngineScheduler:
                 job_id, session_id, agent_id,
             )
 
-            # 2. Send the cron payload as a message
-            msg_resp = await http.post(
-                f"{_API_BASE}/api/engine/chat/sessions/{session_id}/messages",
-                json={
-                    "content": payload,
-                    "enable_thinking": False,
-                    "enable_tools": True,
-                },
-            )
-            if msg_resp.status != 200:
-                body = await msg_resp.text()
-                raise SchedulerError(
-                    f"Job {job_id} message failed: HTTP {msg_resp.status} — {body}"
+            try:
+                # 2. Send the cron payload as a message
+                msg_resp = await http.post(
+                    f"{_API_BASE}/api/engine/chat/sessions/{session_id}/messages",
+                    json={
+                        "content": payload,
+                        "enable_thinking": False,
+                        "enable_tools": True,
+                    },
                 )
+                if msg_resp.status != 200:
+                    body = await msg_resp.text()
+                    raise SchedulerError(
+                        f"Job {job_id} message failed: HTTP {msg_resp.status} — {body}"
+                    )
+            except Exception:
+                # Clean up the empty session so it doesn't become a ghost
+                try:
+                    await http.delete(
+                        f"{_API_BASE}/api/engine/chat/sessions/{session_id}",
+                    )
+                    logger.info(
+                        "Job %s: cleaned up empty session %s after failure",
+                        job_id, session_id,
+                    )
+                except Exception as cleanup_err:
+                    logger.warning(
+                        "Job %s: failed to cleanup session %s: %s",
+                        job_id, session_id, cleanup_err,
+                    )
+                raise
 
             result = await msg_resp.json()
             logger.info(
