@@ -1,7 +1,7 @@
 services:
   # PostgreSQL Database (pgvector enabled for semantic memory)
   aria-db:
-    image: pgvector/pgvector:pg16
+    image: pgvector/pgvector:0.8.0-pg16
     container_name: aria-db
     restart: unless-stopped
     environment:
@@ -27,8 +27,8 @@ services:
 
   # Headless Chrome for browser automation
   aria-browser:
-    # NOTE: browserless/chrome uses :latest — pin to digest after testing
-    image: browserless/chrome:latest
+    # Aria v3 freeze: pinned to digest (no versioned arm64 tags available)
+    image: browserless/chrome:latest@sha256:57d19e414d9fe4ae9d2ab12ba768c97f38d51246c5b31af55a009205c136012f
     container_name: aria-browser
     restart: unless-stopped
     environment:
@@ -100,8 +100,8 @@ services:
 
   # Tor Proxy for privacy
   tor-proxy:
-    # NOTE: dperson/torproxy has no tagged releases — :latest is the only option
-    image: dperson/torproxy:latest
+    # Aria v3 freeze: pinned to digest (no versioned tags available)
+    image: dperson/torproxy:latest@sha256:d8b5f1cf24f1b7a0aa334929a264b2606a107223dd0d51eb1cda8aae6fbeec53
     container_name: tor-proxy
     restart: unless-stopped
     ports:
@@ -117,7 +117,7 @@ services:
 
   # Self-signed TLS cert generator (runs once if missing)
   certs-init:
-    image: alpine:3.20
+    image: alpine:3.20.6
     container_name: aria-certs-init
     restart: "no"
     environment:
@@ -140,7 +140,7 @@ services:
   # Traefik reverse proxy (HTTPS)
   # Token injection via envsubst at startup - NO HARDCODED SECRETS
   traefik:
-    image: traefik:v3.1
+    image: traefik:v3.1.7
     container_name: traefik
     restart: unless-stopped
     entrypoint: ["/bin/sh", "/traefik-entrypoint.sh"]
@@ -188,8 +188,8 @@ services:
 
   # LiteLLM Router for model management
   litellm:
-    # NOTE: litellm uses rolling :main-latest tag — pin to digest after testing
-    image: ghcr.io/berriai/litellm:main-latest
+    # Aria v3 freeze: pinned to stable release v1.81.12 (2026-02-21)
+    image: ghcr.io/berriai/litellm:main-v1.81.12-stable
     container_name: litellm
     restart: unless-stopped
     environment:
@@ -508,7 +508,7 @@ services:
   # S-100: Docker socket proxy — restricted API for service control
   # Only allows container list + restart/stop. No exec, no images, no volumes.
   docker-socket-proxy:
-    image: tecnativa/docker-socket-proxy:0.2
+    image: tecnativa/docker-socket-proxy:0.2.0
     container_name: docker-socket-proxy
     restart: unless-stopped
     environment:
