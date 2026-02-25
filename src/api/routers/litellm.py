@@ -5,6 +5,8 @@ Spend endpoints query the LiteLLM PostgreSQL database directly instead of
 the HTTP proxy, which OOMs / times out with 15K+ spend rows.
 """
 
+import logging
+
 import httpx
 from fastapi import APIRouter, Depends
 from sqlalchemy import text
@@ -13,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from config import LITELLM_MASTER_KEY, SERVICE_URLS
 from deps import get_litellm_db
 
+logger = logging.getLogger("aria.api.litellm")
 router = APIRouter(tags=["LiteLLM"])
 
 
@@ -108,8 +111,8 @@ async def api_litellm_global_spend(db: AsyncSession = Depends(get_litellm_db)):
                 )
                 if resp.status_code == 200:
                     max_budget = resp.json().get("max_budget", 0) or 0
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Failed to fetch max_budget from LiteLLM proxy: %s", e)
 
         return {
             "spend": float(row["total_spend"]),

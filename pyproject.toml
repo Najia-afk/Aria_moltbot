@@ -61,9 +61,23 @@ docker = [
     "docker>=7.0.0",
 ]
 
+tracing = [
+    "opentelemetry-sdk>=1.20",
+    "opentelemetry-exporter-otlp>=1.20",
+    "opentelemetry-instrumentation-asyncpg>=0.40",
+    "opentelemetry-instrumentation-httpx>=0.40",
+]
+
+test = [
+    "pytest-playwright>=0.4",
+    "playwright>=1.40",
+]
+
 all = [
     "aria-blue[dev]",
     "aria-blue[docker]",
+    "aria-blue[tracing]",
+    "aria-blue[test]",
 ]
 
 [project.urls]

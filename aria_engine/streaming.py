@@ -188,8 +188,8 @@ class StreamManager:
                     "type": "error",
                     "message": str(e),
                 })
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to send error to WS: %s", e)
         finally:
             keepalive_task.cancel()
             self._active_connections.pop(connection_id, None)
@@ -604,8 +604,8 @@ class StreamManager:
                     break
         except asyncio.CancelledError:
             pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Keepalive loop error: %s", e)
 
     @staticmethod
     async def _is_connected(websocket: WebSocket) -> bool:
@@ -618,8 +618,8 @@ class StreamManager:
         try:
             if websocket.client_state == WebSocketState.CONNECTED:
                 await websocket.send_text(json.dumps(data))
-        except Exception:
-            pass  # Client disconnected — swallow
+        except Exception as e:
+            logger.debug("WS send_json failed: %s", e)
 
     @property
     def active_connections(self) -> int:

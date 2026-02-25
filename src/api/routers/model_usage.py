@@ -8,13 +8,14 @@ All LLM calls are logged here by the engine's telemetry module
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import ModelUsage
 from deps import get_db
 from pagination import build_paginated_response
+from schemas.requests import CreateModelUsage
 
 router = APIRouter(tags=["Model Usage"])
 
@@ -106,20 +107,18 @@ async def get_model_usage(
 
 
 @router.post("/model-usage")
-async def log_model_usage(request: Request, db: AsyncSession = Depends(get_db)):
-    data = await request.json()
-    session_id = data.get("session_id")
+async def log_model_usage(body: CreateModelUsage, db: AsyncSession = Depends(get_db)):
     usage = ModelUsage(
         id=uuid.uuid4(),
-        model=data.get("model"),
-        provider=data.get("provider"),
-        input_tokens=data.get("input_tokens", 0),
-        output_tokens=data.get("output_tokens", 0),
-        cost_usd=data.get("cost_usd", 0),
-        latency_ms=data.get("latency_ms"),
-        success=data.get("success", True),
-        error_message=data.get("error_message"),
-        session_id=uuid.UUID(session_id) if session_id else None,
+        model=body.model,
+        provider=body.provider,
+        input_tokens=body.input_tokens,
+        output_tokens=body.output_tokens,
+        cost_usd=body.cost_usd,
+        latency_ms=body.latency_ms,
+        success=body.success,
+        error_message=body.error_message,
+        session_id=uuid.UUID(body.session_id) if body.session_id else None,
     )
     db.add(usage)
     await db.commit()
@@ -213,3 +212,14 @@ async def get_model_usage_stats(
             },
         },
     }
+
+
+@router.delete("/model-usage/{usage_id}")
+async def delete_model_usage(usage_id: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(ModelUsage).where(ModelUsage.id == usage_id))
+    row = result.scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Model usage record not found")
+    await db.delete(row)
+    await db.commit()
+    return {"deleted": True, "id": usage_id}

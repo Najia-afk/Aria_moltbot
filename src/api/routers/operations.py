@@ -9,7 +9,7 @@ import os
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, update, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,6 +26,15 @@ from db.models import (
     ScheduledJob,
 )
 from deps import get_db
+from schemas.requests import (
+    RateLimitCheck,
+    RateLimitIncrement,
+    CreateKeyRotation,
+    CreateHeartbeat,
+    CreatePerformanceReview,
+    CreateTask,
+    UpdateTask,
+)
 
 router = APIRouter(tags=["Operations"])
 
@@ -59,13 +68,10 @@ async def get_rate_limits(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/rate-limits/check")
-async def check_rate_limit(request: Request, db: AsyncSession = Depends(get_db)):
-    data = await request.json()
-    skill = data.get("skill")
-    max_actions = data.get("max_actions", 100)
-    window_seconds = data.get("window_seconds", 3600)
-    if not skill:
-        raise HTTPException(status_code=400, detail="skill is required")
+async def check_rate_limit(body: RateLimitCheck, db: AsyncSession = Depends(get_db)):
+    skill = body.skill
+    max_actions = body.max_actions
+    window_seconds = body.window_seconds
 
     result = await db.execute(select(RateLimit).where(RateLimit.skill == skill))
     rl = result.scalar_one_or_none()
@@ -89,12 +95,9 @@ async def check_rate_limit(request: Request, db: AsyncSession = Depends(get_db))
 
 
 @router.post("/rate-limits/increment")
-async def increment_rate_limit(request: Request, db: AsyncSession = Depends(get_db)):
-    data = await request.json()
-    skill = data.get("skill")
-    action_type = data.get("action_type", "action")
-    if not skill:
-        raise HTTPException(status_code=400, detail="skill is required")
+async def increment_rate_limit(body: RateLimitIncrement, db: AsyncSession = Depends(get_db)):
+    skill = body.skill
+    action_type = body.action_type
 
     now = datetime.now(timezone.utc)
     if action_type == "post":
@@ -150,14 +153,13 @@ async def get_api_key_rotations(
 
 
 @router.post("/api-key-rotations")
-async def log_api_key_rotation(request: Request, db: AsyncSession = Depends(get_db)):
-    data = await request.json()
+async def log_api_key_rotation(body: CreateKeyRotation, db: AsyncSession = Depends(get_db)):
     rotation = ApiKeyRotation(
         id=uuid.uuid4(),
-        service=data.get("service"),
-        reason=data.get("reason"),
-        rotated_by=data.get("rotated_by", "system"),
-        metadata_json=data.get("metadata", {}),
+        service=body.service,
+        reason=body.reason,
+        rotated_by=body.rotated_by,
+        metadata_json=body.metadata,
     )
     db.add(rotation)
     await db.commit()
@@ -178,16 +180,15 @@ async def get_heartbeats(limit: int = 50, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/heartbeat")
-async def create_heartbeat(request: Request, db: AsyncSession = Depends(get_db)):
-    data = await request.json()
+async def create_heartbeat(body: CreateHeartbeat, db: AsyncSession = Depends(get_db)):
     hb = HeartbeatLog(
         id=uuid.uuid4(),
-        beat_number=data.get("beat_number", 0),
-        job_name=data.get("job_name"),
-        status=data.get("status", "healthy"),
-        details=data.get("details", {}),
-        executed_at=data.get("executed_at"),
-        duration_ms=data.get("duration_ms"),
+        beat_number=body.beat_number,
+        job_name=body.job_name,
+        status=body.status,
+        details=body.details,
+        executed_at=body.executed_at,
+        duration_ms=body.duration_ms,
     )
     db.add(hb)
     await db.commit()
@@ -219,13 +220,12 @@ async def get_performance_logs(limit: int = 50, db: AsyncSession = Depends(get_d
 
 
 @router.post("/performance")
-async def create_performance_log(request: Request, db: AsyncSession = Depends(get_db)):
-    data = await request.json()
+async def create_performance_log(body: CreatePerformanceReview, db: AsyncSession = Depends(get_db)):
     log = PerformanceLog(
-        review_period=data.get("review_period"),
-        successes=data.get("successes"),
-        failures=data.get("failures"),
-        improvements=data.get("improvements"),
+        review_period=body.review_period,
+        successes=body.successes,
+        failures=body.failures,
+        improvements=body.improvements,
     )
     db.add(log)
     await db.commit()
@@ -249,15 +249,14 @@ async def get_pending_tasks(
 
 
 @router.post("/tasks")
-async def create_pending_task(request: Request, db: AsyncSession = Depends(get_db)):
-    data = await request.json()
+async def create_pending_task(body: CreateTask, db: AsyncSession = Depends(get_db)):
     task = PendingComplexTask(
-        task_id=data.get("task_id", f"task-{str(uuid.uuid4())[:8]}"),
-        task_type=data.get("task_type"),
-        description=data.get("description"),
-        agent_type=data.get("agent_type"),
-        priority=data.get("priority", "medium"),
-        status=data.get("status", "pending"),
+        task_id=body.task_id or f"task-{str(uuid.uuid4())[:8]}",
+        task_type=body.task_type,
+        description=body.description,
+        agent_type=body.agent_type,
+        priority=body.priority,
+        status=body.status,
     )
     db.add(task)
     await db.commit()
@@ -266,11 +265,10 @@ async def create_pending_task(request: Request, db: AsyncSession = Depends(get_d
 
 @router.patch("/tasks/{task_id}")
 async def update_pending_task(
-    task_id: str, request: Request, db: AsyncSession = Depends(get_db)
+    task_id: str, body: UpdateTask, db: AsyncSession = Depends(get_db)
 ):
-    data = await request.json()
-    status = data.get("status")
-    result_text = data.get("result")
+    status = body.status
+    result_text = body.result
     values: dict = {"status": status, "result": result_text}
     if status == "completed":
         values["completed_at"] = text("NOW()")

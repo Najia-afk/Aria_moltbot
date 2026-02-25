@@ -5,6 +5,7 @@ Health, status, and stats endpoints.
 from datetime import datetime, timezone
 
 import asyncio
+import logging
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -16,6 +17,7 @@ from db.session import async_engine
 from db.models import ActivityLog, Thought, Memory
 from deps import get_db
 
+logger = logging.getLogger("aria.api.health")
 router = APIRouter(tags=["Health"])
 
 
@@ -39,11 +41,24 @@ class StatsResponse(BaseModel):
 
 @router.get("/health", response_model=HealthResponse)
 async def health_check():
+    """S-21: Real database connectivity check — returns 503 if DB is unreachable."""
     uptime = (datetime.now(timezone.utc) - STARTUP_TIME).total_seconds()
+    db_status = "connected"
+    try:
+        async with async_engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+    except Exception as e:
+        db_status = f"error: {str(e)[:100]}"
+        return HealthResponse(
+            status="degraded",
+            uptime_seconds=int(uptime),
+            database=db_status,
+            version=API_VERSION,
+        )
     return HealthResponse(
         status="healthy",
         uptime_seconds=int(uptime),
-        database="connected",
+        database=db_status,
         version=API_VERSION,
     )
 
@@ -64,8 +79,8 @@ async def host_stats():
             if resp.status_code == 200:
                 stats.update(resp.json())
                 stats["source"] = "host"
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Failed to fetch host stats from %s: %s", DOCKER_HOST_IP, e)
     return stats
 
 

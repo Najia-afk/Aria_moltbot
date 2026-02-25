@@ -97,7 +97,11 @@ services:
     cpus: ${ENGINE_CPU_LIMIT:-1.0}
     extra_hosts:
       - "host.docker.internal:host-gateway"
-
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
   # Tor Proxy for privacy
   tor-proxy:
     # Aria v3 freeze: pinned to digest (no versioned tags available)
@@ -404,6 +408,11 @@ services:
       - frontend
     mem_limit: ${ARIA_WEB_MEM_LIMIT:-256m}
     cpus: ${ARIA_WEB_CPU_LIMIT:-0.5}
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
 
   # Aria API - FastAPI backend (data routes)
   aria-api:
@@ -504,9 +513,17 @@ services:
     cpus: ${ARIA_API_CPU_LIMIT:-1.0}
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
 
   # S-100: Docker socket proxy — restricted API for service control
   # Only allows container list + restart/stop. No exec, no images, no volumes.
+  # S-01: Use DOCKER_SOCKET_PATH env var for Windows/Linux portability.
+  # macOS/Linux default: /var/run/docker.sock
+  # Windows (Docker Desktop): //var/run/docker.sock
   docker-socket-proxy:
     image: tecnativa/docker-socket-proxy:0.2.0
     container_name: docker-socket-proxy
@@ -522,7 +539,7 @@ services:
       EXEC: 0
       SWARM: 0
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock:ro
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:2375/version"]
       interval: 30s
@@ -532,6 +549,24 @@ services:
       - backend
     mem_limit: 64m
     cpus: 0.25
+
+  # Jaeger — distributed tracing UI & collector (S-25, optional)
+  # Enable: docker compose --profile tracing up -d jaeger
+  # UI: http://localhost:16686  |  OTLP gRPC: localhost:4317
+  jaeger:
+    image: jaegertracing/all-in-one:1.62
+    container_name: aria-jaeger
+    restart: unless-stopped
+    profiles: ["tracing"]
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"   # Jaeger UI
+      - "4317:4317"     # OTLP gRPC receiver
+    networks:
+      - monitoring
+    mem_limit: 512m
+    cpus: 0.5
 
   # Aria Sandbox — isolated code execution environment (S-29)
   # Used by sandbox skill (aria_skills/sandbox/__init__.py) via httpx on port 9999

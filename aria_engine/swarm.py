@@ -328,8 +328,8 @@ class SwarmOrchestrator:
                     if on_vote is not None:
                         try:
                             await on_vote(vote)
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.exception("on_vote callback failed for agent")
                 except Exception as e:
                     logger.warning("Agent %s vote error: %s", agent_id, e)
 

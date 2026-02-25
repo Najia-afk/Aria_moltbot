@@ -83,6 +83,18 @@
     <p>Track Aria's overall sentiment — adapts tone, detects frustration, measures engagement</p>
 </div>
 
+<div class="page-controls">
+    <select id="hours-filter" style="padding:8px 12px; border:1px solid var(--border-color); border-radius:8px; background:var(--bg-secondary); color:var(--text-primary); font-size:13px;">
+        <option value="6">Last 6 Hours</option>
+        <option value="12">Last 12 Hours</option>
+        <option value="24" selected>Last 24 Hours</option>
+        <option value="72">Last 3 Days</option>
+        <option value="168">Last 7 Days</option>
+        <option value="720">Last 30 Days</option>
+    </select>
+    <button class="btn btn-primary" onclick="loadScore(); loadSentiment();">Refresh</button>
+</div>
+
 <!-- Score Gauge + Timeline -->
 <div class="score-section">
     <div class="score-gauge-card" id="score-gauge-card">
@@ -105,7 +117,7 @@
         <div class="emotion-chips" id="emotion-chips"></div>
     </div>
     <div class="score-timeline-card">
-        <h4>📈 Sentiment Score Timeline (24h)</h4>
+        <h4 id="score-timeline-title">📈 Sentiment Score Timeline</h4>
         <canvas id="chart-score-timeline"></canvas>
     </div>
 </div>
@@ -219,7 +231,8 @@ function getScoreColor(score) {
 
 async function loadScore() {
     try {
-        const resp = await fetchWithRetry(`${API}/analysis/sentiment/score?hours=24`);
+        const hours = document.getElementById('hours-filter').value || 24;
+        const resp = await fetchWithRetry(`${API}/analysis/sentiment/score?hours=${hours}`);
         const data = await resp.json();
 
         const score = data.score ?? 50;
@@ -232,7 +245,7 @@ async function loadScore() {
         const trendEl = document.getElementById('score-trend');
         const arrows = { improving: '↑ Improving', declining: '↓ Declining', stable: '→ Stable' };
         trendEl.className = `score-trend ${data.trend || 'stable'}`;
-        trendEl.innerHTML = `<span>${arrows[data.trend] || '→ Stable'}</span><span style="font-weight:400;color:var(--text-muted)">${data.total_events} events</span>`;
+        trendEl.innerHTML = `<span>${arrows[data.trend] || '→ Stable'}</span><span style="font-weight:400;color:var(--text-muted)">${escapeHtml(data.total_events)} events</span>`;
 
         // Details
         document.getElementById('sd-valence').textContent = (data.avg_valence ?? 0).toFixed(2);
@@ -244,7 +257,7 @@ async function loadScore() {
         const chips = document.getElementById('emotion-chips');
         const emotionIcons = {frustrated:'😤',happy:'😄',neutral:'😶',satisfied:'😊',excited:'🎉',sad:'😢',confused:'🤔',assertive:'💪',angry:'😡'};
         chips.innerHTML = (data.top_emotions || []).slice(0, 6).map(e =>
-            `<span class="emotion-chip">${emotionIcons[e.emotion]||'😐'} ${e.emotion} <b>${e.count}</b></span>`
+            `<span class="emotion-chip">${emotionIcons[e.emotion]||'😐'} ${escapeHtml(e.emotion)} <b>${escapeHtml(e.count)}</b></span>`
         ).join('');
 
         // Score timeline chart
@@ -636,6 +649,7 @@ function renderFiltered() {
 }
 
 // Initial load + auto-refresh every 30s
+document.getElementById('hours-filter').addEventListener('change', () => { loadScore(); loadSentiment(); });
 loadScore();
 loadSentiment();
 setInterval(() => { loadScore(); loadSentiment(); }, 30_000);

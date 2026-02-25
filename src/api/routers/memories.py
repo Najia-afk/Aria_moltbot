@@ -3,22 +3,26 @@ Memories endpoints — CRUD with upsert by key + semantic memory (S5-01).
 """
 
 import json as json_lib
+import logging
 import math
 import os
 import re
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import Memory, SemanticMemory
 from deps import get_db
 from pagination import paginate_query, build_paginated_response
+from schemas.requests import CreateMemory, CreateSemanticMemory, SearchByVector, SummarizeSession, UpdateMemory
 
 # LiteLLM connection for embeddings
 LITELLM_URL = os.environ.get("LITELLM_URL", "http://litellm:4000")
 LITELLM_KEY = os.environ.get("LITELLM_MASTER_KEY", "")
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Memories"])
 
@@ -126,14 +130,11 @@ async def get_memories(
 
 @router.post("/memories")
 async def create_or_update_memory(
-    request: Request, db: AsyncSession = Depends(get_db)
+    body: CreateMemory, db: AsyncSession = Depends(get_db)
 ):
-    data = await request.json()
-    key = data.get("key")
-    value = data.get("value")
-    category = data.get("category", "general")
-    if not key:
-        raise HTTPException(status_code=400, detail="key is required")
+    key = body.key
+    value = body.value
+    category = body.category
     if _is_noise_memory_payload(key=key, value=str(value), metadata={"category": category}):
         return {"stored": False, "skipped": True, "reason": "test_or_noise_payload"}
 
@@ -202,20 +203,17 @@ async def list_semantic_memories(
 
 @router.post("/memories/semantic")
 async def store_semantic_memory(
-    request: Request,
+    body: CreateSemanticMemory,
     db: AsyncSession = Depends(get_db),
 ):
     """Store a memory with its vector embedding for semantic search."""
-    data = await request.json()
-    content = data.get("content")
-    if not content:
-        raise HTTPException(status_code=400, detail="content is required")
+    content = body.content
 
-    category = data.get("category", "general")
-    importance = float(data.get("importance", 0.5))
-    source = data.get("source", "api")
-    summary = data.get("summary") or content[:100]
-    metadata = data.get("metadata", {})
+    category = body.category
+    importance = body.importance
+    source = body.source
+    summary = body.summary or content[:100]
+    metadata = body.metadata
     if _is_noise_memory_payload(content=content, summary=summary, source=source, metadata=metadata):
         return {"stored": False, "skipped": True, "reason": "test_or_noise_payload"}
 
@@ -275,7 +273,7 @@ async def search_memories(
 
 @router.post("/memories/search-by-vector")
 async def search_memories_by_vector(
-    request: Request,
+    body: SearchByVector,
     db: AsyncSession = Depends(get_db),
 ):
     """Search memories by a pre-computed embedding vector (pgvector cosine distance).
@@ -283,14 +281,11 @@ async def search_memories_by_vector(
     Used by the EmbeddingSentimentClassifier when it already has an embedding
     and wants to skip the redundant server-side embedding generation.
     """
-    data = await request.json()
-    embedding = data.get("embedding")
-    if not embedding or not isinstance(embedding, list):
-        raise HTTPException(status_code=400, detail="embedding (list of floats) is required")
+    embedding = body.embedding
 
-    category = data.get("category")
-    limit = int(data.get("limit", 7))
-    min_importance = float(data.get("min_importance", 0.0))
+    category = body.category
+    limit = body.limit
+    min_importance = body.min_importance
 
     distance_col = SemanticMemory.embedding.cosine_distance(embedding).label("distance")
     stmt = select(SemanticMemory, distance_col).order_by("distance").limit(limit)
@@ -312,12 +307,11 @@ async def search_memories_by_vector(
 
 @router.post("/memories/summarize-session")
 async def summarize_session(
-    request: Request,
+    body: SummarizeSession,
     db: AsyncSession = Depends(get_db),
 ):
     """Summarize recent activity into an episodic semantic memory (S5-03)."""
-    data = await request.json()
-    hours_back = data.get("hours_back", 24)
+    hours_back = body.hours_back
 
     from db.models import ActivityLog
     from datetime import datetime, timedelta, timezone
@@ -399,8 +393,8 @@ async def summarize_session(
         db.add(mem)
         await db.flush()
         stored_ids.append(str(mem.id))
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error("Failed to store conversation summary: %s", e)
 
     for decision in decisions:
         if isinstance(decision, str) and decision.strip():
@@ -417,8 +411,8 @@ async def summarize_session(
                 db.add(dmem)
                 await db.flush()
                 stored_ids.append(str(dmem.id))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error("Failed to store decision memory: %s", e)
 
     await db.commit()
     return {"summary": summary_text, "decisions": decisions, "stored": bool(stored_ids), "ids": stored_ids}
@@ -443,3 +437,17 @@ async def delete_memory(key: str, db: AsyncSession = Depends(get_db)):
     await db.execute(delete(Memory).where(Memory.key == key))
     await db.commit()
     return {"deleted": True, "key": key}
+
+
+@router.patch("/memories/{key}")
+async def update_memory(key: str, body: UpdateMemory, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Memory).where(Memory.key == key))
+    row = result.scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Memory not found")
+    updates = body.model_dump(exclude_unset=True)
+    for k, value in updates.items():
+        setattr(row, k, value)
+    await db.commit()
+    await db.refresh(row)
+    return row.to_dict()

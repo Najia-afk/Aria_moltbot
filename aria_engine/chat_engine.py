@@ -347,8 +347,8 @@ class ChatEngine:
                         )
                         if isinstance(skills_list, list) and skills_list:
                             allowed_skills = skills_list
-                    except Exception:
-                        pass  # Malformed — allow all
+                    except (json.JSONDecodeError, TypeError, KeyError) as e:
+                        logger.warning("Malformed skills filter: %s", e)
 
             tools_for_llm = (
                 self.tools.get_tools_for_llm(filter_skills=allowed_skills)

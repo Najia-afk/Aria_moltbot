@@ -39,8 +39,8 @@ if _API_DIR not in sys.path:
 if os.name == "nt":
     try:
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-    except Exception:
-        pass
+    except Exception as e:
+        logging.debug("Could not set WindowsSelectorEventLoopPolicy: %s", e)
 
 try:
     from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
@@ -341,8 +341,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=_CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-CSRF-Token", "X-Request-ID"],
 )
 
 # Security middleware — rate limiting, injection scanning, security headers
@@ -476,6 +476,7 @@ try:
     from .routers.lessons import router as lessons_router
     from .routers.proposals import router as proposals_router
     from .routers.analysis import router as analysis_router
+    from .routers.sentiment import router as sentiment_router
     from .routers.engine_cron import router as engine_cron_router
     from .routers.engine_sessions import router as engine_sessions_router
     from .routers.engine_agents import router as engine_agents_router
@@ -508,6 +509,7 @@ except ImportError:
     from routers.lessons import router as lessons_router
     from routers.proposals import router as proposals_router
     from routers.analysis import router as analysis_router
+    from routers.sentiment import router as sentiment_router
     from routers.engine_cron import router as engine_cron_router
     from routers.engine_sessions import router as engine_sessions_router
     from routers.engine_agents import router as engine_agents_router
@@ -543,6 +545,7 @@ app.include_router(skills_router, dependencies=_api_deps)
 app.include_router(lessons_router, dependencies=_api_deps)
 app.include_router(proposals_router, dependencies=_api_deps)
 app.include_router(analysis_router, dependencies=_api_deps)
+app.include_router(sentiment_router, dependencies=_api_deps)
 app.include_router(engine_cron_router, dependencies=_api_deps)
 app.include_router(engine_sessions_router, dependencies=_api_deps)
 app.include_router(engine_agent_metrics_router, dependencies=_api_deps)
@@ -572,7 +575,7 @@ try:
 except ImportError:
     from gql import graphql_app as gql_router   # noqa: E402
 
-app.include_router(gql_router, prefix="/graphql")
+app.include_router(gql_router, prefix="/graphql", dependencies=_api_deps)
 
 # ── Entry point ──────────────────────────────────────────────────────────────
 

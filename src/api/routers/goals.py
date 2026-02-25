@@ -5,13 +5,14 @@ Goals + hourly goals endpoints.
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import Goal, HourlyGoal
 from deps import get_db
 from pagination import paginate_query, build_paginated_response
+from schemas.requests import CreateGoal, UpdateGoal, MoveGoal, CreateHourlyGoal, UpdateHourlyGoal
 
 router = APIRouter(tags=["Goals"])
 
@@ -78,12 +79,11 @@ async def list_goals(
 
 
 @router.post("/goals")
-async def create_goal(request: Request, db: AsyncSession = Depends(get_db)):
-    data = await request.json()
+async def create_goal(body: CreateGoal, db: AsyncSession = Depends(get_db)):
     new_id = uuid.uuid4()
-    goal_id = data.get("goal_id", f"goal-{str(new_id)[:8]}")
-    title = data.get("title")
-    description = data.get("description", "")
+    goal_id = body.goal_id or f"goal-{str(new_id)[:8]}"
+    title = body.title
+    description = body.description
 
     if _is_noisy_goal_payload(goal_id, title, description):
         return {"created": False, "skipped": True, "reason": "test_or_patch_noise"}
@@ -93,15 +93,15 @@ async def create_goal(request: Request, db: AsyncSession = Depends(get_db)):
         goal_id=goal_id,
         title=title,
         description=description,
-        status=data.get("status", "pending"),
-        progress=data.get("progress", 0),
-        priority=data.get("priority", 2),
-        due_date=data.get("due_date") or data.get("target_date"),
-        sprint=data.get("sprint", "backlog"),
-        board_column=data.get("board_column", "backlog"),
-        position=data.get("position", 0),
-        assigned_to=data.get("assigned_to"),
-        tags=data.get("tags", []),
+        status=body.status,
+        progress=body.progress,
+        priority=body.priority,
+        due_date=body.due_date or body.target_date,
+        sprint=body.sprint,
+        board_column=body.board_column,
+        position=body.position,
+        assigned_to=body.assigned_to,
+        tags=body.tags,
     )
     db.add(goal)
     await db.commit()
@@ -318,32 +318,32 @@ async def delete_goal(goal_id: str, db: AsyncSession = Depends(get_db)):
 
 @router.patch("/goals/{goal_id}")
 async def update_goal(
-    goal_id: str, request: Request, db: AsyncSession = Depends(get_db)
+    goal_id: str, body: UpdateGoal, db: AsyncSession = Depends(get_db)
 ):
-    data = await request.json()
+    data = body.model_dump(exclude_none=True)
     next_title = data.get("title")
     next_description = data.get("description")
     if _is_noisy_goal_payload(goal_id, next_title, next_description):
         return {"updated": False, "skipped": True, "reason": "test_or_patch_noise"}
 
     values: dict = {}
-    if data.get("status") is not None:
-        values["status"] = data["status"]
-        if data["status"] == "completed":
+    if body.status is not None:
+        values["status"] = body.status
+        if body.status == "completed":
             from sqlalchemy import text
             values["completed_at"] = text("NOW()")
         # Auto-sync board_column when status changes (unless explicitly set)
         if "board_column" not in data:
             status_col_map = {"active": "doing", "completed": "done", "paused": "on_hold", "cancelled": "done", "pending": "todo"}
-            if data["status"] in status_col_map:
-                values["board_column"] = status_col_map[data["status"]]
-    if data.get("progress") is not None:
-        values["progress"] = data["progress"]
-    if data.get("priority") is not None:
-        values["priority"] = data["priority"]
+            if body.status in status_col_map:
+                values["board_column"] = status_col_map[body.status]
+    if body.progress is not None:
+        values["progress"] = body.progress
+    if body.priority is not None:
+        values["priority"] = body.priority
     # Sprint board fields (S3-01)
     for field in ("sprint", "board_column", "position", "assigned_to", "tags", "title", "description", "due_date"):
-        if data.get(field) is not None:
+        if field in data:
             values[field] = data[field]
 
     if values:
@@ -361,13 +361,12 @@ async def update_goal(
 @router.patch("/goals/{goal_id}/move")
 async def move_goal(
     goal_id: str,
-    request: Request,
+    body: MoveGoal,
     db: AsyncSession = Depends(get_db),
 ):
     """Move goal to new board column (for drag-and-drop)."""
-    data = await request.json()
-    new_column = data.get("board_column")
-    new_position = data.get("position", 0)
+    new_column = body.board_column
+    new_position = body.position
 
     column_to_status = {
         "backlog": "pending",
@@ -425,20 +424,19 @@ async def get_hourly_goals(
 
 
 @router.post("/hourly-goals")
-async def create_hourly_goal(request: Request, db: AsyncSession = Depends(get_db)):
-    data = await request.json()
+async def create_hourly_goal(body: CreateHourlyGoal, db: AsyncSession = Depends(get_db)):
     if _is_noisy_goal_payload(
         None,
-        data.get("goal_type"),
-        data.get("description"),
+        body.goal_type,
+        body.description,
     ):
         return {"created": False, "skipped": True, "reason": "test_or_patch_noise"}
 
     goal = HourlyGoal(
-        hour_slot=data.get("hour_slot"),
-        goal_type=data.get("goal_type"),
-        description=data.get("description"),
-        status=data.get("status", "pending"),
+        hour_slot=body.hour_slot,
+        goal_type=body.goal_type,
+        description=body.description,
+        status=body.status,
     )
     db.add(goal)
     await db.commit()
@@ -447,10 +445,9 @@ async def create_hourly_goal(request: Request, db: AsyncSession = Depends(get_db
 
 @router.patch("/hourly-goals/{goal_id}")
 async def update_hourly_goal(
-    goal_id: int, request: Request, db: AsyncSession = Depends(get_db)
+    goal_id: int, body: UpdateHourlyGoal, db: AsyncSession = Depends(get_db)
 ):
-    data = await request.json()
-    status = data.get("status")
+    status = body.status
     values: dict = {"status": status}
     if status == "completed":
         from sqlalchemy import text

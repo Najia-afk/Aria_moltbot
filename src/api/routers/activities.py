@@ -6,13 +6,14 @@ import json as json_lib
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import Float, case, cast, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import ActivityLog, SocialPost
 from deps import get_db
 from pagination import paginate_query, build_paginated_response
+from schemas.requests import CreateActivity, UpdateActivity
 
 router = APIRouter(tags=["Activities"])
 
@@ -86,9 +87,8 @@ async def api_activities(
 
 
 @router.post("/activities")
-async def create_activity(request: Request, db: AsyncSession = Depends(get_db)):
-    data = await request.json()
-    if data.get("action") == "six_hour_review":
+async def create_activity(body: CreateActivity, db: AsyncSession = Depends(get_db)):
+    if body.action == "six_hour_review":
         last_stmt = (
             select(ActivityLog)
             .where(ActivityLog.action == "six_hour_review")
@@ -111,34 +111,34 @@ async def create_activity(request: Request, db: AsyncSession = Depends(get_db)):
 
     activity = ActivityLog(
         id=uuid.uuid4(),
-        action=data.get("action"),
-        skill=data.get("skill"),
-        details=data.get("details", {}),
-        success=data.get("success", True),
-        error_message=data.get("error_message"),
+        action=body.action,
+        skill=body.skill,
+        details=body.details,
+        success=body.success,
+        error_message=body.error_message,
     )
     db.add(activity)
 
     # Mirror commit/comment-style events into social feed for dashboard visibility.
-    action = data.get("action") or ""
-    details = data.get("details") if isinstance(data.get("details"), dict) else {}
+    action = body.action or ""
+    details = body.details if isinstance(body.details, dict) else {}
     if _should_mirror_to_social(action, details):
         social_post = SocialPost(
             id=uuid.uuid4(),
             platform="activity",
             content=_social_content_from_activity(
                 action=action,
-                skill=data.get("skill"),
+                skill=body.skill,
                 details=details,
-                success=data.get("success", True),
-                error_message=data.get("error_message"),
+                success=body.success,
+                error_message=body.error_message,
             ),
             visibility="public",
             metadata_json={
                 "source": "activity_log",
                 "action": action,
-                "skill": data.get("skill"),
-                "success": data.get("success", True),
+                "skill": body.skill,
+                "success": body.success,
                 "details": details,
             },
         )
@@ -450,6 +450,31 @@ async def activity_visualization(
             for item in recent_items
         ],
     }
+
+
+@router.delete("/activities/{activity_id}")
+async def delete_activity(activity_id: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(ActivityLog).where(ActivityLog.id == activity_id))
+    row = result.scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Activity not found")
+    await db.delete(row)
+    await db.commit()
+    return {"deleted": True, "id": activity_id}
+
+
+@router.patch("/activities/{activity_id}")
+async def update_activity(activity_id: str, body: UpdateActivity, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(ActivityLog).where(ActivityLog.id == activity_id))
+    row = result.scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Activity not found")
+    updates = body.model_dump(exclude_unset=True)
+    for key, value in updates.items():
+        setattr(row, key, value)
+    await db.commit()
+    await db.refresh(row)
+    return row.to_dict()
 
 
 

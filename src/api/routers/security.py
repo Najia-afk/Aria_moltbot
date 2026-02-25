@@ -5,13 +5,14 @@ Security events endpoints — CRUD + stats.
 import json as json_lib
 import uuid
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import SecurityEvent
 from deps import get_db
 from pagination import paginate_query, build_paginated_response
+from schemas.requests import CreateSecurityEvent as CreateSecurityEventBody
 
 router = APIRouter(tags=["Security"])
 
@@ -64,21 +65,20 @@ async def api_security_events(
 
 
 @router.post("/security-events")
-async def create_security_event(request: Request, db: AsyncSession = Depends(get_db)):
-    data = await request.json()
-    input_preview = data.get("input_preview", "")
+async def create_security_event(body: CreateSecurityEventBody, db: AsyncSession = Depends(get_db)):
+    input_preview = body.input_preview or ""
     if input_preview and len(input_preview) > 500:
         input_preview = input_preview[:500] + "..."
     event = SecurityEvent(
         id=uuid.uuid4(),
-        threat_level=data.get("threat_level", "LOW"),
-        threat_type=data.get("threat_type", "unknown"),
-        threat_patterns=data.get("threat_patterns", []),
+        threat_level=body.threat_level,
+        threat_type=body.threat_type,
+        threat_patterns=body.threat_patterns,
         input_preview=input_preview,
-        source=data.get("source", "api"),
-        user_id=data.get("user_id"),
-        blocked=data.get("blocked", False),
-        details=data.get("details", {}),
+        source=body.source,
+        user_id=body.user_id,
+        blocked=body.blocked,
+        details=body.details,
     )
     db.add(event)
     await db.commit()
@@ -120,3 +120,14 @@ async def api_security_stats(db: AsyncSession = Depends(get_db)):
         "by_level": {r[0]: r[1] for r in by_level_result.all()},
         "by_type": {r[0]: r[1] for r in by_type_result.all()},
     }
+
+
+@router.delete("/security-events/{event_id}")
+async def delete_security_event(event_id: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(SecurityEvent).where(SecurityEvent.id == event_id))
+    row = result.scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Security event not found")
+    await db.delete(row)
+    await db.commit()
+    return {"deleted": True, "id": event_id}

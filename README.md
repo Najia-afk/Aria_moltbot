@@ -35,14 +35,37 @@ Built on a native Python engine (`aria_engine`) with multi-model LLM routing via
 
 ## Quick Start
 
+### First-Run Setup (recommended)
+
+The first-run script generates all required secrets and creates your `.env` file:
+
+```bash
+# macOS / Linux
+chmod +x scripts/first-run.sh
+./scripts/first-run.sh
+```
+
+```powershell
+# Windows PowerShell
+.\scripts\first-run.ps1
+```
+
+This will:
+- Check Docker and Docker Compose are installed
+- Copy `.env.example` → `.env`
+- Generate secure random passwords for DB, API keys, LiteLLM, Grafana, pgAdmin
+- Optionally prompt for external API keys (OpenRouter, Moonshot)
+
+### Manual Setup
+
 ```bash
 # Clone
 git clone https://github.com/Najia-afk/Aria_moltbot.git
 cd Aria_moltbot
 
 # Configure
-cp stacks/brain/.env.example .env
-nano .env  # Set API keys, DB credentials
+cp stacks/brain/.env.example stacks/brain/.env
+nano stacks/brain/.env  # Set API keys, DB credentials
 
 # Optional: Start MLX Server (Metal GPU, Apple Silicon)
 mlx_lm.server --model nightmedia/Qwen3-VLTO-8B-Instruct-qx86x-hi-mlx \

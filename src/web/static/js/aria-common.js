@@ -6,6 +6,18 @@
 window.ARIA_DEBUG = (new URLSearchParams(window.location.search).has('debug')) ||
                     (localStorage.getItem('aria_debug') === '1');
 
+/**
+ * Escape HTML special characters to prevent XSS.
+ * Use this whenever inserting dynamic data into innerHTML.
+ */
+function escapeHtml(str) {
+    if (str == null) return '';
+    const div = document.createElement('div');
+    div.appendChild(document.createTextNode(String(str)));
+    return div.innerHTML;
+}
+window.escapeHtml = escapeHtml;
+
 function ariaLog(...args) {
     if (window.ARIA_DEBUG) {
         console.log('[ARIA]', ...args);

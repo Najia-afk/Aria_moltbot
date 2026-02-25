@@ -325,7 +325,7 @@ async function loadCreativePulse() {
 document.getElementById('hours-filter').addEventListener('change', loadCreativePulse);
 loadCreativePulse().catch(err => {
     console.error(err);
-    document.getElementById('recent-body').innerHTML = `<tr><td colspan="6">Error loading Creative Pulse: ${err.message}</td></tr>`;
+    document.getElementById('recent-body').innerHTML = `<tr><td colspan="6">Error loading Creative Pulse: ${escapeHtml(err.message)}</td></tr>`;
     setChartVisibility('hourly-chart', 'hourly-empty', false);
     setChartVisibility('actions-chart', 'actions-empty', false);
     setChartVisibility('skills-chart', 'creative-empty', false);

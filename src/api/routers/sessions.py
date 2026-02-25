@@ -3,17 +3,21 @@ Agent sessions endpoints - CRUD + stats.
 Reads from agent_sessions (PostgreSQL-native). No external sync.
 """
 
+import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import delete, func, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import AgentSession, EngineChatSession, ModelUsage
 from deps import get_db, get_litellm_db
 from pagination import paginate_query, build_paginated_response
+from schemas.requests import CreateSession, UpdateSession
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Sessions"])
 
@@ -121,34 +125,33 @@ async def get_sessions_hourly(
 # -- Create session ----------------------------------------------------------
 
 @router.post("/sessions")
-async def create_agent_session(request: Request, db: AsyncSession = Depends(get_db)):
+async def create_agent_session(body: CreateSession, db: AsyncSession = Depends(get_db)):
     """Create a new chat session."""
-    data = await request.json()
-    status_val = str(data.get("status") or "active").strip().lower()
+    status_val = str(body.status or "active").strip().lower()
     allowed_status = {"active", "completed", "ended", "error"}
     if status_val not in allowed_status:
         status_val = "active"
 
-    started_at = _parse_iso_dt(data.get("started_at"))
-    ended_at = _parse_iso_dt(data.get("ended_at"))
+    started_at = _parse_iso_dt(body.started_at)
+    ended_at = _parse_iso_dt(body.ended_at)
     if status_val in {"completed", "ended", "error"} and ended_at is None:
         ended_at = datetime.now(timezone.utc)
 
-    metadata_payload = data.get("metadata", {})
+    metadata_payload = body.metadata
     if not isinstance(metadata_payload, dict):
         metadata_payload = {}
 
-    external_session_id = str(data.get("external_session_id") or "").strip()
+    external_session_id = str(body.external_session_id or "").strip()
     if external_session_id:
         metadata_payload["external_session_id"] = external_session_id
 
     payload = {
         "id": uuid.uuid4(),
-        "agent_id": data.get("agent_id", "aria"),
-        "session_type": data.get("session_type", "interactive"),
-        "messages_count": int(data.get("messages_count") or 0),
-        "tokens_used": int(data.get("tokens_used") or 0),
-        "cost_usd": float(data.get("cost_usd") or 0),
+        "agent_id": body.agent_id,
+        "session_type": body.session_type,
+        "messages_count": body.messages_count,
+        "tokens_used": body.tokens_used,
+        "cost_usd": body.cost_usd,
         "status": status_val,
         "metadata_json": metadata_payload,
     }
@@ -167,22 +170,21 @@ async def create_agent_session(request: Request, db: AsyncSession = Depends(get_
 
 @router.patch("/sessions/{session_id}")
 async def update_agent_session(
-    session_id: str, request: Request, db: AsyncSession = Depends(get_db)
+    session_id: str, body: UpdateSession, db: AsyncSession = Depends(get_db)
 ):
     """Update session status, metadata, or counters."""
-    data = await request.json()
     values = {}
 
-    if data.get("status"):
-        values["status"] = data["status"]
-        if data["status"] in ("completed", "ended", "error"):
+    if body.status:
+        values["status"] = body.status
+        if body.status in ("completed", "ended", "error"):
             values["ended_at"] = text("NOW()")
-    if data.get("messages_count") is not None:
-        values["messages_count"] = data["messages_count"]
-    if data.get("tokens_used") is not None:
-        values["tokens_used"] = data["tokens_used"]
-    if data.get("cost_usd") is not None:
-        values["cost_usd"] = data["cost_usd"]
+    if body.messages_count is not None:
+        values["messages_count"] = body.messages_count
+    if body.tokens_used is not None:
+        values["tokens_used"] = body.tokens_used
+    if body.cost_usd is not None:
+        values["cost_usd"] = body.cost_usd
 
     if values:
         await db.execute(
@@ -279,8 +281,8 @@ async def get_session_stats(
             'COALESCE(SUM(spend),0) AS cost FROM "LiteLLM_SpendLogs"'
         ))).mappings().one()
         llm = {"rows": int(r["rows"]), "tokens": int(r["tokens"]), "cost": float(r["cost"])}
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("LiteLLM spend query failed: %s", e)
 
     # By agent (sessions + tokens + cost in one query)
     by_agent_result = await db.execute(

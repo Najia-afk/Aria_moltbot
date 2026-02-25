@@ -2,7 +2,7 @@
 Lessons Learned endpoints — error recovery system (S5-02).
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db.models import LessonLearned
 from deps import get_db
 from pagination import paginate_query, build_paginated_response
+from schemas.requests import CreateLesson, UpdateLesson
 
 router = APIRouter(tags=["Lessons"])
 
@@ -31,37 +32,29 @@ _KNOWN_PATTERNS = [
 
 
 @router.post("/lessons")
-async def record_lesson(request: Request, db: AsyncSession = Depends(get_db)):
+async def record_lesson(body: CreateLesson, db: AsyncSession = Depends(get_db)):
     """Record a new lesson or increment occurrence of existing one."""
-    data = await request.json()
-    error_pattern = data.get("error_pattern")
-    error_type = data.get("error_type")
-    resolution = data.get("resolution")
-
-    if not error_pattern or not error_type:
-        raise HTTPException(status_code=400, detail="error_pattern and error_type are required")
-
     existing = await db.execute(
-        select(LessonLearned).where(LessonLearned.error_pattern == error_pattern)
+        select(LessonLearned).where(LessonLearned.error_pattern == body.error_pattern)
     )
     found = existing.scalar_one_or_none()
 
     if found:
         found.occurrences += 1
         found.last_occurred = func.now()
-        if resolution:
-            found.resolution = resolution
+        if body.resolution:
+            found.resolution = body.resolution
         await db.commit()
         return {"updated": True, "occurrences": found.occurrences, "id": str(found.id)}
 
     new_lesson = LessonLearned(
-        error_pattern=error_pattern,
-        error_type=error_type,
-        resolution=resolution or "unresolved — needs investigation",
-        skill_name=data.get("skill_name"),
-        context=data.get("context", {}),
-        resolution_code=data.get("resolution_code"),
-        effectiveness=float(data.get("effectiveness", 1.0)),
+        error_pattern=body.error_pattern,
+        error_type=body.error_type,
+        resolution=body.resolution or "unresolved — needs investigation",
+        skill_name=body.skill_name,
+        context=body.context,
+        resolution_code=body.resolution_code,
+        effectiveness=body.effectiveness,
     )
     db.add(new_lesson)
     await db.commit()
@@ -119,3 +112,28 @@ async def seed_lessons(db: AsyncSession = Depends(get_db)):
         created += max(0, result.rowcount)
     await db.commit()
     return {"seeded": created, "total": len(_KNOWN_PATTERNS)}
+
+
+@router.delete("/lessons/{lesson_id}")
+async def delete_lesson(lesson_id: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(LessonLearned).where(LessonLearned.id == lesson_id))
+    row = result.scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+    await db.delete(row)
+    await db.commit()
+    return {"deleted": True, "id": lesson_id}
+
+
+@router.patch("/lessons/{lesson_id}")
+async def update_lesson(lesson_id: str, body: UpdateLesson, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(LessonLearned).where(LessonLearned.id == lesson_id))
+    row = result.scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+    updates = body.model_dump(exclude_unset=True)
+    for key, value in updates.items():
+        setattr(row, key, value)
+    await db.commit()
+    await db.refresh(row)
+    return row.to_dict()

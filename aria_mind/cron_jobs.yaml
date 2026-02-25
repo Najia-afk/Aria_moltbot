@@ -13,6 +13,8 @@
 #   Lightweight/routine → main (kimi w/ qwen3-mlx fallback)
 #   All routine/social/analysis → main (delegates to sub-agents)
 #   Memeothy → aria-memeothy (independent, 1 post/2 days)
+#   NEW (S-12): Use `model:` field to pin a job to a specific LLM.
+#   If omitted, the system default model is used.
 #
 # ⚠️ PATH RULES (aria_mind/ IS the workspace root in the container):
 #   CORRECT:  skills/run_skill.py  OR  /root/.openclaw/workspace/skills/run_skill.py

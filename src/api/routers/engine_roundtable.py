@@ -880,6 +880,8 @@ async def roundtable_websocket(websocket: WebSocket):
     """
     WebSocket endpoint for streaming roundtable/swarm in real-time.
 
+    S-16: Validates API key from query param before accepting connection.
+
     Client sends: {"type": "start", "mode": "roundtable"|"swarm", "topic": "...", "agent_ids": [...]}
     Server sends: {"type": "turn", "agent_id": "...", "round": 1, "content": "...", "duration_ms": N}
     Server sends: {"type": "vote", "agent_id": "...", "iteration": 1, "vote": "agree", ...}
@@ -887,6 +889,16 @@ async def roundtable_websocket(websocket: WebSocket):
     Server sends: {"type": "done", "session_id": "...", ...}
     Server sends: {"type": "error", "message": "..."}
     """
+    # S-16: WebSocket authentication
+    try:
+        from auth import validate_ws_api_key
+    except ImportError:
+        from ..auth import validate_ws_api_key
+    api_key = websocket.query_params.get("api_key")
+    if not await validate_ws_api_key(api_key):
+        await websocket.close(code=4401, reason="Unauthorized — invalid or missing API key")
+        return
+
     if _roundtable is None:
         await websocket.close(code=1013, reason="Roundtable not initialized")
         return
@@ -932,8 +944,8 @@ async def roundtable_websocket(websocket: WebSocket):
         logger.error("Roundtable WS error: %s", e)
         try:
             await _ws_send(websocket, {"type": "error", "message": str(e)})
-        except Exception:
-            pass
+        except Exception as e2:
+            logger.debug("Failed to send WS error message: %s", e2)
 
 
 async def _handle_roundtable_ws(
@@ -1035,8 +1047,8 @@ async def _ws_send(websocket: WebSocket, data: dict) -> None:
     try:
         if websocket.client_state == WebSocketState.CONNECTED:
             await websocket.send_text(json.dumps(data))
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("WS send failed (client likely disconnected): %s", e)
 
 
 # ── Registration helper ──────────────────────────────────────────────────────

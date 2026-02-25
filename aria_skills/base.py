@@ -60,6 +60,8 @@ try:
 except ImportError:
     HAS_HEALTH_DASHBOARD = False
 
+logger = logging.getLogger(__name__)
+
 T = TypeVar('T')
 
 
@@ -126,6 +128,11 @@ class BaseSkill(ABC):
         self._last_used: datetime | None = None
         self._use_count = 0
         self._error_count = 0
+        # Circuit breaker state (per skill instance)
+        self._cb_failures = 0
+        self._cb_threshold = 5
+        self._cb_reset_after = 60.0  # seconds
+        self._cb_opened_at: float | None = None
     
     @property
     @abstractmethod
@@ -294,8 +301,8 @@ class BaseSkill(ABC):
                     resolution="unresolved — needs investigation",
                     skill_name=self.name,
                 )
-        except Exception:
-            pass  # Never let error handling break the skill
+        except Exception as e:
+            self.logger.debug("Error lesson recording failed: %s", e)
     
     async def execute_with_metrics(
         self, 
@@ -360,8 +367,8 @@ class BaseSkill(ABC):
                             error_type=error_type,
                         )
                     )
-                except Exception:
-                    pass  # Never let observability break the skill
+                except Exception as e:
+                    self.logger.debug("Metrics recording failed: %s", e)
             
             # In-process health dashboard (for cognition-level routing)
             if HAS_HEALTH_DASHBOARD:
@@ -372,8 +379,8 @@ class BaseSkill(ABC):
                         success=success,
                         error_type=error_type,
                     )
-                except Exception:
-                    pass  # Never let observability break the skill
+                except Exception as e:
+                    self.logger.debug("Dashboard metric failed: %s", e)
 
             # Prometheus metrics
             if HAS_PROMETHEUS:
@@ -407,6 +414,33 @@ class BaseSkill(ABC):
             else:
                 self.logger.info(f"skill_execution: {log_data}")
     
+    # ── Circuit Breaker ─────────────────────────────────────────
+    def _is_cb_open(self) -> bool:
+        """Check if this skill's circuit breaker is open."""
+        if self._cb_failures < self._cb_threshold:
+            return False
+        if self._cb_opened_at is None:
+            return False
+        elapsed = time.monotonic() - self._cb_opened_at
+        if elapsed > self._cb_reset_after:
+            self._cb_failures = 0
+            self._cb_opened_at = None
+            self.logger.info("Circuit breaker half-open for %s — retrying", self.name)
+            return False
+        return True
+
+    def _cb_record_success(self):
+        self._cb_failures = 0
+
+    def _cb_record_failure(self):
+        self._cb_failures += 1
+        if self._cb_failures >= self._cb_threshold:
+            self._cb_opened_at = time.monotonic()
+            self.logger.warning(
+                "Circuit breaker OPEN for %s after %d failures",
+                self.name, self._cb_failures,
+            )
+
     async def safe_execute(
         self,
         func: Callable[..., T],
@@ -433,12 +467,20 @@ class BaseSkill(ABC):
             Result from func
         """
         async def _wrapped():
-            if with_retry:
-                return await self.execute_with_retry(
-                    func, *args, max_attempts=max_attempts, **kwargs
-                )
-            else:
-                return await func(*args, **kwargs)
+            if self._is_cb_open():
+                raise RuntimeError(f"Circuit breaker open for skill {self.name}")
+            try:
+                if with_retry:
+                    result = await self.execute_with_retry(
+                        func, *args, max_attempts=max_attempts, **kwargs
+                    )
+                else:
+                    result = await func(*args, **kwargs)
+                self._cb_record_success()
+                return result
+            except Exception:
+                self._cb_record_failure()
+                raise
         
         return await self.execute_with_metrics(_wrapped, operation_name)
 
@@ -450,8 +492,8 @@ class BaseSkill(ABC):
             loop = asyncio.get_event_loop()
             if loop.is_running():
                 asyncio.ensure_future(self._write_activity_log(action, details, success))
-        except Exception:
-            pass  # Never block skill execution for logging
+        except Exception as e:
+            self.logger.debug("Activity log scheduling failed: %s", e)
 
     async def _write_activity_log(self, action: str, details: str, success: bool):
         """Actually write to activity log. Called as background task."""
@@ -539,5 +581,5 @@ async def _post_activity(action, skill, details, success, error_message=None):
             "success": success,
             "error_message": error_message,
         })
-    except Exception:
-        pass  # Never let logging break the skill
+    except Exception as e:
+        logger.debug("Activity POST failed: %s", e)

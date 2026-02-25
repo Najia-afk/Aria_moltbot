@@ -1057,6 +1057,70 @@ function renderDurationChart(rt) {
 
 function renderTimeline(rt) {
     const container = document.getElementById('turn-timeline');
+    const isSwarm = rt._mode === 'swarm' || rt.consensus_score != null;
+
+    // ── Swarm vote timeline ──────────────────────────────────────
+    if (isSwarm && rt.votes && rt.votes.length > 0) {
+        const votes = rt.votes;
+        const iterations = [...new Set(votes.map(v => v.iteration))].sort((a, b) => a - b);
+
+        const voteBadge = (type) => {
+            const map = {
+                agree:    { bg: '#22c55e', icon: '✓' },
+                disagree: { bg: '#ef4444', icon: '✗' },
+                extend:   { bg: '#3b82f6', icon: '↗' },
+                pivot:    { bg: '#f59e0b', icon: '↻' },
+            };
+            const s = map[type] || { bg: '#64748b', icon: '?' };
+            return `<span style="background:${s.bg};color:#fff;padding:2px 8px;border-radius:10px;font-size:0.75rem;font-weight:600;">${s.icon} ${esc(type)}</span>`;
+        };
+
+        let html = '';
+        for (const iter of iterations) {
+            html += `<div class="round-divider">Iteration ${iter}</div>`;
+            const iterVotes = votes.filter(v => v.iteration === iter);
+            for (const v of iterVotes) {
+                const color = agentColor(v.agent_id);
+                const confPct = Math.round((v.confidence || 0) * 100);
+                const confColor = confPct >= 70 ? '#22c55e' : confPct >= 50 ? '#f59e0b' : '#ef4444';
+                html += `
+                    <div class="turn-card" style="border-left: 3px solid ${color};">
+                        <div class="turn-header">
+                            <span class="turn-agent" style="color: ${color};">${esc(v.agent_id)}</span>
+                            <div class="turn-meta">
+                                ${voteBadge(v.vote)}
+                                <span title="Confidence" style="color:${confColor};font-weight:600;">${confPct}%</span>
+                                ${safeNumber(v.duration_ms, 0) > 0 ? `<span>${Math.round(safeNumber(v.duration_ms, 0))}ms</span>` : ''}
+                            </div>
+                        </div>
+                        <div class="turn-content">${esc(v.content)}</div>
+                    </div>
+                `;
+            }
+        }
+
+        // Consensus at the end
+        if (rt.consensus) {
+            html += `<div class="round-divider">🐝 Consensus</div>`;
+            html += `
+                <div class="turn-card synthesis">
+                    <div class="turn-header">
+                        <span class="turn-agent" style="color: #22c55e;">🐝 Swarm Consensus</span>
+                        <div class="turn-meta">
+                            <span>Score: ${Math.round((rt.consensus_score || 0) * 100)}%</span>
+                            <span>${rt.converged ? 'Converged ✓' : 'Not converged'}</span>
+                        </div>
+                    </div>
+                    <div class="turn-content">${esc(rt.consensus)}</div>
+                </div>
+            `;
+        }
+
+        container.innerHTML = html || '<div class="empty-state">No votes recorded</div>';
+        return;
+    }
+
+    // ── Roundtable turn timeline (original) ──────────────────────
     const turns = (rt.turns || []).filter(t => Number.isFinite(Number.parseInt(t?.round, 10)));
     const roundNumbers = [...new Set(turns.map(t => Number.parseInt(t.round, 10)).filter(n => Number.isFinite(n) && n > 0))]
         .sort((a, b) => a - b);

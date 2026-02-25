@@ -2,6 +2,11 @@
 """
 Skill latency logging decorator (S-165).
 
+.. deprecated:: 3.0
+    Prefer ``BaseSkill.execute_with_metrics()`` which consolidates latency
+    tracking into Prometheus + DB telemetry + in-memory health dashboard.
+    ``@log_latency`` will be removed in a future release.
+
 Measures execution time of async skill methods and logs to the database
 via aria-api. Falls back to logger.debug when no API client is available.
 Never breaks the decorated method if logging fails.
@@ -9,12 +14,17 @@ Never breaks the decorated method if logging fails.
 import functools
 import logging
 import time
+import warnings
 
 logger = logging.getLogger(__name__)
 
 
 def log_latency(method):
     """Decorator to log skill method execution latency.
+
+    .. deprecated:: 3.0
+        Use ``execute_with_metrics()`` instead.  This decorator is kept for
+        backward-compatibility but will be removed in a future release.
 
     Usage::
 
@@ -32,6 +42,12 @@ def log_latency(method):
     - Exceptions from the wrapped method propagate normally.
     - Logging failures are silently swallowed so they never break the skill.
     """
+
+    warnings.warn(
+        "log_latency is deprecated — use BaseSkill.execute_with_metrics() instead (S-25)",
+        DeprecationWarning,
+        stacklevel=2,
+    )
 
     @functools.wraps(method)
     async def wrapper(self, *args, **kwargs):

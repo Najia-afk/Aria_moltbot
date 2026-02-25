@@ -55,6 +55,10 @@ class AriaEngine:
         """Boot sequence."""
         logger.info("🚀 Aria Engine starting...")
 
+        # Phase 0: OpenTelemetry (must run before DB / HTTP activity)
+        self._init_tracing()
+        logger.info("✅ Phase 0: Tracing initialized")
+
         # Phase 1: Database
         await self._init_database()
         logger.info("✅ Phase 1: Database connected")
@@ -85,6 +89,19 @@ class AriaEngine:
         await self._shutdown_event.wait()
         await self._cleanup()
         logger.info("🔴 Aria Engine stopped")
+
+    def _init_tracing(self):
+        """Phase 0: Configure OpenTelemetry (opt-in via OTEL_EXPORTER_OTLP_ENDPOINT)."""
+        try:
+            from aria_engine.tracing import configure_tracing, instrument_libraries
+
+            if configure_tracing():
+                instrument_libraries()
+                logger.info("OpenTelemetry tracing active")
+            else:
+                logger.debug("OpenTelemetry tracing skipped (no endpoint configured)")
+        except Exception as e:
+            logger.warning("Tracing init failed (non-fatal): %s", e)
 
     async def _init_database(self):
         """Create async SQLAlchemy engine + session factory."""
@@ -198,11 +215,17 @@ class AriaEngine:
 
 def main():
     """CLI entrypoint — called by Docker CMD."""
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(name)s] %(levelname)s %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
+    # Use structured logging if available, otherwise fallback to basicConfig
+    try:
+        from aria_mind.logging_config import configure_logging
+        configure_logging()
+        logging.getLogger("aria_engine").info("Structured logging initialized")
+    except ImportError:
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s [%(name)s] %(levelname)s %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
 
     engine = AriaEngine()
     loop = asyncio.new_event_loop()

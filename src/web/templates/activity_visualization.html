@@ -162,7 +162,7 @@ async function loadVisualization() {
 document.getElementById('hours-filter').addEventListener('change', loadVisualization);
 loadVisualization().catch(err => {
     console.error(err);
-    document.getElementById('recent-body').innerHTML = `<tr><td colspan="5">Error loading visualization: ${err.message}</td></tr>`;
+    document.getElementById('recent-body').innerHTML = `<tr><td colspan="5">Error loading visualization: ${escapeHtml(err.message)}</td></tr>`;
 });
 </script>
 {% endblock %}

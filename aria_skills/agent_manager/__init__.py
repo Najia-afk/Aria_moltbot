@@ -68,6 +68,25 @@ class AgentManagerSkill(BaseSkill):
             self._status = SkillStatus.ERROR
         return self._status
 
+    # ── Helpers ───────────────────────────────────────────────────
+
+    async def _validate_model(self, model: str) -> bool:
+        """Check that *model* exists and is enabled in models.yaml via API."""
+        try:
+            result = await self._api.get("/models")
+            if not result or not result.data:
+                return False
+            models = result.data if isinstance(result.data, list) else result.data.get("models", [])
+            for m in models:
+                mid = m.get("id") or m.get("model_id") or ""
+                if mid == model and m.get("enabled", True):
+                    return True
+            return False
+        except Exception:
+            # If we can't validate, allow it through (fail-open)
+            self.logger.warning(f"Could not validate model '{model}', allowing")
+            return True
+
     # ── Core methods ─────────────────────────────────────────────
 
     @log_latency
@@ -102,6 +121,7 @@ class AgentManagerSkill(BaseSkill):
         self,
         agent_type: str,
         context: dict | None = None,
+        model: str | None = None,
     ) -> SkillResult:
         """Spawn an agent session with optional context protocol.
 
@@ -110,6 +130,8 @@ class AgentManagerSkill(BaseSkill):
             context: Optional dict with context protocol fields:
                 task, constraints, budget_tokens, deadline_seconds,
                 parent_id, priority, tools_allowed, memory_scope
+            model: Optional LLM model ID from models.yaml to use for this agent.
+                If None, the system default model is used.
         """
         if not self._api:
             return SkillResult.fail("Not initialized")
@@ -118,11 +140,19 @@ class AgentManagerSkill(BaseSkill):
         if context and not context.get("task"):
             return SkillResult.fail("Context must include a non-empty 'task' field")
 
+        # Validate model if specified
+        if model:
+            valid = await self._validate_model(model)
+            if not valid:
+                return SkillResult.fail(f"Unknown or disabled model: {model}")
+
         body: dict[str, Any] = {
             "agent_id": agent_type,
             "session_type": "managed",
             "metadata": context or {},
         }
+        if model:
+            body["model"] = model
 
         try:
             result = await self._api.post("/sessions", data=body)
@@ -320,7 +350,11 @@ class AgentManagerSkill(BaseSkill):
             return SkillResult.fail(f"Health check failed: {e}")
 
     async def spawn_focused_agent(
-        self, task: str, focus: str, tools: list[str]
+        self,
+        task: str,
+        focus: str,
+        tools: list[str],
+        model: str | None = None,
     ) -> SkillResult:
         """Spawn a sub-agent with scoped context via aria-api.
 
@@ -331,9 +365,18 @@ class AgentManagerSkill(BaseSkill):
             task: Task description for the sub-agent
             focus: Focus area (e.g. "research", "devsecops", "creative")
             tools: List of tool/skill names the sub-agent is allowed to use
+            model: Optional LLM model ID from models.yaml to use.
+                If None, the system default model is used.
         """
         if not self._api:
             return SkillResult.fail("Not initialized")
+
+        # Validate model if specified
+        if model:
+            valid = await self._validate_model(model)
+            if not valid:
+                return SkillResult.fail(f"Unknown or disabled model: {model}")
+
         try:
             body = {
                 "agent_id": f"sub-{focus}",
@@ -346,6 +389,8 @@ class AgentManagerSkill(BaseSkill):
                     "parent_id": "agent_manager",
                 },
             }
+            if model:
+                body["model"] = model
             result = await self._api.post("/sessions", data=body)
             if not result:
                 raise Exception(result.error)
@@ -355,3 +400,106 @@ class AgentManagerSkill(BaseSkill):
         except Exception as e:
             self._log_usage("spawn_focused_agent", False, error=str(e))
             return SkillResult.fail(f"Failed to spawn focused agent: {e}")
+
+    # ── High-level delegation (S-11) ─────────────────────────────
+
+    @log_latency
+    async def delegate_task(
+        self,
+        task: str,
+        agent_type: str = "analyst",
+        model: str | None = None,
+        tools: list[str] | None = None,
+        timeout_seconds: int = 300,
+        cleanup: bool = True,
+    ) -> SkillResult:
+        """Atomic task delegation: spawn → send task → poll → collect → cleanup.
+
+        This is the high-level method for delegating work to a sub-agent.
+        It handles the full lifecycle in one call.
+
+        Args:
+            task: The task/prompt to send to the sub-agent.
+            agent_type: Agent profile ID (default "analyst").
+            model: Optional LLM model ID to use for this delegation.
+            tools: Optional list of tool/skill names to allow.
+            timeout_seconds: Max wait time for completion (default 300s).
+            cleanup: Whether to terminate the session after completion.
+
+        Returns:
+            SkillResult with the agent's response data, including
+            model, tokens, cost, and content.
+        """
+        if not self._api:
+            return SkillResult.fail("Not initialized")
+
+        # 1. Spawn the agent session
+        context = {
+            "task": task,
+            "parent_id": "delegate_task",
+            "tools_allowed": tools or [],
+        }
+        spawn_result = await self.spawn_agent(
+            agent_type=agent_type,
+            context=context,
+            model=model,
+        )
+        if not spawn_result.success:
+            return SkillResult.fail(f"Spawn failed: {spawn_result.error}")
+
+        session_id = spawn_result.data.get("id") or spawn_result.data.get("session_id")
+        if not session_id:
+            return SkillResult.fail("Spawn succeeded but no session_id returned")
+
+        self.logger.info(
+            "delegate_task: spawned session %s (agent=%s, model=%s)",
+            session_id, agent_type, model or "default",
+        )
+
+        try:
+            # 2. Send the task as a message
+            msg_result = await self._api.post(
+                f"/engine/chat/sessions/{session_id}/messages",
+                data={
+                    "content": task,
+                    "enable_thinking": False,
+                    "enable_tools": bool(tools),
+                },
+            )
+            if not msg_result or not msg_result.success:
+                err = msg_result.error if msg_result else "No response"
+                raise Exception(f"Message send failed: {err}")
+
+            response_data = msg_result.data or {}
+            self._log_usage(
+                "delegate_task", True,
+                agent_type=agent_type,
+                model=response_data.get("model", model or "default"),
+                tokens=response_data.get("total_tokens", 0),
+            )
+
+            return SkillResult.ok({
+                "session_id": session_id,
+                "agent_type": agent_type,
+                "model": response_data.get("model", ""),
+                "content": response_data.get("content", ""),
+                "total_tokens": response_data.get("total_tokens", 0),
+                "cost_usd": response_data.get("cost_usd", 0),
+                "thinking": response_data.get("thinking", ""),
+            })
+
+        except Exception as e:
+            self._log_usage("delegate_task", False, error=str(e))
+            return SkillResult.fail(f"Delegation failed: {e}")
+
+        finally:
+            # 3. Cleanup: terminate the session
+            if cleanup and session_id:
+                try:
+                    await self.terminate_agent(session_id)
+                    self.logger.debug("delegate_task: cleaned up session %s", session_id)
+                except Exception as cleanup_err:
+                    self.logger.warning(
+                        "delegate_task: cleanup failed for %s: %s",
+                        session_id, cleanup_err,
+                    )

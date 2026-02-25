@@ -6,13 +6,14 @@ Skill Invocation stats (S5-07) — observability dashboard data.
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, func, case, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import SkillStatusRecord, SkillInvocation, KnowledgeQueryLog
 from deps import get_db
+from schemas.requests import CreateSkillInvocation
 
 router = APIRouter(tags=["Skills"])
 
@@ -238,17 +239,16 @@ async def get_skills_coherence(include_support: bool = False):
 # ── Skill Invocation Recording (S5-07) ──────────────────────────────────────
 
 @router.post("/skills/invocations")
-async def record_invocation(request: Request, db: AsyncSession = Depends(get_db)):
+async def record_invocation(body: CreateSkillInvocation, db: AsyncSession = Depends(get_db)):
     """Record a skill invocation for observability."""
-    data = await request.json()
     inv = SkillInvocation(
-        skill_name=data.get("skill_name", "unknown"),
-        tool_name=data.get("tool_name", "unknown"),
-        duration_ms=data.get("duration_ms"),
-        success=data.get("success", True),
-        error_type=data.get("error_type"),
-        tokens_used=data.get("tokens_used"),
-        model_used=data.get("model_used"),
+        skill_name=body.skill_name,
+        tool_name=body.tool_name,
+        duration_ms=body.duration_ms,
+        success=body.success,
+        error_type=body.error_type,
+        tokens_used=body.tokens_used,
+        model_used=body.model_used,
     )
     db.add(inv)
     await db.commit()

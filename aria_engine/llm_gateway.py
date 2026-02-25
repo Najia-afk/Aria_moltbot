@@ -149,6 +149,9 @@ class LLMGateway:
             return False
         return True
 
+    # Default timeout for LLM calls (seconds). Override via config.
+    LLM_TIMEOUT: float = 120.0
+
     async def complete(
         self,
         messages: list[dict[str, str]],
@@ -199,7 +202,10 @@ class LLMGateway:
         start = time.monotonic()
 
         try:
-            response = await acompletion(**kwargs)
+            response = await asyncio.wait_for(
+                acompletion(**kwargs),
+                timeout=self.LLM_TIMEOUT,
+            )
             elapsed_ms = int((time.monotonic() - start) * 1000)
             self._circuit_failures = 0
             self._latency_samples.append(elapsed_ms)
@@ -244,6 +250,12 @@ class LLMGateway:
                 finish_reason=choice.finish_reason or "",
             )
 
+        except asyncio.TimeoutError:
+            self._circuit_failures += 1
+            if self._circuit_failures >= self._circuit_threshold:
+                self._circuit_opened_at = time.monotonic()
+            logger.error("LLM call timed out after %.0fs (failures=%d)", self.LLM_TIMEOUT, self._circuit_failures)
+            raise LLMError(f"LLM completion timed out after {self.LLM_TIMEOUT}s")
         except Exception as e:
             self._circuit_failures += 1
             if self._circuit_failures >= self._circuit_threshold:
@@ -291,7 +303,10 @@ class LLMGateway:
             kwargs.update(thinking_params)
 
         try:
-            response = await acompletion(**kwargs)
+            response = await asyncio.wait_for(
+                acompletion(**kwargs),
+                timeout=self.LLM_TIMEOUT,
+            )
 
             async for chunk in response:
                 delta = chunk.choices[0].delta if chunk.choices else None
@@ -308,6 +323,11 @@ class LLMGateway:
 
             self._circuit_failures = 0
 
+        except asyncio.TimeoutError:
+            self._circuit_failures += 1
+            if self._circuit_failures >= self._circuit_threshold:
+                self._circuit_opened_at = time.monotonic()
+            raise LLMError(f"LLM streaming timed out after {self.LLM_TIMEOUT}s")
         except Exception as e:
             self._circuit_failures += 1
             if self._circuit_failures >= self._circuit_threshold:
