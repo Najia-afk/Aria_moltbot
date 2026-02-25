@@ -317,8 +317,14 @@ class AriaAPIClient(BaseSkill):
         description: str = "",
         priority: int = 2,
         status: str = "pending",
+        progress: int = 0,
         due_date: str | None = None,
-        goal_id: str | None = None
+        goal_id: str | None = None,
+        sprint: str | None = None,
+        board_column: str | None = None,
+        assigned_to: str | None = None,
+        tags: list | None = None,
+        **kwargs,
     ) -> SkillResult:
         """Create a goal."""
         try:
@@ -326,12 +332,21 @@ class AriaAPIClient(BaseSkill):
                 "title": title,
                 "description": description,
                 "priority": priority,
-                "status": status
+                "status": status,
+                "progress": progress,
             }
             if due_date:
                 data["due_date"] = due_date
             if goal_id:
                 data["goal_id"] = goal_id
+            if sprint:
+                data["sprint"] = sprint
+            if board_column:
+                data["board_column"] = board_column
+            if assigned_to:
+                data["assigned_to"] = assigned_to
+            if tags:
+                data["tags"] = tags
             
             resp = await self._client.post("/goals", json=data)
             resp.raise_for_status()
