@@ -71,7 +71,43 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"⚠️  Database init failed: {e}")
 
-    # S-52/S-53: Initialize Aria Engine (chat, streaming, agents)
+    # ── Phase 1: Seed DB tables (models + agents) BEFORE engine pool loads ──
+    # Models must be in DB before LLM gateway resolves them.
+    # Agents must be in DB before AgentPool.load_agents() reads them.
+
+    # Seed LLM models from models.yaml → llm_models DB table
+    try:
+        try:
+            from .models_sync import sync_models_from_yaml
+        except ImportError:
+            from models_sync import sync_models_from_yaml
+        try:
+            from .db import AsyncSessionLocal as _SeedSessionLocal
+        except ImportError:
+            from db import AsyncSessionLocal as _SeedSessionLocal
+        seed_stats = await sync_models_from_yaml(_SeedSessionLocal)
+        print(f"✅ Models synced to DB: {seed_stats['inserted']} new, {seed_stats['updated']} updated ({seed_stats['total']} total)")
+    except Exception as e:
+        print(f"⚠️  Models DB sync failed (non-fatal): {e}")
+
+    # Auto-sync agents from AGENTS.md → agent_state DB table
+    try:
+        try:
+            from .agents_sync import sync_agents_from_markdown
+        except ImportError:
+            from agents_sync import sync_agents_from_markdown
+        try:
+            from .db import AsyncSessionLocal as _AgentSessionLocal
+        except ImportError:
+            from db import AsyncSessionLocal as _AgentSessionLocal
+        agent_stats = await sync_agents_from_markdown(_AgentSessionLocal)
+        print(f"✅ Agents synced to DB: {agent_stats.get('inserted', 0)} new, {agent_stats.get('updated', 0)} updated ({agent_stats.get('total', 0)} total)")
+    except Exception as e:
+        print(f"⚠️  Agents DB sync failed (non-fatal): {e}")
+
+    # ── Phase 2: Initialize Aria Engine (chat, streaming, agents) ─────────
+    # S-52/S-53: Now that DB is seeded, engine pool will find all agents.
+    _rt_pool = None  # Keep reference for reload on POST /agents/db/sync
     try:
         from aria_engine.config import EngineConfig
         from aria_engine.llm_gateway import LLMGateway
@@ -134,35 +170,8 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"⚠️  Engine init failed (chat will be degraded): {e}")
 
-    # Seed LLM models from models.yaml → llm_models DB table
-    try:
-        try:
-            from .models_sync import sync_models_from_yaml
-        except ImportError:
-            from models_sync import sync_models_from_yaml
-        try:
-            from .db import AsyncSessionLocal as _SeedSessionLocal
-        except ImportError:
-            from db import AsyncSessionLocal as _SeedSessionLocal
-        seed_stats = await sync_models_from_yaml(_SeedSessionLocal)
-        print(f"✅ Models synced to DB: {seed_stats['inserted']} new, {seed_stats['updated']} updated ({seed_stats['total']} total)")
-    except Exception as e:
-        print(f"⚠️  Models DB sync failed (non-fatal): {e}")
-
-    # Auto-sync agents from AGENTS.md → agent_state DB table
-    try:
-        try:
-            from .agents_sync import sync_agents_from_markdown
-        except ImportError:
-            from agents_sync import sync_agents_from_markdown
-        try:
-            from .db import AsyncSessionLocal as _AgentSessionLocal
-        except ImportError:
-            from db import AsyncSessionLocal as _AgentSessionLocal
-        agent_stats = await sync_agents_from_markdown(_AgentSessionLocal)
-        print(f"✅ Agents synced to DB: {agent_stats.get('inserted', 0)} new, {agent_stats.get('updated', 0)} updated ({agent_stats.get('total', 0)} total)")
-    except Exception as e:
-        print(f"⚠️  Agents DB sync failed (non-fatal): {e}")
+    # Store pool reference so /agents/db/sync can reload it
+    app.state.agent_pool = _rt_pool
 
     # S4-07: Auto-sync skill graph on startup
     try:
