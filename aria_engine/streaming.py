@@ -516,13 +516,43 @@ class StreamManager:
             messages.append({"role": "system", "content": session.system_prompt})
 
         window = session.context_window or 50
+        MIN_CONVERSATION_TURNS = 10  # always keep at least this many user+assistant msgs
+        fetch_limit = max(window * 3, 200)  # over-fetch so we have room to pick
         result = await db.execute(
             select(EngineChatMessage)
             .where(EngineChatMessage.session_id == session.id)
             .order_by(EngineChatMessage.created_at.desc())
-            .limit(window)
+            .limit(fetch_limit)
         )
-        db_messages = list(reversed(result.scalars().all()))
+        all_db_messages = list(reversed(result.scalars().all()))
+
+        # Split into conversation (user/assistant) and tool/system messages
+        conversation_msgs = [m for m in all_db_messages if m.role in ("user", "assistant")]
+        tool_msgs = [m for m in all_db_messages if m.role not in ("user", "assistant")]
+
+        # Always keep at least MIN_CONVERSATION_TURNS of conversation history
+        # plus the most recent tool messages that fit within the window
+        keep_conv = conversation_msgs[-max(MIN_CONVERSATION_TURNS, window // 2):]
+        keep_conv_ids = {id(m) for m in keep_conv}
+
+        # Budget remaining window slots for tool messages (most recent first)
+        tool_budget = max(window - len(keep_conv), 10)
+        keep_tools = tool_msgs[-tool_budget:]
+        keep_tool_ids = {id(m) for m in keep_tools}
+
+        # Merge back in original chronological order
+        db_messages = [
+            m for m in all_db_messages
+            if id(m) in keep_conv_ids or id(m) in keep_tool_ids
+        ]
+
+        if len(all_db_messages) > window:
+            logger.info(
+                "Context protection: %d total msgs → kept %d conversation + %d tool "
+                "(window=%d, fetched=%d)",
+                len(all_db_messages), len(keep_conv), len(keep_tools),
+                window, fetch_limit,
+            )
 
         for msg in db_messages:
             entry: dict[str, Any] = {"role": msg.role, "content": msg.content or ""}
