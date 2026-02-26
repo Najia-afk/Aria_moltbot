@@ -173,7 +173,7 @@ jobs:
 
   - name: memory_bridge
     cron: "0 0 */3 * * *"
-    text: "Bridge activity data into semantic memory for cognitive skills. Call POST /api/analysis/seed-memories?limit=100&skip_existing=true via api_client. This backfills recent activities and thoughts into semantic_memories so pattern_recognition, sentiment_analysis, and unified_search have fresh data. Log result to activity_log via api_client activity action='cron_execution' with details {'job':'memory_bridge','estimated_tokens':50}."
+    text: "Bridge activity data into semantic memory for cognitive skills. Use the api_client seed_memories tool with limit=100 and skip_existing=true. This backfills recent activities and thoughts into semantic_memories (pgvector) so pattern_recognition, sentiment_analysis, and unified_search have fresh data. Log result to activity_log via api_client create_activity action='cron_execution' with details {'job':'memory_bridge','estimated_tokens':50}."
     agent: aria
     session: isolated
     delivery: none

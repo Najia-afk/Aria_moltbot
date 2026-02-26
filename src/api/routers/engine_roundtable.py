@@ -550,7 +550,8 @@ async def get_roundtable(session_id: str):
                 if isinstance(meta, str):
                     try:
                         meta = json.loads(meta)
-                    except Exception:
+                    except Exception as e:
+                        logger.warning("Metadata JSON parse error: %s", e)
                         meta = {}
 
                 if msg.role == "synthesis":
@@ -635,7 +636,8 @@ async def get_roundtable_turns(session_id: str):
             if isinstance(meta, str):
                 try:
                     meta = json.loads(meta)
-                except Exception:
+                except Exception as e:
+                    logger.warning("Metadata JSON parse error: %s", e)
                     meta = {}
             try:
                 round_num = int(role.split("-")[1])
@@ -833,7 +835,8 @@ async def get_swarm(session_id: str):
                 if isinstance(meta, str):
                     try:
                         meta = json.loads(meta)
-                    except Exception:
+                    except Exception as e:
+                        logger.warning("Metadata JSON parse error: %s", e)
                         meta = {}
 
                 if msg.role == "consensus":
@@ -990,6 +993,7 @@ async def _handle_roundtable_ws(
             "total_duration_ms": result.total_duration_ms,
         })
     except Exception as e:
+        logger.warning("WebSocket roundtable error: %s", e)
         await _ws_send(websocket, {"type": "error", "message": str(e)})
 
 
@@ -1039,6 +1043,7 @@ async def _handle_swarm_ws(
             "total_duration_ms": result.total_duration_ms,
         })
     except Exception as e:
+        logger.warning("WebSocket swarm error: %s", e)
         await _ws_send(websocket, {"type": "error", "message": str(e)})
 
 

@@ -174,6 +174,66 @@ async def generate_embedding(text: str) -> list[float]:
         return resp.json()["data"][0]["embedding"]
 
 
+@router.get("/memories/semantic/stats")
+async def semantic_memory_stats(db: AsyncSession = Depends(get_db)):
+    """Return aggregate statistics for the semantic memory store."""
+    from sqlalchemy import case, cast, String, text as sa_text
+
+    total = (await db.execute(
+        select(func.count()).select_from(SemanticMemory)
+    )).scalar() or 0
+
+    # Breakdown by category
+    cat_rows = (await db.execute(
+        select(SemanticMemory.category, func.count())
+        .group_by(SemanticMemory.category)
+        .order_by(func.count().desc())
+    )).all()
+    by_category = {r[0] or "general": r[1] for r in cat_rows}
+
+    # Breakdown by source
+    src_rows = (await db.execute(
+        select(SemanticMemory.source, func.count())
+        .group_by(SemanticMemory.source)
+        .order_by(func.count().desc())
+    )).all()
+    by_source = {r[0] or "unknown": r[1] for r in src_rows}
+
+    # Average importance
+    avg_imp = (await db.execute(
+        select(func.avg(SemanticMemory.importance))
+    )).scalar()
+
+    # Most recent and oldest
+    newest = (await db.execute(
+        select(func.max(SemanticMemory.created_at))
+    )).scalar()
+    oldest = (await db.execute(
+        select(func.min(SemanticMemory.created_at))
+    )).scalar()
+
+    # Most accessed
+    top_accessed = (await db.execute(
+        select(SemanticMemory.summary, SemanticMemory.category, SemanticMemory.access_count)
+        .where(SemanticMemory.access_count > 0)
+        .order_by(SemanticMemory.access_count.desc())
+        .limit(10)
+    )).all()
+
+    return {
+        "total": total,
+        "by_category": by_category,
+        "by_source": by_source,
+        "avg_importance": round(avg_imp or 0, 3),
+        "newest": newest.isoformat() if newest else None,
+        "oldest": oldest.isoformat() if oldest else None,
+        "top_accessed": [
+            {"summary": r[0], "category": r[1], "access_count": r[2]}
+            for r in top_accessed
+        ],
+    }
+
+
 @router.get("/memories/semantic")
 async def list_semantic_memories(
     category: str = None,

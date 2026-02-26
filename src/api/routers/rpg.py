@@ -11,6 +11,7 @@ Endpoints:
   GET /api/rpg/campaign/{id}/kg      — KG subgraph (vis-network format)
 """
 
+import logging
 import os
 from collections import deque
 from pathlib import Path
@@ -39,6 +40,7 @@ except ImportError:
     )
 
 router = APIRouter(tags=["RPG Dashboard"])
+logger = logging.getLogger("aria.api.rpg")
 
 # ── Paths (from env, never hardcoded) ────────────────────────────────────────
 
@@ -89,7 +91,8 @@ def _load_yaml_safe(path: Path) -> dict:
     try:
         import yaml
         return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    except Exception:
+    except Exception as e:
+        logger.warning("RPG data parse error: %s", e)
         return {}
 
 

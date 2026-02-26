@@ -3,6 +3,7 @@ Social posts endpoints (Moltbook + other platforms).
 """
 
 import json as json_lib
+import logging
 import os
 import uuid
 
@@ -21,6 +22,7 @@ except Exception:  # pragma: no cover
     httpx = None
 
 router = APIRouter(tags=["Social"])
+logger = logging.getLogger("aria.api.social")
 
 _DEFAULT_MOLTBOOK_API = "https://www.moltbook.com/api/v1"
 
@@ -33,7 +35,8 @@ def _is_test_social_payload(platform: str | None, content: str | None, metadata:
             return True
         try:
             parts.append(json_lib.dumps(metadata, ensure_ascii=False))
-        except Exception:
+        except Exception as e:
+            logger.warning("Social metadata parse error: %s", e)
             parts.append(str(metadata))
     haystack = " ".join(parts).lower()
     return any(marker in haystack for marker in markers)
@@ -93,7 +96,8 @@ async def _fetch_paginated_items(client, endpoint_templates: list[str], max_item
 
             try:
                 resp = await client.get(endpoint)
-            except Exception:
+            except Exception as e:
+                logger.warning("Social template item parse error: %s", e)
                 items_for_template = []
                 break
 

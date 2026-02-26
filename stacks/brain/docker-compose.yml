@@ -36,7 +36,7 @@ services:
       CONNECTION_TIMEOUT: 60000
       TOKEN: ${BROWSERLESS_TOKEN:-}
     ports:
-      - "3000:3000"
+      - "${BROWSERLESS_PORT:-3000}:3000"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/"]
       interval: 30s
@@ -109,8 +109,8 @@ services:
     container_name: tor-proxy
     restart: unless-stopped
     ports:
-      - "9050:9050"
-      - "9051:9051"
+      - "${TOR_SOCKS_PORT:-9050}:9050"
+      - "${TOR_CONTROL_PORT:-9051}:9051"
     healthcheck:
       test: ["CMD", "curl", "--socks5", "localhost:9050", "-s", "https://check.torproject.org/api/ip"]
       interval: 60s
@@ -148,6 +148,11 @@ services:
     container_name: traefik
     restart: unless-stopped
     entrypoint: ["/bin/sh", "/traefik-entrypoint.sh"]
+    environment:
+      SERVICE_HOST: ${SERVICE_HOST:-aria.local}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
+      TRAEFIK_DASHBOARD_USER: ${TRAEFIK_DASHBOARD_USER:-admin}
+      TRAEFIK_DASHBOARD_PASSWORD_HASH: ${TRAEFIK_DASHBOARD_PASSWORD_HASH:-}
     command:
       - "--api=true"
       - "--api.dashboard=true"
@@ -207,7 +212,7 @@ services:
     volumes:
       - ./litellm-config.yaml:/app/config.yaml:ro
     ports:
-      - "18793:4000"
+      - "${LITELLM_PORT:-18793}:4000"
     command: ["--config", "/app/config.yaml"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4000/health/readiness')"]
@@ -299,7 +304,7 @@ services:
       DATABASE_URL: postgresql://${DB_USER:-admin}:${DB_PASSWORD:-admin}@aria-db:5432/${DB_NAME:-aria_warehouse}
       # Local LLM (Ollama - native on host)
       OLLAMA_URL: http://host.docker.internal:11434
-      OLLAMA_MODEL: hf.co/unsloth/GLM-4.7-Flash-REAP-23B-A3B-GGUF:Q3_K_S
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-hf.co/unsloth/GLM-4.7-Flash-REAP-23B-A3B-GGUF:Q3_K_S}
       # LLM APIs (fallback)
       MOONSHOT_API_KEY: ${MOONSHOT_KIMI_KEY:-}
       # Moltbook
@@ -342,6 +347,8 @@ services:
     # Keep running for interactive mode
     tty: true
     stdin_open: true
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     mem_limit: ${ARIA_BRAIN_MEM_LIMIT:-512m}
     cpus: ${ARIA_BRAIN_CPU_LIMIT:-1.0}
 
@@ -356,7 +363,7 @@ services:
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
       SCRIPT_NAME: /pgadmin
     ports:
-      - "5050:80"
+      - "${PGADMIN_PORT:-5050}:80"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80/misc/ping"]
       interval: 30s
@@ -496,7 +503,7 @@ services:
       # S-100: Docker socket removed — admin uses docker-socket-proxy
       # See docker-socket-proxy service below
     ports:
-      - "8000:8000"
+      - "${ARIA_API_PORT:-8000}:8000"
     depends_on:
       aria-db:
         condition: service_healthy

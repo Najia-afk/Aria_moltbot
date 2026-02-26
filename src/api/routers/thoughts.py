@@ -3,6 +3,7 @@ Thoughts endpoints — CRUD for reasoning logs.
 """
 
 import json as json_lib
+import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -15,6 +16,7 @@ from pagination import paginate_query, build_paginated_response
 from schemas.requests import CreateThought as CreateThoughtBody, UpdateThought
 
 router = APIRouter(tags=["Thoughts"])
+logger = logging.getLogger("aria.api.thoughts")
 
 
 @router.get("/thoughts")

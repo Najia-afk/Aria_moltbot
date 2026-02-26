@@ -8,6 +8,8 @@ Safety rules:
 - Proposals CANNOT modify soul/ directory
 """
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,6 +20,7 @@ from pagination import paginate_query, build_paginated_response
 from schemas.requests import CreateProposal, ReviewProposal
 
 router = APIRouter(tags=["Proposals"])
+logger = logging.getLogger("aria.api.proposals")
 
 # Paths that proposals cannot touch
 _FORBIDDEN_PATHS = ["soul/", "aria_mind/soul/", "aria_mind/SOUL.md", "aria_mind/SOUL_EVIL.md"]

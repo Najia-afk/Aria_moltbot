@@ -48,6 +48,7 @@ async def health_check():
         async with async_engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
     except Exception as e:
+        logger.warning("DB health check failed: %s", e)
         db_status = f"error: {str(e)[:100]}"
         return HealthResponse(
             status="degraded",
@@ -115,6 +116,7 @@ async def api_status():
             finally:
                 socket.setdefaulttimeout(prev)
         except Exception as e:
+            logger.warning("Service probe %s failed: %s", name, e)
             return name, {"status": "down", "code": None, "error": str(e)[:50]}
 
     urls = {
@@ -136,7 +138,8 @@ async def api_status():
             try:
                 name, info = future.result(timeout=0)
                 results[name] = info
-            except Exception:
+            except Exception as e:
+                logger.warning("Service probe future error: %s", e)
                 results[future_map[future]] = {
                     "status": "down", "code": None, "error": "timeout",
                 }
@@ -158,7 +161,8 @@ async def api_status():
         async with async_engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
         results["postgres"] = {"status": "up", "code": 200}
-    except Exception:
+    except Exception as e:
+        logger.warning("Postgres check failed: %s", e)
         results["postgres"] = {"status": "down", "code": None}
     return results
 
@@ -170,7 +174,8 @@ async def api_status_service(service_id: str):
             async with async_engine.connect() as conn:
                 await conn.execute(text("SELECT 1"))
             return {"status": "online", "code": 200}
-        except Exception:
+        except Exception as e:
+            logger.warning("Service check failed: %s", e)
             return {"status": "offline", "code": None}
 
     service_info = SERVICE_URLS.get(service_id)
@@ -182,7 +187,8 @@ async def api_status_service(service_id: str):
             url = base_url.rstrip("/") + health_path
             resp = client.get(url)
         return {"status": "online", "code": resp.status_code}
-    except Exception:
+    except Exception as e:
+        logger.warning("HTTP service probe failed: %s", e)
         return {"status": "offline", "code": None}
 
 
@@ -207,6 +213,7 @@ async def database_health():
         from db.session import check_database_health
         return await check_database_health()
     except Exception as e:
+        logger.warning("DB health detailed check failed: %s", e)
         return {
             "status": "error",
             "error": str(e)[:200],

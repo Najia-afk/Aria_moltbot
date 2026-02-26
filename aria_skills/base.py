@@ -16,6 +16,8 @@ from enum import Enum
 from functools import wraps
 from typing import Any, Callable, TypeVar
 
+from aria_engine.circuit_breaker import CircuitBreaker
+
 # Optional imports for enhanced features
 try:
     from tenacity import retry, stop_after_attempt, wait_exponential, RetryError
@@ -128,11 +130,12 @@ class BaseSkill(ABC):
         self._last_used: datetime | None = None
         self._use_count = 0
         self._error_count = 0
-        # Circuit breaker state (per skill instance)
-        self._cb_failures = 0
-        self._cb_threshold = 5
-        self._cb_reset_after = 60.0  # seconds
-        self._cb_opened_at: float | None = None
+        # Circuit breaker (shared module — S-22)
+        self._cb = CircuitBreaker(
+            name=f"skill-{self.name}",
+            threshold=5,
+            reset_after=60.0,
+        )
     
     @property
     @abstractmethod
@@ -417,29 +420,13 @@ class BaseSkill(ABC):
     # ── Circuit Breaker ─────────────────────────────────────────
     def _is_cb_open(self) -> bool:
         """Check if this skill's circuit breaker is open."""
-        if self._cb_failures < self._cb_threshold:
-            return False
-        if self._cb_opened_at is None:
-            return False
-        elapsed = time.monotonic() - self._cb_opened_at
-        if elapsed > self._cb_reset_after:
-            self._cb_failures = 0
-            self._cb_opened_at = None
-            self.logger.info("Circuit breaker half-open for %s — retrying", self.name)
-            return False
-        return True
+        return self._cb.is_open()
 
     def _cb_record_success(self):
-        self._cb_failures = 0
+        self._cb.record_success()
 
     def _cb_record_failure(self):
-        self._cb_failures += 1
-        if self._cb_failures >= self._cb_threshold:
-            self._cb_opened_at = time.monotonic()
-            self.logger.warning(
-                "Circuit breaker OPEN for %s after %d failures",
-                self.name, self._cb_failures,
-            )
+        self._cb.record_failure()
 
     async def safe_execute(
         self,

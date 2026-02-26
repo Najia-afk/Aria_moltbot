@@ -44,6 +44,24 @@ class AgentPoolStatus(BaseModel):
     agents: list[AgentSummary]
 
 
+class DelegateRequest(BaseModel):
+    """Request to delegate a task to a specific agent."""
+    agent_id: str
+    message: str
+    session_id: str | None = None
+    context: dict[str, Any] | None = None
+
+
+class DelegateResponse(BaseModel):
+    """Response from a delegated agent task."""
+    agent_id: str
+    session_id: str | None = None
+    response: str = ""
+    status: str = "completed"
+    duration_ms: int = 0
+    metadata: dict[str, Any] | None = None
+
+
 def get_pool() -> AgentPool:
     """
     Get the agent pool from the global engine instance.
@@ -100,3 +118,46 @@ async def get_agent(
     if agent is None:
         raise HTTPException(404, f"Agent {agent_id!r} not found")
     return AgentSummary(**agent.get_summary())
+
+
+@router.post("/delegate", response_model=DelegateResponse)
+async def delegate_task(
+    req: DelegateRequest,
+    pool: AgentPool = Depends(get_pool),
+) -> DelegateResponse:
+    """Delegate a task to a specific agent (S-11).
+
+    Sends a message to the target agent via the pool's process_with_agent()
+    method and returns the result.
+    """
+    import time
+
+    if not pool._agents:
+        await pool.load_agents()
+
+    agent = pool.get_agent(req.agent_id)
+    if agent is None:
+        raise HTTPException(404, f"Agent {req.agent_id!r} not found")
+
+    kwargs: dict[str, Any] = {}
+    if req.session_id:
+        kwargs["session_id"] = req.session_id
+    if req.context:
+        kwargs["context"] = req.context
+
+    t0 = time.perf_counter()
+    try:
+        result = await pool.process_with_agent(req.agent_id, req.message, **kwargs)
+        duration_ms = int((time.perf_counter() - t0) * 1000)
+        return DelegateResponse(
+            agent_id=req.agent_id,
+            session_id=result.get("session_id") or req.session_id,
+            response=result.get("response", result.get("content", "")),
+            status="completed",
+            duration_ms=duration_ms,
+            metadata=result.get("metadata"),
+        )
+    except Exception as exc:
+        duration_ms = int((time.perf_counter() - t0) * 1000)
+        logger.warning("Delegate to %s failed: %s", req.agent_id, exc)
+        raise HTTPException(502, f"Agent delegation failed: {exc}") from exc

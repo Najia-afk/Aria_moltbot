@@ -5,6 +5,7 @@ All LLM calls are logged here by the engine's telemetry module
 (aria_engine.telemetry.log_model_usage).  No direct LiteLLM DB queries.
 """
 
+import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -18,6 +19,7 @@ from pagination import build_paginated_response
 from schemas.requests import CreateModelUsage
 
 router = APIRouter(tags=["Model Usage"])
+logger = logging.getLogger("aria.api.model_usage")
 
 
 _TEST_MODEL_NAMES = {"test-model", "test_model"}

@@ -3,6 +3,7 @@ Security events endpoints — CRUD + stats.
 """
 
 import json as json_lib
+import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -15,6 +16,7 @@ from pagination import paginate_query, build_paginated_response
 from schemas.requests import CreateSecurityEvent as CreateSecurityEventBody
 
 router = APIRouter(tags=["Security"])
+logger = logging.getLogger("aria.api.security")
 
 
 def _parse_jsonb(val, default):

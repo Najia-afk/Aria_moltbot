@@ -4,6 +4,7 @@
 # =============================================================================
 
 from flask import Flask, render_template, make_response, request, Response, send_from_directory, jsonify, redirect
+from flask_wtf.csrf import CSRFProtect
 import os
 import time
 import logging
@@ -23,6 +24,11 @@ def create_app():
     app.config['SESSION_COOKIE_SECURE'] = _is_production
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
+    # S-17: CSRF protection
+    csrf = CSRFProtect(app)
+    # Exempt the API proxy route from CSRF (it forwards to the backend)
+    csrf.exempt('api_proxy')
 
     service_host = os.environ['SERVICE_HOST']
     api_base_url = os.environ['API_BASE_URL']
@@ -259,14 +265,21 @@ def create_app():
     @app.route('/cron')
     @app.route('/cron/')
     def cron_page():
-        """Cron job management page."""
-        return render_template('engine_cron.html')
+        """Cron — redirect to unified operations cron page (S-13)."""
+        return redirect('/operations/cron/', code=301)
 
     @app.route('/agents')
     @app.route('/agents/')
     def agents_page():
         """Agent management page."""
         return render_template('engine_agents.html')
+
+    @app.route('/swarm-recap')
+    @app.route('/swarm-recap/')
+    @app.route('/swarm-recap/<session_id>')
+    def swarm_recap(session_id=None):
+        """Swarm decision recap page (S-09)."""
+        return render_template('engine_swarm_recap.html', session_id=session_id)
 
     @app.route('/agent-dashboard')
     @app.route('/agent-dashboard/')
@@ -327,6 +340,12 @@ def create_app():
     @app.route('/rpg/')
     def rpg():
         return render_template('rpg.html')
+
+    @app.route('/memory-explorer')
+    @app.route('/memory-explorer/')
+    def memory_explorer():
+        """Semantic memory explorer — browse pgvector embeddings, search, seed."""
+        return render_template('memory_explorer.html')
 
     # Flask remains UI-only. All data access goes through the FastAPI service.
 

@@ -946,6 +946,7 @@ class EngineCronJob(Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     schedule: Mapped[str] = mapped_column(String(100), nullable=False)
     agent_id: Mapped[str] = mapped_column(String(100), server_default=text("'aria'"))
+    model: Mapped[str | None] = mapped_column(String(200), nullable=True, doc="LLM model override for this cron job")
     enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
     payload_type: Mapped[str] = mapped_column(String(50), server_default=text("'prompt'"))
     payload: Mapped[str] = mapped_column(Text, nullable=False)

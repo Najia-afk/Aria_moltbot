@@ -5,6 +5,7 @@ Provides CRUD plus weighted-context retrieval and checkpoint/restore.
 """
 
 import json
+import logging
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -20,6 +21,7 @@ from pagination import paginate_query, build_paginated_response
 from schemas.requests import CreateWorkingMemory, UpdateWorkingMemory
 
 router = APIRouter(tags=["Working Memory"])
+logger = logging.getLogger("aria.api.working_memory")
 
 
 def _not_expired_clause():
@@ -448,6 +450,7 @@ async def get_working_memory_file_snapshot():
             "snapshot": picked_payload,
         }
     except Exception as exc:
+        logger.warning("File snapshot read failed: %s", exc)
         raise HTTPException(status_code=500, detail=f"Failed to read file snapshot: {exc}")
 
 

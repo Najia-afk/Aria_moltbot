@@ -3,6 +3,7 @@ Knowledge graph endpoints — entities, relations, traversal, search, query logg
 """
 
 import json as json_lib
+import logging
 import uuid
 from collections import deque
 from datetime import datetime, timezone
@@ -17,6 +18,7 @@ from db.models import KnowledgeEntity, KnowledgeRelation, KnowledgeQueryLog, Ski
 from deps import get_db
 
 router = APIRouter(tags=["Knowledge Graph"])
+logger = logging.getLogger("aria.api.knowledge")
 
 
 def _is_test_kg_payload(*values: str) -> bool:
@@ -127,7 +129,8 @@ async def _resolve_entity_id(db: AsyncSession, ref: str) -> uuid.UUID:
     db.add(entity)
     try:
         await db.flush()
-    except Exception:
+    except Exception as e:
+        logger.warning("Knowledge entity creation failed: %s", e)
         await db.rollback()
         raise HTTPException(
             status_code=404,
@@ -150,7 +153,8 @@ async def _log_query(db: AsyncSession, query_type: str, params: dict, result_cou
         )
         db.add(log)
         await db.commit()
-    except Exception:
+    except Exception as e:
+        logger.warning("Knowledge relation creation failed: %s", e)
         await db.rollback()  # Restore session to usable state
 
 
@@ -207,6 +211,7 @@ async def sync_skills():
     try:
         stats = await sync_skill_graph()
     except Exception as exc:
+        logger.warning("Knowledge sync failed: %s", exc)
         raise HTTPException(status_code=500, detail=f"Sync failed: {exc}")
     return {"status": "ok", "stats": stats}
 
@@ -316,6 +321,7 @@ async def create_knowledge_entity(body: EntityCreate, db: AsyncSession = Depends
     try:
         await db.commit()
     except Exception as exc:
+        logger.warning("Entity merge conflict: %s", exc)
         await db.rollback()
         raise HTTPException(status_code=409, detail=f"Entity creation failed: {exc}")
     return {"id": str(entity.id), "created": True}
@@ -340,6 +346,7 @@ async def create_knowledge_relation(body: RelationCreate, db: AsyncSession = Dep
     try:
         await db.commit()
     except Exception as exc:
+        logger.warning("Relation merge conflict: %s", exc)
         await db.rollback()
         raise HTTPException(status_code=409, detail=f"Relation creation failed: {exc}")
     return {"id": str(relation.id), "created": True}

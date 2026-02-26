@@ -123,7 +123,8 @@ async def detect_patterns(req: PatternDetectionRequest, db: AsyncSession = Depen
             }
             try:
                 embedding = await _generate_embedding(content_text)
-            except Exception:
+            except Exception as e:
+                logger.warning("Embedding generation failed: %s", e)
                 embedding = [0.0] * 768
 
             # Check for existing pattern with same type+subject
@@ -209,7 +210,8 @@ async def run_compression(req: CompressionRequest, db: AsyncSession = Depends(ge
         for cm in manager.compressed_store:
             try:
                 embedding = await _generate_embedding(cm.summary)
-            except Exception:
+            except Exception as e:
+                logger.warning("Embedding generation failed: %s", e)
                 embedding = [0.0] * 768
             mem = SemanticMemory(
                 content=cm.summary,
@@ -322,7 +324,8 @@ async def run_auto_compression(
         for cm in manager.compressed_store:
             try:
                 embedding = await _generate_embedding(cm.summary)
-            except Exception:
+            except Exception as e:
+                logger.warning("Embedding generation failed: %s", e)
                 embedding = [0.0] * 768
             db.add(SemanticMemory(
                 content=cm.summary,

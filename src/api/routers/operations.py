@@ -5,6 +5,7 @@ schedule, jobs, API key rotations.
 
 import json
 import json as json_lib
+import logging
 import os
 import uuid
 from datetime import datetime, timezone
@@ -37,6 +38,7 @@ from schemas.requests import (
 )
 
 router = APIRouter(tags=["Operations"])
+logger = logging.getLogger("aria.api.operations")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -396,8 +398,10 @@ async def sync_jobs(db: AsyncSession = Depends(get_db)):
         total = stats.get("inserted", 0) + stats.get("updated", 0) + stats.get("unchanged", 0)
         return {"synced": total, "source": "cron_jobs.yaml", **stats}
     except Exception as e:
+        logger.warning("Operation failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=500, detail=f"Invalid JSON: {e}")
     except Exception as e:
+        logger.warning("Operation failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))

@@ -410,6 +410,15 @@ CREATE TABLE IF NOT EXISTS aria_data.semantic_memories (
 CREATE INDEX IF NOT EXISTS idx_semantic_category   ON aria_data.semantic_memories(category);
 CREATE INDEX IF NOT EXISTS idx_semantic_importance ON aria_data.semantic_memories(importance);
 CREATE INDEX IF NOT EXISTS idx_semantic_created    ON aria_data.semantic_memories(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_semantic_source     ON aria_data.semantic_memories(source);
+
+-- HNSW vector index for fast approximate nearest-neighbor cosine search.
+-- ef_construction=128 gives good recall; m=16 keeps the graph compact.
+-- Requires pgvector >= 0.5.0 (we ship 0.8.0).
+CREATE INDEX IF NOT EXISTS idx_semantic_embedding_hnsw
+    ON aria_data.semantic_memories
+    USING hnsw (embedding vector_cosine_ops)
+    WITH (m = 16, ef_construction = 128);
 
 -- ============================================================================
 -- Lessons Learned

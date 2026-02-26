@@ -3,6 +3,7 @@ Skill Registry endpoints — read skill health status from the skill_status tabl
 Skill Invocation stats (S5-07) — observability dashboard data.
 """
 
+import logging
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -16,6 +17,7 @@ from deps import get_db
 from schemas.requests import CreateSkillInvocation
 
 router = APIRouter(tags=["Skills"])
+logger = logging.getLogger("aria.api.skills")
 
 _SKILL_SUPPORT_DIRS = {"_template", "__pycache__", "pipelines"}
 
@@ -86,6 +88,7 @@ def _coherence_scan(include_support: bool = False) -> dict:
                         f"skill.json name mismatch: expected '{canonical}', got '{actual_name}'"
                     )
             except Exception as exc:
+                logger.warning("skill.json parse error: %s", exc)
                 row["name_matches"] = False
                 row["errors"].append(f"skill.json parse error: {exc}")
 

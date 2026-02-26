@@ -744,6 +744,48 @@
         },
         "required": ["category", "filename"]
       }
+    },
+    {
+      "name": "seed_memories",
+      "description": "Backfill semantic_memories from recent activities and thoughts. Generates pgvector embeddings and stores them for pattern recognition, sentiment analysis, and semantic search. Should be called periodically by memory_bridge cron.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "description": "Maximum number of records to seed per source (default: 100)"
+          },
+          "skip_existing": {
+            "type": "boolean",
+            "description": "Skip records already seeded (default: true)"
+          }
+        }
+      }
+    },
+    {
+      "name": "detect_patterns",
+      "description": "Run pattern detection on semantic memories. Finds recurring themes, behaviors, and anomalies.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "description": "Filter by memory category (optional)"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Maximum memories to analyze (default: 50)"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_memory_stats",
+      "description": "Get statistics about semantic memories — total count, breakdown by category and source, average importance, recent activity.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
     }
   ],
   "run": "python3 /app/skills/run_skill.py api_client {{tool}} '{{args_json}}'"

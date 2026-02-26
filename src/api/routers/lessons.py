@@ -2,6 +2,8 @@
 Lessons Learned endpoints — error recovery system (S5-02).
 """
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -13,6 +15,7 @@ from pagination import paginate_query, build_paginated_response
 from schemas.requests import CreateLesson, UpdateLesson
 
 router = APIRouter(tags=["Lessons"])
+logger = logging.getLogger("aria.api.lessons")
 
 
 # ── Known error patterns — seeded on first POST /lessons/seed ──────────────

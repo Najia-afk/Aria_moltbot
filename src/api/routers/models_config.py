@@ -43,7 +43,8 @@ def _load_catalog() -> dict[str, Any]:
                 try:
                     import yaml
                     _catalog_cache = yaml.safe_load(content) or {}
-                except Exception:
+                except Exception as e:
+                    logger.warning("Model catalog YAML parse error: %s", e)
                     _catalog_cache = {}
             return _catalog_cache
     _catalog_cache = {}

@@ -3,6 +3,7 @@ Admin endpoints — service control + soul file access + DB maintenance.
 """
 
 import asyncio
+import logging
 import os
 
 import httpx
@@ -14,6 +15,7 @@ from config import ARIA_ADMIN_TOKEN, SERVICE_CONTROL_ENABLED
 from deps import get_db
 
 router = APIRouter(tags=["Admin"])
+logger = logging.getLogger("aria.api.admin")
 
 VACUUM_TABLES = ["activity_log", "model_usage", "heartbeat_log", "thoughts"]
 
@@ -84,6 +86,7 @@ async def api_service_control(service_id: str, action: str, request: Request):
             "stderr": (stderr or b"")[-2000:].decode("utf-8", errors="ignore"),
         }
     except Exception as exc:
+        logger.warning("Admin operation failed: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
 
 
@@ -170,6 +173,7 @@ def _read_root_file(kind: str, path: str) -> dict:
         with open(full, "r", encoding="utf-8", errors="replace") as f:
             return {"path": safe, "content": f.read()}
     except Exception as e:
+        logger.warning("Health check proxy failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -233,6 +237,7 @@ async def run_maintenance(db: AsyncSession = Depends(get_db)):
             await db.execute(text(f"ANALYZE {table}"))
             results[table] = "analyzed"
         except Exception as e:
+            logger.warning("Data integrity check error for %s: %s", table, e)
             results[table] = f"error: {e}"
     return {"maintenance": "complete", "tables": results}
 

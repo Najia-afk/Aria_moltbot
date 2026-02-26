@@ -1,5 +1,6 @@
 flask>=3.0.0
 flask-cors>=4.0.0
+flask-wtf>=1.2.0
 requests>=2.31.0
 psycopg2-binary>=2.9.10
 pyOpenSSL>=23.3.0

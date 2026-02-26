@@ -1413,6 +1413,53 @@ class AriaAPIClient(BaseSkill):
             return SkillResult.fail(f"Failed to summarize session: {e}")
 
     # ========================================
+    # Memory Bridge / Seed (analysis)
+    # ========================================
+    async def seed_memories(
+        self, limit: int = 100, skip_existing: bool = True,
+    ) -> SkillResult:
+        """Backfill semantic_memories from recent activities + thoughts.
+
+        Calls POST /analysis/seed-memories which generates embeddings via
+        LiteLLM and stores them in pgvector for pattern recognition,
+        sentiment analysis, and semantic search.
+        """
+        try:
+            resp = await self._client.post(
+                "/analysis/seed-memories",
+                params={"limit": limit, "skip_existing": skip_existing},
+            )
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to seed memories: {e}")
+
+    async def detect_patterns(
+        self, category: str = None, limit: int = 50,
+    ) -> SkillResult:
+        """Run pattern detection on semantic memories."""
+        try:
+            data: dict[str, Any] = {}
+            if category:
+                data["category"] = category
+            if limit:
+                data["limit"] = limit
+            resp = await self._client.post("/analysis/patterns/detect", json=data)
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to detect patterns: {e}")
+
+    async def get_memory_stats(self) -> SkillResult:
+        """Get statistics about semantic memories (counts, categories, sources)."""
+        try:
+            resp = await self._client.get("/memories/semantic/stats")
+            resp.raise_for_status()
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to get memory stats: {e}")
+
+    # ========================================
     # Lessons Learned (S5-02)
     # ========================================
     async def record_lesson(

@@ -1,26 +1,14 @@
 {
-  "timestamp": "2026-02-25T16:42:00Z",
-  "context": {
-    "last_goal_id": "goal-3745a4e7",
-    "last_goal_title": "Working Memory Maintenance",
-    "work_cycle_actions": [
-      "Verified system health (all components healthy)",
-      "Identified no active goals in progress",
-      "Created new goal: Working Memory Maintenance",
-      "Moved goal to 'doing' status",
-      "Created hourly goal for learning session",
-      "Progressed goal to 50% complete"
-    ]
+  "session_start": "2026-02-25T23:05:06Z",
+  "last_sync": "2026-02-25T23:06:15Z",
+  "active_goals": ["goal-d06f2494"],
+  "system_health": "healthy",
+  "recent_activities": 3,
+  "scheduled_jobs": 15,
+  "agent_stats": {
+    "total_sessions": 0,
+    "total_tokens": 0,
+    "total_cost": 0
   },
-  "system_status": {
-    "overall": "healthy",
-    "memory_usage": "30.3%",
-    "disk_usage": "3.7%",
-    "python_version": "3.13.12"
-  },
-  "next_actions": [
-    "Complete working memory sync",
-    "Update goal progress to 100%",
-    "Move goal to 'done' status"
-  ]
+  "work_cycle_summary": "Initial system health check complete. No active agents. System initialized and operational. Created first goal to establish productive work routine."
 }

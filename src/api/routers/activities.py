@@ -3,6 +3,7 @@ Activity log endpoints — CRUD + activity feed + interactions.
 """
 
 import json as json_lib
+import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -16,6 +17,7 @@ from pagination import paginate_query, build_paginated_response
 from schemas.requests import CreateActivity, UpdateActivity
 
 router = APIRouter(tags=["Activities"])
+logger = logging.getLogger("aria.api.activities")
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────

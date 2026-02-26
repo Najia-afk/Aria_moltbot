@@ -2,6 +2,7 @@
 Goals + hourly goals endpoints.
 """
 
+import logging
 import uuid
 from datetime import datetime
 
@@ -15,6 +16,7 @@ from pagination import paginate_query, build_paginated_response
 from schemas.requests import CreateGoal, UpdateGoal, MoveGoal, CreateHourlyGoal, UpdateHourlyGoal
 
 router = APIRouter(tags=["Goals"])
+logger = logging.getLogger("aria.api.goals")
 
 
 def _is_noisy_goal_payload(goal_id: str | None, title: str | None, description: str | None) -> bool:

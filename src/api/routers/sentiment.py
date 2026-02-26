@@ -245,7 +245,8 @@ def _extract_user_messages_from_jsonl(
 
                     try:
                         parsed = json_lib.loads(raw)
-                    except Exception:
+                    except Exception as e:
+                        logger.warning("Sentiment JSON parse error: %s", e)
                         continue
                     if not isinstance(parsed, dict):
                         continue
@@ -268,7 +269,8 @@ def _extract_user_messages_from_jsonl(
                             "origin": "legacy_jsonl",
                         }
                     )
-        except Exception:
+        except Exception as e:
+            logger.warning("Sentiment file parse error: %s", e)
             continue
 
     return extracted
@@ -424,7 +426,8 @@ async def analyze_message_sentiment(req: SentimentRequest, db: AsyncSession = De
 
             try:
                 embedding = await _generate_embedding(content_text)
-            except Exception:
+            except Exception as e:
+                logger.warning("Embedding generation failed: %s", e)
                 embedding = [0.0] * 768
             mem = SemanticMemory(
                 content=content_text,
@@ -442,6 +445,7 @@ async def analyze_message_sentiment(req: SentimentRequest, db: AsyncSession = De
 
         return result
     except Exception as e:
+        logger.warning("Sentiment analysis failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -617,7 +621,8 @@ async def backfill_sentiment_from_sessions(
             if req.store_semantic:
                 try:
                     embedding = await _generate_embedding(text)
-                except Exception:
+                except Exception as e:
+                    logger.warning("Embedding generation failed: %s", e)
                     embedding = [0.0] * 768
 
                 db.add(SemanticMemory(
@@ -645,6 +650,7 @@ async def backfill_sentiment_from_sessions(
             "sample": sample,
         }
     except Exception as e:
+        logger.warning("Batch sentiment failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -668,6 +674,7 @@ async def analyze_conversation_sentiment(req: ConversationSentimentRequest,
         result = await conv.analyze_conversation(req.messages)
         return result.to_dict()
     except Exception as e:
+        logger.warning("Score computation failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -815,7 +822,8 @@ async def analyze_realtime_user_reply_sentiment(
             )
             try:
                 embedding = await _generate_embedding(text)
-            except Exception:
+            except Exception as e:
+                logger.warning("Embedding generation failed: %s", e)
                 embedding = [0.0] * 768
             mem = SemanticMemory(
                 content=content_text,
@@ -851,6 +859,7 @@ async def analyze_realtime_user_reply_sentiment(
     except HTTPException:
         raise
     except Exception as e:
+        logger.warning("Trend analysis failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -960,7 +969,8 @@ async def backfill_sentiment_from_session_messages(
                 )
                 try:
                     embedding = await _generate_embedding(text)
-                except Exception:
+                except Exception as e:
+                    logger.warning("Embedding generation failed: %s", e)
                     embedding = [0.0] * 768
                 db.add(
                     SemanticMemory(
@@ -987,6 +997,7 @@ async def backfill_sentiment_from_session_messages(
             "sample": sample,
         }
     except Exception as e:
+        logger.warning("Sentiment corpus failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
