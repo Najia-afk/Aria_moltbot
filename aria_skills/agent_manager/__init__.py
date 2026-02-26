@@ -169,6 +169,10 @@ class AgentManagerSkill(BaseSkill):
     async def terminate_agent(self, session_id: str) -> SkillResult:
         """Terminate an agent session gracefully.
 
+        Works for both engine sessions (from spawn_focused_agent) and
+        legacy data-layer sessions.  Tries the engine endpoint first,
+        falls back to data-layer PATCH.
+
         Args:
             session_id: UUID of the session to terminate
         """
@@ -176,6 +180,15 @@ class AgentManagerSkill(BaseSkill):
             return SkillResult.fail("Not initialized")
 
         try:
+            # Try engine endpoint first (covers spawn_focused_agent sessions)
+            result = await self._api.delete(
+                f"/engine/chat/sessions/{session_id}",
+            )
+            if result and result.success:
+                self._log_usage("terminate_agent", True, session_id=session_id)
+                return SkillResult.ok({"session_id": session_id, "status": "ended"})
+
+            # Fallback: legacy data-layer PATCH
             result = await self._api.patch(
                 f"/sessions/{session_id}",
                 data={"status": "terminated"},
@@ -356,12 +369,9 @@ class AgentManagerSkill(BaseSkill):
         focus: str,
         tools: list[str],
         model: str | None = None,
+        persistent: bool = False,
     ) -> SkillResult:
         """Spawn a sub-agent, send the task, and return its response.
-
-        Full lifecycle: create session → send task → collect result.
-        The session is left open so the caller can send follow-ups
-        or terminate it explicitly.
 
         Args:
             task: Task description for the sub-agent
@@ -369,6 +379,10 @@ class AgentManagerSkill(BaseSkill):
             tools: List of tool/skill names the sub-agent is allowed to use
             model: Optional LLM model ID from models.yaml to use.
                 If None, the system default model is used.
+            persistent: If False (default), the session is closed after the
+                first response (ephemeral / one-shot).  If True, the session
+                stays open so the caller can send follow-ups via
+                send_to_agent() and close it later with terminate_agent().
         """
         if not self._api:
             return SkillResult.fail("Not initialized")
@@ -392,6 +406,7 @@ class AgentManagerSkill(BaseSkill):
                     "tools_allowed": tools,
                     "constraints": [f"Use ONLY these tools: {', '.join(tools)}"],
                     "parent_id": "agent_manager",
+                    "persistent": persistent,
                 },
             }
             if model:
@@ -404,8 +419,8 @@ class AgentManagerSkill(BaseSkill):
                 raise Exception("Session created but no id returned")
 
             self.logger.info(
-                "spawn_focused_agent: session %s created (focus=%s)",
-                session_id, focus,
+                "spawn_focused_agent: session %s created (focus=%s, persistent=%s)",
+                session_id, focus, persistent,
             )
 
             # 2. Send the task as a message and get the LLM response
@@ -431,13 +446,31 @@ class AgentManagerSkill(BaseSkill):
                 focus=focus,
                 model=resp_model,
                 tokens=total_tokens,
+                persistent=persistent,
             )
 
-            # 3. Return the full result so the parent can read & decide
+            # 3. Ephemeral: close session.  Persistent: leave open.
+            if not persistent:
+                try:
+                    await self._api.delete(
+                        f"/engine/chat/sessions/{session_id}"
+                    )
+                    self.logger.debug(
+                        "spawn_focused_agent: ephemeral session %s closed",
+                        session_id,
+                    )
+                except Exception as ce:
+                    self.logger.warning(
+                        "spawn_focused_agent: cleanup failed for %s: %s",
+                        session_id, ce,
+                    )
+
+            # 4. Return the full result so the parent can read & decide
             return SkillResult.ok({
                 "session_id": session_id,
                 "focus": focus,
                 "model": resp_model,
+                "persistent": persistent,
                 "content": content,
                 "tool_calls": response_data.get("tool_calls"),
                 "tool_results": response_data.get("tool_results"),
@@ -456,69 +489,39 @@ class AgentManagerSkill(BaseSkill):
                     pass
             return SkillResult.fail(f"Focused agent failed: {e}")
 
-    # ── High-level delegation (S-11) ─────────────────────────────
+    # ── Follow-up messaging ──────────────────────────────────────
 
     @log_latency
-    async def delegate_task(
+    async def send_to_agent(
         self,
-        task: str,
-        agent_type: str = "analyst",
-        model: str | None = None,
-        tools: list[str] | None = None,
-        timeout_seconds: int = 300,
-        cleanup: bool = True,
+        session_id: str,
+        message: str,
+        enable_tools: bool = True,
     ) -> SkillResult:
-        """Atomic task delegation: spawn → send task → poll → collect → cleanup.
+        """Send a follow-up message to a persistent sub-agent session.
 
-        This is the high-level method for delegating work to a sub-agent.
-        It handles the full lifecycle in one call.
+        Use this after spawn_focused_agent(persistent=True) to continue
+        the conversation with the same sub-agent.
 
         Args:
-            task: The task/prompt to send to the sub-agent.
-            agent_type: Agent profile ID (default "analyst").
-            model: Optional LLM model ID to use for this delegation.
-            tools: Optional list of tool/skill names to allow.
-            timeout_seconds: Max wait time for completion (default 300s).
-            cleanup: Whether to terminate the session after completion.
+            session_id: The session UUID returned by spawn_focused_agent.
+            message: The follow-up message / instruction to send.
+            enable_tools: Whether the sub-agent may call tools (default True).
 
         Returns:
-            SkillResult with the agent's response data, including
-            model, tokens, cost, and content.
+            SkillResult with the sub-agent's response content,
+            tool_calls, cost, etc.
         """
         if not self._api:
             return SkillResult.fail("Not initialized")
 
-        # 1. Spawn the agent session
-        context = {
-            "task": task,
-            "parent_id": "delegate_task",
-            "tools_allowed": tools or [],
-        }
-        spawn_result = await self.spawn_agent(
-            agent_type=agent_type,
-            context=context,
-            model=model,
-        )
-        if not spawn_result.success:
-            return SkillResult.fail(f"Spawn failed: {spawn_result.error}")
-
-        session_id = spawn_result.data.get("id") or spawn_result.data.get("session_id")
-        if not session_id:
-            return SkillResult.fail("Spawn succeeded but no session_id returned")
-
-        self.logger.info(
-            "delegate_task: spawned session %s (agent=%s, model=%s)",
-            session_id, agent_type, model or "default",
-        )
-
         try:
-            # 2. Send the task as a message
             msg_result = await self._api.post(
                 f"/engine/chat/sessions/{session_id}/messages",
                 data={
-                    "content": task,
+                    "content": message,
                     "enable_thinking": False,
-                    "enable_tools": bool(tools),
+                    "enable_tools": enable_tools,
                 },
             )
             if not msg_result or not msg_result.success:
@@ -527,36 +530,22 @@ class AgentManagerSkill(BaseSkill):
 
             response_data = msg_result.data or {}
             self._log_usage(
-                "delegate_task", True,
-                agent_type=agent_type,
-                model=response_data.get("model", model or "default"),
+                "send_to_agent", True,
+                session_id=session_id,
                 tokens=response_data.get("total_tokens", 0),
             )
 
             return SkillResult.ok({
                 "session_id": session_id,
-                "agent_type": agent_type,
-                "model": response_data.get("model", ""),
                 "content": response_data.get("content", ""),
+                "tool_calls": response_data.get("tool_calls"),
+                "tool_results": response_data.get("tool_results"),
+                "model": response_data.get("model", ""),
                 "total_tokens": response_data.get("total_tokens", 0),
                 "cost_usd": response_data.get("cost_usd", 0),
-                "thinking": response_data.get("thinking", ""),
             })
-
         except Exception as e:
-            self._log_usage("delegate_task", False, error=str(e))
-            return SkillResult.fail(f"Delegation failed: {e}")
+            self._log_usage("send_to_agent", False, error=str(e))
+            return SkillResult.fail(f"Follow-up failed: {e}")
 
-        finally:
-            # 3. Cleanup: close the engine session
-            if cleanup and session_id:
-                try:
-                    await self._api.delete(
-                        f"/engine/chat/sessions/{session_id}"
-                    )
-                    self.logger.debug("delegate_task: cleaned up session %s", session_id)
-                except Exception as cleanup_err:
-                    self.logger.warning(
-                        "delegate_task: cleanup failed for %s: %s",
-                        session_id, cleanup_err,
-                    )
+    # ── (delegate_task removed — use spawn_focused_agent instead) ──
