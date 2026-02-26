@@ -347,7 +347,12 @@ def create_app():
     @app.route('/chat/')
     @app.route('/chat/<session_id>')
     def chat(session_id=None):
-        return render_template('engine_chat.html', session_id=session_id)
+        user_display_name = os.environ.get('USER_DISPLAY_NAME', 'User')
+        return render_template(
+            'engine_chat.html',
+            session_id=session_id,
+            user_display_name=user_display_name,
+        )
 
     @app.route('/rpg')
     @app.route('/rpg/')

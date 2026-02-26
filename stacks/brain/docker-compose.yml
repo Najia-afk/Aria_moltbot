@@ -407,6 +407,7 @@ services:
       # Set explicitly if behind a custom reverse proxy, e.g. "myhost:8080"
       WS_BASE_URL: ${WS_BASE_URL:-}
       WEB_INTERNAL_PORT: ${WEB_INTERNAL_PORT:-5000}
+      USER_DISPLAY_NAME: ${USER_DISPLAY_NAME:-User}
       GRAFANA_URL: ${GRAFANA_URL:-http://grafana:3000}
       PROMETHEUS_URL: ${PROMETHEUS_URL:-http://prometheus:9090}
       OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
