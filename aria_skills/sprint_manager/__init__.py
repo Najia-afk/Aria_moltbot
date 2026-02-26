@@ -29,9 +29,10 @@ class SprintManagerSkill(BaseSkill):
     async def sprint_status(self, sprint: str = "current") -> SkillResult:
         """Get compact sprint status — optimized for minimal tokens."""
         try:
-            resp = await self._api._client.get(f"/goals/sprint-summary?sprint={sprint}")
-            resp.raise_for_status()
-            return SkillResult.ok(resp.json())
+            result = await self._api.get(f"/goals/sprint-summary?sprint={sprint}")
+            if not result:
+                raise Exception(result.error)
+            return SkillResult.ok(result.data)
         except Exception as e:
             return SkillResult.fail(f"Failed to get sprint status: {e}")
 
@@ -40,11 +41,12 @@ class SprintManagerSkill(BaseSkill):
         results = []
         for gid in goal_ids:
             try:
-                resp = await self._api._client.patch(f"/goals/{gid}", json={
+                result = await self._api.patch(f"/goals/{gid}", data={
                     "sprint": sprint_name,
                     "board_column": "todo",
                 })
-                resp.raise_for_status()
+                if not result:
+                    raise Exception(result.error)
                 results.append({"goal_id": gid, "success": True})
             except Exception as e:
                 results.append({"goal_id": gid, "success": False, "error": str(e)})
@@ -53,21 +55,23 @@ class SprintManagerSkill(BaseSkill):
     async def sprint_move_goal(self, goal_id: str, column: str, position: int = 0) -> SkillResult:
         """Move a goal to a different board column."""
         try:
-            resp = await self._api._client.patch(f"/goals/{goal_id}/move", json={
+            result = await self._api.patch(f"/goals/{goal_id}/move", data={
                 "board_column": column,
                 "position": position,
             })
-            resp.raise_for_status()
-            return SkillResult.ok(resp.json())
+            if not result:
+                raise Exception(result.error)
+            return SkillResult.ok(result.data)
         except Exception as e:
             return SkillResult.fail(f"Failed to move goal: {e}")
 
     async def sprint_report(self, sprint: str = "current") -> SkillResult:
         """Generate sprint progress report."""
         try:
-            resp = await self._api._client.get(f"/goals/board?sprint={sprint}")
-            resp.raise_for_status()
-            board = resp.json()
+            result = await self._api.get(f"/goals/board?sprint={sprint}")
+            if not result:
+                raise Exception(result.error)
+            board = result.data
         except Exception as e:
             return SkillResult.fail(f"Failed to get board: {e}")
 
@@ -92,11 +96,12 @@ class SprintManagerSkill(BaseSkill):
         results = []
         for pos, gid in enumerate(goal_ids_ordered):
             try:
-                resp = await self._api._client.patch(f"/goals/{gid}/move", json={
+                result = await self._api.patch(f"/goals/{gid}/move", data={
                     "board_column": column,
                     "position": pos,
                 })
-                resp.raise_for_status()
+                if not result:
+                    raise Exception(result.error)
                 results.append({"goal_id": gid, "position": pos, "success": True})
             except Exception as e:
                 results.append({"goal_id": gid, "position": pos, "success": False, "error": str(e)})

@@ -3,6 +3,7 @@ Admin endpoints — service control + soul file access + DB maintenance.
 """
 
 import asyncio
+import logging
 import os
 
 import httpx
@@ -14,6 +15,7 @@ from config import ARIA_ADMIN_TOKEN, SERVICE_CONTROL_ENABLED
 from deps import get_db
 
 router = APIRouter(tags=["Admin"])
+logger = logging.getLogger("aria.api.admin")
 
 VACUUM_TABLES = ["activity_log", "model_usage", "heartbeat_log", "thoughts"]
 
@@ -27,21 +29,17 @@ def _service_cmd_env(service_id: str, action: str) -> str:
 
 
 async def _run_docker_command(command: str) -> dict | None:
+    """Execute a docker container control command via docker-socket-proxy (S-100)."""
     tokens = command.strip().split()
     if len(tokens) < 3 or tokens[0] != "docker":
         return None
     action, target = tokens[1], tokens[2]
     if action not in {"restart", "stop", "start"}:
         return None
-    socket_path = "/var/run/docker.sock"
-    if not os.path.exists(socket_path):
-        return {
-            "status": "error", "code": 1,
-            "stdout": "", "stderr": "docker socket not found",
-        }
+    # S-100: Use docker-socket-proxy instead of raw Docker socket
+    docker_host = os.environ.get("DOCKER_HOST", "http://docker-socket-proxy:2375")
     endpoint = f"/containers/{target}/{action}"
-    transport = httpx.AsyncHTTPTransport(uds=socket_path)
-    async with httpx.AsyncClient(transport=transport, base_url="http://docker") as client:
+    async with httpx.AsyncClient(base_url=docker_host, timeout=30.0) as client:
         resp = await client.post(endpoint)
         if resp.status_code in {204, 200}:
             return {"status": "ok", "code": 0, "stdout": "", "stderr": ""}
@@ -88,6 +86,7 @@ async def api_service_control(service_id: str, action: str, request: Request):
             "stderr": (stderr or b"")[-2000:].decode("utf-8", errors="ignore"),
         }
     except Exception as exc:
+        logger.warning("Admin operation failed: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
 
 
@@ -174,6 +173,7 @@ def _read_root_file(kind: str, path: str) -> dict:
         with open(full, "r", encoding="utf-8", errors="replace") as f:
             return {"path": safe, "content": f.read()}
     except Exception as e:
+        logger.warning("Health check proxy failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -237,6 +237,7 @@ async def run_maintenance(db: AsyncSession = Depends(get_db)):
             await db.execute(text(f"ANALYZE {table}"))
             results[table] = "analyzed"
         except Exception as e:
+            logger.warning("Data integrity check error for %s: %s", table, e)
             results[table] = f"error: {e}"
     return {"maintenance": "complete", "tables": results}
 

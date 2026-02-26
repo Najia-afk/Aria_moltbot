@@ -289,9 +289,15 @@ class AgentHeartbeatManager:
             import httpx
 
             api_base = os.getenv("ENGINE_API_BASE_URL", "http://aria-api:8000")
+            # S-103: Pass API key for authenticated endpoints
+            headers = {}
+            api_key = os.getenv("ARIA_API_KEY", "")
+            if api_key:
+                headers["X-API-Key"] = api_key
             async with httpx.AsyncClient(timeout=5.0) as client:
                 await client.post(
                     f"{api_base}/heartbeat",
+                    headers=headers,
                     json={
                         "beat_number": beat_number,
                         "status": status,

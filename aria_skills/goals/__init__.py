@@ -25,7 +25,7 @@ class GoalSchedulerSkill(BaseSkill):
     
     def __init__(self, config: SkillConfig):
         super().__init__(config)
-        self._goals: dict[str, Dict] = {}  # fallback cache
+        self._goals: dict[str, dict] = {}  # fallback cache
         self._goal_counter = 0
         self._api = None
     
@@ -100,9 +100,10 @@ class GoalSchedulerSkill(BaseSkill):
         # Always cache locally for fallback lookups
         self._goals[goal_id] = goal
         try:
-            resp = await self._api._client.post("/goals", json=goal)
-            resp.raise_for_status()
-            api_data = resp.json()
+            result = await self._api.post("/goals", data=goal)
+            if not result:
+                raise Exception(result.error)
+            api_data = result.data
             # Merge API response with local goal data
             if isinstance(api_data, dict):
                 self._goals[goal_id].update(api_data)
@@ -152,9 +153,10 @@ class GoalSchedulerSkill(BaseSkill):
             update_data["notes"] = notes
         
         try:
-            resp = await self._api._client.patch(f"/goals/{goal_id}", json=update_data)
-            resp.raise_for_status()
-            api_data = resp.json()
+            resp = await self._api.patch(f"/goals/{goal_id}", data=update_data)
+            if not resp:
+                raise Exception(resp.error)
+            api_data = resp.data
             self._log_usage("update_goal", True)
             return SkillResult.ok(api_data if api_data else update_data)
         except Exception as e:
@@ -189,18 +191,21 @@ class GoalSchedulerSkill(BaseSkill):
             self._log_usage("update_goal", True)
             return SkillResult.ok(goal)
     
+    @logged_method()
     async def get_goal(self, goal_id: str) -> SkillResult:
         """Get a specific goal."""
         try:
-            resp = await self._api._client.get(f"/goals/{goal_id}")
-            resp.raise_for_status()
-            return SkillResult.ok(resp.json())
+            result = await self._api.get(f"/goals/{goal_id}")
+            if not result:
+                raise Exception(result.error)
+            return SkillResult.ok(result.data)
         except Exception as e:
             self.logger.warning(f"API get_goal failed, using fallback: {e}")
             if goal_id not in self._goals:
                 return SkillResult.fail(f"Goal not found: {goal_id}")
             return SkillResult.ok(self._goals[goal_id])
     
+    @logged_method()
     async def list_goals(
         self,
         status: str | None = None,
@@ -228,9 +233,10 @@ class GoalSchedulerSkill(BaseSkill):
                 params["priority"] = priority
             if tag:
                 params["tag"] = tag
-            resp = await self._api._client.get("/goals", params=params)
-            resp.raise_for_status()
-            api_data = resp.json()
+            resp = await self._api.get("/goals", params=params)
+            if not resp:
+                raise Exception(resp.error)
+            api_data = resp.data
             if isinstance(api_data, list):
                 return SkillResult.ok({"goals": api_data, "total": len(api_data), "filters_applied": params})
             return SkillResult.ok(api_data)
@@ -250,6 +256,7 @@ class GoalSchedulerSkill(BaseSkill):
                 "filters_applied": {"status": status, "priority": priority, "tag": tag},
             })
 
+    @logged_method()
     async def get_next_actions(self, limit: int = 5) -> SkillResult:
         """
         Get prioritized next actions.
@@ -257,9 +264,10 @@ class GoalSchedulerSkill(BaseSkill):
         Returns highest priority active goals that are due soonest.
         """
         try:
-            resp = await self._api._client.get("/goals", params={"status": "active", "limit": limit})
-            resp.raise_for_status()
-            api_data = resp.json()
+            result = await self._api.get("/goals", params={"status": "active", "limit": limit})
+            if not result:
+                raise Exception(result.error)
+            api_data = result.data
             goals = api_data if isinstance(api_data, list) else api_data.get("goals", [])
             return SkillResult.ok({"next_actions": goals[:limit], "total_active": len(goals)})
         except Exception as e:
@@ -278,6 +286,7 @@ class GoalSchedulerSkill(BaseSkill):
             active.sort(key=score)
             return SkillResult.ok({"next_actions": active[:limit], "total_active": len(active)})
     
+    @logged_method()
     async def add_subtask(
         self,
         parent_id: str,
@@ -292,9 +301,10 @@ class GoalSchedulerSkill(BaseSkill):
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
         try:
-            resp = await self._api._client.post(f"/goals/{parent_id}/subtasks", json=subtask)
-            resp.raise_for_status()
-            return SkillResult.ok(resp.json())
+            result = await self._api.post(f"/goals/{parent_id}/subtasks", data=subtask)
+            if not result:
+                raise Exception(result.error)
+            return SkillResult.ok(result.data)
         except Exception as e:
             self.logger.warning(f"API add_subtask failed, using fallback: {e}")
             if parent_id not in self._goals:
@@ -304,15 +314,17 @@ class GoalSchedulerSkill(BaseSkill):
             self._goals[parent_id]["subtasks"].append(subtask)
             return SkillResult.ok({"subtask": subtask, "parent_id": parent_id})
     
+    @logged_method()
     async def complete_subtask(self, parent_id: str, subtask_id: str) -> SkillResult:
         """Mark a subtask as complete."""
         try:
-            resp = await self._api._client.patch(
+            result = await self._api.patch(
                 f"/goals/{parent_id}/subtasks/{subtask_id}",
-                json={"status": "completed", "completed_at": datetime.now(timezone.utc).isoformat()},
+                data={"status": "completed", "completed_at": datetime.now(timezone.utc).isoformat()},
             )
-            resp.raise_for_status()
-            return SkillResult.ok(resp.json())
+            if not result:
+                raise Exception(result.error)
+            return SkillResult.ok(result.data)
         except Exception as e:
             self.logger.warning(f"API complete_subtask failed, using fallback: {e}")
             if parent_id not in self._goals:
@@ -328,12 +340,14 @@ class GoalSchedulerSkill(BaseSkill):
                     return SkillResult.ok({"subtask": subtask, "parent_progress": goal["progress"]})
             return SkillResult.fail(f"Subtask not found: {subtask_id}")
     
+    @logged_method()
     async def get_summary(self) -> SkillResult:
         """Get goal summary statistics."""
         try:
-            resp = await self._api._client.get("/goals")
-            resp.raise_for_status()
-            api_data = resp.json()
+            result = await self._api.get("/goals")
+            if not result:
+                raise Exception(result.error)
+            api_data = result.data
             goals = api_data if isinstance(api_data, list) else api_data.get("goals", [])
             return SkillResult.ok({
                 "total": len(goals),

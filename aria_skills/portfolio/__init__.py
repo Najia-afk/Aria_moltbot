@@ -7,7 +7,8 @@ Tracks and manages cryptocurrency portfolios.
 from datetime import datetime, timezone
 from typing import Any
 
-from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
+from aria_skills.api_client import get_api_client
+from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
 from aria_skills.registry import SkillRegistry
 
 
@@ -21,8 +22,9 @@ class PortfolioSkill(BaseSkill):
     
     def __init__(self, config: SkillConfig):
         super().__init__(config)
-        self._positions: dict[str, Dict] = {}
-        self._transactions: list[Dict] = []
+        self._positions: dict[str, dict] = {}
+        self._transactions: list[dict] = []
+        self._api = None
     
     @property
     def name(self) -> str:
@@ -30,9 +32,10 @@ class PortfolioSkill(BaseSkill):
     
     async def initialize(self) -> bool:
         """Initialize portfolio skill."""
-        # TODO: TICKET-12 - stub requires API endpoint for portfolio persistence.
-        # Currently in-memory only. Needs POST/GET /api/portfolio endpoints.
-        self.logger.warning("portfolio skill is in-memory only — API endpoint not yet available")
+        try:
+            self._api = await get_api_client()
+        except Exception as e:
+            self.logger.info(f"API unavailable, using in-memory cache only: {e}")
         self._status = SkillStatus.AVAILABLE
         self.logger.info("Portfolio skill initialized")
         return True
@@ -41,6 +44,7 @@ class PortfolioSkill(BaseSkill):
         """Check availability."""
         return self._status
     
+    @logged_method()
     async def add_position(
         self,
         symbol: str,
@@ -84,16 +88,23 @@ class PortfolioSkill(BaseSkill):
             }
         
         # Log transaction
-        self._transactions.append({
+        transaction = {
             "type": "buy",
             "symbol": symbol,
             "quantity": quantity,
             "price": entry_price,
             "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        self._transactions.append(transaction)
+        
+        await self._persist_activity("portfolio_position_update", {
+            "position": self._positions[symbol],
+            "transaction": transaction,
         })
         
         return SkillResult.ok(self._positions[symbol])
     
+    @logged_method()
     async def remove_position(
         self,
         symbol: str,
@@ -130,14 +141,15 @@ class PortfolioSkill(BaseSkill):
             pnl_percent = ((exit_price / position["entry_price"]) - 1) * 100
         
         # Log transaction
-        self._transactions.append({
+        transaction = {
             "type": "sell",
             "symbol": symbol,
             "quantity": remove_qty,
             "price": exit_price,
             "pnl": pnl,
             "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
+        }
+        self._transactions.append(transaction)
         
         # Update or remove position
         if remove_qty >= position["quantity"]:
@@ -148,6 +160,14 @@ class PortfolioSkill(BaseSkill):
             position["updated_at"] = datetime.now(timezone.utc).isoformat()
             remaining = position["quantity"]
         
+        await self._persist_activity("portfolio_position_closed", {
+            "symbol": symbol,
+            "removed_quantity": remove_qty,
+            "remaining_quantity": remaining,
+            "exit_price": exit_price,
+            "pnl": pnl,
+        })
+        
         return SkillResult.ok({
             "symbol": symbol,
             "removed_quantity": remove_qty,
@@ -157,6 +177,7 @@ class PortfolioSkill(BaseSkill):
             "pnl_percent": round(pnl_percent, 2) if pnl_percent else None,
         })
     
+    @logged_method()
     async def get_position(self, symbol: str) -> SkillResult:
         """Get a specific position."""
         symbol = symbol.upper()
@@ -166,6 +187,7 @@ class PortfolioSkill(BaseSkill):
         
         return SkillResult.ok(self._positions[symbol])
     
+    @logged_method()
     async def get_portfolio(self, current_prices: dict[str, float] | None = None) -> SkillResult:
         """
         Get full portfolio with optional current valuations.
@@ -223,6 +245,7 @@ class PortfolioSkill(BaseSkill):
         
         return SkillResult.ok(result)
     
+    @logged_method()
     async def get_transactions(self, limit: int = 20, symbol: str | None = None) -> SkillResult:
         """
         Get transaction history.
@@ -245,6 +268,7 @@ class PortfolioSkill(BaseSkill):
             "total": len(transactions),
         })
     
+    @logged_method()
     async def get_summary(self) -> SkillResult:
         """Get portfolio summary statistics."""
         total_buys = sum(1 for t in self._transactions if t["type"] == "buy")
@@ -260,3 +284,24 @@ class PortfolioSkill(BaseSkill):
             "realized_pnl": round(realized_pnl, 2),
             "symbols_held": list(self._positions.keys()),
         })
+
+    # === API Persistence ===
+
+    async def _persist_activity(self, action: str, details: dict) -> None:
+        """Best-effort API persistence. Disables on failure to avoid slowdowns."""
+        if not self._api:
+            return
+        try:
+            import asyncio
+            await asyncio.wait_for(
+                self._api.post("/activities", data={
+                    "action": action,
+                    "skill": self.name,
+                    "details": details,
+                    "success": True,
+                }),
+                timeout=5.0,
+            )
+        except Exception:
+            self.logger.debug("API persistence disabled (API unreachable)")
+            self._api = None

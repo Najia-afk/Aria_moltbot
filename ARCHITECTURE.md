@@ -117,22 +117,43 @@ INPUT → KERNEL decides → FOCUS activates → COGNITION processes
 
 ---
 
-## 5-Layer Skill Hierarchy
+## 5-Layer Skill Hierarchy (L0–L4)
 
 All data access follows a strict layered pattern. Lower layers never import from higher layers. All database access flows through Layer 1.
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  Layer 4 — Orchestration: goals, schedule, performance      │
-├─────────────────────────────────────────────────────────────┤
-│  Layer 3 — Domain: research, moltbook, social, market_data  │
-├─────────────────────────────────────────────────────────────┤
-│  Layer 2 — Core: llm, litellm, health, session_manager      │
-├─────────────────────────────────────────────────────────────┤
-│  Layer 1 — API Client: sole database gateway (httpx)         │
-├─────────────────────────────────────────────────────────────┤
-│  Layer 0 — Kernel: soul, identity, security (read-only)      │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│  L4 — Orchestration: goals, schedule, agent_manager, performance       │
+├─────────────────────────────────────────────────────────────────────────┤
+│  L3 — Domain Skills: research, moltbook, social, market_data, rpg, …   │
+├─────────────────────────────────────────────────────────────────────────┤
+│  L2 — Core Services: moonshot, ollama, model_switcher, session_manager,│
+│         working_memory, sandbox                                        │
+├─────────────────────────────────────────────────────────────────────────┤
+│  L1 — Infrastructure: api_client, health, litellm, database            │
+├─────────────────────────────────────────────────────────────────────────┤
+│  L0 — Security: input_guard (runtime injection detection)              │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### System Layers (non-skill)
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  ARIA Layer        — aria_mind (consciousness, identity, soul)         │
+├─────────────────────────────────────────────────────────────────────────┤
+│  Engine Layer      — aria_engine (coordinates skills, LLM gateway)     │
+├─────────────────────────────────────────────────────────────────────────┤
+│  Skill Layer       — aria_skills (L0–L4 skill modules)                 │
+├─────────────────────────────────────────────────────────────────────────┤
+│  Skill Client Layer— api_client (httpx → FastAPI)                      │
+├─────────────────────────────────────────────────────────────────────────┤
+│  API Layer         — FastAPI routers (src/api/routers/)                 │
+├─────────────────────────────────────────────────────────────────────────┤
+│  ORM Layer         — SQLAlchemy models (src/api/db/models.py)          │
+├─────────────────────────────────────────────────────────────────────────┤
+│  Database Layer    — PostgreSQL 16 + pgvector                          │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 **Data flows one direction:** Skills → api_client → FastAPI → SQLAlchemy ORM → PostgreSQL

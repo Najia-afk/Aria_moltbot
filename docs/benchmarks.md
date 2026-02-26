@@ -1,6 +1,6 @@
 # Aria Engine Benchmarks
 
-**Python:** 3.14.2  
+**Python:** 3.13  
 **JIT:** Disabled  
 **Date:** 2026-02-19 00:32:00  
 **Iterations:** 100  

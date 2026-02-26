@@ -20,6 +20,20 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src" / "api"))  # so 'from db.models import ...' works
 
 
+def _purge_mocked_aria_engine():
+    """Remove any MagicMock stubs for aria_engine from sys.modules.
+
+    Other test files (e.g. test_engine_roundtable_router) register MagicMock
+    stubs at module scope during collection.  Those stubs prevent real imports
+    of ``aria_engine.*`` sub-modules.  Call this before importing real code.
+    """
+    for key in list(sys.modules):
+        if (key == "aria_engine" or key.startswith("aria_engine.")) and isinstance(
+            sys.modules[key], MagicMock
+        ):
+            del sys.modules[key]
+
+
 # ── routing.py ────────────────────────────────────────────────────────────────
 
 class TestRoutingScoring:
@@ -27,6 +41,7 @@ class TestRoutingScoring:
 
     @pytest.fixture(autouse=True)
     def _import(self):
+        _purge_mocked_aria_engine()
         from aria_engine.routing import (
             compute_specialty_match,
             compute_load_score,
@@ -155,6 +170,7 @@ class TestAutoSession:
 
     @pytest.fixture(autouse=True)
     def _import(self):
+        _purge_mocked_aria_engine()
         from aria_engine.auto_session import generate_auto_title, AUTO_TITLE_MAX_LENGTH
         self.generate_auto_title = generate_auto_title
         self.max_length = AUTO_TITLE_MAX_LENGTH
@@ -193,6 +209,7 @@ class TestSessionProtection:
 
     @pytest.fixture(autouse=True)
     def _import(self):
+        _purge_mocked_aria_engine()
         from aria_engine.session_protection import (
             SlidingWindow,
             RateLimitError,

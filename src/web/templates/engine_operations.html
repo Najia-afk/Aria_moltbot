@@ -479,7 +479,7 @@
             cronJobs = data.jobs || data || [];
             renderTable(cronJobs);
         } catch(e) {
-            tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="icon">⚠️</div><h3>Failed to load</h3><p>${e.message}</p></div></td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="icon">⚠️</div><h3>Failed to load</h3><p>${escapeHtml(e.message)}</p></div></td></tr>`;
         }
     }
 
@@ -658,7 +658,7 @@
                     </table>
                 `;
             } catch(e) {
-                content.innerHTML = `<em style="color:#ff4444;">Failed to load history: ${e.message}</em>`;
+                content.innerHTML = `<em style="color:#ff4444;">Failed to load history: ${escapeHtml(e.message)}</em>`;
             }
         } else {
             row.style.display = 'none';

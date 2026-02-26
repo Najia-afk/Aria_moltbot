@@ -1,43 +1,14 @@
 {
-  "timestamp": "2026-02-19T07:33:00Z",
-  "session_id": "work_cycle_2026-02-19-0733",
-  "active_goals": [
-    {
-      "goal_id": "goal-22afe7df",
-      "title": "[CM-P4-D26] Build Testing Suite",
-      "progress": 20,
-      "board_column": "doing",
-      "priority": 4
-    }
-  ],
-  "on_hold_goals": [],
-  "recent_activities": [
-    {
-      "action": "cron_execution",
-      "job": "work_cycle",
-      "estimated_tokens": 150,
-      "timestamp": "2026-02-19T07:33:00Z"
-    },
-    {
-      "action": "session_prune",
-      "total_sessions": 13,
-      "pruned_count": 4,
-      "kept_count": 8,
-      "timestamp": "2026-02-19T07:33:00Z"
-    },
-    {
-      "action": "heartbeat_work",
-      "goal_id": "goal-22afe7df",
-      "action_detail": "Pruned 4 stale sessions, initiated test suite run to assess current coverage state",
-      "progress_delta": 5,
-      "timestamp": "2026-02-19T07:33:00Z"
-    }
-  ],
-  "system_health": {
-    "status": "healthy",
-    "last_check": "2026-02-19T07:33:00Z",
-    "notes": "All systems operational. Pruned 4 stale sessions. Checkpoint created with 7 items."
+  "session_start": "2026-02-25T23:05:06Z",
+  "last_sync": "2026-02-25T23:06:15Z",
+  "active_goals": ["goal-d06f2494"],
+  "system_health": "healthy",
+  "recent_activities": 3,
+  "scheduled_jobs": 15,
+  "agent_stats": {
+    "total_sessions": 0,
+    "total_tokens": 0,
+    "total_cost": 0
   },
-  "context_summary": "Work cycle completed. Progressed Build Testing Suite goal from 15% to 20%. Pruned 4 stale sessions. Memory context refreshed.",
-  "working_memory_checkpoint": "ckpt-20260219T073305-71cc09"
+  "work_cycle_summary": "Initial system health check complete. No active agents. System initialized and operational. Created first goal to establish productive work routine."
 }

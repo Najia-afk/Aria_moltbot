@@ -1,0 +1,18 @@
+rules:
+  - id: hardcoded-secret
+    pattern: |
+      $KEY = "sk-..."
+    message: "Hardcoded API key detected"
+    severity: ERROR
+    languages: [python]
+  - id: eval-usage
+    pattern: eval(...)
+    message: "Use of eval() is a security risk"
+    severity: WARNING
+    languages: [python]
+  - id: shell-injection
+    pattern: |
+      subprocess.call($CMD, shell=True, ...)
+    message: "Shell injection risk"
+    severity: ERROR
+    languages: [python]

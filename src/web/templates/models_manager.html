@@ -106,6 +106,19 @@
                 <label for="fCostOutput">Cost Output ($/1M tok)</label>
                 <input id="fCostOutput" name="cost_output" type="number" step="0.001" min="0" value="0" class="form-input">
             </div>
+            <!-- Row 5b: Rate Limits -->
+            <div class="form-group">
+                <label for="fMaxRpm">Max RPM (requests/min)</label>
+                <input id="fMaxRpm" name="max_rpm" type="number" min="0" value="0" placeholder="0 = unlimited" class="form-input">
+            </div>
+            <div class="form-group">
+                <label for="fMaxTpd">Max TPD (tokens/day)</label>
+                <input id="fMaxTpd" name="max_tpd" type="number" min="0" value="0" placeholder="0 = unlimited" class="form-input">
+            </div>
+            <div class="form-group">
+                <label for="fCooldownSec">Cooldown (seconds)</label>
+                <input id="fCooldownSec" name="cooldown_seconds" type="number" min="0" value="0" placeholder="0 = no cooldown" class="form-input">
+            </div>
             <!-- Row 6: Capabilities -->
             <div class="form-group" style="grid-column:1/-1;">
                 <label>Capabilities</label>
@@ -287,31 +300,31 @@ function renderModels() {
         return `
         <div class="model-mgmt-card ${disabledClass}">
             <div class="card-header">
-                <h4 title="${m.name}">${m.name}</h4>
+                <h4 title="${escapeHtml(m.name)}">${escapeHtml(m.name)}</h4>
                 <div class="badges">
                     <span class="badge-tier ${tierClass}">${tierLabel}</span>
                     ${caps.join('')}
                 </div>
             </div>
             <div class="card-meta">
-                <span>🆔 ${m.id}</span>
+                <span>🆔 ${escapeHtml(m.id)}</span>
                 <span>📐 ${ctx}</span>
                 <span>💲 ${cost}</span>
             </div>
-            <div class="card-detail" title="${m.litellm_model || ''}">
-                🔗 ${m.litellm_model || '—'}
+            <div class="card-detail" title="${escapeHtml(m.litellm_model || '')}">
+                🔗 ${escapeHtml(m.litellm_model || '—')}
             </div>
             <div class="card-detail">
                 🔑 ${m.litellm_api_key_set ? '✅ Set' : '❌ Not set'}
-                ${m.litellm_api_base ? ` &nbsp;🌐 ${m.litellm_api_base}` : ''}
+                ${m.litellm_api_base ? ` &nbsp;🌐 ${escapeHtml(m.litellm_api_base)}` : ''}
             </div>
-            ${m.aliases && m.aliases.length ? `<div class="card-detail">📎 ${m.aliases.join(', ')}</div>` : ''}
+            ${m.aliases && m.aliases.length ? `<div class="card-detail">📎 ${escapeHtml(m.aliases.join(', '))}</div>` : ''}
             <div class="card-actions">
-                <button class="btn btn-secondary btn-sm" onclick="openEditModal('${m.id}')" style="font-size:12px;">✏️ Edit</button>
-                <button class="btn btn-secondary btn-sm" onclick="toggleEnabled('${m.id}', ${!m.enabled})" style="font-size:12px;">
+                <button class="btn btn-secondary btn-sm" onclick="openEditModal('${escapeHtml(m.id)}')" style="font-size:12px;">✏️ Edit</button>
+                <button class="btn btn-secondary btn-sm" onclick="toggleEnabled('${escapeHtml(m.id)}', ${!m.enabled})" style="font-size:12px;">
                     ${m.enabled ? '🚫 Disable' : '✅ Enable'}
                 </button>
-                <button class="btn btn-secondary btn-sm" style="font-size:12px;color:#ef4444;" onclick="deleteModel('${m.id}')">🗑️ Delete</button>
+                <button class="btn btn-secondary btn-sm" style="font-size:12px;color:#ef4444;" onclick="deleteModel('${escapeHtml(m.id)}')">🗑️ Delete</button>
             </div>
         </div>`;
     }).join('');
@@ -345,6 +358,9 @@ function openEditModal(id) {
     document.getElementById('fApiBase').value = m.litellm_api_base || '';
     document.getElementById('fCostInput').value = m.cost_input || 0;
     document.getElementById('fCostOutput').value = m.cost_output || 0;
+    document.getElementById('fMaxRpm').value = m.max_rpm || 0;
+    document.getElementById('fMaxTpd').value = m.max_tpd || 0;
+    document.getElementById('fCooldownSec').value = m.cooldown_seconds || 0;
     document.getElementById('fReasoning').checked = m.reasoning;
     document.getElementById('fVision').checked = m.vision;
     document.getElementById('fToolCalling').checked = m.tool_calling;
@@ -372,6 +388,9 @@ async function saveModel(e) {
         litellm_api_base: document.getElementById('fApiBase').value || null,
         cost_input: parseFloat(document.getElementById('fCostInput').value) || 0,
         cost_output: parseFloat(document.getElementById('fCostOutput').value) || 0,
+        max_rpm: parseInt(document.getElementById('fMaxRpm').value) || 0,
+        max_tpd: parseInt(document.getElementById('fMaxTpd').value) || 0,
+        cooldown_seconds: parseInt(document.getElementById('fCooldownSec').value) || 0,
         reasoning: document.getElementById('fReasoning').checked,
         vision: document.getElementById('fVision').checked,
         tool_calling: document.getElementById('fToolCalling').checked,

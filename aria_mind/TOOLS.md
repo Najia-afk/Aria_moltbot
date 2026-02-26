@@ -1,6 +1,6 @@
 # TOOLS.md - Skill Quick Reference
 
-**Full documentation: See SKILLS.md for complete skill reference (35+ active skills)**
+**Full documentation: See SKILLS.md for complete skill reference (40 active skills)**
 
 Skills are auto-discovered from `aria_skills/*/skill.json`.
 
@@ -118,7 +118,7 @@ aria-api-client.mark_proposal_implemented({"proposal_id": "UUID", "reviewed_by":
 - Never propose modifications under `soul/` paths.
 - After implementation, mark proposal status to `implemented` and log execution outcome via activity.
 
-## All 35+ Active Skills
+## All 40 Active Skills
 
 | Category | Skills |
 |----------|--------|

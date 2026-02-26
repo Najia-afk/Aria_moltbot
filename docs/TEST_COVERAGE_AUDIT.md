@@ -1,131 +1,116 @@
 # API Test Coverage Audit
 
-- Total routes: **177**
-- Covered routes: **177**
-- Uncovered routes: **0**
-- Coverage: **100.0%**
+> Verified against filesystem: 2025-02-26
 
-## Largest Gaps by Router File
+## Summary
 
-## Uncovered Routes
-## Covered Routes (sample)
-- GET /activities — tests/test_activities.py, tests/test_smoke.py
-- POST /activities — tests/test_activities.py, tests/test_cross_entity.py
-- GET /activities/cron-summary — tests/test_activities.py
-- GET /activities/timeline — tests/test_activities.py
-- GET /activities/visualization — tests/test_activities.py
-- GET /admin/files/agents — tests/test_admin.py
-- GET /admin/files/agents/{path:path} — tests/test_admin.py
-- GET /admin/files/memories — tests/test_admin.py
-- GET /admin/files/memories/{path:path} — tests/test_admin.py
-- GET /admin/files/mind — tests/test_admin.py
-- GET /admin/files/mind/{path:path} — tests/test_admin.py
-- GET /admin/files/souvenirs — tests/test_admin.py
-- GET /admin/files/souvenirs/{path:path} — tests/test_admin.py
-- POST /admin/services/{service_id}/{action} — tests/test_admin.py
-- POST /analysis/compression/auto-run — tests/test_analysis.py
-- GET /analysis/compression/history — tests/test_analysis.py
-- POST /analysis/compression/run — tests/test_analysis.py
-- POST /analysis/patterns/detect — tests/test_analysis.py
-- GET /analysis/patterns/history — tests/test_analysis.py
-- POST /analysis/seed-memories — tests/test_analysis.py
-- POST /analysis/sentiment/auto-promote — tests/test_analysis.py
-- POST /analysis/sentiment/backfill-messages — tests/test_analysis.py
-- POST /analysis/sentiment/backfill-sessions — tests/test_analysis.py
-- POST /analysis/sentiment/cleanup-placeholders — tests/test_analysis.py
-- POST /analysis/sentiment/conversation — tests/test_analysis.py
-- POST /analysis/sentiment/feedback — tests/test_analysis.py
-- GET /analysis/sentiment/history — tests/test_analysis.py
-- POST /analysis/sentiment/message — tests/test_analysis.py
-- POST /analysis/sentiment/reply — tests/test_analysis.py
-- POST /analysis/sentiment/seed-references — tests/test_analysis.py
-- GET /api-key-rotations — tests/test_operations.py
-- POST /api-key-rotations — tests/test_operations.py
-- GET /api/metrics — tests/test_health.py
-- GET /engine/agents — tests/test_engine_agents.py
-- GET /engine/agents/metrics — tests/test_engine_agents.py
-- GET /engine/agents/metrics/{agent_id} — tests/test_engine_agents.py
-- GET /engine/agents/metrics/{agent_id}/history — tests/test_engine_agents.py
-- GET /engine/agents/{agent_id} — tests/test_engine_agents.py
-- GET /engine/chat/sessions — tests/test_engine_chat.py, tests/test_smoke.py
-- POST /engine/chat/sessions — tests/test_cross_entity.py, tests/test_engine_chat.py
-- DELETE /engine/chat/sessions/{session_id} — tests/test_cross_entity.py, tests/test_engine_chat.py
-- GET /engine/chat/sessions/{session_id} — tests/test_cross_entity.py, tests/test_engine_chat.py
-- GET /engine/chat/sessions/{session_id}/export — tests/test_cross_entity.py, tests/test_engine_chat.py
-- POST /engine/chat/sessions/{session_id}/messages — tests/test_cross_entity.py, tests/test_engine_chat.py
-- GET /engine/cron — tests/test_engine_cron.py
-- POST /engine/cron — tests/test_engine_cron.py
-- GET /engine/cron/status — tests/test_engine_cron.py
-- DELETE /engine/cron/{job_id} — tests/test_engine_cron.py
-- GET /engine/cron/{job_id} — tests/test_engine_cron.py
-- PUT /engine/cron/{job_id} — tests/test_engine_cron.py
-- GET /engine/cron/{job_id}/history — tests/test_engine_cron.py
-- POST /engine/cron/{job_id}/trigger — tests/test_engine_cron.py
-- GET /engine/sessions — tests/test_engine_sessions.py
-- GET /engine/sessions/stats — tests/test_engine_sessions.py
-- DELETE /engine/sessions/{session_id} — tests/test_cross_entity.py, tests/test_engine_sessions.py
-- GET /engine/sessions/{session_id} — tests/test_engine_sessions.py
-- POST /engine/sessions/{session_id}/end — tests/test_engine_sessions.py
-- GET /engine/sessions/{session_id}/messages — tests/test_engine_sessions.py
-- GET /export — tests/test_records.py
-- GET /goals — tests/test_goals.py, tests/test_validation.py
-- POST /goals — tests/test_goals.py, tests/test_graphql.py
-- GET /goals/archive — tests/test_goals.py
-- GET /goals/board — tests/test_goals.py
-- GET /goals/history — tests/test_goals.py
-- GET /goals/sprint-summary — tests/test_goals.py
-- DELETE /goals/{goal_id} — tests/test_goals.py, tests/test_graphql.py
-- GET /goals/{goal_id} — tests/test_goals.py, tests/test_smoke.py
-- PATCH /goals/{goal_id} — tests/test_goals.py, tests/test_smoke.py
-- PATCH /goals/{goal_id}/move — tests/test_goals.py
-- GET /health — tests/test_health.py, tests/test_security_middleware.py
-- GET /health/db — tests/test_health.py, tests/test_smoke.py
-- GET /heartbeat — tests/test_operations.py
-- POST /heartbeat — tests/test_operations.py
-- GET /heartbeat/latest — tests/test_operations.py
-- GET /host-stats — tests/test_health.py
-- GET /hourly-goals — tests/test_goals.py
-- POST /hourly-goals — tests/test_goals.py, tests/test_validation.py
-- PATCH /hourly-goals/{goal_id} — tests/test_goals.py
-- GET /jobs — tests/test_operations.py
-- GET /jobs/live — tests/test_operations.py
-- POST /jobs/sync — tests/test_operations.py
-- GET /jobs/{job_id} — tests/test_operations.py, tests/test_validation.py
-- GET /knowledge-graph — tests/test_knowledge.py, tests/test_smoke.py
-- DELETE /knowledge-graph/auto-generated — tests/test_cross_entity.py, tests/test_knowledge.py
-- GET /knowledge-graph/entities — tests/test_knowledge.py
-- POST /knowledge-graph/entities — tests/test_cross_entity.py, tests/test_knowledge.py
-- GET /knowledge-graph/query-log — tests/test_knowledge.py
-- GET /knowledge-graph/relations — tests/test_cross_entity.py, tests/test_knowledge.py
-- POST /knowledge-graph/relations — tests/test_cross_entity.py, tests/test_knowledge.py
-- GET /knowledge-graph/search — tests/test_knowledge.py, tests/test_validation.py
-- GET /knowledge-graph/skill-for-task — tests/test_knowledge.py
-- POST /knowledge-graph/sync-skills — tests/test_cross_entity.py, tests/test_knowledge.py
-- GET /knowledge-graph/traverse — tests/test_knowledge.py
-- GET /lessons — tests/test_lessons.py
-- POST /lessons — tests/test_cross_entity.py, tests/test_lessons.py
-- GET /lessons/check — tests/test_cross_entity.py, tests/test_lessons.py
-- POST /lessons/seed — tests/test_lessons.py
-- GET /litellm/global-spend — tests/test_litellm.py
-- GET /litellm/health — tests/test_litellm.py
-- GET /litellm/models — tests/test_litellm.py
-- GET /litellm/spend — tests/test_litellm.py
-- POST /maintenance — tests/test_admin.py
-- GET /memories — tests/test_memories.py, tests/test_validation.py
-- POST /memories — tests/test_memories.py, tests/test_noise_filters.py
-- GET /memories/search — tests/test_memories.py, tests/test_validation.py
-- POST /memories/search-by-vector — tests/test_memories.py
-- GET /memories/semantic — tests/test_memories.py
-- POST /memories/semantic — tests/test_memories.py
-- POST /memories/summarize-session — tests/test_memories.py
-- DELETE /memories/{key} — tests/test_graphql.py, tests/test_memories.py
-- GET /memories/{key} — tests/test_memories.py, tests/test_smoke.py
-- GET /model-usage — tests/test_model_usage.py
-- POST /model-usage — tests/test_model_usage.py, tests/test_validation.py
-- GET /model-usage/stats — tests/test_model_usage.py
-- GET /models/config — tests/test_models_config.py, tests/test_smoke.py
-- GET /models/pricing — tests/test_models_config.py
-- POST /models/reload — tests/test_models_config.py
-- GET /performance — tests/test_operations.py
-- POST /performance — tests/test_operations.py, tests/test_validation.py
-- GET /proposals — tests/test_proposals.py
+| Metric | Count |
+|--------|-------|
+| **Total REST endpoints** | 222 |
+| **WebSocket endpoints** | 2 |
+| **GraphQL endpoint** | 1 |
+| **Standalone (aiohttp)** | 1 |
+| **Total test files** | 38 |
+| **Total test functions** | 427 |
+| **Endpoints with direct test coverage** | ~200 |
+| **Endpoints with NO test coverage** | ~26 |
+| **Estimated coverage** | ~88% |
+
+---
+
+## Test Files (38 files in `tests/`)
+
+| File | Router(s) Tested |
+|------|------------------|
+| test_activities.py | activities |
+| test_admin.py | admin |
+| test_advanced_memory.py | memories (advanced scenarios) |
+| test_agents_crud.py | agents_crud |
+| test_analysis.py | analysis |
+| test_architecture.py | Architecture validation |
+| test_cross_entity.py | Cross-entity integration |
+| test_engine_agents.py | engine_agents, engine_agent_metrics |
+| test_engine_chat.py | engine_chat |
+| test_engine_cron.py | engine_cron |
+| test_engine_internals.py | Engine pure-function unit tests |
+| test_engine_sessions.py | engine_sessions |
+| test_goals.py | goals |
+| test_graphql.py | GraphQL schema |
+| test_health.py | health |
+| test_knowledge.py | knowledge |
+| test_lessons.py | lessons |
+| test_litellm.py | litellm |
+| test_memories.py | memories |
+| test_models_config.py | models_config |
+| test_models_crud.py | models_crud |
+| test_model_usage.py | model_usage |
+| test_noise_filters.py | Noise filter validation |
+| test_operations.py | operations |
+| test_proposals.py | proposals |
+| test_providers.py | providers |
+| test_records.py | records |
+| test_security.py | security |
+| test_security_middleware.py | Security middleware |
+| test_sessions.py | sessions |
+| test_skills.py | skills |
+| test_smoke.py | Smoke tests (multiple routers) |
+| test_social.py | social |
+| test_thoughts.py | thoughts |
+| test_validation.py | Input validation (multiple routers) |
+| test_websocket.py | WebSocket (engine_chat WS) |
+| test_web_routes.py | Flask web routes |
+| test_working_memory.py | working_memory |
+
+---
+
+## Routers With NO Dedicated Test File
+
+The following routers have **zero test coverage** — no dedicated test file exists:
+
+| Router File | Endpoints | Status |
+|-------------|-----------|--------|
+| `artifacts.py` | 4 | ❌ **Untested** — file artifact CRUD |
+| `engine_roundtable.py` | 12 REST + 1 WS | ❌ **Untested** — roundtable & swarm |
+| `rpg.py` | 4 | ❌ **Untested** — RPG dashboard |
+
+---
+
+## Endpoints With No Direct Test Coverage
+
+Based on audit of test files vs. endpoint definitions:
+
+| # | Method | Path | Router File | Reason |
+|---|--------|------|-------------|--------|
+| 1 | PATCH | `/sessions/{session_id}` | sessions.py | No test call found |
+| 2 | DELETE | `/sessions/{session_id}` | sessions.py | No test call found |
+| 3 | PATCH | `/tasks/{task_id}` | operations.py | No test call found |
+| 4 | GET | `/models/available` | models_config.py | No test call found |
+| 5 | PATCH | `/working-memory/{item_id}` | working_memory.py | No test call found |
+| 6 | GET | `/engine/chat/sessions/{sid}/messages` | engine_chat.py | Only tested indirectly |
+| 7 | PATCH | `/engine/sessions/{sid}/title` | engine_sessions.py | No test call found |
+| 8 | POST | `/engine/sessions/{sid}/archive` | engine_sessions.py | No test call found |
+| 9 | DELETE | `/engine/sessions/ghosts` | engine_sessions.py | No test call found |
+| 10 | POST | `/engine/sessions/cleanup` | engine_sessions.py | No test call found |
+| 11 | POST | `/agents/db/enable-core` | agents_crud.py | No test call found |
+| 12 | POST | `/agents/db/enable-all` | agents_crud.py | No test call found |
+| 13–16 | ALL | `/artifacts/*` | artifacts.py | Entire router untested |
+| 17–29 | ALL | `/engine/roundtable/*` | engine_roundtable.py | Entire router untested (12 REST + 1 WS) |
+| 30–33 | ALL | `/rpg/*` | rpg.py | Entire router untested |
+| 34 | GET | `/health` (port 8081) | aria_engine/entrypoint.py | Separate aiohttp server |
+
+---
+
+## Largest Coverage Gaps by Router
+
+| Router | Total Endpoints | Untested | Coverage |
+|--------|----------------|----------|----------|
+| engine_roundtable.py | 13 (12+1 WS) | 13 | 0% |
+| artifacts.py | 4 | 4 | 0% |
+| rpg.py | 4 | 4 | 0% |
+| engine_sessions.py | 10 | 4 | 60% |
+| agents_crud.py | 10 | 2 | 80% |
+| sessions.py | 6 | 2 | 67% |
+
+---
+
+*Audit date: 2025-02-26 — 38 test files, 427 test functions, ~88% endpoint coverage*

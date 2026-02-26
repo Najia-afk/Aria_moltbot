@@ -6,6 +6,7 @@ their corresponding SQLAlchemy model classes.
 """
 
 from datetime import datetime
+import logging
 from decimal import Decimal
 from typing import Any
 import uuid as uuid_mod
@@ -23,6 +24,7 @@ from db.models import (
 from deps import get_db
 
 router = APIRouter(tags=["Records"])
+logger = logging.getLogger("aria.api.records")
 
 
 # ── Table whitelist ──────────────────────────────────────────────────────────

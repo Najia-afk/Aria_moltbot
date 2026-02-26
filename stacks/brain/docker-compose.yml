@@ -1,7 +1,7 @@
 services:
   # PostgreSQL Database (pgvector enabled for semantic memory)
   aria-db:
-    image: pgvector/pgvector:pg16
+    image: pgvector/pgvector:0.8.0-pg16
     container_name: aria-db
     restart: unless-stopped
     environment:
@@ -11,21 +11,24 @@ services:
     volumes:
       - aria_pg_data:/var/lib/postgresql/data
       - ./init-scripts:/docker-entrypoint-initdb.d:ro
-    ports:
-      - "5432:5432"
+    # S-108: Port removed — DB only accessible via internal networks
+    # ports:
+    #   - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - aria-net
+      - data
+      - backend
     mem_limit: ${POSTGRES_MEM_LIMIT:-512m}
     cpus: ${POSTGRES_CPU_LIMIT:-1.0}
 
   # Headless Chrome for browser automation
   aria-browser:
-    image: browserless/chrome:latest
+    # Aria v3 freeze: pinned to digest (no versioned arm64 tags available)
+    image: browserless/chrome:latest@sha256:57d19e414d9fe4ae9d2ab12ba768c97f38d51246c5b31af55a009205c136012f
     container_name: aria-browser
     restart: unless-stopped
     environment:
@@ -33,9 +36,14 @@ services:
       CONNECTION_TIMEOUT: 60000
       TOKEN: ${BROWSERLESS_TOKEN:-}
     ports:
-      - "3000:3000"
+      - "${BROWSERLESS_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     networks:
-      - aria-net
+      - backend
 
   # ── Aria Engine (v2.0) — Standalone Python runtime ──────────────────────────
   # Replaces the legacy Node.js gateway with native Python engine
@@ -54,6 +62,8 @@ services:
       ENGINE_DEBUG: ${ENGINE_DEBUG:-false}
       # Full URL for heartbeat API posts (not the routing prefix API_BASE_URL)
       ENGINE_API_BASE_URL: http://aria-api:8000
+      # S-103: API key for engine→API authentication
+      ARIA_API_KEY: ${ARIA_API_KEY:-}
       PYTHONPATH: /
     volumes:
       - ../../aria_memories:/app/aria_memories
@@ -70,37 +80,48 @@ services:
       aria-db:
         condition: service_healthy
       litellm:
-        condition: service_started
+        condition: service_healthy
       aria-api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/health')"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     networks:
-      - aria-net
+      - backend
     labels:
       - "com.aria.service=engine"
     mem_limit: ${ENGINE_MEM_LIMIT:-512m}
     cpus: ${ENGINE_CPU_LIMIT:-1.0}
     extra_hosts:
       - "host.docker.internal:host-gateway"
-
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
   # Tor Proxy for privacy
   tor-proxy:
-    image: dperson/torproxy:latest
+    # Aria v3 freeze: pinned to digest (no versioned tags available)
+    image: dperson/torproxy:latest@sha256:d8b5f1cf24f1b7a0aa334929a264b2606a107223dd0d51eb1cda8aae6fbeec53
     container_name: tor-proxy
     restart: unless-stopped
     ports:
-      - "9050:9050"
-      - "9051:9051"
+      - "${TOR_SOCKS_PORT:-9050}:9050"
+      - "${TOR_CONTROL_PORT:-9051}:9051"
+    healthcheck:
+      test: ["CMD", "curl", "--socks5", "localhost:9050", "-s", "https://check.torproject.org/api/ip"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
     networks:
-      - aria-net
+      - backend
 
   # Self-signed TLS cert generator (runs once if missing)
   certs-init:
-    image: alpine:3.20
+    image: alpine:3.20.6
     container_name: aria-certs-init
     restart: "no"
     environment:
@@ -118,19 +139,24 @@ services:
       -subj \"/C=US/ST=Local/L=LAN/O=Aria/CN=${SERVICE_HOST}\" \
       -addext \"subjectAltName=$$SAN\""
     networks:
-      - aria-net
+      - frontend
 
   # Traefik reverse proxy (HTTPS)
   # Token injection via envsubst at startup - NO HARDCODED SECRETS
   traefik:
-    image: traefik:v3.1
+    image: traefik:v3.1.7
     container_name: traefik
     restart: unless-stopped
     entrypoint: ["/bin/sh", "/traefik-entrypoint.sh"]
+    environment:
+      SERVICE_HOST: ${SERVICE_HOST:-aria.local}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
+      TRAEFIK_DASHBOARD_USER: ${TRAEFIK_DASHBOARD_USER:-admin}
+      TRAEFIK_DASHBOARD_PASSWORD_HASH: ${TRAEFIK_DASHBOARD_PASSWORD_HASH:-}
     command:
       - "--api=true"
       - "--api.dashboard=true"
-      - "--api.insecure=true"
+      # S-107: Removed --api.insecure=true — dashboard requires auth via Traefik middleware
       - "--ping=true"
       - "--providers.file.filename=/etc/traefik/dynamic.yaml"
       - "--entrypoints.web.address=:80"
@@ -150,23 +176,29 @@ services:
       - ./traefik-entrypoint.sh:/traefik-entrypoint.sh:ro
       - ./traefik-dynamic.template.yaml:/etc/traefik/dynamic.template.yaml:ro
       - ./certs:/certs:ro
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
     depends_on:
       certs-init:
         condition: service_completed_successfully
       aria-web:
-        condition: service_started
+        condition: service_healthy
       aria-api:
-        condition: service_started
+        condition: service_healthy
       litellm:
-        condition: service_started
+        condition: service_healthy
     networks:
-      - aria-net
+      - frontend
     mem_limit: ${TRAEFIK_MEM_LIMIT:-512m}
     cpus: ${TRAEFIK_CPU_LIMIT:-0.5}
 
   # LiteLLM Router for model management
   litellm:
-    image: ghcr.io/berriai/litellm:main-latest
+    # Aria v3 freeze: pinned to stable release v1.81.12 (2026-02-21)
+    image: ghcr.io/berriai/litellm:main-v1.81.12-stable
     container_name: litellm
     restart: unless-stopped
     environment:
@@ -180,13 +212,19 @@ services:
     volumes:
       - ./litellm-config.yaml:/app/config.yaml:ro
     ports:
-      - "18793:4000"
+      - "${LITELLM_PORT:-18793}:4000"
     command: ["--config", "/app/config.yaml"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4000/health/readiness')"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 300s
     depends_on:
       aria-db:
         condition: service_healthy
     networks:
-      - aria-net
+      - backend
     mem_limit: ${LITELLM_MEM_LIMIT:-1024m}
     cpus: ${LITELLM_CPU_LIMIT:-1.0}
     extra_hosts:
@@ -198,12 +236,13 @@ services:
 
   # Prometheus for metrics (optional: docker compose --profile monitoring up -d)
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v2.51.0
     container_name: prometheus
     restart: unless-stopped
     profiles: ["monitoring"]
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus-alerts.yml:/etc/prometheus/prometheus-alerts.yml:ro
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
@@ -213,14 +252,20 @@ services:
       - '--web.route-prefix=/prometheus/'
     ports:
       - "9090:9090"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/-/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     networks:
-      - aria-net
+      - monitoring
+      - backend
     mem_limit: 512m
     cpus: 0.5
 
   # Grafana for dashboards (optional: docker compose --profile monitoring up -d)
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:11.4.0
     container_name: grafana
     restart: unless-stopped
     profiles: ["monitoring"]
@@ -234,10 +279,16 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
     ports:
       - "3001:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     depends_on:
       - prometheus
     networks:
-      - aria-net
+      - monitoring
+      - frontend
     mem_limit: 512m
     cpus: 0.5
 
@@ -253,7 +304,7 @@ services:
       DATABASE_URL: postgresql://${DB_USER:-admin}:${DB_PASSWORD:-admin}@aria-db:5432/${DB_NAME:-aria_warehouse}
       # Local LLM (Ollama - native on host)
       OLLAMA_URL: http://host.docker.internal:11434
-      OLLAMA_MODEL: hf.co/unsloth/GLM-4.7-Flash-REAP-23B-A3B-GGUF:Q3_K_S
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-hf.co/unsloth/GLM-4.7-Flash-REAP-23B-A3B-GGUF:Q3_K_S}
       # LLM APIs (fallback)
       MOONSHOT_API_KEY: ${MOONSHOT_KIMI_KEY:-}
       # Moltbook
@@ -285,18 +336,25 @@ services:
       aria-api:
         condition: service_healthy
       litellm:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import aria_mind; print('ok')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     networks:
-      - aria-net
+      - backend
     # Keep running for interactive mode
     tty: true
     stdin_open: true
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     mem_limit: ${ARIA_BRAIN_MEM_LIMIT:-512m}
     cpus: ${ARIA_BRAIN_CPU_LIMIT:-1.0}
 
   # PgAdmin for database management (optional: docker compose --profile monitoring up -d)
   pgadmin:
-    image: dpage/pgadmin4:latest
+    image: dpage/pgadmin4:8.14
     container_name: aria-pgadmin
     restart: unless-stopped
     profiles: ["monitoring"]
@@ -305,11 +363,16 @@ services:
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
       SCRIPT_NAME: /pgadmin
     ports:
-      - "5050:80"
+      - "${PGADMIN_PORT:-5050}:80"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/misc/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     depends_on:
       - aria-db
     networks:
-      - aria-net
+      - data
     mem_limit: 256m
     cpus: 0.3
 
@@ -339,13 +402,24 @@ services:
       - ../../src/web/app.py:/app/app.py:ro
     ports:
       - "${ARIA_WEB_PORT:-5050}:5000"   # host 5050 (macOS 5000 reserved)
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/')"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
     depends_on:
       aria-db:
         condition: service_healthy
     networks:
-      - aria-net
+      - frontend
     mem_limit: ${ARIA_WEB_MEM_LIMIT:-256m}
     cpus: ${ARIA_WEB_CPU_LIMIT:-0.5}
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
 
   # Aria API - FastAPI backend (data routes)
   aria-api:
@@ -358,6 +432,9 @@ services:
       # /aria_skills is bind-mounted; PYTHONPATH=/ makes it importable
       PYTHONPATH: /
       DATABASE_URL: postgresql://${DB_USER:-admin}:${DB_PASSWORD:-admin}@aria-db:5432/${DB_NAME:-aria_warehouse}
+      # S-103: API authentication keys
+      ARIA_API_KEY: ${ARIA_API_KEY:-}
+      ARIA_ADMIN_KEY: ${ARIA_ADMIN_KEY:-}
       GRAFANA_URL: http://grafana:3000
       PROMETHEUS_URL: http://prometheus:9090
       OLLAMA_URL: http://host.docker.internal:11434
@@ -380,6 +457,8 @@ services:
       # Service control (admin)
       ARIA_SERVICE_CONTROL_ENABLED: ${ARIA_SERVICE_CONTROL_ENABLED:-false}
       ARIA_ADMIN_TOKEN: ${ARIA_ADMIN_TOKEN:-}
+      # S-100: Docker commands route through socket proxy
+      DOCKER_HOST: http://docker-socket-proxy:2375
       ARIA_SERVICE_CMD_LITELLM_RESTART: ${ARIA_SERVICE_CMD_LITELLM_RESTART:-docker restart litellm}
       ARIA_SERVICE_CMD_LITELLM_STOP: ${ARIA_SERVICE_CMD_LITELLM_STOP:-docker stop litellm}
       ARIA_SERVICE_CMD_OLLAMA_RESTART: ${ARIA_SERVICE_CMD_OLLAMA_RESTART:-}
@@ -421,15 +500,17 @@ services:
       - ../../aria_agents:/aria_agents:ro
       # Mount aria_souvenirs for soul file browser (read-only)
       - ../../aria_souvenirs:/aria_souvenirs:ro
-      # Docker socket for service control (admin actions)
-      - /var/run/docker.sock:/var/run/docker.sock
+      # S-100: Docker socket removed — admin uses docker-socket-proxy
+      # See docker-socket-proxy service below
     ports:
-      - "8000:8000"
+      - "${ARIA_API_PORT:-8000}:8000"
     depends_on:
       aria-db:
         condition: service_healthy
     networks:
-      - aria-net
+      - frontend
+      - backend
+      - data
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health || exit 1"]
       interval: 10s
@@ -439,9 +520,64 @@ services:
     cpus: ${ARIA_API_CPU_LIMIT:-1.0}
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # S-100: Docker socket proxy — restricted API for service control
+  # Only allows container list + restart/stop. No exec, no images, no volumes.
+  # S-01: Use DOCKER_SOCKET_PATH env var for Windows/Linux portability.
+  # macOS/Linux default: /var/run/docker.sock
+  # Windows (Docker Desktop): //var/run/docker.sock
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:0.2.0
+    container_name: docker-socket-proxy
+    restart: unless-stopped
+    environment:
+      CONTAINERS: 1
+      POST: 1
+      SERVICES: 0
+      TASKS: 0
+      NETWORKS: 0
+      VOLUMES: 0
+      IMAGES: 0
+      EXEC: 0
+      SWARM: 0
+    volumes:
+      - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock:ro
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:2375/version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - backend
+    mem_limit: 64m
+    cpus: 0.25
+
+  # Jaeger — distributed tracing UI & collector (S-25, optional)
+  # Enable: docker compose --profile tracing up -d jaeger
+  # UI: http://localhost:16686  |  OTLP gRPC: localhost:4317
+  jaeger:
+    image: jaegertracing/all-in-one:1.62
+    container_name: aria-jaeger
+    restart: unless-stopped
+    profiles: ["tracing"]
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"   # Jaeger UI
+      - "4317:4317"     # OTLP gRPC receiver
+    networks:
+      - monitoring
+    mem_limit: 512m
+    cpus: 0.5
 
   # Aria Sandbox — isolated code execution environment (S-29)
   # Used by sandbox skill (aria_skills/sandbox/__init__.py) via httpx on port 9999
+  # S-102: Isolated network, read-only filesystem, no-new-privileges
   aria-sandbox:
     build:
       context: ../sandbox
@@ -452,13 +588,21 @@ services:
     environment:
       SANDBOX_PORT: "9999"
       SANDBOX_TIMEOUT: "60"
+    read_only: true
+    tmpfs:
+      - /tmp:size=100m
+      - /sandbox/tmp:size=100m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     deploy:
       resources:
         limits:
           cpus: "1.0"
           memory: 512M
     networks:
-      - aria-net
+      - sandbox-net
     mem_limit: 512m
     cpus: 1.0
 
@@ -470,5 +614,15 @@ volumes:
   aria_logs:
 
 networks:
-  aria-net:
+  frontend:
     driver: bridge
+  backend:
+    driver: bridge
+  data:
+    driver: bridge
+  monitoring:
+    driver: bridge
+  # S-102: Isolated network for sandbox — no access to other services
+  sandbox-net:
+    driver: bridge
+    internal: true

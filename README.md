@@ -35,6 +35,29 @@ Built on a native Python engine (`aria_engine`) with multi-model LLM routing via
 
 ## Quick Start
 
+### First-Run Setup (recommended)
+
+The first-run script generates all required secrets and creates your `.env` file:
+
+```bash
+# macOS / Linux
+chmod +x scripts/first-run.sh
+./scripts/first-run.sh
+```
+
+```powershell
+# Windows PowerShell
+.\scripts\first-run.ps1
+```
+
+This will:
+- Check Docker and Docker Compose are installed
+- Copy `.env.example` → `.env`
+- Generate secure random passwords for DB, API keys, LiteLLM, Grafana, pgAdmin
+- Optionally prompt for external API keys (OpenRouter, Moonshot)
+
+### Manual Setup
+
 ```bash
 # Clone
 git clone https://github.com/Najia-afk/Aria_moltbot.git
@@ -49,7 +72,7 @@ mlx_lm.server --model nightmedia/Qwen3-VLTO-8B-Instruct-qx86x-hi-mlx \
   --host 0.0.0.0 --port 8080 &
 
 # Deploy
-cd stacks/brain && docker compose up -d
+docker compose up -d
 
 # Verify
 docker compose ps
@@ -84,7 +107,7 @@ These canonical files contain the live, authoritative data. Don't duplicate thei
 | Skill registry | [`aria_skills/*/skill.json`](aria_skills/) |
 | API routers | [`src/api/routers/`](src/api/routers/) |
 | ORM models | [`src/api/db/models.py`](src/api/db/models.py) |
-| Docker services | [`stacks/brain/docker-compose.yml`](stacks/brain/docker-compose.yml) |
+| Docker services | [`docker-compose.yml`](docker-compose.yml) (includes [`stacks/brain/docker-compose.yml`](stacks/brain/docker-compose.yml)) |
 | Focus personas | [`aria_mind/soul/focus.py`](aria_mind/soul/focus.py) |
 | Agent roles | [`aria_agents/base.py`](aria_agents/base.py) |
 | Dashboard templates | [`src/web/templates/`](src/web/templates/) |

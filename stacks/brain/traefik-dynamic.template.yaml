@@ -99,6 +99,7 @@ http:
       service: api@internal
       middlewares:
         - traefik-strip
+        - traefik-auth
 
     # HTTPS Routers (secure access)
     
@@ -196,6 +197,7 @@ http:
       service: api@internal
       middlewares:
         - traefik-strip
+        - traefik-auth
       tls: {}
 
   middlewares:
@@ -233,6 +235,7 @@ http:
           - /socket.io
 
     # CORS Only (Safe for WebSockets)
+    # S-109: Restricted CORS origins (no wildcard *)
     cors-only:
       headers:
         accessControlAllowMethods:
@@ -244,11 +247,15 @@ http:
         accessControlAllowHeaders:
           - "*"
         accessControlAllowOriginList: 
-          - "*"
+          - "http://localhost:5000"
+          - "http://localhost:5050"
+          - "http://aria-web:5000"
+          - "https://${SERVICE_HOST}"
         accessControlMaxAge: 100
         addVaryHeader: true
 
     # Security Headers for Websockets (No Keep-Alive)
+    # S-109: Restricted CORS origins
     secure-headers-ws:
       headers:
         accessControlAllowMethods:
@@ -260,13 +267,17 @@ http:
         accessControlAllowHeaders:
           - "*"
         accessControlAllowOriginList: 
-          - "*"
+          - "http://localhost:5000"
+          - "http://localhost:5050"
+          - "http://aria-web:5000"
+          - "https://${SERVICE_HOST}"
         accessControlMaxAge: 100
         addVaryHeader: true
         contentTypeNosniff: true
         browserXssFilter: true
 
     # Security Headers for Standard HTTP (With Keep-Alive for stability)
+    # S-109: Restricted CORS origins
     secure-headers:
       headers:
         accessControlAllowMethods:
@@ -278,7 +289,10 @@ http:
         accessControlAllowHeaders:
           - "*"
         accessControlAllowOriginList: 
-          - "*"
+          - "http://localhost:5000"
+          - "http://localhost:5050"
+          - "http://aria-web:5000"
+          - "https://${SERVICE_HOST}"
         accessControlMaxAge: 100
         addVaryHeader: true
         contentTypeNosniff: true
@@ -287,6 +301,12 @@ http:
         customResponseHeaders:
           Connection: "keep-alive"
           Keep-Alive: "timeout=5, max=1000"
+
+    # S-107: Basic auth for Traefik dashboard
+    traefik-auth:
+      basicAuth:
+        users:
+          - "${TRAEFIK_DASHBOARD_USER}:${TRAEFIK_DASHBOARD_PASSWORD_HASH}"
 
   services:
     portal:

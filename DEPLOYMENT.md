@@ -74,8 +74,8 @@ See [ROLLBACK.md](ROLLBACK.md) for detailed rollback procedures.
 
 ```bash
 git clone https://github.com/Najia-afk/Aria_moltbot.git
-cd Aria_moltbot/stacks/brain
-cp .env.example .env
+cd Aria_moltbot
+cp stacks/brain/.env.example .env
 nano .env  # Edit with your values
 ```
 
@@ -115,7 +115,7 @@ curl http://localhost:8081/metrics | grep aria_
 
 ## API Keys
 
-Configure in `stacks/brain/.env`:
+Configure in `.env`:
 
 ### OpenRouter (FREE models — recommended fallback)
 1. Go to https://openrouter.ai/
@@ -139,7 +139,8 @@ FREE models available:
 
 ```env
 # Database (creates TWO databases: aria_warehouse + litellm)
-DB_USER=aria_admin
+# Defaults match docker-compose.yml: admin / admin / aria_warehouse
+DB_USER=admin
 DB_PASSWORD=your_secure_password
 DB_NAME=aria_warehouse
 
@@ -188,11 +189,11 @@ The `init-scripts/` folder runs on first PostgreSQL startup:
 ### Manual Access
 
 ```bash
-# Connect to aria_warehouse
-docker exec -it aria-db psql -U aria_admin -d aria_warehouse
+# Connect to aria_warehouse (default DB_USER is 'admin')
+docker exec -it aria-db psql -U ${DB_USER:-admin} -d aria_warehouse
 
 # Connect to litellm
-docker exec -it aria-db psql -U aria_admin -d litellm
+docker exec -it aria-db psql -U ${DB_USER:-admin} -d litellm
 
 # List tables
 \dt
@@ -205,21 +206,27 @@ SELECT COUNT(*) FROM activity_log;
 
 ## Docker Stack
 
-| Service | Image | Port | Description |
-|---------|-------|------|-------------|
-| **traefik** | traefik:v3.1 | 80, 443, 8081 | HTTPS reverse proxy + dashboard |
-| **aria-engine** | Custom (Python) | 8100 | Aria Engine AI gateway |
-| **litellm** | ghcr.io/berriai/litellm | 18793 | LLM model router |
-| **aria-db** | postgres:16-alpine | 5432 | PostgreSQL (dual database) |
-| **aria-api** | Custom (FastAPI) | 8000 | REST API backend |
-| **aria-web** | Custom (Flask) | 5000 | Dashboard UI |
-| **aria-brain** | Custom (Python) | — | Agent runtime |
-| **grafana** | grafana/grafana | 3001 | Monitoring dashboards |
-| **prometheus** | prom/prometheus | 9090 | Metrics collection |
-| **pgadmin** | dpage/pgadmin4 | 5050 | Database admin UI |
-| **aria-browser** | browserless/chrome | 3000 | Headless browser automation |
-| **tor-proxy** | dperson/torproxy | 9050 | Privacy proxy |
-| **certs-init** | alpine:3.20 | — | TLS certificate generation (oneshot) |
+| Service | Image | Port (host) | Profile | Description |
+|---------|-------|-------------|---------|-------------|
+| **aria-db** | pgvector/pgvector:pg16 | — (internal) | default | PostgreSQL 16 + pgvector (dual database) |
+| **aria-browser** | browserless/chrome:2.18.0 | 3000 | default | Headless browser automation |
+| **aria-engine** | Custom (Python) | — (internal) | default | Aria Engine AI gateway (health on :8081) |
+| **tor-proxy** | dperson/torproxy:latest | 9050, 9051 | default | Privacy proxy |
+| **certs-init** | alpine:3.20 | — | default | TLS certificate generation (oneshot) |
+| **traefik** | traefik:v3.1 | 8080, 8443, 8081 | default | HTTPS reverse proxy + dashboard |
+| **litellm** | ghcr.io/berriai/litellm:main-v1.61.4 | 18793 | default | LLM model router |
+| **aria-brain** | Custom (Python) | — | default | Agent runtime |
+| **aria-web** | Custom (Flask) | 5050 | default | Dashboard UI |
+| **aria-api** | Custom (FastAPI) | 8000 | default | REST API backend |
+| **docker-socket-proxy** | tecnativa/docker-socket-proxy:0.2 | — (internal) | default | Restricted Docker API proxy |
+| **prometheus** | prom/prometheus:v2.51.0 | 9090 | monitoring | Metrics collection |
+| **grafana** | grafana/grafana:11.4.0 | 3001 | monitoring | Monitoring dashboards |
+| **pgadmin** | dpage/pgadmin4:8.14 | 5050 | monitoring | Database admin UI |
+| **aria-sandbox** | Custom (Python) | — (internal) | sandbox | Isolated code execution (S-29) |
+
+> **15 services total**: 11 default + 3 monitoring profile + 1 sandbox profile.
+> Traefik ports use env vars: `TRAEFIK_HTTP_PORT` (default 8080), `TRAEFIK_HTTPS_PORT` (default 8443), `TRAEFIK_DASH_PORT` (default 8081).
+> aria-web port uses `ARIA_WEB_PORT` (default 5050; macOS reserves 5000).
 
 **Volumes:** `aria_pg_data` · `prometheus_data` · `grafana_data` · `aria_data` · `aria_logs` · `aria_engine_data`
 
@@ -388,7 +395,7 @@ docker compose ps
 
 ```bash
 docker logs aria-db
-docker exec -it aria-db psql -U aria_admin -d aria_warehouse -c '\dt'
+docker exec -it aria-db psql -U ${DB_USER:-admin} -d aria_warehouse -c '\dt'
 ```
 
 ### Slow LLM responses
@@ -417,7 +424,6 @@ curl http://localhost:18793/models
 ### Fresh rebuild (nuclear option)
 
 ```bash
-cd stacks/brain
 docker compose down -v   # Remove ALL volumes (data loss!)
 docker compose up -d     # Start fresh
 docker compose ps        # Verify all services healthy
@@ -438,8 +444,8 @@ docker exec aria-engine aria-engine status --deep
 ### Database
 
 ```bash
-docker exec -it aria-db psql -U aria_admin -d aria_warehouse -c '\dt'
-docker exec -it aria-db psql -U aria_admin -d aria_warehouse -c 'SELECT COUNT(*) FROM activity_log'
+docker exec -it aria-db psql -U ${DB_USER:-admin} -d aria_warehouse -c '\dt'
+docker exec -it aria-db psql -U ${DB_USER:-admin} -d aria_warehouse -c 'SELECT COUNT(*) FROM activity_log'
 ```
 
 ### Service URLs
@@ -465,7 +471,7 @@ docker exec -it aria-db psql -U aria_admin -d aria_warehouse -c 'SELECT COUNT(*)
 - [ ] `.env` configured with all credentials
 - [ ] MLX Server running on Apple Silicon host
 - [ ] Docker stack started (`docker compose up -d`)
-- [ ] All 14 containers healthy
+- [ ] All 15 services defined (11 default + monitoring/sandbox profiles)
 
 ### Verification
 
@@ -489,26 +495,34 @@ docker exec -it aria-db psql -U aria_admin -d aria_warehouse -c 'SELECT COUNT(*)
 
 ```
 Mac Mini (192.168.1.53)
-├── docker compose stack:
-│   ├── aria-db (PostgreSQL 16 + pgvector)
+├── docker compose stack (15 services):
+│   ├── aria-db (PostgreSQL 16 + pgvector — pgvector/pgvector:pg16)
 │   ├── litellm (LLM model router)
 │   ├── aria-brain (aria_engine — heartbeat, cron, agents)
 │   ├── aria-api (FastAPI REST API)
 │   ├── aria-web (Dashboard)
-│   ├── prometheus (Metrics collection)
-│   └── grafana (Monitoring dashboards)
+│   ├── aria-engine (Python async engine)
+│   ├── traefik (HTTPS reverse proxy)
+│   ├── docker-socket-proxy (restricted Docker API)
+│   ├── tor-proxy, aria-browser, certs-init
+│   └── [monitoring profile] prometheus, grafana, pgadmin
+│   └── [sandbox profile] aria-sandbox
 ├── /home/najia/aria/
-│   ├── aria_engine/ (NEW — replaces legacy gateway)
+│   ├── aria_engine/
 │   ├── aria_mind/
 │   ├── aria_skills/
 │   ├── aria_agents/
 │   ├── aria_memories/ (persistent data)
 │   └── backups/ (deploy backups)
 └── Ports:
-    ├── 5000 — Flask app
-    ├── 8081 — Prometheus metrics / aria_engine health
-    ├── 3000 — Grafana
-    └── 9090 — Prometheus UI
+    ├── 5050 — Flask dashboard (ARIA_WEB_PORT)
+    ├── 8080 — Traefik HTTP (TRAEFIK_HTTP_PORT)
+    ├── 8443 — Traefik HTTPS (TRAEFIK_HTTPS_PORT)
+    ├── 8081 — Traefik dashboard (TRAEFIK_DASH_PORT)
+    ├── 8000 — aria-api (FastAPI)
+    ├── 18793 — LiteLLM
+    ├── 3000 — aria-browser
+    └── 9050 — tor-proxy
 ```
 
 ---

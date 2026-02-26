@@ -80,6 +80,15 @@ class SandboxSkill(BaseSkill):
             self._status = SkillStatus.ERROR
         return self._status
 
+    @staticmethod
+    def _sanitize_path(path: str) -> str:
+        """S-104: Sanitize file path to prevent code injection."""
+        # Remove quotes, semicolons, newlines — prevents breaking out of f-string
+        sanitized = path.replace("'", "").replace('"', '').replace(';', '').replace('\n', '').replace('\r', '')
+        # Prevent path traversal
+        sanitized = sanitized.replace('..', '')
+        return sanitized
+
     @logged_method()
     async def run_code(self, code: str, timeout: int = 30, **kwargs) -> SkillResult:
         """Execute Python code in the sandbox."""
@@ -108,7 +117,7 @@ class SandboxSkill(BaseSkill):
 
     @logged_method()
     async def write_file(self, path: str = "", content: str = "", *, file_path: str = "") -> SkillResult:
-        """Write a file in the sandbox via code execution."""
+        """Write a file in the sandbox via code execution (S-104: injection-safe)."""
         # Accept both 'path' and 'file_path' — LLMs sometimes hallucinate param names
         path = path or file_path
         if not path:
@@ -116,19 +125,22 @@ class SandboxSkill(BaseSkill):
         if not self._client:
             return SkillResult.fail("Not initialized")
 
-        # Escape content for Python string
-        escaped = content.replace("\\", "\\\\").replace("'", "\\'")
+        # S-104: Use base64 encoding to prevent code injection via content/path
+        import base64
+        encoded_content = base64.b64encode(content.encode()).decode()
+        safe_path = self._sanitize_path(path)
         code = (
-            f"import pathlib; p = pathlib.Path('{path}'); "
+            f"import pathlib, base64; "
+            f"p = pathlib.Path('{safe_path}'); "
             f"p.parent.mkdir(parents=True, exist_ok=True); "
-            f"p.write_text('''{escaped}''')"
+            f"p.write_text(base64.b64decode('{encoded_content}').decode())"
         )
 
         return await self.run_code(code, timeout=10)
 
     @logged_method()
     async def read_file(self, path: str = "", *, file_path: str = "") -> SkillResult:
-        """Read a file from the sandbox via code execution."""
+        """Read a file from the sandbox via code execution (S-104: injection-safe)."""
         # Accept both 'path' and 'file_path' — LLMs sometimes hallucinate param names
         path = path or file_path
         if not path:
@@ -136,7 +148,9 @@ class SandboxSkill(BaseSkill):
         if not self._client:
             return SkillResult.fail("Not initialized")
 
-        code = f"import pathlib; print(pathlib.Path('{path}').read_text())"
+        # S-104: Sanitize path to prevent injection
+        safe_path = self._sanitize_path(path)
+        code = f"import pathlib; print(pathlib.Path('{safe_path}').read_text())"
         result = await self.run_code(code, timeout=10)
 
         if result.success and result.data:
@@ -150,9 +164,11 @@ class SandboxSkill(BaseSkill):
         if not self._client:
             return SkillResult.fail("Not initialized")
 
+        # S-104: Sanitize test path
+        safe_path = self._sanitize_path(test_path)
         code = (
             f"import subprocess, sys; "
-            f"r = subprocess.run([sys.executable, '-m', 'pytest', '{test_path}', '-v', '--tb=short'], "
+            f"r = subprocess.run([sys.executable, '-m', 'pytest', '{safe_path}', '-v', '--tb=short'], "
             f"capture_output=True, text=True, timeout=60); "
             f"print(r.stdout); print(r.stderr, file=sys.stderr); sys.exit(r.returncode)"
         )

@@ -427,9 +427,10 @@ class ResearchSkill(BaseSkill):
             params = {"type": "research"}
             if status:
                 params["status"] = status
-            resp = await self._api._client.get("/memories", params=params)
-            resp.raise_for_status()
-            api_data = resp.json()
+            resp = await self._api.get("/memories", params=params)
+            if not resp:
+                raise Exception(resp.error)
+            api_data = resp.data
             memories = api_data if isinstance(api_data, list) else api_data.get("memories", [])
             projects = []
             for mem in memories:
@@ -477,7 +478,7 @@ class ResearchSkill(BaseSkill):
                 "key": project.id,
                 "data": self._serialize_project(project),
             }
-            await self._api._client.post("/memories", json=memory_data)
+            await self._api.post("/memories", data=memory_data)
         except Exception as e:
             self.logger.warning(f"API _save_project_to_api failed: {e}")
     

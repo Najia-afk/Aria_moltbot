@@ -3,16 +3,18 @@ Social posts endpoints (Moltbook + other platforms).
 """
 
 import json as json_lib
+import logging
 import os
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import SocialPost
 from deps import get_db
 from pagination import paginate_query, build_paginated_response
+from schemas.requests import CreateSocialPost, SocialCleanup, SocialDedupe, ImportMoltbook, UpdateSocialPost
 
 try:
     import httpx
@@ -20,6 +22,7 @@ except Exception:  # pragma: no cover
     httpx = None
 
 router = APIRouter(tags=["Social"])
+logger = logging.getLogger("aria.api.social")
 
 _DEFAULT_MOLTBOOK_API = "https://www.moltbook.com/api/v1"
 
@@ -32,7 +35,8 @@ def _is_test_social_payload(platform: str | None, content: str | None, metadata:
             return True
         try:
             parts.append(json_lib.dumps(metadata, ensure_ascii=False))
-        except Exception:
+        except Exception as e:
+            logger.warning("Social metadata parse error: %s", e)
             parts.append(str(metadata))
     haystack = " ".join(parts).lower()
     return any(marker in haystack for marker in markers)
@@ -92,7 +96,8 @@ async def _fetch_paginated_items(client, endpoint_templates: list[str], max_item
 
             try:
                 resp = await client.get(endpoint)
-            except Exception:
+            except Exception as e:
+                logger.warning("Social template item parse error: %s", e)
                 items_for_template = []
                 break
 
@@ -140,11 +145,10 @@ async def get_social_posts(
 
 
 @router.post("/social")
-async def create_social_post(request: Request, db: AsyncSession = Depends(get_db)):
-    data = await request.json()
-    platform = data.get("platform", "moltbook")
-    content = data.get("content")
-    metadata = data.get("metadata", {})
+async def create_social_post(body: CreateSocialPost, db: AsyncSession = Depends(get_db)):
+    platform = body.platform
+    content = body.content
+    metadata = body.metadata
 
     if _is_test_social_payload(platform, content, metadata):
         return {"created": False, "skipped": True, "reason": "test_payload"}
@@ -152,11 +156,11 @@ async def create_social_post(request: Request, db: AsyncSession = Depends(get_db
     post = SocialPost(
         id=uuid.uuid4(),
         platform=platform,
-        post_id=data.get("post_id"),
+        post_id=body.post_id,
         content=content,
-        visibility=data.get("visibility", "public"),
-        reply_to=data.get("reply_to"),
-        url=data.get("url"),
+        visibility=body.visibility,
+        reply_to=body.reply_to,
+        url=body.url,
         metadata_json=metadata,
     )
     db.add(post)
@@ -165,12 +169,11 @@ async def create_social_post(request: Request, db: AsyncSession = Depends(get_db
 
 
 @router.post("/social/cleanup")
-async def cleanup_social_posts(request: Request, db: AsyncSession = Depends(get_db)):
+async def cleanup_social_posts(body: SocialCleanup, db: AsyncSession = Depends(get_db)):
     """Remove test/noise social rows by pattern/platform; supports dry-run."""
-    data = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
-    patterns = data.get("patterns") or ["test", "live test post", "abc123", "post 42"]
-    platform = data.get("platform")
-    dry_run = bool(data.get("dry_run", False))
+    patterns = body.patterns or ["test", "live test post", "abc123", "post 42"]
+    platform = body.platform
+    dry_run = body.dry_run
 
     clauses = []
     for pat in patterns:
@@ -202,11 +205,10 @@ async def cleanup_social_posts(request: Request, db: AsyncSession = Depends(get_
 
 
 @router.post("/social/dedupe")
-async def dedupe_social_posts(request: Request, db: AsyncSession = Depends(get_db)):
+async def dedupe_social_posts(body: SocialDedupe, db: AsyncSession = Depends(get_db)):
     """Remove duplicates by (platform, post_id), keeping the newest row."""
-    data = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
-    dry_run = bool(data.get("dry_run", True))
-    platform = data.get("platform")
+    dry_run = body.dry_run
+    platform = body.platform
 
     stmt = select(SocialPost).where(SocialPost.post_id.isnot(None)).order_by(SocialPost.posted_at.desc())
     if platform:
@@ -255,19 +257,18 @@ async def dedupe_social_posts(request: Request, db: AsyncSession = Depends(get_d
 
 
 @router.post("/social/import-moltbook")
-async def import_moltbook(request: Request, db: AsyncSession = Depends(get_db)):
+async def import_moltbook(body: ImportMoltbook, db: AsyncSession = Depends(get_db)):
     """Backfill Aria Moltbook posts/comments into social_posts; optional test cleanup."""
     if httpx is None:
         raise HTTPException(status_code=500, detail="httpx is required for import")
 
-    body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
-    include_comments = bool(body.get("include_comments", True))
-    cleanup_test = bool(body.get("cleanup_test", True))
-    dry_run = bool(body.get("dry_run", False))
-    max_items = int(body.get("max_items", 200))
+    include_comments = body.include_comments
+    cleanup_test = body.cleanup_test
+    dry_run = body.dry_run
+    max_items = body.max_items
 
-    api_url = str(body.get("api_url") or os.getenv("MOLTBOOK_API_URL", _DEFAULT_MOLTBOOK_API)).rstrip("/")
-    api_key = body.get("api_key") or os.getenv("MOLTBOOK_API_KEY") or os.getenv("MOLTBOOK_TOKEN")
+    api_url = str(body.api_url or os.getenv("MOLTBOOK_API_URL", _DEFAULT_MOLTBOOK_API)).rstrip("/")
+    api_key = body.api_key or os.getenv("MOLTBOOK_API_KEY") or os.getenv("MOLTBOOK_TOKEN")
     if not api_key:
         raise HTTPException(status_code=400, detail="MOLTBOOK_API_KEY/TOKEN not configured")
 
@@ -360,3 +361,28 @@ async def import_moltbook(request: Request, db: AsyncSession = Depends(get_db)):
         "cleanup": cleanup_result,
         "dry_run": dry_run,
     }
+
+
+@router.delete("/social/{post_id}")
+async def delete_social_post(post_id: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(SocialPost).where(SocialPost.id == post_id))
+    row = result.scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Social post not found")
+    await db.delete(row)
+    await db.commit()
+    return {"deleted": True, "id": post_id}
+
+
+@router.patch("/social/{post_id}")
+async def update_social_post(post_id: str, body: UpdateSocialPost, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(SocialPost).where(SocialPost.id == post_id))
+    row = result.scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Social post not found")
+    updates = body.model_dump(exclude_unset=True)
+    for key, value in updates.items():
+        setattr(row, key, value)
+    await db.commit()
+    await db.refresh(row)
+    return row.to_dict()

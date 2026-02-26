@@ -5,11 +5,12 @@ Provides CRUD plus weighted-context retrieval and checkpoint/restore.
 """
 
 import json
+import logging
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select, delete, update, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,8 +18,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db.models import WorkingMemory
 from deps import get_db
 from pagination import paginate_query, build_paginated_response
+from schemas.requests import CreateWorkingMemory, UpdateWorkingMemory
 
 router = APIRouter(tags=["Working Memory"])
+logger = logging.getLogger("aria.api.working_memory")
 
 
 def _not_expired_clause():
@@ -141,22 +144,19 @@ async def get_working_memory_context(
 
 @router.post("/working-memory")
 async def store_working_memory(
-    request: Request,
+    body: CreateWorkingMemory,
     db: AsyncSession = Depends(get_db),
 ):
     """Store or upsert a working memory item."""
-    data = await request.json()
-    key = data.get("key")
-    value = data.get("value")
-    category = data.get("category", "general")
-    importance = data.get("importance", 0.5)
-    ttl_hours = data.get("ttl_hours")
-    source = data.get("source")
+    key = body.key
+    value = body.value
+    category = body.category
+    importance = body.importance
+    ttl_hours = body.ttl_hours
+    source = body.source
 
     if not key:
         raise HTTPException(status_code=400, detail="key is required")
-    if value is None:
-        raise HTTPException(status_code=400, detail="value is required")
 
     # Upsert by (category, key)
     result = await db.execute(
@@ -199,7 +199,7 @@ async def store_working_memory(
 @router.patch("/working-memory/{item_id}")
 async def update_working_memory(
     item_id: str,
-    request: Request,
+    body: UpdateWorkingMemory,
     db: AsyncSession = Depends(get_db),
 ):
     """Partial update of a working memory item (value, importance)."""
@@ -215,11 +215,10 @@ async def update_working_memory(
     if not item:
         raise HTTPException(status_code=404, detail="Working memory item not found")
 
-    data = await request.json()
-    if "value" in data:
-        item.value = data["value"]
-    if "importance" in data:
-        item.importance = data["importance"]
+    if body.value is not None:
+        item.value = body.value
+    if body.importance is not None:
+        item.importance = body.importance
     item.updated_at = datetime.now(timezone.utc)
     await db.commit()
     return item.to_dict()
@@ -254,7 +253,6 @@ async def delete_working_memory(
 
 @router.post("/working-memory/checkpoint")
 async def create_checkpoint(
-    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -452,6 +450,7 @@ async def get_working_memory_file_snapshot():
             "snapshot": picked_payload,
         }
     except Exception as exc:
+        logger.warning("File snapshot read failed: %s", exc)
         raise HTTPException(status_code=500, detail=f"Failed to read file snapshot: {exc}")
 
 

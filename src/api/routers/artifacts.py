@@ -6,6 +6,7 @@ Aria can save research, diary entries, plans, and other persistent files
 via the API layer (respecting the 5-layer architecture constraint).
 """
 import json
+import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,6 +15,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 router = APIRouter(tags=["Artifacts"])
+logger = logging.getLogger("aria.api.artifacts")
 
 # Writable directory — aria_memories is the ONLY writable path
 ARIA_MEMORIES_PATH = Path(os.environ.get("ARIA_MEMORIES_PATH", "/aria_memories"))
@@ -80,6 +82,7 @@ async def write_artifact(body: ArtifactWriteRequest):
             "filename": body.filename,
         }
     except Exception as e:
+        logger.warning("Artifact write failed: %s", e)
         raise HTTPException(status_code=500, detail=f"Failed to write artifact: {e}")
 
 
@@ -111,6 +114,7 @@ async def read_artifact(category: str, filename: str):
     except UnicodeDecodeError:
         raise HTTPException(status_code=400, detail="File is not valid UTF-8 text")
     except Exception as e:
+        logger.warning("Artifact read failed: %s", e)
         raise HTTPException(status_code=500, detail=f"Failed to read artifact: {e}")
 
 
@@ -178,4 +182,5 @@ async def delete_artifact(category: str, filename: str):
         filepath.unlink()
         return {"success": True, "deleted": f"{category}/{filename}"}
     except Exception as e:
+        logger.warning("Artifact delete failed: %s", e)
         raise HTTPException(status_code=500, detail=f"Failed to delete: {e}")

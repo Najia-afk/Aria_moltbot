@@ -5,6 +5,7 @@ Health, status, and stats endpoints.
 from datetime import datetime, timezone
 
 import asyncio
+import logging
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -16,6 +17,7 @@ from db.session import async_engine
 from db.models import ActivityLog, Thought, Memory
 from deps import get_db
 
+logger = logging.getLogger("aria.api.health")
 router = APIRouter(tags=["Health"])
 
 
@@ -39,11 +41,25 @@ class StatsResponse(BaseModel):
 
 @router.get("/health", response_model=HealthResponse)
 async def health_check():
+    """S-21: Real database connectivity check — returns 503 if DB is unreachable."""
     uptime = (datetime.now(timezone.utc) - STARTUP_TIME).total_seconds()
+    db_status = "connected"
+    try:
+        async with async_engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+    except Exception as e:
+        logger.warning("DB health check failed: %s", e)
+        db_status = f"error: {str(e)[:100]}"
+        return HealthResponse(
+            status="degraded",
+            uptime_seconds=int(uptime),
+            database=db_status,
+            version=API_VERSION,
+        )
     return HealthResponse(
         status="healthy",
         uptime_seconds=int(uptime),
-        database="connected",
+        database=db_status,
         version=API_VERSION,
     )
 
@@ -64,8 +80,8 @@ async def host_stats():
             if resp.status_code == 200:
                 stats.update(resp.json())
                 stats["source"] = "host"
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Failed to fetch host stats from %s: %s", DOCKER_HOST_IP, e)
     return stats
 
 
@@ -100,6 +116,7 @@ async def api_status():
             finally:
                 socket.setdefaulttimeout(prev)
         except Exception as e:
+            logger.warning("Service probe %s failed: %s", name, e)
             return name, {"status": "down", "code": None, "error": str(e)[:50]}
 
     urls = {
@@ -121,7 +138,8 @@ async def api_status():
             try:
                 name, info = future.result(timeout=0)
                 results[name] = info
-            except Exception:
+            except Exception as e:
+                logger.warning("Service probe future error: %s", e)
                 results[future_map[future]] = {
                     "status": "down", "code": None, "error": "timeout",
                 }
@@ -143,7 +161,8 @@ async def api_status():
         async with async_engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
         results["postgres"] = {"status": "up", "code": 200}
-    except Exception:
+    except Exception as e:
+        logger.warning("Postgres check failed: %s", e)
         results["postgres"] = {"status": "down", "code": None}
     return results
 
@@ -155,7 +174,8 @@ async def api_status_service(service_id: str):
             async with async_engine.connect() as conn:
                 await conn.execute(text("SELECT 1"))
             return {"status": "online", "code": 200}
-        except Exception:
+        except Exception as e:
+            logger.warning("Service check failed: %s", e)
             return {"status": "offline", "code": None}
 
     service_info = SERVICE_URLS.get(service_id)
@@ -167,7 +187,8 @@ async def api_status_service(service_id: str):
             url = base_url.rstrip("/") + health_path
             resp = client.get(url)
         return {"status": "online", "code": resp.status_code}
-    except Exception:
+    except Exception as e:
+        logger.warning("HTTP service probe failed: %s", e)
         return {"status": "offline", "code": None}
 
 
@@ -192,6 +213,7 @@ async def database_health():
         from db.session import check_database_health
         return await check_database_health()
     except Exception as e:
+        logger.warning("DB health detailed check failed: %s", e)
         return {
             "status": "error",
             "error": str(e)[:200],

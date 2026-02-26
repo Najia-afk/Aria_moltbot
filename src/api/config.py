@@ -8,6 +8,8 @@ import logging
 from pathlib import Path
 from datetime import datetime, timezone
 
+_logger = logging.getLogger("aria.config")
+
 
 def _load_stack_env_if_present() -> None:
     """Best-effort load of stacks/brain/.env into process env.
@@ -28,8 +30,8 @@ def _load_stack_env_if_present() -> None:
             value = value.strip().strip('"').strip("'")
             if key and key not in os.environ:
                 os.environ[key] = value
-    except Exception:
-        pass
+    except Exception as e:
+        _logger.warning("Failed to load stack .env from %s: %s", env_path, e)
 
 # ── Database ──────────────────────────────────────────────────────────────────
 DATABASE_URL = os.getenv("DATABASE_URL")

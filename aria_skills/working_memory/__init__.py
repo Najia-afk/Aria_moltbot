@@ -7,6 +7,9 @@ Wraps the /working-memory REST endpoints via httpx (api_client pattern).
 from datetime import datetime, timezone
 from typing import Any
 from pathlib import Path
+import json as _json
+import logging
+import os
 
 from aria_skills.api_client import get_api_client
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
@@ -46,7 +49,8 @@ class WorkingMemorySkill(BaseSkill):
             self.logger.error(f"API client init failed: {e}")
             self._status = SkillStatus.UNAVAILABLE
             return False
-        if not self._api._client:
+        hc = await self._api.health_check()
+        if hc != SkillStatus.AVAILABLE:
             self.logger.error("API client not available")
             self._status = SkillStatus.UNAVAILABLE
             return False
@@ -56,13 +60,13 @@ class WorkingMemorySkill(BaseSkill):
 
     async def health_check(self) -> SkillStatus:
         """Ping the API health endpoint."""
-        if not self._api or not self._api._client:
+        if not self._api:
             self._status = SkillStatus.UNAVAILABLE
             return self._status
         try:
-            resp = await self._api._client.get("/health")
+            result = await self._api.get("/health")
             self._status = (
-                SkillStatus.AVAILABLE if resp.status_code == 200 else SkillStatus.ERROR
+                SkillStatus.AVAILABLE if result.success else SkillStatus.ERROR
             )
         except Exception as e:
             self.logger.error(f"Health check failed: {e}")
@@ -87,10 +91,10 @@ class WorkingMemorySkill(BaseSkill):
         source: str | None = None,
     ) -> SkillResult:
         """Store (or upsert) a working memory item."""
-        if not self._api or not self._api._client:
+        if not self._api:
             return SkillResult.fail("Working memory not initialized")
         try:
-            resp = await self._api._client.post("/working-memory", json={
+            result = await self._api.post("/working-memory", data={
                 "key": key,
                 "value": value,
                 "category": category,
@@ -98,8 +102,9 @@ class WorkingMemorySkill(BaseSkill):
                 "ttl_hours": ttl_hours,
                 "source": source,
             })
-            resp.raise_for_status()
-            return SkillResult.ok(resp.json())
+            if not result:
+                raise Exception(result.error)
+            return SkillResult.ok(result.data)
         except Exception as e:
             return SkillResult.fail(f"remember failed: {e}")
 
@@ -111,7 +116,7 @@ class WorkingMemorySkill(BaseSkill):
         limit: int = 50,
     ) -> SkillResult:
         """Retrieve working memory items by key and/or category."""
-        if not self._api or not self._api._client:
+        if not self._api:
             return SkillResult.fail("Working memory not initialized")
         try:
             params: dict[str, Any] = {"limit": limit}
@@ -119,9 +124,10 @@ class WorkingMemorySkill(BaseSkill):
                 params["key"] = key
             if category:
                 params["category"] = category
-            resp = await self._api._client.get("/working-memory", params=params)
-            resp.raise_for_status()
-            return SkillResult.ok(resp.json())
+            result = await self._api.get("/working-memory", params=params)
+            if not result:
+                raise Exception(result.error)
+            return SkillResult.ok(result.data)
         except Exception as e:
             return SkillResult.fail(f"recall failed: {e}")
 
@@ -135,7 +141,7 @@ class WorkingMemorySkill(BaseSkill):
         category: str | None = None,
     ) -> SkillResult:
         """Weighted-ranked context retrieval for LLM injection."""
-        if not self._api or not self._api._client:
+        if not self._api:
             return SkillResult.fail("Working memory not initialized")
         try:
             params: dict[str, Any] = {
@@ -146,72 +152,78 @@ class WorkingMemorySkill(BaseSkill):
             }
             if category:
                 params["category"] = category
-            resp = await self._api._client.get("/working-memory/context", params=params)
-            resp.raise_for_status()
-            return SkillResult.ok(resp.json())
+            result = await self._api.get("/working-memory/context", params=params)
+            if not result:
+                raise Exception(result.error)
+            return SkillResult.ok(result.data)
         except Exception as e:
             return SkillResult.fail(f"get_context failed: {e}")
 
     @logged_method()
     async def checkpoint(self) -> SkillResult:
         """Snapshot all current working memory items."""
-        if not self._api or not self._api._client:
+        if not self._api:
             return SkillResult.fail("Working memory not initialized")
         try:
-            resp = await self._api._client.post("/working-memory/checkpoint", json={})
-            resp.raise_for_status()
-            return SkillResult.ok(resp.json())
+            result = await self._api.post("/working-memory/checkpoint", data={})
+            if not result:
+                raise Exception(result.error)
+            return SkillResult.ok(result.data)
         except Exception as e:
             return SkillResult.fail(f"checkpoint failed: {e}")
 
     @logged_method()
     async def restore_checkpoint(self) -> SkillResult:
         """Fetch items from the latest checkpoint."""
-        if not self._api or not self._api._client:
+        if not self._api:
             return SkillResult.fail("Working memory not initialized")
         try:
-            resp = await self._api._client.get("/working-memory/checkpoint")
-            resp.raise_for_status()
-            return SkillResult.ok(resp.json())
+            result = await self._api.get("/working-memory/checkpoint")
+            if not result:
+                raise Exception(result.error)
+            return SkillResult.ok(result.data)
         except Exception as e:
             return SkillResult.fail(f"restore_checkpoint failed: {e}")
 
     @logged_method()
     async def forget(self, item_id: str) -> SkillResult:
         """Delete a working memory item by UUID."""
-        if not self._api or not self._api._client:
+        if not self._api:
             return SkillResult.fail("Working memory not initialized")
         try:
-            resp = await self._api._client.delete(f"/working-memory/{item_id}")
-            resp.raise_for_status()
-            return SkillResult.ok(resp.json())
+            result = await self._api.delete(f"/working-memory/{item_id}")
+            if not result:
+                raise Exception(result.error)
+            return SkillResult.ok(result.data)
         except Exception as e:
             return SkillResult.fail(f"forget failed: {e}")
 
     @logged_method()
     async def update(self, item_id: str, **kwargs) -> SkillResult:
         """Partial update (value, importance) for an item."""
-        if not self._api or not self._api._client:
+        if not self._api:
             return SkillResult.fail("Working memory not initialized")
         try:
-            resp = await self._api._client.patch(
+            result = await self._api.patch(
                 f"/working-memory/{item_id}",
-                json=kwargs,
+                data=kwargs,
             )
-            resp.raise_for_status()
-            return SkillResult.ok(resp.json())
+            if not result:
+                raise Exception(result.error)
+            return SkillResult.ok(result.data)
         except Exception as e:
             return SkillResult.fail(f"update failed: {e}")
 
     @logged_method()
     async def reflect(self) -> SkillResult:
         """Produce a human-readable summary of current working memory."""
-        if not self._api or not self._api._client:
+        if not self._api:
             return SkillResult.fail("Working memory not initialized")
         try:
-            resp = await self._api._client.get("/working-memory", params={"limit": 100})
-            resp.raise_for_status()
-            data = resp.json()
+            result = await self._api.get("/working-memory", params={"limit": 100})
+            if not result:
+                raise Exception(result.error)
+            data = result.data
             items = data.get("items", [])
 
             if not items:
@@ -242,16 +254,43 @@ class WorkingMemorySkill(BaseSkill):
             return SkillResult.fail(f"reflect failed: {e}")
 
     @logged_method()
+    async def read_context(self) -> SkillResult:
+        """Read context.json with auto-sync on error.
+
+        If the file is missing or corrupt, re-fetches from API and rewrites.
+        """
+        workspace_root = self._resolve_workspace_root()
+        context_path = workspace_root / "aria_memories" / "memory" / "context.json"
+
+        try:
+            if context_path.exists():
+                data = _json.loads(context_path.read_text(encoding="utf-8"))
+                return SkillResult.ok(data)
+            else:
+                self.logger.info("context.json not found, triggering sync from API")
+        except (ValueError, _json.JSONDecodeError, OSError) as e:
+            self.logger.warning(f"context.json read failed ({e}), re-syncing from API")
+
+        # Auto-sync: re-fetch from API and rewrite
+        sync_result = await self.sync_to_files()
+        if sync_result.success:
+            try:
+                data = _json.loads(context_path.read_text(encoding="utf-8"))
+                return SkillResult.ok(data)
+            except Exception as e2:
+                return SkillResult.fail(f"context.json still unreadable after sync: {e2}")
+        return SkillResult.fail(f"Auto-sync failed: {sync_result.error}")
+
+    @logged_method()
     async def sync_to_files(self) -> SkillResult:
         """Cron-callable: sync DB state to aria_memories/memory/ JSON files."""
-        import json as _json
-        import os
         workspace_root = self._resolve_workspace_root()
         memories_path = workspace_root / "aria_memories" / "memory"
         memories_path.mkdir(parents=True, exist_ok=True)
 
         context_data = {
             "last_updated": datetime.now(timezone.utc).isoformat(),
+            "last_modified": datetime.now(timezone.utc).isoformat(),
             "active_goals": [],
             "recent_activities": [],
             "system_health": {"status": "unknown"},
@@ -259,27 +298,45 @@ class WorkingMemorySkill(BaseSkill):
 
         # Fetch goals via existing API client
         try:
-            if self._api and self._api._client:
-                resp = await self._api._client.get(
+            if self._api:
+                goals_result = await self._api.get(
                     "/goals", params={"status": "active", "limit": 20}
                 )
-                if resp.status_code == 200:
-                    context_data["active_goals"] = resp.json().get("goals", [])
+                if goals_result.success:
+                    context_data["active_goals"] = goals_result.data.get("goals", [])
 
-                resp = await self._api._client.get(
+                activities_result = await self._api.get(
                     "/activities", params={"limit": 10}
                 )
-                if resp.status_code == 200:
-                    context_data["recent_activities"] = resp.json().get("activities", [])
+                if activities_result.success:
+                    context_data["recent_activities"] = activities_result.data.get("activities", [])
         except Exception as e:
             self.logger.warning(f"sync_to_files: API fetch failed: {e}")
 
-        # Write canonical context.json
+        # Write canonical context.json (with conflict detection)
         context_path = memories_path / "context.json"
+
+        # Conflict detection: compare last_modified timestamps
+        if context_path.exists():
+            try:
+                existing = _json.loads(context_path.read_text(encoding="utf-8"))
+                existing_modified = existing.get("last_modified", "")
+                if hasattr(self, "_last_written_modified") and existing_modified:
+                    if existing_modified != self._last_written_modified:
+                        self.logger.warning(
+                            "context.json conflict detected: file was modified externally "
+                            "(expected %s, found %s). Overwriting with fresh API data.",
+                            self._last_written_modified,
+                            existing_modified,
+                        )
+            except Exception as e:
+                self.logger.debug(f"Conflict check skipped: {e}")
+
         payload = _json.dumps(context_data, indent=2, default=str)
         context_path.write_text(
             payload, encoding="utf-8"
         )
+        self._last_written_modified = context_data["last_modified"]
 
         mirror_paths = self._legacy_snapshot_paths(workspace_root)
         mirrored = []

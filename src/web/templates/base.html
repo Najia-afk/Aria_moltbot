@@ -8,6 +8,7 @@
     <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{% block title %}Aria Blue{% endblock %}</title>
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <link rel="shortcut icon" href="/favicon.ico">
@@ -68,7 +69,9 @@
         height: 12px;
         transition: transform 0.2s;
     }
-    .nav-dropdown:hover .nav-dropdown-toggle svg.chevron {
+    .nav-dropdown:hover .nav-dropdown-toggle svg.chevron,
+    .nav-dropdown:focus-within .nav-dropdown-toggle svg.chevron,
+    .nav-dropdown.open .nav-dropdown-toggle svg.chevron {
         transform: rotate(180deg);
     }
     .nav-dropdown-menu {
@@ -87,10 +90,28 @@
         z-index: 1000;
         padding: 0.5rem 0;
     }
-    .nav-dropdown:hover .nav-dropdown-menu {
+    .nav-dropdown:hover .nav-dropdown-menu,
+    .nav-dropdown:focus-within .nav-dropdown-menu,
+    .nav-dropdown.open .nav-dropdown-menu {
         opacity: 1;
         visibility: visible;
         transform: translateY(0);
+    }
+    /* Skip-to-content link */
+    .skip-link {
+        position: absolute;
+        top: -100%;
+        left: 1rem;
+        z-index: 9999;
+        padding: 0.75rem 1.5rem;
+        background: var(--accent-primary);
+        color: #fff;
+        border-radius: var(--radius-md);
+        text-decoration: none;
+        font-weight: 600;
+    }
+    .skip-link:focus {
+        top: 0.5rem;
     }
     .nav-dropdown-menu a {
         display: flex;
@@ -126,9 +147,10 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
     <header>
         <div class="container">
-            <nav>
+            <nav aria-label="Main navigation">
                 <a href="/" class="logo">
                     <div class="logo-icon">🌟</div>
                     <div class="logo-text"><span>Aria Blue</span></div>
@@ -142,87 +164,67 @@
                         </svg>
                         Home
                     </a>
-                    
-                    <!-- Overview Dropdown -->
+
+                    <!-- Memory Dropdown (reorganized) -->
                     <div class="nav-dropdown">
-                        <button class="nav-dropdown-toggle {% if '/activities' in request.path or '/thoughts' in request.path or '/memories' in request.path or '/records' in request.path or '/search' in request.path %}active{% endif %}">
-                            <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                                <path d="M5 4a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1H5zm-.5 2.5A.5.5 0 0 1 5 6h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zM5 8a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1H5zm0 2a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1H5z"/>
-                                <path d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2zm10-1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1z"/>
-                            </svg>
-                            Overview
+                        <button class="nav-dropdown-toggle {% if '/memories' in request.path or '/knowledge' in request.path or '/working-memory' in request.path or '/records' in request.path or '/activities' in request.path or '/thoughts' in request.path %}active{% endif %}">
+                            💾 Memory
                             <svg class="chevron" viewBox="0 0 16 16" fill="currentColor">
                                 <path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
                             </svg>
                         </button>
                         <div class="nav-dropdown-menu">
+                            <a href="/memories" class="{% if '/memories' in request.path %}active{% endif %}">
+                                💾 Memories
+                            </a>
+                            <a href="/knowledge" class="{% if '/knowledge' == request.path %}active{% endif %}">
+                                🕸️ Knowledge Graph
+                            </a>
+                            <a href="/working-memory" class="{% if '/working-memory' in request.path %}active{% endif %}">
+                                🧠 Working Memory
+                            </a>
+                            <a href="/records" class="{% if '/records' in request.path %}active{% endif %}">
+                                🗃️ Records
+                            </a>
                             <a href="/activities" class="{% if '/activities' in request.path %}active{% endif %}">
                                 ⚡ Activities
                             </a>
                             <a href="/thoughts" class="{% if '/thoughts' in request.path %}active{% endif %}">
                                 🧠 Thoughts
                             </a>
-                            <a href="/memories" class="{% if '/memories' in request.path %}active{% endif %}">
-                                💾 Memories
-                            </a>
-                            <a href="/records" class="{% if '/records' in request.path %}active{% endif %}">
-                                🗃️ Records
-                            </a>
-                            <a href="/search" class="{% if '/search' in request.path %}active{% endif %}">
-                                🔍 Search
-                            </a>
                         </div>
                     </div>
 
-                    <!-- Intelligence Dropdown -->
+                    <!-- Intelligence Dropdown (reorganized) -->
                     <div class="nav-dropdown">
-                        <button class="nav-dropdown-toggle {% if '/sprint-board' in request.path or '/knowledge' in request.path or '/skill-graph' in request.path or '/working-memory' in request.path or '/sentiment' in request.path or '/patterns' in request.path or '/skills' in request.path or '/skill-health' in request.path or '/activity-visualization' in request.path or '/creative-pulse' in request.path %}active{% endif %}">
+                        <button class="nav-dropdown-toggle {% if '/sprint-board' in request.path or '/sentiment' in request.path or '/patterns' in request.path or '/proposals' in request.path or '/creative-pulse' in request.path %}active{% endif %}">
                             Intelligence
                             <svg class="chevron" viewBox="0 0 16 16" fill="currentColor">
                                 <path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
                             </svg>
                         </button>
                         <div class="nav-dropdown-menu">
-                            <a href="/sprint-board" class="{% if '/sprint-board' in request.path %}active{% endif %}">
-                                📋 Sprint Board
-                            </a>
-                            <a href="/knowledge" class="{% if '/knowledge' == request.path %}active{% endif %}">
-                                🕸️ Knowledge
-                            </a>
-                            <a href="/skill-graph" class="{% if '/skill-graph' in request.path %}active{% endif %}">
-                                🔗 Skill Graph
-                            </a>
-                            <a href="/working-memory" class="{% if '/working-memory' in request.path %}active{% endif %}">
-                                🧠 Working Memory
-                            </a>
                             <a href="/sentiment" class="{% if '/sentiment' in request.path %}active{% endif %}">
                                 💭 Sentiment
                             </a>
                             <a href="/patterns" class="{% if '/patterns' in request.path %}active{% endif %}">
                                 🔍 Patterns
                             </a>
-                            <a href="/skills" class="{% if '/skills' == request.path %}active{% endif %}">
-                                🔧 Skills
+                            <a href="/sprint-board" class="{% if '/sprint-board' in request.path %}active{% endif %}">
+                                📋 Sprint Board
                             </a>
-                            <a href="/creative-pulse" class="{% if '/activity-visualization' in request.path or '/creative-pulse' in request.path %}active{% endif %}">
-                                ✨ Creative Pulse
-                            </a>
-                            <div class="divider"></div>
                             <a href="/proposals" class="{% if '/proposals' in request.path %}active{% endif %}">
                                 💡 Proposals
                             </a>
-                            <a href="/skill-stats" class="{% if '/skill-stats' in request.path %}active{% endif %}">
-                                📊 Skill Stats
-                            </a>
-                            <a href="/skill-health" class="{% if '/skill-health' in request.path %}active{% endif %}">
-                                🩺 Skill Health
+                            <a href="/creative-pulse" class="{% if '/creative-pulse' in request.path %}active{% endif %}">
+                                ✨ Creative Pulse
                             </a>
                         </div>
                     </div>
 
-                    <!-- Social Dropdown -->
+                    <!-- Social Dropdown (reorganized: +RPG +Roundtable) -->
                     <div class="nav-dropdown">
-                        <button class="nav-dropdown-toggle {% if '/social' in request.path %}active{% endif %}">
+                        <button class="nav-dropdown-toggle {% if '/social' in request.path or '/rpg' in request.path or '/roundtable' in request.path %}active{% endif %}">
                             Social
                             <svg class="chevron" viewBox="0 0 16 16" fill="currentColor">
                                 <path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
@@ -232,20 +234,63 @@
                             <a href="/social" class="{% if '/social' in request.path %}active{% endif %}">
                                 📱 Social
                             </a>
+                            <a href="/rpg" class="{% if '/rpg' in request.path %}active{% endif %}">
+                                🎲 RPG
+                            </a>
+                            <a href="/roundtable" class="{% if '/roundtable' in request.path %}active{% endif %}">
+                                🔄 Roundtable
+                            </a>
                             <a href="#" class="disabled" style="opacity:0.5; pointer-events:none;">
                                 📓 Moltbook (coming soon)
                             </a>
                         </div>
                     </div>
 
-                    <!-- RPG Dashboard - Top-level link -->
-                    <a href="/rpg" class="{% if '/rpg' in request.path %}active{% endif %}">
-                        🎲 RPG
-                    </a>
-
-                    <!-- Operations Dropdown -->
+                    <!-- Agents Dropdown (reorganized: -roundtable -dashboard +sessions) -->
                     <div class="nav-dropdown">
-                        <button class="nav-dropdown-toggle {% if '/heartbeat' in request.path or '/sessions' in request.path or '/performance' in request.path or '/services' in request.path or '/chat' in request.path or '/roundtable' in request.path %}active{% endif %}">
+                        <button class="nav-dropdown-toggle {% if '/chat' in request.path or '/agent-manager' in request.path or '/sessions' in request.path %}active{% endif %}">
+                            🤖 Agents
+                            <svg class="chevron" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
+                            </svg>
+                        </button>
+                        <div class="nav-dropdown-menu">
+                            <a href="/chat/" class="{% if '/chat' in request.path %}active{% endif %}">
+                                💬 Chat
+                            </a>
+                            <a href="/agent-manager" class="{% if '/agent-manager' in request.path %}active{% endif %}">
+                                🤖 Agent Manager
+                            </a>
+                            <a href="/sessions" class="{% if '/sessions' in request.path %}active{% endif %}">
+                                💬 Sessions
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Skills Dropdown (reorganized: +skill-stats, merged catalog into health) -->
+                    <div class="nav-dropdown">
+                        <button class="nav-dropdown-toggle {% if '/skills' in request.path or '/skill-graph' in request.path or '/skill-health' in request.path or '/skill-stats' in request.path %}active{% endif %}">
+                            🔧 Skills
+                            <svg class="chevron" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
+                            </svg>
+                        </button>
+                        <div class="nav-dropdown-menu">
+                            <a href="/skill-health" class="{% if '/skill-health' in request.path %}active{% endif %}">
+                                🩺 Skill Health
+                            </a>
+                            <a href="/skill-graph" class="{% if '/skill-graph' in request.path %}active{% endif %}">
+                                🔗 Skill Graph
+                            </a>
+                            <a href="/skill-stats" class="{% if '/skill-stats' in request.path %}active{% endif %}">
+                                📊 Skill Stats
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Operations Dropdown (S-07: slimmed) -->
+                    <div class="nav-dropdown">
+                        <button class="nav-dropdown-toggle {% if '/heartbeat' in request.path or '/performance' in request.path or '/services' in request.path %}active{% endif %}">
                             <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
                                 <path d="M9.405 1.05c-.413-1.4-2.397-1.4-2.81 0l-.1.34a1.464 1.464 0 0 1-2.105.872l-.31-.17c-1.283-.698-2.686.705-1.987 1.987l.169.311c.446.82.023 1.841-.872 2.105l-.34.1c-1.4.413-1.4 2.397 0 2.81l.34.1a1.464 1.464 0 0 1 .872 2.105l-.17.31c-.698 1.283.705 2.686 1.987 1.987l.311-.169a1.464 1.464 0 0 1 2.105.872l.1.34c.413 1.4 2.397 1.4 2.81 0l.1-.34a1.464 1.464 0 0 1 2.105-.872l.31.17c1.283.698 2.686-.705 1.987-1.987l-.169-.311a1.464 1.464 0 0 1 .872-2.105l.34-.1c1.4-.413 1.4-2.397 0-2.81l-.34-.1a1.464 1.464 0 0 1-.872-2.105l.17-.31c.698-1.283-.705-2.686-1.987-1.987l-.311.169a1.464 1.464 0 0 1-2.105-.872l-.1-.34zM8 10.93a2.929 2.929 0 1 1 0-5.86 2.929 2.929 0 0 1 0 5.858z"/>
                             </svg>
@@ -255,20 +300,8 @@
                             </svg>
                         </button>
                         <div class="nav-dropdown-menu">
-                            <a href="/chat/" class="{% if '/chat' in request.path %}active{% endif %}">
-                                💬 Chat
-                            </a>
-                            <a href="/roundtable" class="{% if '/roundtable' in request.path %}active{% endif %}">
-                                🔄 Roundtable
-                            </a>
                             <a href="/heartbeat" class="{% if '/heartbeat' in request.path %}active{% endif %}">
                                 💓 Heartbeat
-                            </a>
-                            <a href="/agent-manager" class="{% if '/agent-manager' in request.path %}active{% endif %}">
-                                🤖 Agent Manager
-                            </a>
-                            <a href="/sessions" class="{% if '/sessions' in request.path %}active{% endif %}">
-                                💬 Sessions
                             </a>
                             <a href="/performance" class="{% if '/performance' in request.path %}active{% endif %}">
                                 📈 Performance
@@ -284,7 +317,7 @@
 
                     <!-- Models Dropdown -->
                     <div class="nav-dropdown">
-                        <button class="nav-dropdown-toggle {% if '/models' in request.path or '/model-usage' in request.path or '/rate-limits' in request.path or '/model-manager' in request.path %}active{% endif %}">
+                        <button class="nav-dropdown-toggle {% if '/models' in request.path or '/model-usage' in request.path or '/model-manager' in request.path %}active{% endif %}">
                             <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
                                 <path d="M4 11a1 1 0 1 1 2 0v1a1 1 0 1 1-2 0v-1zm6-4a1 1 0 1 1 2 0v5a1 1 0 1 1-2 0V7zM7 9a1 1 0 0 1 2 0v3a1 1 0 1 1-2 0V9z"/>
                                 <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/>
@@ -304,29 +337,13 @@
                             <a href="/model-usage" class="{% if '/model-usage' in request.path %}active{% endif %}">
                                 📊 Model Usage
                             </a>
-                            <a href="/rate-limits" class="{% if '/rate-limits' in request.path %}active{% endif %}">
-                                ⏱️ Rate Limits
-                            </a>
                         </div>
                     </div>
 
-                    <!-- Security Dropdown -->
-                    <div class="nav-dropdown">
-                        <button class="nav-dropdown-toggle {% if '/security' in request.path or '/api-key-rotations' in request.path %}active{% endif %}">
-                            Security
-                            <svg class="chevron" viewBox="0 0 16 16" fill="currentColor">
-                                <path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
-                            </svg>
-                        </button>
-                        <div class="nav-dropdown-menu">
-                            <a href="/security" class="{% if '/security' in request.path %}active{% endif %}">
-                                🛡️ Security Events
-                            </a>
-                            <a href="/api-key-rotations" class="{% if '/api-key-rotations' in request.path %}active{% endif %}">
-                                🔑 API Key Rotations
-                            </a>
-                        </div>
-                    </div>
+                    <!-- Security (single link, removed api-key-rotations) -->
+                    <a href="/security" class="{% if '/security' in request.path %}active{% endif %}">
+                        🛡️ Security
+                    </a>
 
                     <!-- Identity Dropdown -->
                     <div class="nav-dropdown">
@@ -343,13 +360,13 @@
                         </div>
                     </div>
 
-                    <div class="api-status" id="api-status">
-                        <span class="status-dot"></span>
+                    <div class="api-status" id="api-status" role="status" aria-live="polite">
+                        <span class="status-dot" aria-hidden="true"></span>
                         <span>Loading...</span>
                     </div>
                 </div>
 
-                <button class="menu-toggle" onclick="toggleMenu()" aria-label="Toggle menu">
+                <button class="menu-toggle" onclick="toggleMenu()" aria-label="Toggle menu" aria-expanded="false">
                     <svg width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
                         <path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/>
                     </svg>
@@ -402,22 +419,49 @@
         window.ARIA_CHAT_URL = `${window.location.protocol}//${window.location.hostname}/chat/`;
 
         function toggleMenu() {
-            document.getElementById('nav-links').classList.toggle('active');
+            const navLinks = document.getElementById('nav-links');
+            navLinks.classList.toggle('active');
+            const btn = document.querySelector('.menu-toggle');
+            btn.setAttribute('aria-expanded', navLinks.classList.contains('active'));
         }
 
-        // Mobile: tap dropdown toggles instead of hover
+        // Keyboard-accessible dropdown toggles (works on all screen sizes)
         document.querySelectorAll('.nav-dropdown-toggle').forEach(btn => {
+            btn.setAttribute('aria-haspopup', 'true');
+            btn.setAttribute('aria-expanded', 'false');
+
             btn.addEventListener('click', function(e) {
-                if (window.innerWidth <= 768) {
-                    e.preventDefault();
-                    const dropdown = this.closest('.nav-dropdown');
-                    // Close other dropdowns
-                    document.querySelectorAll('.nav-dropdown.open').forEach(d => {
-                        if (d !== dropdown) d.classList.remove('open');
-                    });
+                e.preventDefault();
+                const dropdown = this.closest('.nav-dropdown');
+                const isOpen = dropdown.classList.contains('open');
+                // Close other dropdowns
+                document.querySelectorAll('.nav-dropdown.open').forEach(d => {
+                    d.classList.remove('open');
+                    d.querySelector('.nav-dropdown-toggle').setAttribute('aria-expanded', 'false');
+                });
+                if (!isOpen) {
                     dropdown.classList.toggle('open');
+                    this.setAttribute('aria-expanded', 'true');
                 }
             });
+
+            btn.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    this.closest('.nav-dropdown').classList.remove('open');
+                    this.setAttribute('aria-expanded', 'false');
+                    this.focus();
+                }
+            });
+        });
+
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.nav-dropdown')) {
+                document.querySelectorAll('.nav-dropdown.open').forEach(d => {
+                    d.classList.remove('open');
+                    d.querySelector('.nav-dropdown-toggle').setAttribute('aria-expanded', 'false');
+                });
+            }
         });
 
         function showNotification(message, type = 'info') {

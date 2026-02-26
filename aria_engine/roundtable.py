@@ -218,8 +218,8 @@ class Roundtable:
                 for t in round_turns:
                     try:
                         await on_turn(t)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.exception("on_turn callback failed")
 
         # Synthesis round
         elapsed = time.monotonic() - start

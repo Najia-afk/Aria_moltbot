@@ -9,11 +9,13 @@ To add a new model (Gemini, Claude, etc.) → edit models.yaml only.
 """
 
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter
 
+logger = logging.getLogger("aria.api.models_config")
 router = APIRouter(tags=["Models"])
 
 # ── Catalog loader ───────────────────────────────────────────────────────────
@@ -41,7 +43,8 @@ def _load_catalog() -> dict[str, Any]:
                 try:
                     import yaml
                     _catalog_cache = yaml.safe_load(content) or {}
-                except Exception:
+                except Exception as e:
+                    logger.warning("Model catalog YAML parse error: %s", e)
                     _catalog_cache = {}
             return _catalog_cache
     _catalog_cache = {}
@@ -138,8 +141,8 @@ async def api_models_available():
                     for r in rows
                 ]
                 return {"models": models_list, "source": "db"}
-    except Exception:
-        pass  # Fall through to YAML
+    except Exception as e:
+        logger.debug("DB model query failed, falling through to YAML: %s", e)
 
     # ── Fallback: models.yaml ────────────────────────────────────
     catalog = _load_catalog()

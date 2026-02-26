@@ -25,7 +25,7 @@ class ScheduleSkill(BaseSkill):
     
     def __init__(self, config: SkillConfig):
         super().__init__(config)
-        self._jobs: dict[str, Dict] = {}  # fallback cache
+        self._jobs: dict[str, dict] = {}  # fallback cache
         self._job_counter = 0
         self._api = None
     
@@ -54,7 +54,7 @@ class ScheduleSkill(BaseSkill):
         name: str,
         schedule: str,  # cron-like or "every X minutes/hours"
         action: str,
-        params: Dict | None = None,
+        params: dict | None = None,
         enabled: bool = True,
     ) -> SkillResult:
         """
@@ -87,36 +87,41 @@ class ScheduleSkill(BaseSkill):
         }
         
         try:
-            resp = await self._api._client.post("/schedule", json=job)
-            resp.raise_for_status()
-            api_data = resp.json()
+            result = await self._api.post("/schedule", data=job)
+            if not result:
+                raise Exception(result.error)
+            api_data = result.data
             return SkillResult.ok(api_data if api_data else job)
         except Exception as e:
             self.logger.warning(f"API create_job failed, using fallback: {e}")
             self._jobs[job_id] = job
             return SkillResult.ok(job)
     
+    @logged_method()
     async def get_job(self, job_id: str) -> SkillResult:
         """Get a specific job."""
         try:
-            resp = await self._api._client.get(f"/schedule/{job_id}")
-            resp.raise_for_status()
-            return SkillResult.ok(resp.json())
+            result = await self._api.get(f"/schedule/{job_id}")
+            if not result:
+                raise Exception(result.error)
+            return SkillResult.ok(result.data)
         except Exception as e:
             self.logger.warning(f"API get_job failed, using fallback: {e}")
             if job_id not in self._jobs:
                 return SkillResult.fail(f"Job not found: {job_id}")
             return SkillResult.ok(self._jobs[job_id])
     
+    @logged_method()
     async def list_jobs(self, enabled_only: bool = False) -> SkillResult:
         """List all scheduled jobs."""
         try:
             params: dict[str, Any] = {}
             if enabled_only:
                 params["enabled"] = True
-            resp = await self._api._client.get("/schedule", params=params)
-            resp.raise_for_status()
-            api_data = resp.json()
+            resp = await self._api.get("/schedule", params=params)
+            if not resp:
+                raise Exception(resp.error)
+            api_data = resp.data
             jobs = api_data if isinstance(api_data, list) else api_data.get("jobs", [])
             if enabled_only:
                 jobs = [j for j in jobs if j.get("enabled")]
@@ -136,12 +141,14 @@ class ScheduleSkill(BaseSkill):
                 "enabled": sum(1 for j in jobs if j["enabled"]),
             })
     
+    @logged_method()
     async def enable_job(self, job_id: str) -> SkillResult:
         """Enable a job."""
         try:
-            resp = await self._api._client.put(f"/schedule/{job_id}", json={"enabled": True})
-            resp.raise_for_status()
-            return SkillResult.ok(resp.json())
+            result = await self._api.put(f"/schedule/{job_id}", data={"enabled": True})
+            if not result:
+                raise Exception(result.error)
+            return SkillResult.ok(result.data)
         except Exception as e:
             self.logger.warning(f"API enable_job failed, using fallback: {e}")
             if job_id not in self._jobs:
@@ -150,12 +157,14 @@ class ScheduleSkill(BaseSkill):
             self._jobs[job_id]["next_run"] = self._calculate_next_run(self._jobs[job_id]["schedule"])
             return SkillResult.ok(self._jobs[job_id])
     
+    @logged_method()
     async def disable_job(self, job_id: str) -> SkillResult:
         """Disable a job."""
         try:
-            resp = await self._api._client.put(f"/schedule/{job_id}", json={"enabled": False})
-            resp.raise_for_status()
-            return SkillResult.ok(resp.json())
+            result = await self._api.put(f"/schedule/{job_id}", data={"enabled": False})
+            if not result:
+                raise Exception(result.error)
+            return SkillResult.ok(result.data)
         except Exception as e:
             self.logger.warning(f"API disable_job failed, using fallback: {e}")
             if job_id not in self._jobs:
@@ -164,11 +173,13 @@ class ScheduleSkill(BaseSkill):
             self._jobs[job_id]["next_run"] = None
             return SkillResult.ok(self._jobs[job_id])
     
+    @logged_method()
     async def delete_job(self, job_id: str) -> SkillResult:
         """Delete a job."""
         try:
-            resp = await self._api._client.delete(f"/schedule/{job_id}")
-            resp.raise_for_status()
+            result = await self._api.delete(f"/schedule/{job_id}")
+            if not result:
+                raise Exception(result.error)
             return SkillResult.ok({"deleted": job_id})
         except Exception as e:
             self.logger.warning(f"API delete_job failed, using fallback: {e}")
@@ -177,13 +188,15 @@ class ScheduleSkill(BaseSkill):
             job = self._jobs.pop(job_id)
             return SkillResult.ok({"deleted": job_id, "name": job["name"]})
     
+    @logged_method()
     async def get_due_jobs(self) -> SkillResult:
         """Get jobs that are due to run."""
         now = datetime.now(timezone.utc)
         try:
-            resp = await self._api._client.get("/schedule", params={"due": True})
-            resp.raise_for_status()
-            api_data = resp.json()
+            result = await self._api.get("/schedule", params={"due": True})
+            if not result:
+                raise Exception(result.error)
+            api_data = result.data
             jobs = api_data if isinstance(api_data, list) else api_data.get("jobs", [])
             return SkillResult.ok({
                 "due_jobs": jobs,
@@ -206,6 +219,7 @@ class ScheduleSkill(BaseSkill):
                 "checked_at": now.isoformat(),
             })
     
+    @logged_method()
     async def mark_job_run(self, job_id: str, success: bool = True) -> SkillResult:
         """Mark a job as having run."""
         run_data = {
@@ -213,9 +227,10 @@ class ScheduleSkill(BaseSkill):
             "last_success": success,
         }
         try:
-            resp = await self._api._client.put(f"/schedule/{job_id}", json=run_data)
-            resp.raise_for_status()
-            return SkillResult.ok(resp.json())
+            result = await self._api.put(f"/schedule/{job_id}", data=run_data)
+            if not result:
+                raise Exception(result.error)
+            return SkillResult.ok(result.data)
         except Exception as e:
             self.logger.warning(f"API mark_job_run failed, using fallback: {e}")
             if job_id not in self._jobs:

@@ -213,30 +213,30 @@
 <script src="https://unpkg.com/vis-network@9.1.6/standalone/umd/vis-network.min.js"></script>
 <script>
 /* Aria RPG Dashboard — AA+ compliant: ZERO hardcoded IPs/ports/URLs */
-var API_BASE = window.location.origin + '/api';
-var currentCampaign = null;
-var kgNetwork = null;
-var kgData = null;
+const API_BASE = window.location.origin + '/api';
+let currentCampaign = null;
+let kgNetwork = null;
+let kgData = null;
 
 function $(sel) { return document.querySelector(sel); }
 function $$(sel) { return document.querySelectorAll(sel); }
 
 async function apiFetch(path) {
-    var resp = await fetch(API_BASE + path);
-    if (!resp.ok) { var txt = await resp.text(); throw new Error('API ' + resp.status + ': ' + txt.slice(0, 200)); }
+    const resp = await fetch(API_BASE + path);
+    if (!resp.ok) { const txt = await resp.text(); throw new Error('API ' + resp.status + ': ' + txt.slice(0, 200)); }
     return resp.json();
 }
 
 function timeAgo(ts) {
     if (!ts) return '\u2014';
-    var d = new Date(ts), now = new Date(), diff = Math.floor((now - d) / 1000);
+    const d = new Date(ts), now = new Date(), diff = Math.floor((now - d) / 1000);
     if (diff < 60) return 'just now';
     if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
     if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
     return Math.floor(diff / 86400) + 'd ago';
 }
 
-function esc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
+function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
 
 /* Tab Navigation */
 $$('.rpg-tab').forEach(function(btn) {
@@ -244,7 +244,7 @@ $$('.rpg-tab').forEach(function(btn) {
         $$('.rpg-tab').forEach(function(b) { b.classList.remove('active'); });
         $$('.rpg-panel').forEach(function(p) { p.classList.remove('active'); });
         btn.classList.add('active');
-        var panel = $('#panel-' + btn.dataset.tab);
+        const panel = $('#panel-' + btn.dataset.tab);
         if (panel) panel.classList.add('active');
         if (btn.dataset.tab === 'kg' && currentCampaign && !kgData) loadKG(currentCampaign.id);
     });
@@ -253,11 +253,11 @@ $$('.rpg-tab').forEach(function(btn) {
 /* Campaign Loading */
 async function loadCampaigns() {
     try {
-        var campaigns = await apiFetch('/rpg/campaigns');
-        var sel = $('#campaignSelect');
+        const campaigns = await apiFetch('/rpg/campaigns');
+        const sel = $('#campaignSelect');
         sel.innerHTML = '<option value="">\u2014 Select Campaign \u2014</option>';
         campaigns.forEach(function(c) {
-            var opt = document.createElement('option');
+            const opt = document.createElement('option');
             opt.value = c.id; opt.textContent = c.title + ' (' + c.status + ')';
             sel.appendChild(opt);
         });
@@ -273,7 +273,7 @@ $('#campaignSelect').addEventListener('change', function(e) { if (e.target.value
 
 async function selectCampaign(campaignId) {
     try {
-        var detail = await apiFetch('/rpg/campaign/' + campaignId);
+        const detail = await apiFetch('/rpg/campaign/' + campaignId);
         currentCampaign = detail; kgData = null;
         $('#statParty').textContent = (detail.party || []).length;
         $('#statSessions').textContent = (detail.sessions ? detail.sessions.length : 0);
@@ -288,12 +288,12 @@ async function selectCampaign(campaignId) {
             '<tr><th>Description</th><td>' + (esc(detail.description) || '<em style="color:var(--text-dim)">No description</em>') + '</td></tr>' +
             '</table>';
 
-        var party = detail.party || [];
+        const party = detail.party || [];
         if (party.length > 0) {
-            var rows = party.map(function(p) {
-                var name = typeof p === 'string' ? p : (p.name || p.character_id || JSON.stringify(p));
-                var cls = typeof p === 'object' ? (p.class || p.ancestry || '') : '';
-                var level = typeof p === 'object' ? (p.level || '') : '';
+            const rows = party.map(function(p) {
+                const name = typeof p === 'string' ? p : (p.name || p.character_id || JSON.stringify(p));
+                const cls = typeof p === 'object' ? (p.class || p.ancestry || '') : '';
+                const level = typeof p === 'object' ? (p.level || '') : '';
                 return '<tr><td>' + esc(name) + '</td><td>' + esc(cls) + '</td><td>' + esc(level) + '</td></tr>';
             }).join('');
             $('#partyRoster').innerHTML = '<table><thead><tr><th>Name</th><th>Class</th><th>Level</th></tr></thead><tbody>' + rows + '</tbody></table>';
@@ -310,10 +310,10 @@ async function selectCampaign(campaignId) {
 }
 
 function populateSessionSelector(detail) {
-    var sel = $('#sessionSelect');
+    const sel = $('#sessionSelect');
     sel.innerHTML = '<option value="">\u2014 Select Session \u2014</option>';
     (detail.sessions || []).forEach(function(s, i) {
-        var opt = document.createElement('option');
+        const opt = document.createElement('option');
         opt.value = s.session_id || s.file || ('session-' + i);
         opt.textContent = s.title || s.file || ('Session ' + (i + 1));
         sel.appendChild(opt);
@@ -324,19 +324,19 @@ $('#sessionSelect').addEventListener('change', function(e) { if (e.target.value)
 
 /* Transcript Loading */
 async function loadTranscript(sessionId) {
-    var container = $('#transcriptContent');
+    const container = $('#transcriptContent');
     container.innerHTML = '<div class="rpg-loading">Loading transcript\u2026</div>';
     try {
-        var data = await apiFetch('/rpg/session/' + sessionId + '/transcript');
+        const data = await apiFetch('/rpg/session/' + sessionId + '/transcript');
         if (!data.messages || data.messages.length === 0) {
             container.innerHTML = '<div style="color:var(--text-muted);padding:var(--space-md)">No messages in this session</div>';
             return;
         }
         container.innerHTML = data.messages.map(function(msg) {
-            var rc = msg.role === 'user' ? 'msg-user' : 'msg-assistant';
-            var rl = msg.role === 'user' ? '🎮 Player' : '🎲 Aria DM';
-            var content = esc(msg.content).replace(/\n/g, '<br>');
-            var time = msg.timestamp ? '<div class="msg-time">' + timeAgo(msg.timestamp) + '</div>' : '';
+            const rc = msg.role === 'user' ? 'msg-user' : 'msg-assistant';
+            const rl = msg.role === 'user' ? '🎮 Player' : '🎲 Aria DM';
+            const content = esc(msg.content).replace(/\n/g, '<br>');
+            const time = msg.timestamp ? '<div class="msg-time">' + timeAgo(msg.timestamp) + '</div>' : '';
             return '<div class="msg ' + rc + '"><div class="msg-role">' + rl + '</div><div class="msg-content">' + content + '</div>' + time + '</div>';
         }).join('');
     } catch(err) {
@@ -345,7 +345,7 @@ async function loadTranscript(sessionId) {
 }
 
 /* KG Visualization (vis-network) */
-var TYPE_COLORS = {
+const TYPE_COLORS = {
     player_character: '#6366f1', npc: '#10b981', npc_companion: '#34d399',
     location: '#f59e0b', city: '#f97316', tavern: '#ea580c',
     dungeon_room: '#8b5cf6', monster: '#ef4444', enemy: '#dc2626',
@@ -355,17 +355,17 @@ var TYPE_COLORS = {
 };
 
 async function loadKG(campaignId) {
-    var container = $('#kg-container');
+    const container = $('#kg-container');
     container.innerHTML = '<div class="rpg-loading" style="padding-top:40vh">Loading knowledge graph\u2026</div>';
     try {
-        var data = await apiFetch('/rpg/campaign/' + campaignId + '/kg');
+        const data = await apiFetch('/rpg/campaign/' + campaignId + '/kg');
         kgData = data;
         if (!data.nodes || data.nodes.length === 0) {
             container.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted)">No KG data for this campaign</div>';
             return;
         }
         container.innerHTML = '';
-        var nodes = new vis.DataSet(data.nodes.map(function(n) {
+        const nodes = new vis.DataSet(data.nodes.map(function(n) {
             return {
                 id: n.id, label: n.label, group: n.group,
                 color: { background: TYPE_COLORS[n.group] || n.color || '#64748b', border: 'rgba(255,255,255,0.1)', highlight: { background: '#f8fafc', border: TYPE_COLORS[n.group] || n.color || '#64748b' } },
@@ -375,7 +375,7 @@ async function loadKG(campaignId) {
                 size: n.group === 'campaign' ? 30 : (['player_character','monster'].indexOf(n.group) >= 0 ? 22 : 16)
             };
         }));
-        var edges = new vis.DataSet(data.edges.map(function(e, i) {
+        const edges = new vis.DataSet(data.edges.map(function(e, i) {
             return {
                 id: 'edge-' + i, from: e.from, to: e.to, label: e.label || '', arrows: e.arrows || 'to',
                 color: { color: 'rgba(255,255,255,0.15)', opacity: 0.6 },
@@ -383,7 +383,7 @@ async function loadKG(campaignId) {
                 smooth: { type: 'continuous' }
             };
         }));
-        var options = {
+        const options = {
             physics: { stabilization: { iterations: 150 }, barnesHut: { gravitationalConstant: -3000, springLength: 120, springConstant: 0.02 } },
             interaction: { hover: true, tooltipDelay: 200, navigationButtons: true, keyboard: true },
             layout: { improvedLayout: true },
@@ -393,8 +393,8 @@ async function loadKG(campaignId) {
         kgNetwork = new vis.Network(container, { nodes: nodes, edges: edges }, options);
         kgNetwork.on('click', function(params) {
             if (params.nodes.length > 0) {
-                var nodeId = params.nodes[0];
-                var node = data.nodes.find(function(n) { return n.id === nodeId; });
+                const nodeId = params.nodes[0];
+                const node = data.nodes.find(function(n) { return n.id === nodeId; });
                 if (node) showEntityModal(node);
             }
         });
@@ -405,10 +405,10 @@ async function loadKG(campaignId) {
 }
 
 function buildKGLegend(nodes) {
-    var types = []; nodes.forEach(function(n) { if (types.indexOf(n.group) < 0) types.push(n.group); });
-    var legend = $('#kgLegend'); legend.innerHTML = '';
+    const types = []; nodes.forEach(function(n) { if (types.indexOf(n.group) < 0) types.push(n.group); });
+    const legend = $('#kgLegend'); legend.innerHTML = '';
     types.forEach(function(t) {
-        var color = TYPE_COLORS[t] || '#64748b';
+        const color = TYPE_COLORS[t] || '#64748b';
         legend.innerHTML += '<div class="kg-legend-item"><span class="kg-legend-dot" style="background:' + color + '"></span>' + t.replace(/_/g, ' ') + '</div>';
     });
 }
@@ -416,14 +416,14 @@ function buildKGLegend(nodes) {
 /* Entity Modal */
 function showEntityModal(node) {
     $('#modalTitle').textContent = node.label;
-    var html = '<p><strong>Type:</strong> <span class="rpg-badge rpg-badge-type">' + esc(node.group) + '</span></p>';
+    let html = '<p><strong>Type:</strong> <span class="rpg-badge rpg-badge-type">' + esc(node.group) + '</span></p>';
     if (node.title) {
         html += '<pre style="margin-top:12px;padding:12px;background:var(--bg-primary);border-radius:var(--radius-md);font-size:0.85rem;white-space:pre-wrap;color:var(--text-secondary);font-family:var(--font-mono)">' + esc(node.title) + '</pre>';
     }
     if (node.properties && Object.keys(node.properties).length > 0) {
         html += '<h4 style="margin-top:12px;color:var(--accent-cyan)">Properties</h4><table>';
-        for (var k in node.properties) {
-            var v = node.properties[k];
+        for (const k in node.properties) {
+            const v = node.properties[k];
             html += '<tr><th>' + esc(k) + '</th><td>' + esc(typeof v === 'object' ? JSON.stringify(v) : String(v)) + '</td></tr>';
         }
         html += '</table>';
@@ -439,10 +439,10 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
 /* Resume Campaign */
 async function resumeCampaign() {
     if (!currentCampaign) { $('#resumeStatus').innerHTML = '<div class="rpg-error">Select a campaign first</div>'; return; }
-    var btn = $('#resumeBtn'); btn.disabled = true; btn.textContent = '\u23F3 Loading\u2026';
+    const btn = $('#resumeBtn'); btn.disabled = true; btn.textContent = '\u23F3 Loading\u2026';
     $('#resumeStatus').innerHTML = '<div class="rpg-loading">Preparing session\u2026</div>';
     try {
-        var sessions = currentCampaign.sessions || [];
+        const sessions = currentCampaign.sessions || [];
         if (sessions.length === 0) {
             $('#resumeStatus').innerHTML = '<div style="color:var(--warning);margin-top:var(--space-lg)">No previous sessions found. Start a new campaign session with Aria via chat!</div>';
             return;
@@ -458,9 +458,9 @@ async function resumeCampaign() {
 
 async function loadPreviouslyOn(campaignId) {
     try {
-        var data = await apiFetch('/rpg/campaign/' + campaignId + '/kg?max_depth=2');
+        const data = await apiFetch('/rpg/campaign/' + campaignId + '/kg?max_depth=2');
         if (!data.nodes || data.nodes.length === 0) return;
-        var scenes = data.nodes.filter(function(n) { return ['session','divine_event','dungeon_room'].indexOf(n.group) >= 0; });
+        const scenes = data.nodes.filter(function(n) { return ['session','divine_event','dungeon_room'].indexOf(n.group) >= 0; });
         if (scenes.length > 0) {
             $('#previouslyOnCard').style.display = 'block';
             $('#previouslyOn').innerHTML = scenes.map(function(s) {

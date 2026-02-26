@@ -8,42 +8,40 @@ Safety rules:
 - Proposals CANNOT modify soul/ directory
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import ImprovementProposal
 from deps import get_db
 from pagination import paginate_query, build_paginated_response
+from schemas.requests import CreateProposal, ReviewProposal
 
 router = APIRouter(tags=["Proposals"])
+logger = logging.getLogger("aria.api.proposals")
 
 # Paths that proposals cannot touch
 _FORBIDDEN_PATHS = ["soul/", "aria_mind/soul/", "aria_mind/SOUL.md", "aria_mind/SOUL_EVIL.md"]
 
 
 @router.post("/proposals")
-async def create_proposal(request: Request, db: AsyncSession = Depends(get_db)):
+async def create_proposal(body: CreateProposal, db: AsyncSession = Depends(get_db)):
     """Aria proposes an improvement."""
-    data = await request.json()
-    title = data.get("title")
-    description = data.get("description")
-    if not title or not description:
-        raise HTTPException(status_code=400, detail="title and description are required")
-
-    file_path = data.get("file_path", "")
+    file_path = body.file_path or ""
     if any(fp in (file_path or "") for fp in _FORBIDDEN_PATHS):
         raise HTTPException(status_code=403, detail="Proposals cannot modify soul/ directory")
 
     proposal = ImprovementProposal(
-        title=title,
-        description=description,
-        category=data.get("category"),
-        risk_level=data.get("risk_level", "low"),
+        title=body.title,
+        description=body.description,
+        category=body.category,
+        risk_level=body.risk_level,
         file_path=file_path,
-        current_code=data.get("current_code"),
-        proposed_code=data.get("proposed_code"),
-        rationale=data.get("rationale", ""),
+        current_code=body.current_code,
+        proposed_code=body.proposed_code,
+        rationale=body.rationale or "",
     )
     db.add(proposal)
     await db.commit()
@@ -86,12 +84,11 @@ async def get_proposal(proposal_id: str, db: AsyncSession = Depends(get_db)):
 @router.patch("/proposals/{proposal_id}")
 async def review_proposal(
     proposal_id: str,
-    request: Request,
+    body: ReviewProposal,
     db: AsyncSession = Depends(get_db),
 ):
     """Approve or reject a proposal."""
-    data = await request.json()
-    new_status = data.get("status")
+    new_status = body.status
     if new_status not in ("approved", "rejected", "implemented"):
         raise HTTPException(status_code=400, detail="status must be 'approved', 'rejected', or 'implemented'")
 
@@ -103,7 +100,20 @@ async def review_proposal(
         raise HTTPException(status_code=404, detail="Proposal not found")
 
     proposal.status = new_status
-    proposal.reviewed_by = data.get("reviewed_by", "najia")
+    proposal.reviewed_by = body.reviewed_by
     proposal.reviewed_at = func.now()
     await db.commit()
     return {"updated": True, "id": str(proposal.id), "status": new_status}
+
+
+@router.delete("/proposals/{proposal_id}")
+async def delete_proposal(proposal_id: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(ImprovementProposal).where(ImprovementProposal.id == proposal_id)
+    )
+    row = result.scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Proposal not found")
+    await db.delete(row)
+    await db.commit()
+    return {"deleted": True, "id": proposal_id}

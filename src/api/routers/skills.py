@@ -3,18 +3,21 @@ Skill Registry endpoints — read skill health status from the skill_status tabl
 Skill Invocation stats (S5-07) — observability dashboard data.
 """
 
+import logging
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, func, case, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import SkillStatusRecord, SkillInvocation, KnowledgeQueryLog
 from deps import get_db
+from schemas.requests import CreateSkillInvocation
 
 router = APIRouter(tags=["Skills"])
+logger = logging.getLogger("aria.api.skills")
 
 _SKILL_SUPPORT_DIRS = {"_template", "__pycache__", "pipelines"}
 
@@ -85,6 +88,7 @@ def _coherence_scan(include_support: bool = False) -> dict:
                         f"skill.json name mismatch: expected '{canonical}', got '{actual_name}'"
                     )
             except Exception as exc:
+                logger.warning("skill.json parse error: %s", exc)
                 row["name_matches"] = False
                 row["errors"].append(f"skill.json parse error: {exc}")
 
@@ -238,17 +242,16 @@ async def get_skills_coherence(include_support: bool = False):
 # ── Skill Invocation Recording (S5-07) ──────────────────────────────────────
 
 @router.post("/skills/invocations")
-async def record_invocation(request: Request, db: AsyncSession = Depends(get_db)):
+async def record_invocation(body: CreateSkillInvocation, db: AsyncSession = Depends(get_db)):
     """Record a skill invocation for observability."""
-    data = await request.json()
     inv = SkillInvocation(
-        skill_name=data.get("skill_name", "unknown"),
-        tool_name=data.get("tool_name", "unknown"),
-        duration_ms=data.get("duration_ms"),
-        success=data.get("success", True),
-        error_type=data.get("error_type"),
-        tokens_used=data.get("tokens_used"),
-        model_used=data.get("model_used"),
+        skill_name=body.skill_name,
+        tool_name=body.tool_name,
+        duration_ms=body.duration_ms,
+        success=body.success,
+        error_type=body.error_type,
+        tokens_used=body.tokens_used,
+        model_used=body.model_used,
     )
     db.add(inv)
     await db.commit()

@@ -3,6 +3,7 @@ Provider balance endpoints — Moonshot/Kimi, OpenRouter, local models.
 """
 
 import asyncio
+import logging
 
 import httpx
 from fastapi import APIRouter
@@ -10,6 +11,7 @@ from fastapi import APIRouter
 from config import MOONSHOT_KIMI_KEY, OPEN_ROUTER_KEY
 
 router = APIRouter(tags=["Providers"])
+logger = logging.getLogger("aria.api.providers")
 
 
 async def _fetch_kimi_balance() -> dict:
@@ -32,6 +34,7 @@ async def _fetch_kimi_balance() -> dict:
                 }
             return {"provider": "Moonshot/Kimi", "status": "error", "code": resp.status_code}
     except Exception as e:
+        logger.warning("Moonshot/Kimi health check failed: %s", e)
         return {"provider": "Moonshot/Kimi", "status": "error", "error": str(e)[:100]}
 
 
@@ -59,6 +62,7 @@ async def _fetch_openrouter_balance() -> dict:
                 }
             return {"provider": "OpenRouter", "status": "error", "code": resp.status_code}
     except Exception as e:
+        logger.warning("OpenRouter health check failed: %s", e)
         return {"provider": "OpenRouter", "status": "error", "error": str(e)[:100]}
 
 

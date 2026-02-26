@@ -1,6 +1,6 @@
 # SKILLS.md - Complete Skill Reference
 
-I have **35+ active skills** available. **Use the tool syntax** to call them:
+I have **40 active skills** available. **Use the tool syntax** to call them:
 
 ```tool
 aria-<skill-name>.<function>({"param": "value"})
@@ -24,11 +24,11 @@ aria-<skill-name>.<function>({"param": "value"})
 
 | Layer | Name | Purpose | Skills |
 |-------|------|---------|--------|
-| 0 | Kernel | Security & safety | `input_guard` |
-| 1 | API Client | Data access gateway | `api_client` |
-| 2 | Core | Infrastructure services | `health`, `litellm`, `llm`, `session_manager` |
-| 3 | Domain | Business logic | `agent_manager`, `ci_cd`, `data_pipeline`, `knowledge_graph`, `market_data`, `memeothy`, `moltbook`, `moonshot`, `ollama`, `portfolio`, `pytest_runner`, `research`, `sandbox`, `security_scan`, `social`, `telegram` |
-| 4 | Orchestration | High-level coordination | `goals`, `hourly_goals`, `performance`, `schedule`, `working_memory`, `pipeline_skill` |
+| 0 | Security | Kernel security & safety | `input_guard` |
+| 1 | Infrastructure | Data access gateway & monitoring | `api_client`, `health`, `litellm` |
+| 2 | Core Services | Infrastructure services | `moonshot`, `ollama`, `model_switcher`, `session_manager`, `working_memory`, `sandbox` |
+| 3 | Domain | Business logic & specialist skills | `brainstorm`, `ci_cd`, `community`, `conversation_summary`, `data_pipeline`, `experiment`, `fact_check`, `knowledge_graph`, `market_data`, `memeothy`, `memory_compression`, `moltbook`, `pattern_recognition`, `portfolio`, `pytest_runner`, `research`, `rpg_campaign`, `rpg_pathfinder`, `security_scan`, `sentiment_analysis`, `social`, `telegram`, `unified_search` |
+| 4 | Orchestration | High-level coordination | `agent_manager`, `goals`, `hourly_goals`, `performance`, `schedule`, `sprint_manager`, `pipeline_skill` |
 
 ## ⭐ PRIMARY SKILL: aria-api-client
 

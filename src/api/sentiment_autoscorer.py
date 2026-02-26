@@ -240,8 +240,8 @@ async def _sync_jsonl(db: AsyncSession) -> int:
                         try:
                             from dateutil.parser import isoparse
                             msg.created_at = isoparse(ts_str)
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            _logger.debug("Could not parse timestamp %r: %s", ts_str, e)
 
                     db.add(msg)
                     inserted += 1

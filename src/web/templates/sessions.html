@@ -79,6 +79,14 @@
     <select class="filter-select" id="agent-filter">
         <option value="">All Agents</option>
     </select>
+    <select class="filter-select" id="hours-filter">
+        <option value="6">Last 6 Hours</option>
+        <option value="12">Last 12 Hours</option>
+        <option value="24" selected>Last 24 Hours</option>
+        <option value="72">Last 3 Days</option>
+        <option value="168">Last 7 Days</option>
+        <option value="720">Last 30 Days</option>
+    </select>
     <label class="inline-toggle" title="Show cron sessions in the dashboard">
         <input type="checkbox" id="cron-toggle" checked>
         Show cron sessions
@@ -142,7 +150,7 @@
 
     <div class="charts-row">
         <div class="chart-card">
-            <h4>📊 24h Activity by Agent</h4>
+            <h4 id="hourly-chart-title">📊 Activity by Agent</h4>
             <canvas id="chart-status"></canvas>
         </div>
         <div class="chart-card">
@@ -516,12 +524,12 @@ function renderRecent() {
     if (filtered.length > 0) {
         body.innerHTML = filtered.map(s => `
             <tr>
-                <td><code style="font-size:11px">${s.id.slice(0,8)}...</code></td>
-                <td><span class="agent-badge">🤖 ${s.agent_id}</span></td>
-                <td>${s.title || '-'}</td>
-                <td>${s.model || '-'}</td>
-                <td><span class="type-badge">${s.session_type}</span></td>
-                <td><span class="status-badge ${s.status}">${s.status}</span></td>
+                <td><code style="font-size:11px">${escapeHtml(s.id.slice(0,8))}...</code></td>
+                <td><span class="agent-badge">🤖 ${escapeHtml(s.agent_id)}</span></td>
+                <td>${escapeHtml(s.title || '-')}</td>
+                <td>${escapeHtml(s.model || '-')}</td>
+                <td><span class="type-badge">${escapeHtml(s.session_type)}</span></td>
+                <td><span class="status-badge ${escapeHtml(s.status)}">${escapeHtml(s.status)}</span></td>
                 <td>${s.messages_count || '-'}</td>
                 <td>${s.tokens_used ? formatNumber(s.tokens_used) : '-'}</td>
                 <td>${s.cost_usd ? formatCost(s.cost_usd) : '-'}</td>
@@ -610,13 +618,15 @@ async function cleanGhosts() {
 
 async function loadSessionDashboard() {
     await AriaModels.init();
+    const hours = parseInt(document.getElementById('hours-filter').value) || 24;
     loadSessionStats();
     loadSessions();
-    loadHourlySeries(24);
+    loadHourlySeries(hours);
 }
 
 document.getElementById('status-filter').addEventListener('change', () => loadSessionDashboard());
 document.getElementById('agent-filter').addEventListener('change', () => loadSessionDashboard());
+document.getElementById('hours-filter').addEventListener('change', () => loadSessionDashboard());
 document.getElementById('search-input').addEventListener('input', renderRecent);
 document.getElementById('cron-toggle').addEventListener('change', () => loadSessionDashboard());
 

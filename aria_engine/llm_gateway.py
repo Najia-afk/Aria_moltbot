@@ -21,6 +21,7 @@ import litellm
 from litellm import acompletion, token_counter
 
 from aria_engine.config import EngineConfig
+from aria_engine.circuit_breaker import CircuitBreaker
 from aria_engine.exceptions import LLMError
 from aria_models.loader import load_catalog, get_routing_config, normalize_model_id
 
@@ -67,10 +68,7 @@ class LLMGateway:
     def __init__(self, config: EngineConfig):
         self.config = config
         self._models_config: dict[str, Any] | None = None
-        self._circuit_failures = 0
-        self._circuit_threshold = 5
-        self._circuit_reset_after = 30.0
-        self._circuit_opened_at: float | None = None
+        self._cb = CircuitBreaker(name="llm", threshold=5, reset_after=30.0)
         self._latency_samples: list[float] = []
 
         # Configure litellm
@@ -137,17 +135,10 @@ class LLMGateway:
 
     def _is_circuit_open(self) -> bool:
         """Check if circuit breaker is open."""
-        if self._circuit_failures < self._circuit_threshold:
-            return False
-        if self._circuit_opened_at is None:
-            return False
-        elapsed = time.monotonic() - self._circuit_opened_at
-        if elapsed > self._circuit_reset_after:
-            # Half-open: reset and try again
-            self._circuit_failures = 0
-            self._circuit_opened_at = None
-            return False
-        return True
+        return self._cb.is_open()
+
+    # Default timeout for LLM calls (seconds). Override via config.
+    LLM_TIMEOUT: float = 120.0
 
     async def complete(
         self,
@@ -199,9 +190,12 @@ class LLMGateway:
         start = time.monotonic()
 
         try:
-            response = await acompletion(**kwargs)
+            response = await asyncio.wait_for(
+                acompletion(**kwargs),
+                timeout=self.LLM_TIMEOUT,
+            )
             elapsed_ms = int((time.monotonic() - start) * 1000)
-            self._circuit_failures = 0
+            self._cb.record_success()
             self._latency_samples.append(elapsed_ms)
 
             choice = response.choices[0]
@@ -244,11 +238,13 @@ class LLMGateway:
                 finish_reason=choice.finish_reason or "",
             )
 
+        except asyncio.TimeoutError:
+            self._cb.record_failure()
+            logger.error("LLM call timed out after %.0fs (failures=%d)", self.LLM_TIMEOUT, self._cb.failure_count)
+            raise LLMError(f"LLM completion timed out after {self.LLM_TIMEOUT}s")
         except Exception as e:
-            self._circuit_failures += 1
-            if self._circuit_failures >= self._circuit_threshold:
-                self._circuit_opened_at = time.monotonic()
-            logger.error("LLM call failed (failures=%d): %s", self._circuit_failures, e)
+            self._cb.record_failure()
+            logger.error("LLM call failed (failures=%d): %s", self._cb.failure_count, e)
             raise LLMError(f"LLM completion failed: {e}") from e
 
     async def stream(
@@ -291,7 +287,10 @@ class LLMGateway:
             kwargs.update(thinking_params)
 
         try:
-            response = await acompletion(**kwargs)
+            response = await asyncio.wait_for(
+                acompletion(**kwargs),
+                timeout=self.LLM_TIMEOUT,
+            )
 
             async for chunk in response:
                 delta = chunk.choices[0].delta if chunk.choices else None
@@ -308,6 +307,11 @@ class LLMGateway:
 
             self._circuit_failures = 0
 
+        except asyncio.TimeoutError:
+            self._circuit_failures += 1
+            if self._circuit_failures >= self._circuit_threshold:
+                self._circuit_opened_at = time.monotonic()
+            raise LLMError(f"LLM streaming timed out after {self.LLM_TIMEOUT}s")
         except Exception as e:
             self._circuit_failures += 1
             if self._circuit_failures >= self._circuit_threshold:

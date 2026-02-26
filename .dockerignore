@@ -6,11 +6,11 @@ venv
 __pycache__
 *.pyc
 *.pyo
-*.env
 .env
 .env.*
 *.backup
 *.bak
+*.log
 
 # Secrets
 *.pem
@@ -20,19 +20,29 @@ secrets/
 stacks/brain/.env
 stacks/brain/.env.backup
 
-# Memory / user data
+# Memory / user data — large dirs excluded from build context
 aria_memory/
-aria_memories/logs/
-aria_memories/drafts/
+aria_memories/
+aria_souvenirs/
+
+# Docs & images (except README.md for pip install)
+*.md
+!README.md
+docs/
+images/
+*.png
+*.jpg
+
+# Tests
+tests/
+.pytest_cache/
+.mypy_cache
+.coverage
+htmlcov/
 
 # IDE
 .vscode/
 .idea/
-
-# Test artifacts
-.pytest_cache/
-.coverage
-htmlcov/
 
 # Build artifacts
 dist/
@@ -42,8 +52,3 @@ build/
 # OS
 .DS_Store
 Thumbs.db
-
-# Images
-images/
-*.png
-*.jpg

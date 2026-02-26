@@ -8,7 +8,7 @@ The API is the **sole database gateway** — all skills and agents access data t
 
 ### REST Routers
 
-All routers live in `src/api/routers/`. Each file is a self-contained FastAPI router module. Browse the directory for the current list — do not maintain a hardcoded inventory elsewhere.
+All routers live in `src/api/routers/` — 31 router files containing 222 REST endpoints, 2 WebSocket endpoints, and 1 GraphQL schema.
 
 **→ [`src/api/routers/`](src/api/routers/)**
 
@@ -29,6 +29,11 @@ Key endpoints:
 | `/engine/chat` | Engine chat sessions — create, message, export, history |
 | `/engine/cron` | Cron job management — CRUD + trigger + history |
 | `/engine/agents` | Engine agent state + performance metrics |
+| `/engine/roundtable` | Multi-agent roundtable discussions + swarm decisions |
+| `/artifacts` | File artifact CRUD in aria_memories/ |
+| `/rpg/campaigns` | RPG campaign dashboard, sessions, knowledge graph |
+
+**Totals:** 31 router files, 222 REST endpoints, 2 WebSocket endpoints, 1 GraphQL endpoint.
 
 Full interactive docs are served at `/api/docs` (Swagger) when the stack is running.
 
@@ -60,14 +65,14 @@ SQLAlchemy 2.0 async models and session management:
 
 ## Dashboard — Flask + Chart.js
 
-A Flask application with Jinja2 templates, Chart.js visualizations, tabbed layouts, and auto-refresh.
+A Flask application with 43 Jinja2 templates, Chart.js visualizations, tabbed layouts, and auto-refresh.
 
 The Flask app includes a reverse proxy for seamless `/api/*` forwarding.
 
 ### Source
 
 - App: `src/web/app.py`
-- Templates: `src/web/templates/`
+- Templates: `src/web/templates/` (43 pages)
 - Static assets: `src/web/static/`
 
 ### Key Pages

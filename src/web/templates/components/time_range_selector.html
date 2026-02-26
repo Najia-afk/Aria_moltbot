@@ -1,0 +1,16 @@
+{# Reusable time-range selector component (S-08)
+   Usage: {% include 'components/time_range_selector.html' %}
+   Requires: a parent element with class "page-controls"
+   Emits: change event on #hours-filter with value = hours integer
+   Optional: set `time_range_default` before including (default: 24)
+#}
+<select id="hours-filter" class="filter-select"
+        aria-label="Time range filter"
+        title="Select time window for chart data">
+    <option value="6" {% if time_range_default|default(24) == 6 %}selected{% endif %}>Last 6 Hours</option>
+    <option value="12" {% if time_range_default|default(24) == 12 %}selected{% endif %}>Last 12 Hours</option>
+    <option value="24" {% if time_range_default|default(24) == 24 %}selected{% endif %}>Last 24 Hours</option>
+    <option value="72" {% if time_range_default|default(24) == 72 %}selected{% endif %}>Last 3 Days</option>
+    <option value="168" {% if time_range_default|default(24) == 168 %}selected{% endif %}>Last 7 Days</option>
+    <option value="720" {% if time_range_default|default(24) == 720 %}selected{% endif %}>Last 30 Days</option>
+</select>

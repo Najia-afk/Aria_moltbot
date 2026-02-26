@@ -232,8 +232,8 @@ class ToolRegistry:
                 except TypeError:
                     try:
                         instance = skill_cls()
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug("Cannot instantiate skill %s: %s", skill_name, e)
 
                 if instance is None:
                     # Can't instantiate — keep tools as lazy (will try again at call time)
@@ -313,8 +313,8 @@ class ToolRegistry:
             except (TypeError, ImportError):
                 try:
                     instance = skill_cls()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Cannot instantiate skill %s: %s", tool.skill_name, e)
 
             if instance is None:
                 return None

@@ -1,6 +1,6 @@
 # Aria Security Architecture 🛡️
 
-> **Version 3.0** | February 4, 2026  
+> **Version 3.0** | February 21, 2026  
 > Comprehensive security for prompt injection, API protection, and data safety.
 
 ---

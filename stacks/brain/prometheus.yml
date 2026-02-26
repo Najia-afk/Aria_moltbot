@@ -7,7 +7,8 @@ alerting:
     - static_configs:
         - targets: []
 
-rule_files: []
+rule_files:
+  - /etc/prometheus/prometheus-alerts.yml
 
 scrape_configs:
   # Prometheus self-monitoring
@@ -28,6 +29,13 @@ scrape_configs:
       - targets: ['aria-api:8000']
     metrics_path: /api/metrics
     scrape_interval: 30s
+
+  # Aria Engine metrics
+  - job_name: 'aria-engine'
+    static_configs:
+      - targets: ['aria-engine:8081']
+    metrics_path: /metrics
+    scrape_interval: 15s
 
   # Grafana metrics
   - job_name: 'grafana'

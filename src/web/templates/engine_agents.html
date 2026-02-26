@@ -100,12 +100,16 @@ function renderTabs() {
     const container = document.getElementById('agentTabs');
     container.innerHTML = agents.map(a => `
         <div class="agent-tab ${selectedAgent === a.agent_id ? 'active' : ''}"
-             onclick="selectAgent('${a.agent_id}')">
+             data-agent-id="${escapeHtml(a.agent_id)}">
             <span class="status-dot ${statusColor(a.status)}"></span>
             <strong>${a.display_name || a.agent_id}</strong>
             <small class="text-muted ms-1">${a.model ? a.model.split('/').pop() : ''}</small>
         </div>
     `).join('');
+    // S-18: Event delegation instead of inline onclick
+    container.querySelectorAll('.agent-tab[data-agent-id]').forEach(el => {
+        el.addEventListener('click', () => selectAgent(el.dataset.agentId));
+    });
 }
 
 function selectAgent(agentId) {

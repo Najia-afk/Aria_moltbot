@@ -9,6 +9,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
+from aria_skills.api_client import get_api_client
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus, logged_method
 from aria_skills.registry import SkillRegistry
 
@@ -30,12 +31,17 @@ class CommunitySkill(BaseSkill):
         self._members: dict[str, dict] = {}
         self._engagements: list[dict] = []
         self._campaigns: dict[str, dict] = {}
+        self._api = None
 
     @property
     def name(self) -> str:
         return "community"
 
     async def initialize(self) -> bool:
+        try:
+            self._api = await get_api_client()
+        except Exception as e:
+            self.logger.info(f"API unavailable, using in-memory cache only: {e}")
         self._status = SkillStatus.AVAILABLE
         self.logger.info("Community skill initialized")
         return True
@@ -51,7 +57,7 @@ class CommunitySkill(BaseSkill):
         """Track a community member."""
         member_id = member_id or kwargs.get("member_id", str(uuid.uuid4())[:8])
         name = name or kwargs.get("name", "Anonymous")
-        self._members[member_id] = {
+        member_data = {
             "id": member_id,
             "name": name,
             "platform": platform,
@@ -59,6 +65,12 @@ class CommunitySkill(BaseSkill):
             "engagement_count": 0,
             "joined_at": datetime.now(timezone.utc).isoformat(),
         }
+        self._members[member_id] = member_data
+
+        await self._persist_activity("community_member_tracked", {
+            "member": member_data,
+        })
+
         return SkillResult.ok({
             "member": self._members[member_id],
             "total_members": len(self._members),
@@ -82,6 +94,11 @@ class CommunitySkill(BaseSkill):
         self._engagements.append(entry)
         if member_id in self._members:
             self._members[member_id]["engagement_count"] += 1
+
+        await self._persist_activity("community_engagement_recorded", {
+            "engagement": entry,
+        })
+
         return SkillResult.ok({
             "engagement": entry,
             "total_engagements": len(self._engagements),
@@ -124,7 +141,7 @@ class CommunitySkill(BaseSkill):
         """Create a community growth campaign."""
         name = name or kwargs.get("name", "Growth Campaign")
         campaign_id = str(uuid.uuid4())[:8]
-        self._campaigns[campaign_id] = {
+        campaign_data = {
             "id": campaign_id,
             "name": name,
             "description": description or kwargs.get("description", ""),
@@ -133,6 +150,12 @@ class CommunitySkill(BaseSkill):
             "status": "active",
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
+        self._campaigns[campaign_id] = campaign_data
+
+        await self._persist_activity("community_campaign_created", {
+            "campaign": campaign_data,
+        })
+
         return SkillResult.ok({
             "campaign": self._campaigns[campaign_id],
             "total_campaigns": len(self._campaigns),
@@ -178,3 +201,24 @@ class CommunitySkill(BaseSkill):
             "platform": platform,
             "posts_per_week": len(days),
         })
+
+    # === API Persistence ===
+
+    async def _persist_activity(self, action: str, details: dict) -> None:
+        """Best-effort API persistence. Disables on failure to avoid slowdowns."""
+        if not self._api:
+            return
+        try:
+            import asyncio
+            await asyncio.wait_for(
+                self._api.post("/activities", data={
+                    "action": action,
+                    "skill": self.name,
+                    "details": details,
+                    "success": True,
+                }),
+                timeout=5.0,
+            )
+        except Exception:
+            self.logger.debug("API persistence disabled (API unreachable)")
+            self._api = None

@@ -212,6 +212,8 @@ class AgentPool:
         in the pool. Agents with status='disabled' are loaded but
         not activated.
 
+        Calling this again reloads from DB (replaces in-memory state).
+
         Returns:
             Number of agents loaded.
         """
@@ -225,6 +227,9 @@ class AgentPool:
                 .order_by(EngineAgentState.agent_id)
             )
             rows = result.scalars().all()
+
+        # Clear previous state so removed agents don't linger
+        self._agents.clear()
 
         for row in rows:
             is_enabled = row.enabled

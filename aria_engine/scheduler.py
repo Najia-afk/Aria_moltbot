@@ -12,6 +12,7 @@ Features:
 """
 import asyncio
 import logging
+import os
 import time
 from datetime import datetime, timezone
 from typing import Any
@@ -53,6 +54,7 @@ async def _scheduler_dispatch(
     session_mode: str,
     max_duration: int,
     retry_count: int,
+    model: str = "",
 ) -> None:
     """Module-level trampoline that APScheduler can serialize."""
     if _active_scheduler is None:
@@ -66,6 +68,7 @@ async def _scheduler_dispatch(
         session_mode=session_mode,
         max_duration=max_duration,
         retry_count=retry_count,
+        model=model,
     )
 
 
@@ -218,8 +221,8 @@ class EngineScheduler:
                     if resp.status == 200:
                         logger.info("aria-api is reachable")
                         return
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Health check attempt: %s", e)
             await asyncio.sleep(2)
         logger.warning("aria-api not reachable after %ds — jobs may fail initially", timeout)
 
@@ -249,8 +252,8 @@ class EngineScheduler:
         if self._scheduler is not None:
             try:
                 await self._scheduler.stop()
-            except Exception:
-                pass  # already stopped or never started
+            except Exception as e:
+                logger.debug("APScheduler stop: %s", e)
             await self._scheduler.__aexit__(None, None, None)
             self._scheduler = None
 
@@ -283,6 +286,7 @@ class EngineScheduler:
                         "session_mode": row["session_mode"],
                         "max_duration": row["max_duration_seconds"],
                         "retry_count": row["retry_count"],
+                        "model": row.get("model", "") or "",
                     },
                 )
                 registered += 1
@@ -301,6 +305,7 @@ class EngineScheduler:
         session_mode: str,
         max_duration: int,
         retry_count: int,
+        model: str = "",
     ) -> None:
         """
         Execute a single cron job with concurrency control, timeout,
@@ -331,6 +336,7 @@ class EngineScheduler:
                             payload_type=payload_type,
                             payload=payload,
                             session_mode=session_mode,
+                            model=model,
                         ),
                         timeout=max_duration,
                     ) or {}
@@ -413,6 +419,7 @@ class EngineScheduler:
         payload_type: str,
         payload: str,
         session_mode: str,
+        model: str = "",
     ) -> dict:
         """
         Dispatch a job by creating a session via aria-api and sending
@@ -429,14 +436,23 @@ class EngineScheduler:
             return {}
 
         async with aiohttp.ClientSession() as http:
+            # S-103: Build auth headers for API calls
+            _headers = {}
+            _api_key = os.getenv("ARIA_API_KEY", "")
+            if _api_key:
+                _headers["X-API-Key"] = _api_key
             # 1. Create a session via aria-api
+            session_body: dict = {
+                "agent_id": agent_id,
+                "session_type": "cron",
+                "metadata": {"cron_job_id": job_id},
+            }
+            if model:
+                session_body["model"] = model
             create_resp = await http.post(
                 f"{_API_BASE}/api/engine/chat/sessions",
-                json={
-                    "agent_id": agent_id,
-                    "session_type": "cron",
-                    "metadata": {"cron_job_id": job_id},
-                },
+                json=session_body,
+                headers=_headers,
             )
             if create_resp.status != 201:
                 body = await create_resp.text()
@@ -461,6 +477,7 @@ class EngineScheduler:
                         "enable_thinking": False,
                         "enable_tools": True,
                     },
+                    headers=_headers,
                 )
                 if msg_resp.status != 200:
                     body = await msg_resp.text()
@@ -472,6 +489,7 @@ class EngineScheduler:
                 try:
                     await http.delete(
                         f"{_API_BASE}/api/engine/chat/sessions/{session_id}",
+                        headers=_headers,
                     )
                     logger.info(
                         "Job %s: cleaned up empty session %s after failure",
@@ -582,6 +600,10 @@ class EngineScheduler:
 
         try:
             async with aiohttp.ClientSession() as http:
+                _hb_headers = {}
+                _hb_key = os.getenv("ARIA_API_KEY", "")
+                if _hb_key:
+                    _hb_headers["X-API-Key"] = _hb_key
                 await http.post(
                     f"{_API_BASE}/api/heartbeat",
                     json={
@@ -591,6 +613,7 @@ class EngineScheduler:
                         "executed_at": datetime.now(timezone.utc).isoformat(),
                         "duration_ms": duration_ms,
                     },
+                    headers=_hb_headers,
                 )
         except Exception as e:
             logger.warning("Failed to write heartbeat log for %s: %s", job_name, e)

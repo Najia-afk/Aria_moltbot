@@ -6,6 +6,55 @@
 window.ARIA_DEBUG = (new URLSearchParams(window.location.search).has('debug')) ||
                     (localStorage.getItem('aria_debug') === '1');
 
+/**
+ * Escape HTML special characters to prevent XSS.
+ * Use this whenever inserting dynamic data into innerHTML.
+ */
+function escapeHtml(str) {
+    if (str == null) return '';
+    const div = document.createElement('div');
+    div.appendChild(document.createTextNode(String(str)));
+    return div.innerHTML;
+}
+window.escapeHtml = escapeHtml;
+
+/**
+ * CSRF-aware fetch wrapper (S-17).
+ * Automatically attaches X-CSRFToken header for mutating requests (POST/PUT/DELETE/PATCH).
+ * @param {string} url
+ * @param {RequestInit} [opts={}]
+ * @returns {Promise<Response>}
+ */
+function ariaFetch(url, opts = {}) {
+    const method = (opts.method || 'GET').toUpperCase();
+    if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        if (meta) {
+            opts.headers = opts.headers || {};
+            if (opts.headers instanceof Headers) {
+                opts.headers.set('X-CSRFToken', meta.content);
+            } else {
+                opts.headers['X-CSRFToken'] = meta.content;
+            }
+        }
+    }
+    return fetch(url, opts);
+}
+window.ariaFetch = ariaFetch;
+
+/**
+ * Tagged template literal for safe HTML (S-18).
+ * All interpolated values are HTML-escaped automatically.
+ * Usage: safeHTML`<div>${userInput}</div>` → returns escaped string
+ */
+function safeHTML(strings, ...values) {
+    return strings.reduce((result, str, i) => {
+        const val = i < values.length ? escapeHtml(values[i]) : '';
+        return result + str + val;
+    }, '');
+}
+window.safeHTML = safeHTML;
+
 function ariaLog(...args) {
     if (window.ARIA_DEBUG) {
         console.log('[ARIA]', ...args);

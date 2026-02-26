@@ -7,14 +7,14 @@
 
 | Metric | Count |
 |--------|-------|
-| **Total REST endpoints** | 175+ |
-| **WebSocket endpoints** | 3 |
+| **Total REST endpoints** | 222 |
+| **WebSocket endpoints** | 2 |
 | **GraphQL endpoint** | 1 |
 | **Standalone (non-FastAPI)** | 1 |
-| **Router files** | 30 |
-| **Test files** | 35 |
-| **Endpoints with direct test coverage** | ~130 |
-| **Endpoints with NO test coverage** | ~35 |
+| **Router files** | 31 |
+| **Test files** | 38 |
+| **Endpoints with direct test coverage** | ~200 |
+| **Endpoints with NO test coverage** | ~22 |
 
 ### Dependency Injection (src/api/deps.py)
 
@@ -440,7 +440,72 @@ Strawberry schema supports queries and mutations for Goals, Memories, Knowledge 
 
 | # | Method | Path | Port | Handler | Description | Test Coverage |
 |---|--------|------|------|---------|-------------|---------------|
-| 197 | GET | `/health` | 8081 | `AriaEngine._health_handler` | Engine runtime health check | ❌ Not tested (separate aiohttp server) |
+| 222 | GET | `/health` | 8081 | `AriaEngine._health_handler` | Engine runtime health check | ❌ Not tested (separate aiohttp server) |
+
+---
+
+## 31. Artifacts — `src/api/routers/artifacts.py`
+
+| # | Method | Path | Handler | DB Models / Tables | Skills / External | Test Coverage |
+|---|--------|------|---------|--------------------|-------------------|---------------|
+| 223 | POST | `/artifacts` | `write_artifact` | — | Filesystem (aria_memories/) | ❌ No direct test |
+| 224 | GET | `/artifacts` | `list_artifacts` | — | Filesystem (aria_memories/) | ❌ No direct test |
+| 225 | GET | `/artifacts/{category}/{filename:path}` | `read_artifact` | — | Filesystem (aria_memories/) | ❌ No direct test |
+| 226 | DELETE | `/artifacts/{category}/{filename:path}` | `delete_artifact` | — | Filesystem (aria_memories/) | ❌ No direct test |
+
+---
+
+## 32. Engine Roundtable — `src/api/routers/engine_roundtable.py` (prefix: `/engine/roundtable`)
+
+| # | Method | Path | Handler | DB Models / Tables | Skills / External | Test Coverage |
+|---|--------|------|---------|--------------------|-------------------|---------------|
+| 227 | POST | `/engine/roundtable` | `start_roundtable` | EngineChatSession, EngineChatMessage | Roundtable engine (LLM) | ❌ No direct test |
+| 228 | POST | `/engine/roundtable/async` | `start_roundtable_async` | EngineChatSession | Roundtable engine (background) | ❌ No direct test |
+| 229 | GET | `/engine/roundtable` | `list_roundtables` | EngineChatSession, EngineChatSessionArchive | — | ❌ No direct test |
+| 230 | GET | `/engine/roundtable/agents/available` | `get_available_agents` | EngineAgentState | — | ❌ No direct test |
+| 231 | GET | `/engine/roundtable/status/{key}` | `get_roundtable_status` | — | In-memory tracking | ❌ No direct test |
+| 232 | GET | `/engine/roundtable/{session_id}` | `get_roundtable` | EngineChatSession, EngineChatMessage | — | ❌ No direct test |
+| 233 | GET | `/engine/roundtable/{session_id}/turns` | `get_roundtable_turns` | EngineChatSession, EngineChatMessage | — | ❌ No direct test |
+| 234 | DELETE | `/engine/roundtable/{session_id}` | `delete_roundtable` | EngineChatSession | — | ❌ No direct test |
+| 235 | POST | `/engine/roundtable/swarm` | `start_swarm` | EngineChatSession | SwarmOrchestrator (LLM) | ❌ No direct test |
+| 236 | POST | `/engine/roundtable/swarm/async` | `start_swarm_async` | EngineChatSession | SwarmOrchestrator (background) | ❌ No direct test |
+| 237 | GET | `/engine/roundtable/swarm/status/{key}` | `get_swarm_status` | — | In-memory tracking | ❌ No direct test |
+| 238 | GET | `/engine/roundtable/swarm/{session_id}` | `get_swarm` | EngineChatSession, EngineChatMessage | — | ❌ No direct test |
+
+### WebSocket
+
+| # | Protocol | Path | Handler | Description | Test Coverage |
+|---|----------|------|---------|-----------  |---------------|
+| 239 | WS | `/ws/roundtable` | `roundtable_websocket` | Real-time roundtable/swarm streaming | ❌ No direct test |
+
+---
+
+## 33. RPG Dashboard — `src/api/routers/rpg.py`
+
+| # | Method | Path | Handler | DB Models / Tables | Skills / External | Test Coverage |
+|---|--------|------|---------|--------------------|-------------------|---------------|
+| 240 | GET | `/rpg/campaigns` | `list_campaigns` | KnowledgeEntity | Filesystem (rpg/) | ❌ No direct test |
+| 241 | GET | `/rpg/campaign/{campaign_id}` | `get_campaign_detail` | KnowledgeEntity, KnowledgeRelation, EngineChatSession | Filesystem (rpg/) | ❌ No direct test |
+| 242 | GET | `/rpg/session/{session_id}/transcript` | `get_session_transcript` | EngineChatMessage | — | ❌ No direct test |
+| 243 | GET | `/rpg/campaign/{campaign_id}/kg` | `get_campaign_kg` | KnowledgeEntity, KnowledgeRelation | — | ❌ No direct test |
+
+---
+
+## Additional Engine Session Endpoints (not in original audit)
+
+| # | Method | Path | Handler | DB Models / Tables | Skills / External | Test Coverage |
+|---|--------|------|---------|--------------------|-------------------|---------------|
+| 244 | PATCH | `/engine/sessions/{session_id}/title` | `rename_session` | aria_engine.chat_sessions | NativeSessionManager | ❌ No direct test |
+| 245 | POST | `/engine/sessions/{session_id}/archive` | `archive_session` | aria_engine.chat_sessions | NativeSessionManager | ❌ No direct test |
+| 246 | DELETE | `/engine/sessions/ghosts` | `delete_ghost_sessions` | aria_engine.chat_sessions | NativeSessionManager | ❌ No direct test |
+| 247 | POST | `/engine/sessions/cleanup` | `cleanup_sessions` | aria_engine.chat_sessions | NativeSessionManager | ❌ No direct test |
+
+## Additional Agents CRUD Endpoints (not in original audit)
+
+| # | Method | Path | Handler | DB Models / Tables | Skills / External | Test Coverage |
+|---|--------|------|---------|--------------------|-------------------|---------------|
+| 248 | POST | `/agents/db/enable-core` | `enable_core_agents` | EngineAgentState | — | ❌ No direct test |
+| 249 | POST | `/agents/db/enable-all` | `enable_all_agents` | EngineAgentState | — | ❌ No direct test |
 
 ---
 

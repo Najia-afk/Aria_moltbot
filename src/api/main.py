@@ -24,6 +24,13 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from prometheus_fastapi_instrumentator import Instrumentator
 
+# S-103: Authentication dependencies
+from fastapi import Depends
+try:
+    from .auth import require_api_key, require_admin_key
+except ImportError:
+    from auth import require_api_key, require_admin_key
+
 # Import-path compatibility for mixed absolute/relative imports across src/api.
 _API_DIR = str(Path(__file__).resolve().parent)
 if _API_DIR not in sys.path:
@@ -32,8 +39,8 @@ if _API_DIR not in sys.path:
 if os.name == "nt":
     try:
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-    except Exception:
-        pass
+    except Exception as e:
+        logging.debug("Could not set WindowsSelectorEventLoopPolicy: %s", e)
 
 try:
     from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
@@ -64,7 +71,43 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"⚠️  Database init failed: {e}")
 
-    # S-52/S-53: Initialize Aria Engine (chat, streaming, agents)
+    # ── Phase 1: Seed DB tables (models + agents) BEFORE engine pool loads ──
+    # Models must be in DB before LLM gateway resolves them.
+    # Agents must be in DB before AgentPool.load_agents() reads them.
+
+    # Seed LLM models from models.yaml → llm_models DB table
+    try:
+        try:
+            from .models_sync import sync_models_from_yaml
+        except ImportError:
+            from models_sync import sync_models_from_yaml
+        try:
+            from .db import AsyncSessionLocal as _SeedSessionLocal
+        except ImportError:
+            from db import AsyncSessionLocal as _SeedSessionLocal
+        seed_stats = await sync_models_from_yaml(_SeedSessionLocal)
+        print(f"✅ Models synced to DB: {seed_stats['inserted']} new, {seed_stats['updated']} updated ({seed_stats['total']} total)")
+    except Exception as e:
+        print(f"⚠️  Models DB sync failed (non-fatal): {e}")
+
+    # Auto-sync agents from AGENTS.md → agent_state DB table
+    try:
+        try:
+            from .agents_sync import sync_agents_from_markdown
+        except ImportError:
+            from agents_sync import sync_agents_from_markdown
+        try:
+            from .db import AsyncSessionLocal as _AgentSessionLocal
+        except ImportError:
+            from db import AsyncSessionLocal as _AgentSessionLocal
+        agent_stats = await sync_agents_from_markdown(_AgentSessionLocal)
+        print(f"✅ Agents synced to DB: {agent_stats.get('inserted', 0)} new, {agent_stats.get('updated', 0)} updated ({agent_stats.get('total', 0)} total)")
+    except Exception as e:
+        print(f"⚠️  Agents DB sync failed (non-fatal): {e}")
+
+    # ── Phase 2: Initialize Aria Engine (chat, streaming, agents) ─────────
+    # S-52/S-53: Now that DB is seeded, engine pool will find all agents.
+    _rt_pool = None  # Keep reference for reload on POST /agents/db/sync
     try:
         from aria_engine.config import EngineConfig
         from aria_engine.llm_gateway import LLMGateway
@@ -127,35 +170,8 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"⚠️  Engine init failed (chat will be degraded): {e}")
 
-    # Seed LLM models from models.yaml → llm_models DB table
-    try:
-        try:
-            from .models_sync import sync_models_from_yaml
-        except ImportError:
-            from models_sync import sync_models_from_yaml
-        try:
-            from .db import AsyncSessionLocal as _SeedSessionLocal
-        except ImportError:
-            from db import AsyncSessionLocal as _SeedSessionLocal
-        seed_stats = await sync_models_from_yaml(_SeedSessionLocal)
-        print(f"✅ Models synced to DB: {seed_stats['inserted']} new, {seed_stats['updated']} updated ({seed_stats['total']} total)")
-    except Exception as e:
-        print(f"⚠️  Models DB sync failed (non-fatal): {e}")
-
-    # Auto-sync agents from AGENTS.md → agent_state DB table
-    try:
-        try:
-            from .agents_sync import sync_agents_from_markdown
-        except ImportError:
-            from agents_sync import sync_agents_from_markdown
-        try:
-            from .db import AsyncSessionLocal as _AgentSessionLocal
-        except ImportError:
-            from db import AsyncSessionLocal as _AgentSessionLocal
-        agent_stats = await sync_agents_from_markdown(_AgentSessionLocal)
-        print(f"✅ Agents synced to DB: {agent_stats.get('inserted', 0)} new, {agent_stats.get('updated', 0)} updated ({agent_stats.get('total', 0)} total)")
-    except Exception as e:
-        print(f"⚠️  Agents DB sync failed (non-fatal): {e}")
+    # Store pool reference so /agents/db/sync can reload it
+    app.state.agent_pool = _rt_pool
 
     # S4-07: Auto-sync skill graph on startup
     try:
@@ -325,8 +341,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=_CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-CSRF-Token", "X-Request-ID"],
 )
 
 # Security middleware — rate limiting, injection scanning, security headers
@@ -460,6 +476,7 @@ try:
     from .routers.lessons import router as lessons_router
     from .routers.proposals import router as proposals_router
     from .routers.analysis import router as analysis_router
+    from .routers.sentiment import router as sentiment_router
     from .routers.engine_cron import router as engine_cron_router
     from .routers.engine_sessions import router as engine_sessions_router
     from .routers.engine_agents import router as engine_agents_router
@@ -492,6 +509,7 @@ except ImportError:
     from routers.lessons import router as lessons_router
     from routers.proposals import router as proposals_router
     from routers.analysis import router as analysis_router
+    from routers.sentiment import router as sentiment_router
     from routers.engine_cron import router as engine_cron_router
     from routers.engine_sessions import router as engine_sessions_router
     from routers.engine_agents import router as engine_agents_router
@@ -502,35 +520,39 @@ except ImportError:
     from routers.artifacts import router as artifacts_router
     from routers.rpg import router as rpg_router
 
-app.include_router(health_router)
-app.include_router(activities_router)
-app.include_router(thoughts_router)
-app.include_router(memories_router)
-app.include_router(goals_router)
-app.include_router(sessions_router)
-app.include_router(model_usage_router)
-app.include_router(litellm_router)
-app.include_router(providers_router)
-app.include_router(security_router)
-app.include_router(knowledge_router)
-app.include_router(social_router)
-app.include_router(operations_router)
-app.include_router(records_router)
-app.include_router(admin_router)
-app.include_router(models_config_router)
-app.include_router(models_crud_router)
-app.include_router(working_memory_router)
-app.include_router(skills_router)
-app.include_router(lessons_router)
-app.include_router(proposals_router)
-app.include_router(analysis_router)
-app.include_router(engine_cron_router)
-app.include_router(engine_sessions_router)
-app.include_router(engine_agent_metrics_router)
-app.include_router(engine_agents_router)
-app.include_router(agents_crud_router)
-app.include_router(artifacts_router)
-app.include_router(rpg_router)
+app.include_router(health_router)  # S-103: Health exempt from auth (monitoring)
+# S-103: All data routers require API key
+_api_deps = [Depends(require_api_key)]
+_admin_deps = [Depends(require_admin_key)]
+app.include_router(activities_router, dependencies=_api_deps)
+app.include_router(thoughts_router, dependencies=_api_deps)
+app.include_router(memories_router, dependencies=_api_deps)
+app.include_router(goals_router, dependencies=_api_deps)
+app.include_router(sessions_router, dependencies=_api_deps)
+app.include_router(model_usage_router, dependencies=_api_deps)
+app.include_router(litellm_router, dependencies=_api_deps)
+app.include_router(providers_router, dependencies=_api_deps)
+app.include_router(security_router, dependencies=_api_deps)
+app.include_router(knowledge_router, dependencies=_api_deps)
+app.include_router(social_router, dependencies=_api_deps)
+app.include_router(operations_router, dependencies=_api_deps)
+app.include_router(records_router, dependencies=_api_deps)
+app.include_router(admin_router, dependencies=_admin_deps)  # Admin needs elevated key
+app.include_router(models_config_router, dependencies=_api_deps)
+app.include_router(models_crud_router, dependencies=_api_deps)
+app.include_router(working_memory_router, dependencies=_api_deps)
+app.include_router(skills_router, dependencies=_api_deps)
+app.include_router(lessons_router, dependencies=_api_deps)
+app.include_router(proposals_router, dependencies=_api_deps)
+app.include_router(analysis_router, dependencies=_api_deps)
+app.include_router(sentiment_router, dependencies=_api_deps)
+app.include_router(engine_cron_router, dependencies=_api_deps)
+app.include_router(engine_sessions_router, dependencies=_api_deps)
+app.include_router(engine_agent_metrics_router, dependencies=_api_deps)
+app.include_router(engine_agents_router, dependencies=_api_deps)
+app.include_router(agents_crud_router, dependencies=_api_deps)
+app.include_router(artifacts_router, dependencies=_api_deps)
+app.include_router(rpg_router, dependencies=_api_deps)
 
 # ── Static file serving (RPG Dashboard at /rpg/) ─────────────────────────────
 # Mounted AFTER API routers so /api/* takes priority.
@@ -553,7 +575,7 @@ try:
 except ImportError:
     from gql import graphql_app as gql_router   # noqa: E402
 
-app.include_router(gql_router, prefix="/graphql")
+app.include_router(gql_router, prefix="/graphql", dependencies=_api_deps)
 
 # ── Entry point ──────────────────────────────────────────────────────────────
 

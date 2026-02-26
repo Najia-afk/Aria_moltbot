@@ -66,6 +66,8 @@
         <option value="12">Last 12 Hours</option>
         <option value="24" selected>Last 24 Hours</option>
         <option value="72">Last 3 Days</option>
+        <option value="168">Last 7 Days</option>
+        <option value="720">Last 30 Days</option>
     </select>
     <button class="btn btn-primary" onclick="loadCreativePulse()">Refresh</button>
     <span id="sync-meta" class="sync-meta">Data sync: —</span>
@@ -325,7 +327,7 @@ async function loadCreativePulse() {
 document.getElementById('hours-filter').addEventListener('change', loadCreativePulse);
 loadCreativePulse().catch(err => {
     console.error(err);
-    document.getElementById('recent-body').innerHTML = `<tr><td colspan="6">Error loading Creative Pulse: ${err.message}</td></tr>`;
+    document.getElementById('recent-body').innerHTML = `<tr><td colspan="6">Error loading Creative Pulse: ${escapeHtml(err.message)}</td></tr>`;
     setChartVisibility('hourly-chart', 'hourly-empty', false);
     setChartVisibility('actions-chart', 'actions-empty', false);
     setChartVisibility('skills-chart', 'creative-empty', false);

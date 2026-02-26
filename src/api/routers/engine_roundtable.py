@@ -138,6 +138,7 @@ class PaginatedRoundtables(BaseModel):
     total: int
     page: int
     page_size: int
+    has_more: bool = False
 
 
 class RoundtableStatusResponse(BaseModel):
@@ -340,7 +341,7 @@ async def start_roundtable_async(
 @router.get("", response_model=PaginatedRoundtables)
 async def list_roundtables(
     page: int = Query(default=1, ge=1),
-    page_size: int = Query(default=20, ge=1, le=100),
+    page_size: int = Query(default=50, ge=1, le=100),
     roundtable: Roundtable = Depends(_get_roundtable),
 ):
     """
@@ -367,6 +368,7 @@ async def list_roundtables(
                 total=len(rows),
                 page=page,
                 page_size=page_size,
+                has_more=len(rows) >= page_size,
             )
 
         async with _db_session() as session:
@@ -382,11 +384,19 @@ async def list_roundtables(
             archive_count_res = await session.execute(archive_count_stmt)
             total = (working_count_res.scalar() or 0) + (archive_count_res.scalar() or 0)
 
-            working_stmt = select(EngineChatSession).where(
-                EngineChatSession.session_type.in_(allowed_types)
+            # S-164: Push ORDER BY + LIMIT to DB to avoid loading all sessions
+            fetch_limit = offset + page_size
+            working_stmt = (
+                select(EngineChatSession)
+                .where(EngineChatSession.session_type.in_(allowed_types))
+                .order_by(EngineChatSession.created_at.desc())
+                .limit(fetch_limit)
             )
-            archive_stmt = select(EngineChatSessionArchive).where(
-                EngineChatSessionArchive.session_type.in_(allowed_types)
+            archive_stmt = (
+                select(EngineChatSessionArchive)
+                .where(EngineChatSessionArchive.session_type.in_(allowed_types))
+                .order_by(EngineChatSessionArchive.created_at.desc())
+                .limit(fetch_limit)
             )
 
             working_res = await session.execute(working_stmt)
@@ -423,6 +433,7 @@ async def list_roundtables(
             total=total,
             page=page,
             page_size=page_size,
+            has_more=(page * page_size) < total,
         )
     except Exception as e:
         logger.error("List roundtables failed: %s", e)
@@ -539,7 +550,8 @@ async def get_roundtable(session_id: str):
                 if isinstance(meta, str):
                     try:
                         meta = json.loads(meta)
-                    except Exception:
+                    except Exception as e:
+                        logger.warning("Metadata JSON parse error: %s", e)
                         meta = {}
 
                 if msg.role == "synthesis":
@@ -624,7 +636,8 @@ async def get_roundtable_turns(session_id: str):
             if isinstance(meta, str):
                 try:
                     meta = json.loads(meta)
-                except Exception:
+                except Exception as e:
+                    logger.warning("Metadata JSON parse error: %s", e)
                     meta = {}
             try:
                 round_num = int(role.split("-")[1])
@@ -822,7 +835,8 @@ async def get_swarm(session_id: str):
                 if isinstance(meta, str):
                     try:
                         meta = json.loads(meta)
-                    except Exception:
+                    except Exception as e:
+                        logger.warning("Metadata JSON parse error: %s", e)
                         meta = {}
 
                 if msg.role == "consensus":
@@ -869,6 +883,8 @@ async def roundtable_websocket(websocket: WebSocket):
     """
     WebSocket endpoint for streaming roundtable/swarm in real-time.
 
+    S-16: Validates API key from query param before accepting connection.
+
     Client sends: {"type": "start", "mode": "roundtable"|"swarm", "topic": "...", "agent_ids": [...]}
     Server sends: {"type": "turn", "agent_id": "...", "round": 1, "content": "...", "duration_ms": N}
     Server sends: {"type": "vote", "agent_id": "...", "iteration": 1, "vote": "agree", ...}
@@ -876,6 +892,16 @@ async def roundtable_websocket(websocket: WebSocket):
     Server sends: {"type": "done", "session_id": "...", ...}
     Server sends: {"type": "error", "message": "..."}
     """
+    # S-16: WebSocket authentication
+    try:
+        from auth import validate_ws_api_key
+    except ImportError:
+        from ..auth import validate_ws_api_key
+    api_key = websocket.query_params.get("api_key")
+    if not await validate_ws_api_key(api_key):
+        await websocket.close(code=4401, reason="Unauthorized — invalid or missing API key")
+        return
+
     if _roundtable is None:
         await websocket.close(code=1013, reason="Roundtable not initialized")
         return
@@ -921,8 +947,8 @@ async def roundtable_websocket(websocket: WebSocket):
         logger.error("Roundtable WS error: %s", e)
         try:
             await _ws_send(websocket, {"type": "error", "message": str(e)})
-        except Exception:
-            pass
+        except Exception as e2:
+            logger.debug("Failed to send WS error message: %s", e2)
 
 
 async def _handle_roundtable_ws(
@@ -967,6 +993,7 @@ async def _handle_roundtable_ws(
             "total_duration_ms": result.total_duration_ms,
         })
     except Exception as e:
+        logger.warning("WebSocket roundtable error: %s", e)
         await _ws_send(websocket, {"type": "error", "message": str(e)})
 
 
@@ -1016,6 +1043,7 @@ async def _handle_swarm_ws(
             "total_duration_ms": result.total_duration_ms,
         })
     except Exception as e:
+        logger.warning("WebSocket swarm error: %s", e)
         await _ws_send(websocket, {"type": "error", "message": str(e)})
 
 
@@ -1024,8 +1052,8 @@ async def _ws_send(websocket: WebSocket, data: dict) -> None:
     try:
         if websocket.client_state == WebSocketState.CONNECTED:
             await websocket.send_text(json.dumps(data))
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("WS send failed (client likely disconnected): %s", e)
 
 
 # ── Registration helper ──────────────────────────────────────────────────────

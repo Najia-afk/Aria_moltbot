@@ -1,0 +1,2 @@
+include:
+  - ./stacks/brain/docker-compose.yml

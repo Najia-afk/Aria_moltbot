@@ -483,12 +483,24 @@ async def chat_websocket(
     """
     WebSocket endpoint for streaming chat.
 
+    S-16: Validates API key from query param before accepting connection.
+
     Protocol:
       Client sends: {"type": "message", "content": "Hello!", "enable_thinking": false}
       Server sends: {"type": "token", "content": "Hi"}, ..., {"type": "done", ...}
 
     See aria_engine/streaming.py for full protocol documentation.
     """
+    # S-16: WebSocket authentication — check API key from query param
+    try:
+        from auth import validate_ws_api_key
+    except ImportError:
+        from ..auth import validate_ws_api_key
+    api_key = websocket.query_params.get("api_key")
+    if not await validate_ws_api_key(api_key):
+        await websocket.close(code=4401, reason="Unauthorized — invalid or missing API key")
+        return
+
     if _stream_manager is None:
         await websocket.close(code=1013, reason="Engine not initialized")
         return
@@ -499,8 +511,8 @@ async def chat_websocket(
         logger.error("WebSocket error for session %s: %s", session_id, e)
         try:
             await websocket.close(code=1011, reason=str(e))
-        except Exception:
-            pass
+        except Exception as e2:
+            logger.debug("Failed to close WebSocket for session %s: %s", session_id, e2)
 
 
 # ── Registration helper ──────────────────────────────────────────────────────

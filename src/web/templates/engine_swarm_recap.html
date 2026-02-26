@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% block title %}Swarm Recap{% endblock %}
+
+{% block extra_css %}
+<style>
+    .recap-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
+    .recap-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px; }
+    .stat-card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px; text-align: center; }
+    .stat-value { font-size: 24px; font-weight: 800; color: var(--text-primary); }
+    .stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 4px; }
+
+    .consensus-box { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; margin-bottom: 24px; }
+    .consensus-box h3 { font-size: 14px; font-weight: 700; margin-bottom: 10px; color: var(--accent-primary); }
+    .consensus-text { font-size: 14px; line-height: 1.7; color: var(--text-primary); white-space: pre-wrap; }
+
+    .convergence-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 700; }
+    .convergence-badge.converged { background: rgba(34,197,94,0.15); color: #22c55e; }
+    .convergence-badge.diverged { background: rgba(239,68,68,0.15); color: #ef4444; }
+
+    .iteration-section { margin-bottom: 20px; }
+    .iteration-header { font-size: 13px; font-weight: 700; color: var(--text-secondary); margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border-color); }
+    .vote-card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 14px 16px; margin-bottom: 8px; }
+    .vote-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .vote-agent { font-weight: 700; font-size: 13px; color: var(--accent-primary); }
+    .vote-badge { padding: 2px 10px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+    .vote-badge.agree { background: rgba(34,197,94,0.15); color: #22c55e; }
+    .vote-badge.disagree { background: rgba(239,68,68,0.15); color: #ef4444; }
+    .vote-badge.extend { background: rgba(59,130,246,0.15); color: #3b82f6; }
+    .vote-badge.pivot { background: rgba(245,158,11,0.15); color: #f59e0b; }
+    .vote-content { font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+    .vote-detail { display: flex; gap: 12px; font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+
+    .participants-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+    .participant-chip { padding: 4px 12px; border-radius: 16px; font-size: 12px; font-weight: 600; background: var(--bg-tertiary, var(--bg-secondary)); border: 1px solid var(--border-color); color: var(--text-primary); }
+
+    .swarm-list { display: grid; gap: 10px; }
+    .swarm-row { display: grid; grid-template-columns: 1fr 120px 80px 100px 80px; align-items: center; gap: 12px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 16px; cursor: pointer; transition: border-color 0.2s; }
+    .swarm-row:hover { border-color: var(--accent-primary); }
+    .swarm-topic { font-weight: 600; font-size: 13px; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .swarm-row-meta { font-size: 12px; color: var(--text-muted); }
+
+    .empty-state { text-align: center; padding: 50px 20px; color: var(--text-secondary); background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; }
+
+    @media (max-width: 768px) { .swarm-row { grid-template-columns: 1fr; } .recap-stats { grid-template-columns: 1fr 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>🐝 Swarm Recap</h1>
+    <p>Review completed swarm decision sessions — votes, convergence & consensus</p>
+</div>
+
+<!-- List view (shown when no session_id) -->
+<div id="list-view" style="display:none;">
+    <div class="page-controls">
+        <button class="btn btn-primary" onclick="loadSwarmList()">Refresh</button>
+        <span id="list-sync" class="sync-meta">—</span>
+    </div>
+    <div id="swarm-list-container" class="swarm-list">
+        <div class="empty-state">Loading swarm sessions…</div>
+    </div>
+</div>
+
+<!-- Detail view (shown when session_id provided or clicked) -->
+<div id="detail-view" style="display:none;">
+    <div class="recap-header">
+        <div>
+            <a href="/swarm-recap" style="color:var(--accent-primary);font-size:13px;">&larr; Back to list</a>
+            <h2 id="recap-topic" style="margin-top:6px;font-size:18px;"></h2>
+        </div>
+        <span id="converged-badge" class="convergence-badge"></span>
+    </div>
+    <div class="recap-stats" id="recap-stats"></div>
+    <h3 style="font-size:14px;font-weight:700;margin-bottom:8px;">Participants</h3>
+    <div class="participants-list" id="participants"></div>
+    <div class="consensus-box">
+        <h3>📋 Consensus</h3>
+        <div class="consensus-text" id="consensus-text">—</div>
+    </div>
+    <h3 style="font-size:14px;font-weight:700;margin-bottom:12px;">Iteration Breakdown</h3>
+    <div id="iterations-container"></div>
+</div>
+
+{% block extra_js %}
+<script>
+const API_BASE = window.API_BASE_URL || '';
+const SESSION_ID = {{ session_id | tojson }};
+
+function esc(s) { return typeof escapeHtml === 'function' ? escapeHtml(s) : String(s || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (SESSION_ID) {
+        loadSwarmDetail(SESSION_ID);
+    } else {
+        document.getElementById('list-view').style.display = '';
+        loadSwarmList();
+    }
+});
+
+async function loadSwarmList() {
+    const container = document.getElementById('swarm-list-container');
+    container.innerHTML = '<div class="empty-state">Loading…</div>';
+    try {
+        const resp = await fetch(`${API_BASE}/engine/roundtable?page=1&page_size=100`);
+        if (!resp.ok) throw new Error(resp.statusText);
+        const data = await resp.json();
+        const swarms = (data.sessions || data.items || data || []).filter(s =>
+            (s.session_type === 'swarm') || (s.title && s.title.startsWith('Swarm:'))
+        );
+        if (!swarms.length) {
+            container.innerHTML = '<div class="empty-state">No swarm sessions found.</div>';
+            return;
+        }
+        container.innerHTML = swarms.map(s => `
+            <div class="swarm-row" onclick="navigateToRecap('${esc(s.id || s.session_id)}')">
+                <span class="swarm-topic">${esc(s.title || s.topic || 'Untitled')}</span>
+                <span class="swarm-row-meta">${s.created_at ? new Date(s.created_at).toLocaleDateString() : '—'}</span>
+                <span class="swarm-row-meta">${s.message_count || 0} msgs</span>
+                <span class="swarm-row-meta">${s.status || '—'}</span>
+                <span class="convergence-badge ${s.metadata_json?.converged ? 'converged' : ''}" style="font-size:11px;">
+                    ${s.metadata_json?.converged ? '✓ Converged' : '—'}
+                </span>
+            </div>
+        `).join('');
+        document.getElementById('list-sync').textContent = `${swarms.length} swarm sessions`;
+    } catch (err) {
+        container.innerHTML = `<div class="empty-state">Error loading swarms: ${esc(err.message)}</div>`;
+    }
+}
+
+function navigateToRecap(sessionId) {
+    window.location.href = `/swarm-recap/${sessionId}`;
+}
+
+async function loadSwarmDetail(sessionId) {
+    document.getElementById('detail-view').style.display = '';
+    try {
+        const resp = await fetch(`${API_BASE}/engine/roundtable/swarm/${sessionId}`);
+        if (!resp.ok) throw new Error(resp.statusText);
+        const data = await resp.json();
+        renderRecap(data);
+    } catch (err) {
+        document.getElementById('detail-view').innerHTML = `<div class="empty-state">Error loading recap: ${esc(err.message)}</div>`;
+    }
+}
+
+function renderRecap(data) {
+    document.getElementById('recap-topic').textContent = data.topic || 'Swarm Session';
+
+    const badge = document.getElementById('converged-badge');
+    badge.className = `convergence-badge ${data.converged ? 'converged' : 'diverged'}`;
+    badge.textContent = data.converged ? '✓ Converged' : '✗ Diverged';
+
+    // Stats
+    const score = data.consensus_score != null ? (data.consensus_score * 100).toFixed(0) : '—';
+    const duration = data.total_duration_ms != null ? (data.total_duration_ms / 1000).toFixed(1) + 's' : '—';
+    document.getElementById('recap-stats').innerHTML = `
+        <div class="stat-card"><div class="stat-value">${data.iterations || 0}</div><div class="stat-label">Iterations</div></div>
+        <div class="stat-card"><div class="stat-value">${(data.participants || []).length}</div><div class="stat-label">Participants</div></div>
+        <div class="stat-card"><div class="stat-value">${(data.votes || []).length}</div><div class="stat-label">Total Votes</div></div>
+        <div class="stat-card"><div class="stat-value">${esc(score)}%</div><div class="stat-label">Consensus</div></div>
+        <div class="stat-card"><div class="stat-value">${esc(duration)}</div><div class="stat-label">Duration</div></div>
+    `;
+
+    // Participants
+    document.getElementById('participants').innerHTML = (data.participants || []).map(p =>
+        `<span class="participant-chip">${esc(p)}</span>`
+    ).join('');
+
+    // Consensus
+    document.getElementById('consensus-text').textContent = data.consensus || 'No consensus text available.';
+
+    // Votes grouped by iteration
+    const container = document.getElementById('iterations-container');
+    const votes = data.votes || [];
+    const byIteration = {};
+    votes.forEach(v => {
+        const iter = v.iteration || 0;
+        if (!byIteration[iter]) byIteration[iter] = [];
+        byIteration[iter].push(v);
+    });
+    const iters = Object.keys(byIteration).sort((a, b) => Number(a) - Number(b));
+    if (!iters.length) {
+        container.innerHTML = '<div class="empty-state">No vote data available.</div>';
+        return;
+    }
+    container.innerHTML = iters.map(iter => `
+        <div class="iteration-section">
+            <div class="iteration-header">Iteration ${Number(iter) + 1}</div>
+            ${byIteration[iter].map(v => `
+                <div class="vote-card">
+                    <div class="vote-meta">
+                        <span class="vote-agent">${esc(v.agent_id)}</span>
+                        <span class="vote-badge ${(v.vote || '').toLowerCase()}">${esc(v.vote || 'unknown')}</span>
+                    </div>
+                    <div class="vote-content">${esc(v.content)}</div>
+                    <div class="vote-detail">
+                        <span>Confidence: ${v.confidence != null ? (v.confidence * 100).toFixed(0) + '%' : '—'}</span>
+                        <span>Duration: ${v.duration_ms != null ? v.duration_ms + 'ms' : '—'}</span>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `).join('');
+}
+</script>
+{% endblock %}
+{% endblock %}

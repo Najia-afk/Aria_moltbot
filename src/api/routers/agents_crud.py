@@ -17,7 +17,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
@@ -370,8 +370,8 @@ async def enable_all_agents():
 
 
 @router.post("/agents/db/sync")
-async def sync_agents_from_md():
-    """Sync agents from AGENTS.md → DB (upsert)."""
+async def sync_agents_from_md(request: Request):
+    """Sync agents from AGENTS.md → DB (upsert), then reload in-memory pool."""
     try:
         from agents_sync import sync_agents_from_markdown
     except ImportError:
@@ -382,4 +382,14 @@ async def sync_agents_from_md():
         from .db import AsyncSessionLocal
 
     stats = await sync_agents_from_markdown(AsyncSessionLocal)
+
+    # Reload the in-memory agent pool so roundtable/swarm see the new state
+    pool = getattr(request.app.state, "agent_pool", None)
+    if pool is not None:
+        try:
+            reloaded = await pool.load_agents()
+            stats["pool_reloaded"] = reloaded
+        except Exception as e:
+            stats["pool_reload_error"] = str(e)
+
     return {"status": "synced", **stats}

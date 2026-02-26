@@ -118,7 +118,7 @@ backup() {
 
     # Backup database
     log "  Backing up database..."
-    ssh_cmd "cd $REMOTE_DIR && docker compose exec -T aria-db pg_dump -U aria aria_blue > $BACKUP_DIR/db_${TIMESTAMP}.sql"
+    ssh_cmd "cd $REMOTE_DIR && docker compose exec -T aria-db pg_dump -U ${DB_USER:-admin} ${DB_NAME:-aria_warehouse} > $BACKUP_DIR/db_${TIMESTAMP}.sql"
 
     # Backup docker-compose.yml
     ssh_cmd "cp $REMOTE_DIR/$COMPOSE_FILE $BACKUP_DIR/docker-compose_${TIMESTAMP}.yml"
@@ -232,7 +232,7 @@ verify_health() {
 
     # Check all containers are running
     RUNNING=$(ssh_cmd "cd $REMOTE_DIR && docker compose ps --status running -q | wc -l")
-    EXPECTED=7  # aria-db, litellm, aria-brain, aria-api, aria-web, prometheus, grafana
+    EXPECTED=10  # aria-db, aria-browser, aria-engine, tor-proxy, traefik, litellm, aria-brain, aria-web, aria-api, docker-socket-proxy
     if [ "$RUNNING" -lt "$EXPECTED" ]; then
         error "  Only $RUNNING/$EXPECTED containers running"
         return 1
@@ -240,7 +240,7 @@ verify_health() {
     log "  Containers: $RUNNING/$EXPECTED running"
 
     # HTTP health check
-    for endpoint in "http://localhost:5000/health" "http://localhost:5000/api/health" "http://localhost:8081/metrics"; do
+    for endpoint in "http://localhost:8000/health" "http://localhost:8000/api/health" "http://localhost:8081/metrics"; do
         STATUS=$(ssh_cmd "curl -s -o /dev/null -w '%{http_code}' $endpoint" 2>/dev/null || echo "000")
         if [ "$STATUS" != "200" ]; then
             error "  Health check failed: $endpoint returned $STATUS"
@@ -250,7 +250,7 @@ verify_health() {
     done
 
     # Database connectivity
-    DB_STATUS=$(ssh_cmd "cd $REMOTE_DIR && docker compose exec -T aria-db pg_isready -U aria" 2>/dev/null || echo "FAIL")
+    DB_STATUS=$(ssh_cmd "cd $REMOTE_DIR && docker compose exec -T aria-db pg_isready -U ${DB_USER:-admin}" 2>/dev/null || echo "FAIL")
     if echo "$DB_STATUS" | grep -q "accepting connections"; then
         log "  Database: OK"
     else
@@ -259,7 +259,7 @@ verify_health() {
     fi
 
     # Check aria_engine version
-    VERSION=$(ssh_cmd "curl -s http://localhost:5000/api/status | python3 -c 'import sys,json; print(json.load(sys.stdin).get(\"version\",\"unknown\"))'" 2>/dev/null || echo "unknown")
+    VERSION=$(ssh_cmd "curl -s http://localhost:8000/api/status | python3 -c 'import sys,json; print(json.load(sys.stdin).get(\"version\",\"unknown\"))'" 2>/dev/null || echo "unknown")
     log "  Version: $VERSION"
 
     # Check metrics endpoint
@@ -291,7 +291,7 @@ rollback() {
     fi
 
     # Restore database
-    ssh_cmd "cd $REMOTE_DIR && docker compose exec -T aria-db psql -U aria aria_blue < $LATEST_BACKUP"
+    ssh_cmd "cd $REMOTE_DIR && docker compose exec -T aria-db psql -U ${DB_USER:-admin} ${DB_NAME:-aria_warehouse} < $LATEST_BACKUP"
 
     # Restart with restored config
     ssh_cmd "cd $REMOTE_DIR && docker compose up -d"

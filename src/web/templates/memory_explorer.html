@@ -1,0 +1,421 @@
+{% extends "base.html" %}
+{% block title %}Memory Explorer - Aria{% endblock %}
+
+{% block extra_css %}
+<style>
+.memory-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+.stat-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem;
+    text-align: center;
+}
+.stat-card .stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--accent-primary);
+}
+.stat-card .stat-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+}
+.category-chart {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+.cat-chip {
+    padding: 0.4rem 0.8rem;
+    background: rgba(59, 130, 246, 0.12);
+    border: 1px solid rgba(59, 130, 246, 0.25);
+    border-radius: 20px;
+    font-size: 0.82rem;
+    color: var(--accent-blue);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.cat-chip:hover, .cat-chip.active {
+    background: rgba(59, 130, 246, 0.25);
+    border-color: var(--accent-blue);
+}
+.cat-chip .chip-count {
+    font-weight: 700;
+    margin-left: 0.3rem;
+    opacity: 0.8;
+}
+.semantic-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem;
+    transition: transform 0.15s, box-shadow 0.15s;
+}
+.semantic-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+.sem-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.75rem;
+}
+.sem-category {
+    padding: 0.2rem 0.6rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: rgba(108, 92, 231, 0.15);
+    color: var(--accent-primary);
+}
+.sem-importance {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+.importance-bar {
+    width: 60px;
+    height: 6px;
+    background: var(--bg-tertiary);
+    border-radius: 3px;
+    overflow: hidden;
+}
+.importance-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s;
+}
+.sem-content {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    max-height: 120px;
+    overflow-y: auto;
+    margin: 0.5rem 0;
+    word-break: break-word;
+}
+.sem-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border-color);
+}
+.sem-source {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    padding: 0.15rem 0.5rem;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+}
+.search-section {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+.search-row {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-end;
+}
+.search-row .input-group { flex: 1; }
+.search-row .input-group label {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 0.3rem;
+}
+.search-results {
+    margin-top: 1rem;
+}
+.similarity-badge {
+    background: rgba(0, 200, 83, 0.15);
+    color: #4caf50;
+    padding: 0.15rem 0.5rem;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+.seed-btn {
+    position: relative;
+}
+.seed-btn.running::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border: 2px solid transparent;
+    border-top-color: var(--accent-primary);
+    border-radius: inherit;
+    animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.top-accessed {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.top-accessed li {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.85rem;
+}
+.top-accessed li:last-child { border-bottom: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>🧠 Memory Explorer</h1>
+    <p>Semantic memory store — pgvector embeddings for pattern recognition and cognitive skills</p>
+</div>
+
+<!-- Stats Row -->
+<div class="memory-stats" id="statsRow">
+    <div class="stat-card"><span class="stat-value" id="statTotal">-</span><span class="stat-label">Total Memories</span></div>
+    <div class="stat-card"><span class="stat-value" id="statCategories">-</span><span class="stat-label">Categories</span></div>
+    <div class="stat-card"><span class="stat-value" id="statSources">-</span><span class="stat-label">Sources</span></div>
+    <div class="stat-card"><span class="stat-value" id="statImportance">-</span><span class="stat-label">Avg Importance</span></div>
+</div>
+
+<!-- Category Chips -->
+<div class="category-chart" id="categoryChips"></div>
+
+<!-- Semantic Search -->
+<div class="search-section">
+    <h3 style="margin:0 0 1rem;">🔍 Semantic Search</h3>
+    <div class="search-row">
+        <div class="input-group">
+            <label for="searchQuery">Query (natural language)</label>
+            <input type="text" class="input" id="searchQuery" placeholder="e.g. What patterns relate to goal completion?">
+        </div>
+        <div class="input-group" style="width:120px;">
+            <label for="searchLimit">Limit</label>
+            <select class="input" id="searchLimit">
+                <option value="5">5</option>
+                <option value="10" selected>10</option>
+                <option value="25">25</option>
+            </select>
+        </div>
+        <button class="btn btn-primary" onclick="semanticSearch()">Search</button>
+    </div>
+    <div class="search-results" id="searchResults"></div>
+</div>
+
+<!-- Actions -->
+<div style="display:flex; gap:1rem; margin-bottom:1.5rem; flex-wrap:wrap;">
+    <button class="btn btn-primary seed-btn" id="seedBtn" onclick="runSeed()">🌱 Seed Memories Now</button>
+    <button class="btn btn-secondary" onclick="loadStats()">🔄 Refresh Stats</button>
+</div>
+
+<!-- Top Accessed -->
+<div id="topAccessedSection" style="display:none; margin-bottom:2rem;">
+    <h3 style="margin-bottom:0.75rem;">📊 Most Accessed Memories</h3>
+    <ul class="top-accessed" id="topAccessedList"></ul>
+</div>
+
+<!-- Memory List -->
+<div class="filters" style="margin-bottom:1rem;">
+    <div class="filter-group">
+        <label class="filter-label">Source:</label>
+        <select id="sourceFilter" class="input" onchange="loadMemories()">
+            <option value="">All Sources</option>
+        </select>
+    </div>
+    <div class="filter-group">
+        <label class="filter-label">Min Importance:</label>
+        <select id="impFilter" class="input" onchange="loadMemories()">
+            <option value="0">Any</option>
+            <option value="0.3">≥ 0.3</option>
+            <option value="0.5">≥ 0.5</option>
+            <option value="0.7">≥ 0.7</option>
+        </select>
+    </div>
+</div>
+<div class="grid-2" id="memoriesGrid">
+    <div class="loading"><div class="spinner"></div></div>
+</div>
+<div id="mem-pagination"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script data-page-script>
+const API = window.ARIA_API_BASE_URL;
+let activeCategory = '';
+let memPager;
+
+function importanceColor(v) {
+    if (v >= 0.7) return '#4caf50';
+    if (v >= 0.4) return '#ff9800';
+    return '#888';
+}
+
+async function loadStats() {
+    try {
+        const r = await fetchWithRetry(`${API}/memories/semantic/stats`);
+        const d = await r.json();
+        document.getElementById('statTotal').textContent = d.total || 0;
+        document.getElementById('statCategories').textContent = Object.keys(d.by_category || {}).length;
+        document.getElementById('statSources').textContent = Object.keys(d.by_source || {}).length;
+        document.getElementById('statImportance').textContent = d.avg_importance ?? '-';
+
+        // Category chips
+        const chips = document.getElementById('categoryChips');
+        chips.innerHTML = `<span class="cat-chip ${!activeCategory ? 'active' : ''}" onclick="filterCategory('')">All<span class="chip-count">${d.total}</span></span>`;
+        for (const [cat, cnt] of Object.entries(d.by_category || {})) {
+            chips.innerHTML += `<span class="cat-chip ${activeCategory === cat ? 'active' : ''}" onclick="filterCategory('${escapeHtml(cat)}')">${escapeHtml(cat)}<span class="chip-count">${cnt}</span></span>`;
+        }
+
+        // Source filter
+        const sf = document.getElementById('sourceFilter');
+        sf.innerHTML = '<option value="">All Sources</option>';
+        for (const src of Object.keys(d.by_source || {})) {
+            sf.innerHTML += `<option value="${escapeHtml(src)}">${escapeHtml(src)}</option>`;
+        }
+
+        // Top accessed
+        if (d.top_accessed && d.top_accessed.length) {
+            document.getElementById('topAccessedSection').style.display = '';
+            document.getElementById('topAccessedList').innerHTML = d.top_accessed.map(t =>
+                `<li><span>${escapeHtml(t.summary || '(no summary)')}</span><span style="color:var(--accent-primary);font-weight:600;">${t.access_count}×</span></li>`
+            ).join('');
+        }
+    } catch (e) {
+        console.error('Stats load failed:', e);
+    }
+}
+
+function filterCategory(cat) {
+    activeCategory = cat;
+    loadMemories();
+    // Update chip highlight
+    document.querySelectorAll('.cat-chip').forEach(c => c.classList.remove('active'));
+    event.target.classList.add('active');
+}
+
+async function loadMemories(page = 1, limit = 20) {
+    const grid = document.getElementById('memoriesGrid');
+    grid.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+    const params = new URLSearchParams({ page, limit });
+    if (activeCategory) params.set('category', activeCategory);
+    const src = document.getElementById('sourceFilter').value;
+    if (src) params.set('source', src);
+    const imp = document.getElementById('impFilter').value;
+    if (parseFloat(imp) > 0) params.set('min_importance', imp);
+
+    try {
+        const r = await fetchWithRetry(`${API}/memories/semantic?${params}`);
+        const d = await r.json();
+        const items = d.items || [];
+        if (!items.length) {
+            grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><p>No semantic memories found</p></div>';
+            return;
+        }
+        grid.innerHTML = items.map(renderCard).join('');
+        if (memPager && d.pages) memPager.update(d);
+    } catch (e) {
+        showErrorState('#memoriesGrid', 'Error loading memories: ' + e.message, () => loadMemories(page, limit));
+    }
+}
+
+function renderCard(m) {
+    const imp = m.importance ?? 0.5;
+    const col = importanceColor(imp);
+    const pct = Math.round(imp * 100);
+    const cat = m.category || 'general';
+    const src = m.source || '';
+    const ts = m.created_at ? formatTime(m.created_at) : '';
+    const content = m.content || m.summary || '';
+    const accessCnt = m.access_count || 0;
+    return `
+        <div class="semantic-card">
+            <div class="sem-header">
+                <span class="sem-category">${escapeHtml(cat)}</span>
+                <span class="sem-importance">
+                    <div class="importance-bar"><div class="importance-fill" style="width:${pct}%;background:${col}"></div></div>
+                    ${imp.toFixed(2)}
+                </span>
+            </div>
+            <div class="sem-content">${escapeHtml(content.substring(0, 500))}</div>
+            <div class="sem-footer">
+                <span>${ts}${accessCnt ? ` · ${accessCnt}× accessed` : ''}</span>
+                ${src ? `<span class="sem-source">${escapeHtml(src)}</span>` : ''}
+            </div>
+        </div>`;
+}
+
+async function semanticSearch() {
+    const q = document.getElementById('searchQuery').value.trim();
+    if (!q) return;
+    const limit = document.getElementById('searchLimit').value;
+    const box = document.getElementById('searchResults');
+    box.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+    try {
+        const r = await fetchWithRetry(`${API}/memories/search?query=${encodeURIComponent(q)}&limit=${limit}`);
+        const d = await r.json();
+        const mems = d.memories || [];
+        if (!mems.length) { box.innerHTML = '<p style="color:var(--text-muted)">No results.</p>'; return; }
+        box.innerHTML = '<div class="grid-2" style="margin-top:1rem;">' + mems.map(m => {
+            const sim = m.similarity ?? 0;
+            return `
+                <div class="semantic-card">
+                    <div class="sem-header">
+                        <span class="sem-category">${escapeHtml(m.category || 'general')}</span>
+                        <span class="similarity-badge">${(sim * 100).toFixed(1)}% match</span>
+                    </div>
+                    <div class="sem-content">${escapeHtml((m.content || '').substring(0, 400))}</div>
+                    <div class="sem-footer">
+                        <span>${m.created_at ? formatTime(m.created_at) : ''}</span>
+                        ${m.source ? `<span class="sem-source">${escapeHtml(m.source)}</span>` : ''}
+                    </div>
+                </div>`;
+        }).join('') + '</div>';
+    } catch (e) {
+        box.innerHTML = `<p style="color:var(--danger)">Search failed: ${escapeHtml(e.message)}</p>`;
+    }
+}
+
+async function runSeed() {
+    const btn = document.getElementById('seedBtn');
+    btn.classList.add('running');
+    btn.disabled = true;
+    btn.textContent = '⏳ Seeding…';
+    try {
+        const r = await fetchWithRetry(`${API}/analysis/seed-memories?limit=100&skip_existing=true`, { method: 'POST' });
+        const d = await r.json();
+        showToast(`Seeded ${d.seeded} memories (${d.skipped} skipped, ${d.errors} errors)`);
+        loadStats();
+        loadMemories();
+    } catch (e) {
+        showToast('Seed failed: ' + e.message, 'error');
+    } finally {
+        btn.classList.remove('running');
+        btn.disabled = false;
+        btn.textContent = '🌱 Seed Memories Now';
+    }
+}
+
+document.getElementById('searchQuery').addEventListener('keydown', e => {
+    if (e.key === 'Enter') semanticSearch();
+});
+
+memPager = new AriaPagination('mem-pagination', {
+    onPageChange: (p, l) => loadMemories(p, l),
+    limit: 20
+});
+document.addEventListener('DOMContentLoaded', () => { loadStats(); loadMemories(); });
+</script>
+{% endblock %}
