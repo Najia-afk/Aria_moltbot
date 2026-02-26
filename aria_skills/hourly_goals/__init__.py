@@ -89,11 +89,24 @@ class HourlyGoalsSkill(BaseSkill):
             return SkillResult.ok(goal_data)
     
     @logged_method()
-    async def get_current_goals(self) -> SkillResult:
-        """Get goals for the current hour."""
+    async def get_current_goals(
+        self,
+        status: str | None = None,
+        date: str | None = None,
+    ) -> SkillResult:
+        """Get goals for the current hour with optional filters.
+
+        Args:
+            status: Filter by status (pending, in_progress, completed, failed, all).
+                    If "all" or None, no status filter is applied.
+            date: Filter by date string (YYYY-MM-DD). Currently unused by API.
+        """
         current_hour = datetime.now(timezone.utc).hour
+        params: dict = {"hour": current_hour}
+        if status and status != "all":
+            params["status"] = status
         try:
-            result = await self._api.get("/hourly-goals", params={"hour": current_hour})
+            result = await self._api.get("/hourly-goals", params=params)
             if not result:
                 raise Exception(result.error)
             api_data = result.data
@@ -107,6 +120,8 @@ class HourlyGoalsSkill(BaseSkill):
         except Exception as e:
             self.logger.warning(f"API get_current_goals failed, using fallback: {e}")
             goals = self._hourly_goals.get(current_hour, [])
+            if status and status != "all":
+                goals = [g for g in goals if g.get("status") == status]
             return SkillResult.ok({
                 "hour": current_hour,
                 "goals": goals,
