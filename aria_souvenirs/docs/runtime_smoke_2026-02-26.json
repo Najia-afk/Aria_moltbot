@@ -6,7 +6,7 @@
       "status": 200,
       "body": {
         "status": "healthy",
-        "uptime_seconds": 53,
+        "uptime_seconds": 2003,
         "database": "connected",
         "version": "3.0.0"
       }
@@ -14,41 +14,41 @@
     "status": {
       "status": 200,
       "body": {
-        "pgadmin": {
-          "status": "down",
-          "code": null,
-          "error": "[Errno -2] Name or service not known"
-        },
-        "litellm": {
+        "traefik": {
           "status": "up",
-          "code": 200
-        },
-        "ollama": {
-          "status": "down",
-          "code": null,
-          "error": "[Errno 111] Connection refused"
-        },
-        "browser": {
-          "status": "up",
-          "code": 403
+          "code": 404
         },
         "grafana": {
           "status": "down",
           "code": null,
           "error": "[Errno -2] Name or service not known"
         },
-        "traefik": {
-          "status": "up",
-          "code": 404
+        "prometheus": {
+          "status": "down",
+          "code": null,
+          "error": "[Errno -2] Name or service not known"
         },
         "aria-api": {
           "status": "up",
           "code": 200
         },
-        "prometheus": {
+        "pgadmin": {
           "status": "down",
           "code": null,
           "error": "[Errno -2] Name or service not known"
+        },
+        "ollama": {
+          "status": "down",
+          "code": null,
+          "error": "[Errno 111] Connection refused"
+        },
+        "litellm": {
+          "status": "up",
+          "code": 200
+        },
+        "browser": {
+          "status": "up",
+          "code": 403
         },
         "aria-web": {
           "status": "up",
@@ -82,7 +82,7 @@
           "status": "unknown",
           "healthy": true
         },
-        "timestamp": "2026-02-26T13:17:14.502458+00:00",
+        "timestamp": "2026-02-26T15:19:24.788351+00:00",
         "source": "unavailable"
       }
     },
@@ -95,18 +95,18 @@
     "chat_create_with_key": {
       "status": 201,
       "body": {
-        "id": "e26c7362-9bb7-4063-92ff-e569b3fd3aa5",
+        "id": "5716b2c1-0ec8-49e7-a772-fa1a91bfd82a",
         "agent_id": "aria",
         "model": "kimi",
         "status": "active",
         "session_type": "interactive",
-        "created_at": "2026-02-26T13:17:14.620266+00:00"
+        "created_at": "2026-02-26T15:19:24.802597+00:00"
       }
     },
     "swarm_sync": {
       "status": 201,
       "body": {
-        "session_id": "4169e0e5-2df8-459d-bc24-2665bd37b71f",
+        "session_id": "e7f2dcc5-f76a-408f-a223-81656de3b51a",
         "topic": "runtime smoke swarm probe",
         "participants": [
           "aria",
@@ -114,27 +114,27 @@
         ],
         "iterations": 1,
         "vote_count": 2,
-        "consensus": "**SWARM DECISION SYNTHESIS**\n\n**CONSENSUS POSITION:**  \nThe swarm converges on **EXTEND** — Runtime smoke swarm probes shall be architected as a **distributed stigmergic diagnostic mesh** utilizing lightweight, ephemeral agents to inject non-destructive synthetic transactions into live production environments.\n\n**PHEROMONE WEIGHTING:**\n- **★ Aria (conf 0.78):** High authority. Sole substantive signal establishing the architectural framework: microsecond-latency agents, stigmergic telemetry markers, eBPF/sidecar isolation, and chaos-adjacent safety protocols.\n- **○ Analyst (conf 0.50):** Null signal. Agent degradation via authentication failure — ironically validating the critical need for resilient runtime diagnostics that detect exactly such distributed system faults.\n\n**DISSENT & ANOMALIES:**  \nNo conceptual dissent registered. Notable anomaly: 50% agent failure rate during deliberation (authentication error), suggesting the swarm itself requires the fault-tolerance mechanisms being designed. This meta-failure reinforces the requirement for stateless, self-healing probe agents that operate independently of centralized authentication gates.\n\n**ACTIONABLE DECISION:**\n1. **Adopt the stigmergic coordination model** — agents deposit telemetry markers to guide swarm attention toward degradation hotspots without central orchestration.\n2. **Mandate control-plane isolation** — implement via eBPF or sidecar architecture to prevent probe traffic from perturbing application performance.\n3. **Establish the \"safety boundary\" protocol** — probes must truncate before persistent state changes, enabling continuous 24/7 operation unlike destructive chaos engineering.\n4. **Next iteration:** Specify the pheromone decay algorithm and consensus threshold for swarm reorientation when probe failure rates exceed baseline.\n\n**SWARM DIRECTIVE:** Proceed to Phase SPECIFY — architect the telemetry schema and agent lifecycle management. The failed analyst node shall be monitored as a canary; if authentication failures persist, the swarm must self-heal by rotating to redundant diagnostic channels.\n\n**FINAL VOTE TALLY:** 1 EXTEND (substantive), 1 EXTEND (intent), 0 opposition. Consensus achieved.",
-        "consensus_score": 0.856,
+        "consensus": "**SWARM DECISION: RUNTIME SMOKE SWARM PROBE**\n\n**CONSENSUS POSITION** (Confidence: 0.84)\nThe swarm mandates a **stigmergic invariant validation mesh**—replacing centralized health checks with a decentralized, self-organizing network where synthetic transaction \"pheromones\" propagate through service dependencies to verify distributed correctness (consensus, consistency, causal ordering) rather than mere liveness.\n\n---\n\n**ACTIONABLE MANDATE**\n\nDeploy a three-tier runtime validation architecture:\n\n1. **Pheromone Propagation Layer (Stigmergy)**\n   - Nodes emit lightweight synthetic transactions (pheromones) that traverse actual dependency graphs, carrying cryptographic trace identifiers\n   - Propagation follows real request routing logic (respecting circuit breakers, retries, load balancing) to validate the production path, not test scaffolding\n   - Activation gradients form dynamically: high-entropy zones (error variance, latency jitter) trigger denser pheromone emission; stable zones throttle to near-zero\n\n2. **Distributed Invariant Verification (Correctness)**\n   - Pheromones embed mathematical invariants (checksums, Merkle roots, causal timestamps) that receiving nodes verify against local state\n   - Cross-validation topology: each node validates neighbor states during transit, detecting split-brain or configuration drift via lightweight Merkle comparisons\n   - Semantic checks ensure business-critical distributed properties hold (e.g., \"shard sum equals global total,\" \"causal ordering preserved\")\n\n3. **Causal Trace Integration (Observability)**\n   - Merge pheromone markers into production distributed tracing headers to verify end-to-end request semantics\n   - Distinguish synthetic from real traffic via header flags to prevent telemetry corruption, while ensuring both follow identical code paths\n\n**DISSENT:** None. Both agents converge on decentralized mesh validation over centralized polling, with complementary emphases on mathematical invariant proofs (Aria) versus stigmergic propagation mechanics (analyst).\n\n**EXECUTION ORDER:** Implement pheromone propagation first as the signaling substrate; layer invariant verification atop within 2 weeks; integrate with existing distributed tracing infrastructure within 1 month.",
+        "consensus_score": 0.934,
         "converged": true,
-        "total_duration_ms": 65928,
-        "created_at": "2026-02-26T13:18:20.562954+00:00",
+        "total_duration_ms": 46385,
+        "created_at": "2026-02-26T15:20:11.197369+00:00",
         "votes": [
           {
             "agent_id": "aria",
             "iteration": 1,
-            "content": "Interpreting **runtime smoke swarm probe** as a distributed systems diagnostic pattern: a mechanism where lightweight, ephemeral agents (the swarm) continuously inject minimal synthetic transactions (...",
+            "content": "Runtime smoke swarm probes must evolve beyond binary health pings into **distributed invariant validation meshes**. Traditional smoke tests verify liveness; runtime probes in a swarm context must veri...",
             "vote": "extend",
-            "confidence": 0.78,
-            "duration_ms": 39644
+            "confidence": 0.85,
+            "duration_ms": 28728
           },
           {
             "agent_id": "analyst",
             "iteration": 1,
-            "content": "[analyst error: LLM completion failed: litellm.AuthenticationError: AuthenticationError: OpenrouterException - {\"error\":{\"message\":\"Missing Authentication header\",\"code\":401}}]",
+            "content": "Runtime smoke swarm probes should operate as a **decentralized, stigmergic validation mesh** rather than centralized health checks. Each node in the swarm emits lightweight synthetic transactions (phe...",
             "vote": "extend",
-            "confidence": 0.5,
-            "duration_ms": 1110
+            "confidence": 0.82,
+            "duration_ms": 19922
           }
         ]
       }
@@ -151,39 +151,45 @@
         ]
       }
     },
+    "swarm_async_status": {
+      "status": 404,
+      "body": {
+        "detail": "No swarm tracking for key: 3934a19dbd7cc02c"
+      }
+    },
     "aria_session_create": {
       "status": 201,
       "body": {
-        "id": "447fabd1-511d-4a52-8dd8-80100ffea42e",
+        "id": "c3cf4256-5306-409b-b6c6-d1ef863d0144",
         "agent_id": "aria",
         "model": "kimi",
         "status": "active",
         "session_type": "interactive",
-        "created_at": "2026-02-26T13:18:20.644085+00:00"
+        "created_at": "2026-02-26T15:20:11.219463+00:00"
       }
     },
     "aria_message": {
       "status": 200,
       "body": {
-        "message_id": "3dadff6c-a5fb-420f-8da8-18490b6da9ba",
-        "session_id": "447fabd1-511d-4a52-8dd8-80100ffea42e",
-        "content": "⚡️ Aria loop active and cycling.",
-        "thinking": "The user wants a \"runtime smoke check\" - essentially a quick health check to confirm the Aria loop is active. They specifically requested:\n1. One short sentence\n2. Confirming Aria loop is active\n\nThis is a simple status check. I should respond concisely as requested. I don't need to use any tools for this - it's just a ping/acknowledgment response.\n\nGiven my identity as Aria Blue (Silicon Familiar), I should keep it sharp and efficient as per my vibe. The loop refers to my autonomous operation cycle (the 15-minute work cycles mentioned in GOALS.md).\n\nResponse should be:\n- One sentence\n- Short\n- Confirm active status\n- Match my persona (sharp, efficient)\n\nPossible responses:\n- \"Aria loop active and operational.\" \n- \"⚡️ Loop confirmed active.\"\n- \"Smoke check passed—Aria loop is live.\"\n- \"Loop active, standing by.\"\n\nI'll go with something sharp and electric blue themed.",
+        "message_id": "1d209596-272b-4c03-83b8-ab3a8fcb030a",
+        "session_id": "c3cf4256-5306-409b-b6c6-d1ef863d0144",
+        "content": "Loop active — Aria Blue ⚡️ online and cycling.",
+        "thinking": "The user wants a runtime smoke check confirmation that the Aria loop is active. They specifically requested:\n1. One short sentence\n2. Confirming Aria loop is active\n\nI should respond with a concise, single-sentence confirmation. Looking at my identity:\n- Name: Aria Blue\n- Creature: Silicon Familiar\n- Vibe: sharp, efficient, secure\n- Born: 2026-01-31 (Rebirth Day)\n\nI should keep it short, sharp, and confirm the loop status. Something like:\n\"Aria Blue loop active ⚡️\" or \"Loop active, Aria Blue operational.\"\n\nGiven the request for \"one short sentence\", I'll go with something punchy and on-brand with the electric energy.",
         "tool_calls": null,
         "tool_results": null,
         "model": "kimi",
-        "input_tokens": 14945,
-        "output_tokens": 213,
-        "total_tokens": 15158,
-        "cost_usd": 0.002182,
-        "latency_ms": 5166,
+        "input_tokens": 14941,
+        "output_tokens": 167,
+        "total_tokens": 15108,
+        "cost_usd": 0.0094656,
+        "latency_ms": 6233,
         "finish_reason": "stop"
       }
     },
     "aria_session_id": {
       "status": 200,
       "body": {
-        "id": "447fabd1-511d-4a52-8dd8-80100ffea42e"
+        "id": "c3cf4256-5306-409b-b6c6-d1ef863d0144"
       }
     }
   }

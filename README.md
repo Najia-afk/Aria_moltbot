@@ -94,8 +94,11 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for the full guide — API keys, environment 
 | **[API.md](API.md)** | REST API, GraphQL, dashboard, security middleware |
 | **[STRUCTURE.md](STRUCTURE.md)** | Repository directory layout |
 | **[CHANGELOG.md](CHANGELOG.md)** | Version history |
-| **[AUDIT_REPORT.md](AUDIT_REPORT.md)** | Website & API audit findings |
+| **[ROLLBACK.md](ROLLBACK.md)** | Rollback procedures |
 | **[docs/RUNBOOK.md](docs/RUNBOOK.md)** | Operational runbook |
+| **[docs/API_ENDPOINT_INVENTORY.md](docs/API_ENDPOINT_INVENTORY.md)** | Comprehensive endpoint reference |
+| **[docs/RPG_SYSTEM.md](docs/RPG_SYSTEM.md)** | Pathfinder 2e RPG engine |
+| **[docs/ANALYSIS_SYSTEM.md](docs/ANALYSIS_SYSTEM.md)** | Sentiment & pattern analysis |
 
 ### Source-of-Truth Files
 

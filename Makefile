@@ -50,7 +50,7 @@ restart: ## Restart API container
 # Development
 # ============================================================================
 
-.PHONY: lint format check verify-deploy verify-pairing watchdog hooks security-scan audit-deps guardrail
+.PHONY: lint format check verify-deploy watchdog hooks security-scan audit-deps guardrail
 
 lint: security-scan ## Run linting + security scans
 	ruff check aria_skills/ aria_agents/ aria_models/ src/
@@ -71,9 +71,6 @@ check: lint test-quick ## Lint + quick tests
 
 verify-deploy: ## Run deployment verification script
 	./scripts/verify_deployment.sh --quick
-
-verify-pairing: ## Verify aria-api telegram pairing persistence (usage: make verify-pairing USER_ID=1643801012)
-	./scripts/verify_pairing.sh --user-id $(USER_ID)
 
 guardrail: ## Fail-fast check for Mac/Web->Docker API path auth & CSRF regressions
 	python scripts/guardrail_web_api_path.py

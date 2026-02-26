@@ -76,6 +76,5 @@ Or browse: `aria_skills/*/skill.json`
 
 ## Related
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) — Layer diagram and data flow
+- [ARCHITECTURE.md](ARCHITECTURE.md) — Layer diagram, data flow, and enforcement rules
 - [aria_skills/AUDIT.md](aria_skills/AUDIT.md) — Skill audit report
-- [docs/architecture.md](docs/architecture.md) — Layer enforcement code examples

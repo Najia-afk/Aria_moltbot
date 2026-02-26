@@ -254,7 +254,7 @@ See `STRUCTURE.md` for the complete directory layout.
 
 - **Architecture questions**: See `ARCHITECTURE.md`
 - **Skill development**: See `aria_skills/SKILL_CREATION_GUIDE.md` and `aria_skills/SKILL_STANDARD.md`
-- **API reference**: See `API.md` and `API_ENDPOINT_INVENTORY.md`
+- **API reference**: See `API.md` and `docs/API_ENDPOINT_INVENTORY.md`
 - **Deployment**: See `DEPLOYMENT.md`
 - **Model routing**: See `MODELS.md`
 

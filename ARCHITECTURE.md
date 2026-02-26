@@ -160,7 +160,7 @@ All data access follows a strict layered pattern. Lower layers never import from
 
 No raw SQL. No direct database access from skills. Enforced by `scripts/check_architecture.py`.
 
-See [docs/architecture.md](docs/architecture.md) for the full enforcement rules and code examples.
+Architecture layer enforcement is checked by `scripts/check_architecture.py`.
 
 ---
 
@@ -295,5 +295,4 @@ Full service list and ports: see [DEPLOYMENT.md](DEPLOYMENT.md)
 - [MODELS.md](MODELS.md) — Model routing and tiers
 - [API.md](API.md) — REST API, GraphQL, and dashboard
 - [STRUCTURE.md](STRUCTURE.md) — Repository layout
-- [docs/architecture.md](docs/architecture.md) — Layer enforcement rules
 - [CHANGELOG.md](CHANGELOG.md) — Version history

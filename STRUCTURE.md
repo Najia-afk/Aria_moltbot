@@ -15,12 +15,7 @@ Aria_moltbot/
 ├── MODELS.md                     # Model routing strategy & tiers
 ├── API.md                        # REST API, GraphQL, dashboard overview
 ├── STRUCTURE.md                  # This file
-├── API_ENDPOINT_INVENTORY.md     # Comprehensive endpoint audit
-├── API_AUDIT_2026-02-24.md       # API audit findings
-├── AUDIT_ENGINE_SKILLS_WEB.md    # Engine/skills/web audit
-├── AUDIT_REPORT.md               # Website & API audit findings
-├── ARIA_PRODUCTION_AUDIT_2026-02-21.md # Production audit
-├── DATA_MIGRATION_REPORT.md      # Data migration report
+
 ├── CHANGELOG.md                  # Version history
 ├── ROLLBACK.md                   # Rollback procedures
 ├── LICENSE                       # Source Available License
@@ -353,25 +348,24 @@ Aria_moltbot/
 │   ├── analyze_logs.py           # Log analysis tool
 │   ├── apply_patch.sh            # Patch application
 │   ├── aria_backup.sh            # Backup script
-│   ├── audit_skills.py           # Skill auditing
-│   ├── audit_souvenirs.py        # Souvenir auditing
 │   ├── benchmark_models.py       # Model benchmarking
 │   ├── check_architecture.py     # Architecture validation
-│   ├── check_db.sh               # Database health check
 │   ├── deploy_production.sh      # Production deployment
+│   ├── first-run.sh              # Quick-start setup script
+│   ├── generate_endpoint_matrix.py # Endpoint matrix generation
 │   ├── generate_litellm_config.py # LiteLLM config generator
-│   ├── generate_skill_graph.py   # Skill graph generation
+│   ├── guardrail_web_api_path.py # Web/API path guardrail check
 │   ├── health_check.sh           # System health check
 │   ├── health_watchdog.sh        # Health watchdog daemon
-│   ├── retrieve_logs.ps1         # Windows log retrieval
-│   ├── retrieve_logs.sh          # Linux log retrieval
-│   ├── retitle_sessions.py       # Session retitling
-│   ├── service_control_setup.py  # Service configuration
-│   ├── session_dashboard.py      # Session dashboard
-│   ├── talk_to_aria.py           # Interactive Aria CLI
+│   ├── install_hooks.sh          # Git hooks installer
+│   ├── pre-commit-hook.sh        # Pre-commit hook
+│   ├── retrieve_logs.sh          # Log retrieval
 │   ├── rpg_chat.py               # RPG chat interface
 │   ├── rpg_roundtable.py         # RPG roundtable runner
 │   ├── rpg_session.py            # RPG session management
+│   ├── run-load-test.sh          # Load test runner
+│   ├── runtime_smoke_check.py    # Runtime smoke check
+│   ├── talk_to_aria.py           # Interactive Aria CLI
 │   └── verify_deployment.sh      # Deployment verification
 │
 ├── prompts/                      # Prompt templates
@@ -379,20 +373,28 @@ Aria_moltbot/
 │   └── ARIA_COMPLETE_REFERENCE.md
 │
 ├── docs/                         # Documentation
-│   ├── API_AUDIT_REPORT.md
-│   ├── architecture.md
+│   ├── ANALYSIS_SYSTEM.md
+│   ├── API_ENDPOINT_INVENTORY.md
+│   ├── RPG_SYSTEM.md
+│   ├── RUNBOOK.md
+│   ├── TEST_COVERAGE_AUDIT.md
 │   ├── article_llm_self_awareness_experiment.md
 │   ├── benchmarks.json
 │   ├── benchmarks.md
-│   ├── RUNBOOK.md
-│   └── TEST_COVERAGE_AUDIT.md
+│   └── archive/
+│       ├── AUDIT_REPORT.md
+│       └── DATA_MIGRATION_REPORT.md
 │
 ├── deploy/                       # Deployment utilities
+│   ├── grafana/
 │   └── mac/                      # macOS-specific deployment
 │
 ├── images/                       # Image assets
 │
 ├── articles/                     # Published articles
+│   ├── article_llm_self_awareness_experiment.md
+│   ├── article_shadows_of_absalom.html
+│   └── linkedin_article_llm_self_awareness.md
 │
 ├── tasks/                        # Task documentation
 │   └── lessons.md
