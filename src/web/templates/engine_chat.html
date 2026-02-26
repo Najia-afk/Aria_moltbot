@@ -1263,7 +1263,7 @@
                 resultEl.className = 'tool-call-result error';
                 resultEl.textContent = result.error || 'Unknown error';
             } else {
-                const formatted = this._formatJSON(result.result);
+                const formatted = this._formatJSON(result.result ?? result.output ?? result.content);
                 resultEl.innerHTML = formatted;
             }
             resultSection.style.display = '';
@@ -1368,8 +1368,11 @@
         if (sessionId) {
             loadSession(sessionId);
         } else if (allSessions.length) {
-            // Auto-select the most recent session so the user sees their last chat
-            switchSession(allSessions[0].id);
+            // Auto-select the most recent non-ghost session so the user sees their last chat
+            const nonGhost = allSessions.find(s => (s.message_count || 0) > 0);
+            if (nonGhost) {
+                switchSession(nonGhost.id);
+            }
         }
         // Mobile: start sidebar collapsed
         if (window.innerWidth <= 768) {
@@ -2233,6 +2236,7 @@
             // Refresh sidebar session list
             loadSessions();
         } catch(e) {
+            pendingMessage = null;  // discard buffered message so it doesn't leak into the next session
             showError('Failed to create session: ' + e.message);
         }
     }
