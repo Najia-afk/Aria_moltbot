@@ -149,13 +149,14 @@ class AgentManagerSkill(BaseSkill):
         body: dict[str, Any] = {
             "agent_id": agent_type,
             "session_type": "managed",
+            "title": f"Agent: {agent_type}",
             "metadata": context or {},
         }
         if model:
             body["model"] = model
 
         try:
-            result = await self._api.post("/sessions", data=body)
+            result = await self._api.post("/engine/chat/sessions", data=body)
             if not result:
                 raise Exception(result.error)
             data = result.data
@@ -380,10 +381,11 @@ class AgentManagerSkill(BaseSkill):
 
         session_id = None
         try:
-            # 1. Create the scoped session
+            # 1. Create the scoped session (engine table so messages work)
             body = {
                 "agent_id": f"sub-{focus}",
                 "session_type": "scoped",
+                "title": f"Agent: {focus} — {task[:80]}",
                 "metadata": {
                     "task": task,
                     "focus": focus,
@@ -394,7 +396,7 @@ class AgentManagerSkill(BaseSkill):
             }
             if model:
                 body["model"] = model
-            result = await self._api.post("/sessions", data=body)
+            result = await self._api.post("/engine/chat/sessions", data=body)
             if not result or not result.success:
                 raise Exception(result.error if result else "No response from API")
             session_id = (result.data or {}).get("id")
@@ -444,10 +446,12 @@ class AgentManagerSkill(BaseSkill):
             })
         except Exception as e:
             self._log_usage("spawn_focused_agent", False, error=str(e))
-            # Clean up session on failure if it was created
+            # Clean up engine session on failure if it was created
             if session_id:
                 try:
-                    await self.terminate_agent(session_id)
+                    await self._api.delete(
+                        f"/engine/chat/sessions/{session_id}"
+                    )
                 except Exception:
                     pass
             return SkillResult.fail(f"Focused agent failed: {e}")
@@ -544,10 +548,12 @@ class AgentManagerSkill(BaseSkill):
             return SkillResult.fail(f"Delegation failed: {e}")
 
         finally:
-            # 3. Cleanup: terminate the session
+            # 3. Cleanup: close the engine session
             if cleanup and session_id:
                 try:
-                    await self.terminate_agent(session_id)
+                    await self._api.delete(
+                        f"/engine/chat/sessions/{session_id}"
+                    )
                     self.logger.debug("delegate_task: cleaned up session %s", session_id)
                 except Exception as cleanup_err:
                     self.logger.warning(
