@@ -11,6 +11,8 @@
     {"name": "sprint_status", "description": "Get compact sprint status (token-efficient)"},
     {"name": "sprint_move_goal", "description": "Move a goal to a different board column"},
     {"name": "sprint_report", "description": "Generate sprint progress report"},
-    {"name": "sprint_prioritize", "description": "Reorder goals by priority within a column"}
+    {"name": "sprint_prioritize", "description": "Reorder goals by priority within a column"},
+    {"name": "sprint_create", "description": "Create a new sprint with optional start/end dates and capacity"},
+    {"name": "sprint_review", "description": "Generate full retrospective review for a sprint (completed, carried-over, blocked, action items)"}
   ]
 }

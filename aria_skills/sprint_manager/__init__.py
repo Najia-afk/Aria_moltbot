@@ -106,3 +106,78 @@ class SprintManagerSkill(BaseSkill):
             except Exception as e:
                 results.append({"goal_id": gid, "position": pos, "success": False, "error": str(e)})
         return SkillResult.ok({"column": column, "reordered": results})
+
+    async def sprint_create(
+        self,
+        sprint_name: str,
+        start_date: str = "",
+        end_date: str = "",
+        capacity: int = 0,
+    ) -> SkillResult:
+        """Create a new sprint with optional dates and capacity."""
+        try:
+            payload: dict = {"name": sprint_name}
+            if start_date:
+                payload["start_date"] = start_date
+            if end_date:
+                payload["end_date"] = end_date
+            if capacity > 0:
+                payload["capacity"] = capacity
+            result = await self._api.post("/goals/sprints", data=payload)
+            if not result:
+                raise Exception(result.error)
+            return SkillResult.ok(result.data)
+        except Exception as e:
+            return SkillResult.fail(f"Failed to create sprint: {e}")
+
+    async def sprint_review(self, sprint: str = "current") -> SkillResult:
+        """Generate a full retrospective review for a sprint."""
+        try:
+            result = await self._api.get(f"/goals/board?sprint={sprint}")
+            if not result:
+                raise Exception(result.error)
+            board = result.data
+        except Exception as e:
+            return SkillResult.fail(f"Failed to get board for review: {e}")
+
+        columns = board.get("columns", {})
+        done_goals = columns.get("done", [])
+        on_hold_goals = columns.get("on_hold", [])
+        todo_goals = columns.get("todo", [])
+        doing_goals = columns.get("doing", [])
+
+        total = sum(len(v) for v in columns.values())
+        done = len(done_goals)
+        incomplete = len(todo_goals) + len(doing_goals)
+        completion_pct = round(done / total * 100, 1) if total > 0 else 0
+
+        review = {
+            "sprint": sprint,
+            "summary": {
+                "total_goals": total,
+                "completed": done,
+                "incomplete": incomplete,
+                "completion_pct": completion_pct,
+            },
+            "completed_goals": done_goals,
+            "carried_over": todo_goals + doing_goals,
+            "blocked": on_hold_goals,
+            "retrospective": {
+                "went_well": (
+                    f"Completed {done} of {total} goals ({completion_pct}%)"
+                    if total > 0
+                    else "No goals tracked this sprint"
+                ),
+                "needs_improvement": (
+                    f"{incomplete} goals were not completed"
+                    if incomplete > 0
+                    else "All goals completed"
+                ),
+                "action_items": (
+                    [f"Carry over {incomplete} incomplete goals to next sprint"]
+                    if incomplete > 0
+                    else ["Plan next sprint goals"]
+                ),
+            },
+        }
+        return SkillResult.ok(review)

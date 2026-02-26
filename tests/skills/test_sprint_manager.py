@@ -218,3 +218,137 @@ async def test_sprint_prioritize_success(mock_api):
     for i, item in enumerate(result.data["reordered"]):
         assert item["position"] == i
         assert item["success"] is True
+
+
+# ---------------------------------------------------------------------------
+# Sprint Create
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_sprint_create_success(mock_api):
+    skill = _make_skill()
+    skill._api = mock_api
+    skill._status = SkillStatus.AVAILABLE
+    mock_api.post = AsyncMock(return_value=SkillResult.ok({"id": "s1", "name": "Sprint 8"}))
+
+    result = await skill.sprint_create(sprint_name="Sprint 8")
+    assert result.success
+    assert result.data["name"] == "Sprint 8"
+    mock_api.post.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_sprint_create_with_dates_and_capacity(mock_api):
+    skill = _make_skill()
+    skill._api = mock_api
+    skill._status = SkillStatus.AVAILABLE
+    mock_api.post = AsyncMock(return_value=SkillResult.ok({
+        "id": "s2", "name": "Sprint 9", "start_date": "2026-03-01",
+        "end_date": "2026-03-14", "capacity": 20,
+    }))
+
+    result = await skill.sprint_create(
+        sprint_name="Sprint 9",
+        start_date="2026-03-01",
+        end_date="2026-03-14",
+        capacity=20,
+    )
+    assert result.success
+    call_kwargs = mock_api.post.call_args
+    payload = call_kwargs.kwargs.get("data", call_kwargs.args[1] if len(call_kwargs.args) > 1 else {})
+    assert payload.get("start_date") == "2026-03-01"
+    assert payload.get("end_date") == "2026-03-14"
+    assert payload.get("capacity") == 20
+
+
+@pytest.mark.asyncio
+async def test_sprint_create_failure(mock_api):
+    skill = _make_skill()
+    skill._api = mock_api
+    skill._status = SkillStatus.AVAILABLE
+    mock_api.post = AsyncMock(side_effect=Exception("Duplicate sprint name"))
+
+    result = await skill.sprint_create(sprint_name="Sprint 8")
+    assert not result.success
+    assert "Failed to create sprint" in result.error
+
+
+# ---------------------------------------------------------------------------
+# Sprint Review
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_sprint_review_success(mock_api):
+    skill = _make_skill()
+    skill._api = mock_api
+    skill._status = SkillStatus.AVAILABLE
+    mock_api.get = AsyncMock(return_value=SkillResult.ok({
+        "columns": {
+            "todo": ["g1"],
+            "doing": ["g2"],
+            "done": ["g3", "g4", "g5"],
+            "on_hold": ["g6"],
+        }
+    }))
+
+    result = await skill.sprint_review()
+    assert result.success
+    data = result.data
+    assert data["summary"]["total_goals"] == 6
+    assert data["summary"]["completed"] == 3
+    assert data["summary"]["incomplete"] == 2
+    assert data["summary"]["completion_pct"] == 50.0
+    assert len(data["completed_goals"]) == 3
+    assert len(data["carried_over"]) == 2
+    assert len(data["blocked"]) == 1
+    assert "retrospective" in data
+    assert "went_well" in data["retrospective"]
+    assert "needs_improvement" in data["retrospective"]
+    assert len(data["retrospective"]["action_items"]) > 0
+
+
+@pytest.mark.asyncio
+async def test_sprint_review_all_done(mock_api):
+    skill = _make_skill()
+    skill._api = mock_api
+    skill._status = SkillStatus.AVAILABLE
+    mock_api.get = AsyncMock(return_value=SkillResult.ok({
+        "columns": {"done": ["g1", "g2", "g3"], "todo": [], "doing": [], "on_hold": []}
+    }))
+
+    result = await skill.sprint_review(sprint="Sprint 5")
+    assert result.success
+    data = result.data
+    assert data["sprint"] == "Sprint 5"
+    assert data["summary"]["completed"] == 3
+    assert data["summary"]["incomplete"] == 0
+    assert data["summary"]["completion_pct"] == 100.0
+    assert data["retrospective"]["needs_improvement"] == "All goals completed"
+    assert data["retrospective"]["action_items"] == ["Plan next sprint goals"]
+
+
+@pytest.mark.asyncio
+async def test_sprint_review_empty_board(mock_api):
+    skill = _make_skill()
+    skill._api = mock_api
+    skill._status = SkillStatus.AVAILABLE
+    mock_api.get = AsyncMock(return_value=SkillResult.ok({"columns": {}}))
+
+    result = await skill.sprint_review()
+    assert result.success
+    data = result.data
+    assert data["summary"]["total_goals"] == 0
+    assert data["summary"]["completion_pct"] == 0
+    assert data["retrospective"]["went_well"] == "No goals tracked this sprint"
+
+
+@pytest.mark.asyncio
+async def test_sprint_review_api_failure(mock_api):
+    skill = _make_skill()
+    skill._api = mock_api
+    skill._status = SkillStatus.AVAILABLE
+    mock_api.get = AsyncMock(side_effect=Exception("Board unavailable"))
+
+    result = await skill.sprint_review()
+    assert not result.success
+    assert "Failed to get board for review" in result.error
