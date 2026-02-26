@@ -1,15 +1,23 @@
 """Comprehensive audit of skills, web pages, and API endpoints."""
+import os
 import urllib.request, json
 
-API = "http://localhost:8000"
-WEB = "http://localhost:8080"
+API = os.getenv("ARIA_API_URL", "http://localhost:8000")
+WEB = os.getenv("ARIA_WEB_URL", "http://localhost:8080")
+API_KEY = os.getenv("ARIA_API_KEY", "")
+
+
+def _request(url: str, timeout: int = 10):
+    headers = {"X-API-Key": API_KEY} if API_KEY else {}
+    req = urllib.request.Request(url, headers=headers)
+    return urllib.request.urlopen(req, timeout=timeout)
 
 def get(url, timeout=10):
-    r = urllib.request.urlopen(url, timeout=timeout)
+    r = _request(url, timeout=timeout)
     return json.loads(r.read().decode())
 
 def get_raw(url, timeout=5):
-    r = urllib.request.urlopen(url, timeout=timeout)
+    r = _request(url, timeout=timeout)
     return r.read().decode()
 
 # 1. Skills health dashboard
@@ -84,7 +92,7 @@ endpoints = [
 ]
 for method, path in endpoints:
     try:
-        r = urllib.request.urlopen(f"{API}{path}", timeout=10)
+        r = _request(f"{API}{path}", timeout=10)
         body = r.read().decode()[:200]
         print(f"  OK   {method} {path:45} => {body[:100]}")
     except Exception as e:

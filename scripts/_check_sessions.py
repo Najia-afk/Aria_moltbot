@@ -1,13 +1,19 @@
-import urllib.request, json
+import json
+import os
+import urllib.request
 
 # Exactly what browser fetches when checkbox IS ticked
-url_with = "http://localhost:8000/engine/sessions?limit=200&sort=updated_at&order=desc"
-# Exactly what browser fetches when checkbox NOT ticked
-url_without = "http://localhost:8000/engine/sessions?limit=200&sort=updated_at&order=desc&exclude_agent_sessions=true"
+base = os.getenv("ARIA_API_URL", "http://localhost:8000")
+api_key = os.getenv("ARIA_API_KEY", "")
+headers = {"X-API-Key": api_key} if api_key else {}
 
-with urllib.request.urlopen(url_with) as r:
+url_with = f"{base}/engine/sessions?limit=200&sort=updated_at&order=desc"
+# Exactly what browser fetches when checkbox NOT ticked
+url_without = f"{base}/engine/sessions?limit=200&sort=updated_at&order=desc&exclude_agent_sessions=true"
+
+with urllib.request.urlopen(urllib.request.Request(url_with, headers=headers)) as r:
     d_with = json.load(r)
-with urllib.request.urlopen(url_without) as r:
+with urllib.request.urlopen(urllib.request.Request(url_without, headers=headers)) as r:
     d_without = json.load(r)
 
 s_with = d_with.get("sessions", [])

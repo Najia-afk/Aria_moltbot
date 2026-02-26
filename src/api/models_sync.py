@@ -2,6 +2,8 @@
 Sync models.yaml → llm_models DB table on startup.
 
 Idempotent: inserts new models, updates existing ones, never deletes.
+Respects ``app_managed`` flag — rows edited via API/UI are skipped
+unless ``force=True`` is passed.
 Called from main.py lifespan.
 """
 import logging
@@ -14,10 +16,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 logger = logging.getLogger("aria.api.models_sync")
 
 
-async def sync_models_from_yaml(db_factory) -> dict[str, int]:
+async def sync_models_from_yaml(db_factory, *, force: bool = False) -> dict[str, int]:
     """Read models.yaml and upsert every entry into ``llm_models``.
 
-    Returns {"inserted": N, "updated": N, "total": N}.
+    Args:
+        db_factory: Async session factory.
+        force: If True, overwrite even ``app_managed`` rows.
+
+    Returns {"inserted": N, "updated": N, "skipped": N, "total": N}.
     """
     from db.models import LlmModelEntry
 
@@ -51,6 +57,7 @@ async def sync_models_from_yaml(db_factory) -> dict[str, int]:
 
     inserted = 0
     updated = 0
+    skipped = 0
 
     async with db_factory() as db:
         for model_id, entry in models_raw.items():
@@ -76,7 +83,7 @@ async def sync_models_from_yaml(db_factory) -> dict[str, int]:
                 "litellm_api_base": litellm_block.get("api_base", ""),
                 "route_skill": entry.get("routeSkill", ""),
                 "aliases": entry.get("aliases", []),
-                "enabled": True,
+                "enabled": entry.get("enabled", True),
             }
 
             existing = await db.execute(
@@ -88,6 +95,9 @@ async def sync_models_from_yaml(db_factory) -> dict[str, int]:
                 row = LlmModelEntry(id=model_id, **values)
                 db.add(row)
                 inserted += 1
+            elif row.app_managed and not force:
+                # Row was edited through the API/UI — don't overwrite
+                skipped += 1
             else:
                 for k, v in values.items():
                     setattr(row, k, v)
@@ -97,5 +107,8 @@ async def sync_models_from_yaml(db_factory) -> dict[str, int]:
         await db.commit()
 
     total = inserted + updated
-    logger.info("Models sync: %d inserted, %d updated (%d total)", inserted, updated, total)
-    return {"inserted": inserted, "updated": updated, "total": total}
+    logger.info(
+        "Models sync: %d inserted, %d updated, %d skipped (%d total)",
+        inserted, updated, skipped, total,
+    )
+    return {"inserted": inserted, "updated": updated, "skipped": skipped, "total": total}

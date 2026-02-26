@@ -88,6 +88,7 @@ class AgentResponse(BaseModel):
     timeout_seconds: int
     rate_limit: dict
     last_active_at: str | None
+    app_managed: bool = False
     metadata: dict
     created_at: str | None
     updated_at: str | None
@@ -127,6 +128,7 @@ def _row_to_response(row) -> AgentResponse:
         timeout_seconds=getattr(row, "timeout_seconds", None) or 600,
         rate_limit=getattr(row, "rate_limit", None) or {},
         last_active_at=row.last_active_at.isoformat() if row.last_active_at else None,
+        app_managed=getattr(row, "app_managed", False) or False,
         metadata=row.metadata_json if hasattr(row, "metadata_json") else (getattr(row, "metadata", None) or {}),
         created_at=row.created_at.isoformat() if row.created_at else None,
         updated_at=row.updated_at.isoformat() if row.updated_at else None,
@@ -233,6 +235,7 @@ async def update_agent_db(agent_id: str, body: AgentUpdate):
             updates["metadata_json"] = updates.pop("metadata")
         for key, value in updates.items():
             setattr(row, key, value)
+        row.app_managed = True
         row.updated_at = datetime.now(timezone.utc)
         await db.commit()
         await db.refresh(row)
@@ -370,8 +373,11 @@ async def enable_all_agents():
 
 
 @router.post("/agents/db/sync")
-async def sync_agents_from_md(request: Request):
-    """Sync agents from AGENTS.md → DB (upsert), then reload in-memory pool."""
+async def sync_agents_from_md(request: Request, force: bool = False):
+    """Sync agents from AGENTS.md → DB (upsert), then reload in-memory pool.
+
+    Pass ``?force=true`` to overwrite app-managed rows.
+    """
     try:
         from agents_sync import sync_agents_from_markdown
     except ImportError:
@@ -381,7 +387,7 @@ async def sync_agents_from_md(request: Request):
     except ImportError:
         from .db import AsyncSessionLocal
 
-    stats = await sync_agents_from_markdown(AsyncSessionLocal)
+    stats = await sync_agents_from_markdown(AsyncSessionLocal, force=force)
 
     # Reload the in-memory agent pool so roundtable/swarm see the new state
     pool = getattr(request.app.state, "agent_pool", None)

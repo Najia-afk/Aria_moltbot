@@ -46,6 +46,7 @@ http:
         - web
       service: aria-api
       middlewares:
+        - api-auth-inject
         - api-strip
         - secure-headers
 
@@ -139,6 +140,7 @@ http:
         - websecure
       service: aria-api
       middlewares:
+        - api-auth-inject
         - api-strip
         - secure-headers
       tls: {}
@@ -201,6 +203,11 @@ http:
       tls: {}
 
   middlewares:
+    api-auth-inject:
+      headers:
+        customRequestHeaders:
+          X-API-Key: "${ARIA_API_KEY}"
+
     api-strip:
       stripPrefix:
         prefixes:

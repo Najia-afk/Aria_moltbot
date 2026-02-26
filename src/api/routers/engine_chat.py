@@ -518,7 +518,7 @@ async def chat_websocket(
 # ── Registration helper ──────────────────────────────────────────────────────
 
 
-def register_engine_chat(app) -> None:
+def register_engine_chat(app, dependencies: list | None = None) -> None:
     """
     Register the engine chat routers with the FastAPI app.
 
@@ -526,7 +526,7 @@ def register_engine_chat(app) -> None:
         from routers.engine_chat import register_engine_chat, configure_engine
         register_engine_chat(app)
     """
-    app.include_router(router)
+    app.include_router(router, dependencies=dependencies)
     app.include_router(ws_router)
     logger.info(
         "Registered engine chat routes: %s + WS /ws/chat/{session_id}",

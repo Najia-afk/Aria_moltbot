@@ -257,7 +257,7 @@
 (function() {
     'use strict';
 
-    const API = '/api/engine';
+    const API = '/api';
 
     document.addEventListener('DOMContentLoaded', () => {
         checkEngineHealth();
@@ -284,7 +284,7 @@
                 throw new Error('unhealthy');
             }
 
-            detail.textContent = `Uptime: ${data.uptime || '—'} · DB: ${data.database || '—'}`;
+            detail.textContent = `Uptime: ${data.uptime_seconds || '—'}s · DB: ${data.database || '—'}`;
 
             // Populate card stats if available
             if (data.sessions != null) document.getElementById('statSessions').textContent = data.sessions;
@@ -300,17 +300,17 @@
 
     async function loadQuickStats() {
         try {
-            const resp = await fetch(`${API}/stats/quick`);
+            const resp = await fetch(`${API}/stats`);
             if (!resp.ok) return;
             const data = await resp.json();
 
             const mapping = {
-                qsTotalMessages: data.messages_today,
-                qsCronRuns: data.cron_runs_today,
-                qsErrors: data.errors_24h,
-                qsTokens: formatNumber(data.tokens_used),
-                qsAvgLatency: data.avg_latency_ms ? `${data.avg_latency_ms}ms` : null,
-                qsDbSize: data.db_size_mb ? `${data.db_size_mb}MB` : null,
+                qsTotalMessages: data.activities_count,
+                qsCronRuns: data.thoughts_count,
+                qsErrors: null,
+                qsTokens: null,
+                qsAvgLatency: null,
+                qsDbSize: data.memories_count,
             };
 
             for (const [id, value] of Object.entries(mapping)) {
@@ -318,8 +318,8 @@
             }
 
             // Also update card stats
-            if (data.model_count != null) document.getElementById('statModels').textContent = data.model_count;
-            if (data.skill_count != null) document.getElementById('statSkills').textContent = data.skill_count;
+            if (data.memories_count != null) document.getElementById('statModels').textContent = data.memories_count;
+            if (data.thoughts_count != null) document.getElementById('statSkills').textContent = data.thoughts_count;
         } catch(e) { /* ignore */ }
     }
 

@@ -1,11 +1,15 @@
 import json
+import os
 import urllib.request
 
-BASE = "http://127.0.0.1:8000"
+BASE = os.getenv("ARIA_API_URL", "http://127.0.0.1:8000")
+API_KEY = os.getenv("ARIA_API_KEY", "")
 
 
 def get_json(path: str):
-    with urllib.request.urlopen(BASE + path, timeout=20) as resp:
+    headers = {"X-API-Key": API_KEY} if API_KEY else {}
+    req = urllib.request.Request(BASE + path, headers=headers)
+    with urllib.request.urlopen(req, timeout=20) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
 

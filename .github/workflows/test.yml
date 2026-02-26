@@ -102,6 +102,10 @@ jobs:
             --timeout=120 \
             --tb=short
 
+      - name: Run web/API path guardrail
+        run: |
+          python scripts/guardrail_web_api_path.py
+
       - name: Stop services
         if: always()
         run: docker compose -f stacks/brain/docker-compose.yml down -v
@@ -138,6 +142,10 @@ jobs:
       - name: Run load smoke test (5 users, 30s)
         run: |
           USERS=5 RATE=1 DURATION=30s bash scripts/run-load-test.sh
+
+      - name: Run web/API path guardrail
+        run: |
+          python scripts/guardrail_web_api_path.py
 
       - name: Upload load test report
         if: always()

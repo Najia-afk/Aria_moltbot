@@ -563,10 +563,10 @@ if _RPG_STATIC.exists():
     app.mount("/rpg", StaticFiles(directory=str(_RPG_STATIC), html=True), name="rpg-dashboard")
 
 # Engine Roundtable + Swarm — REST + WebSocket
-register_roundtable(app)
+register_roundtable(app, dependencies=_api_deps)
 
 # Engine Chat — REST + WebSocket
-register_engine_chat(app)
+register_engine_chat(app, dependencies=_api_deps)
 
 # ── GraphQL ──────────────────────────────────────────────────────────────────
 

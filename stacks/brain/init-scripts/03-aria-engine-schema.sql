@@ -124,6 +124,7 @@ CREATE TABLE IF NOT EXISTS aria_engine.agent_state (
     timeout_seconds INTEGER DEFAULT 600,
     rate_limit JSONB DEFAULT '{}',
     last_active_at TIMESTAMP WITH TIME ZONE,
+    app_managed BOOLEAN DEFAULT false,
     metadata JSONB DEFAULT '{}',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -258,6 +259,7 @@ CREATE TABLE IF NOT EXISTS aria_engine.llm_models (
     aliases JSONB DEFAULT '[]',
     enabled BOOLEAN DEFAULT true,
     sort_order INTEGER DEFAULT 100,
+    app_managed BOOLEAN DEFAULT false,
     extra JSONB DEFAULT '{}',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

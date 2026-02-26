@@ -181,7 +181,7 @@ def _get_roundtable() -> Roundtable:
 
 
 async def _validate_requested_agents(agent_ids: list[str]) -> None:
-    """Ensure all requested agents are active/enabled before execution."""
+    """Ensure requested agents are runnable; auto-heal transient error states."""
     if _db_session is None:
         return
 
@@ -189,10 +189,31 @@ async def _validate_requested_agents(agent_ids: list[str]) -> None:
     if not normalized:
         raise HTTPException(status_code=400, detail="No valid agent_ids provided")
 
+    healed: list[str] = []
+
     async with _db_session() as session:
         stmt = select(EngineAgentState).where(EngineAgentState.agent_id.in_(normalized))
         result = await session.execute(stmt)
         rows = result.scalars().all()
+
+        for row in rows:
+            status = (row.status or "").lower()
+            enabled = row.enabled is not False
+            if enabled and status == "error":
+                row.status = "idle"
+                row.consecutive_failures = 0
+                row.current_task = None
+                row.current_session_id = None
+                healed.append(row.agent_id)
+
+        if healed:
+            await session.commit()
+            logger.warning(
+                "Auto-healed agents from error->idle before roundtable/swarm: %s",
+                ", ".join(sorted(healed)),
+            )
+            result = await session.execute(stmt)
+            rows = result.scalars().all()
 
     by_id = {row.agent_id: row for row in rows}
     missing = [agent_id for agent_id in normalized if agent_id not in by_id]
@@ -207,8 +228,11 @@ async def _validate_requested_agents(agent_ids: list[str]) -> None:
         enabled = row.enabled is not False
         if not enabled or status in {"disabled", "terminated"}:
             disabled.append(agent_id)
-        elif status in {"error"}:
-            unavailable.append(agent_id)
+        elif status in {"error"} and agent_id not in healed:
+            logger.warning(
+                "Agent %s still reports status=error; continuing roundtable/swarm preflight",
+                agent_id,
+            )
 
     if missing or disabled or unavailable:
         problems: list[str] = []
@@ -1059,8 +1083,8 @@ async def _ws_send(websocket: WebSocket, data: dict) -> None:
 # ── Registration helper ──────────────────────────────────────────────────────
 
 
-def register_roundtable(app) -> None:
+def register_roundtable(app, dependencies: list | None = None) -> None:
     """Register both REST + WebSocket routers."""
-    app.include_router(router)
+    app.include_router(router, dependencies=dependencies)
     app.include_router(ws_router)
     logger.info("Registered roundtable routes: %s + WS /ws/roundtable", router.prefix)

@@ -1,13 +1,21 @@
 """Quick check of recent skill failures."""
 import urllib.request
 import json
+import os
 
-BASE = "http://localhost:8080/api"
+BASE = os.getenv("ARIA_API_URL", "http://localhost:8080/api")
+API_KEY = os.getenv("ARIA_API_KEY", "")
+
+
+def _open(url: str):
+    headers = {"X-API-Key": API_KEY} if API_KEY else {}
+    req = urllib.request.Request(url, headers=headers)
+    return urllib.request.urlopen(req)
 
 def check_stats(skill_name):
     url = f"{BASE}/skills/stats/{skill_name}"
     try:
-        r = urllib.request.urlopen(url)
+        r = _open(url)
         data = json.loads(r.read())
         invocations = data.get("invocations", [])
         failures = [x for x in invocations if not x.get("success", True)]
@@ -23,7 +31,7 @@ def check_api_client_methods():
     """Check what methods api_client has as tools."""
     url = f"{BASE}/skills/coherence"
     try:
-        r = urllib.request.urlopen(url)
+        r = _open(url)
         data = json.loads(r.read())
         for s in data.get("skills", []):
             name = s.get("skill", "")

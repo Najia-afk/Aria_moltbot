@@ -473,7 +473,7 @@
     async function loadCronJobs() {
         const tbody = document.getElementById('cronTableBody');
         try {
-            const resp = await fetch(`${API}/jobs`);
+            const resp = await fetch(`${API}`);
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
             const data = await resp.json();
             cronJobs = data.jobs || data || [];
@@ -544,8 +544,8 @@
     // ── CRUD Operations ─────────────────────────────────────────
     async function toggleJob(id, enabled) {
         try {
-            await fetch(`${API}/jobs/${id}`, {
-                method: 'PATCH',
+            await fetch(`${API}/${id}`, {
+                method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ enabled }),
             });
@@ -557,7 +557,7 @@
 
     async function triggerJob(id) {
         try {
-            const resp = await fetch(`${API}/jobs/${id}/trigger`, { method: 'POST' });
+            const resp = await fetch(`${API}/${id}/trigger`, { method: 'POST' });
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
             alert('Job triggered successfully');
             setTimeout(loadCronJobs, 2000);
@@ -569,7 +569,7 @@
     async function deleteJob(id) {
         if (!confirm('Delete this cron job? This cannot be undone.')) return;
         try {
-            await fetch(`${API}/jobs/${id}`, { method: 'DELETE' });
+            await fetch(`${API}/${id}`, { method: 'DELETE' });
             loadCronJobs();
         } catch(e) {
             alert('Failed to delete job: ' + e.message);
@@ -593,7 +593,7 @@
         }
 
         try {
-            const url = editId ? `${API}/jobs/${editId}` : `${API}/jobs`;
+            const url = editId ? `${API}/${editId}` : `${API}`;
             const method = editId ? 'PUT' : 'POST';
             const resp = await fetch(url, {
                 method,
@@ -635,10 +635,10 @@
             row.style.display = '';
             const content = document.getElementById(`history-content-${id}`);
             try {
-                const resp = await fetch(`${API}/jobs/${id}/history?limit=10`);
+                const resp = await fetch(`${API}/${id}/history?limit=10`);
                 const data = await resp.json();
-                const runs = data.runs || data || [];
-                if (!runs.length) {
+                const entries = data.entries || data.runs || data || [];
+                if (!entries.length) {
                     content.innerHTML = '<em style="color:var(--text-muted);">No execution history yet.</em>';
                     return;
                 }
@@ -646,12 +646,12 @@
                     <table class="history-table">
                         <thead><tr><th>Time</th><th>Status</th><th>Duration</th><th>Error</th></tr></thead>
                         <tbody>
-                            ${runs.map(r => `
+                            ${entries.map(r => `
                                 <tr>
-                                    <td>${new Date(r.executed_at || r.timestamp).toLocaleString()}</td>
-                                    <td><span class="status-badge ${r.status}">${r.status}</span></td>
+                                    <td>${new Date(r.created_at || r.executed_at || r.timestamp || Date.now()).toLocaleString()}</td>
+                                    <td><span class="status-badge ${r.success === false ? 'failed' : 'success'}">${r.success === false ? 'failed' : 'success'}</span></td>
                                     <td>${r.duration_ms ? r.duration_ms + 'ms' : '—'}</td>
-                                    <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;">${esc(r.error || '—')}</td>
+                                    <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;">${esc((r.details && r.details.error) || r.error || '—')}</td>
                                 </tr>
                             `).join('')}
                         </tbody>

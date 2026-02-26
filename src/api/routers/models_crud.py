@@ -93,6 +93,7 @@ class ModelResponse(BaseModel):
     aliases: list[str]
     enabled: bool
     sort_order: int
+    app_managed: bool = False
     extra: dict
     created_at: str | None
     updated_at: str | None
@@ -131,6 +132,7 @@ def _row_to_response(row) -> ModelResponse:
         aliases=row.aliases or [],
         enabled=row.enabled,
         sort_order=row.sort_order,
+        app_managed=getattr(row, "app_managed", False) or False,
         extra=row.extra or {},
         created_at=row.created_at.isoformat() if row.created_at else None,
         updated_at=row.updated_at.isoformat() if row.updated_at else None,
@@ -215,6 +217,7 @@ async def update_model_db(model_id: str, body: ModelUpdate):
         updates = body.model_dump(exclude_unset=True)
         for k, v in updates.items():
             setattr(row, k, v)
+        row.app_managed = True
         row.updated_at = datetime.now(timezone.utc)
         await db.commit()
         await db.refresh(row)
@@ -239,8 +242,11 @@ async def delete_model_db(model_id: str):
 
 
 @router.post("/models/db/sync")
-async def sync_models_db():
-    """Re-sync models.yaml → DB (upsert)."""
+async def sync_models_db(force: bool = False):
+    """Re-sync models.yaml → DB (upsert).
+
+    Pass ``?force=true`` to overwrite app-managed rows.
+    """
     try:
         from models_sync import sync_models_from_yaml
     except ImportError:
@@ -250,5 +256,5 @@ async def sync_models_db():
     except ImportError:
         from .db import AsyncSessionLocal
 
-    stats = await sync_models_from_yaml(AsyncSessionLocal)
+    stats = await sync_models_from_yaml(AsyncSessionLocal, force=force)
     return {"status": "synced", **stats}

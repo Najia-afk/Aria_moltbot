@@ -329,7 +329,7 @@
 (function() {
     'use strict';
 
-    const API = '/api/engine';
+    const API = '/api';
     let refreshInterval = null;
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -355,29 +355,31 @@
         btn.classList.add('loading');
 
         try {
-            const [healthResp, errorsResp, metricsResp] = await Promise.allSettled([
+            const [healthResp, statusResp, hostResp] = await Promise.allSettled([
                 fetch(`${API}/health`),
-                fetch(`${API}/health/errors?limit=20`),
-                fetch(`${API}/health/metrics`),
+                fetch(`${API}/status`),
+                fetch(`${API}/host-stats`),
             ]);
 
             if (healthResp.status === 'fulfilled' && healthResp.value.ok) {
                 const health = await healthResp.value.json();
                 renderOverallStatus(health);
-                renderSubsystems(health.subsystems || {});
             } else {
                 renderDown();
             }
 
-            if (errorsResp.status === 'fulfilled' && errorsResp.value.ok) {
-                const errors = await errorsResp.value.json();
-                renderErrors(errors.errors || []);
+            let serviceStatus = {};
+            if (statusResp.status === 'fulfilled' && statusResp.value.ok) {
+                serviceStatus = await statusResp.value.json();
+                renderSubsystems(serviceStatus || {});
             }
 
-            if (metricsResp.status === 'fulfilled' && metricsResp.value.ok) {
-                const metrics = await metricsResp.value.json();
-                renderMetrics(metrics);
+            if (hostResp.status === 'fulfilled' && hostResp.value.ok) {
+                const hostStats = await hostResp.value.json();
+                renderMetrics(hostStats || {});
             }
+
+            renderErrors(buildServiceErrors(serviceStatus));
         } catch(e) {
             renderDown();
         }
@@ -397,7 +399,7 @@
             el.className = 'overall-status healthy';
             icon.textContent = '✅';
             title.textContent = 'All Systems Operational';
-            desc.textContent = `Uptime: ${health.uptime || '—'} · Version: ${health.version || '—'}`;
+            desc.textContent = `Uptime: ${health.uptime_seconds || '—'}s · Version: ${health.version || '—'}`;
         } else if (health.status === 'degraded') {
             el.className = 'overall-status degraded';
             icon.textContent = '⚠️';
@@ -456,11 +458,14 @@
     }
 
     function renderMetrics(metrics) {
+        const ram = metrics.ram || {};
+        const disk = metrics.disk || {};
+
         const bars = [
-            { id: 'mem', pct: metrics.memory_percent, label: `${metrics.memory_used_mb || '?'} / ${metrics.memory_total_mb || '?'} MB` },
-            { id: 'cpu', pct: metrics.cpu_percent, label: `${metrics.cpu_percent || 0}%` },
-            { id: 'disk', pct: metrics.disk_percent, label: `${metrics.disk_used_gb || '?'} / ${metrics.disk_total_gb || '?'} GB` },
-            { id: 'dbConn', pct: metrics.db_connections_percent, label: `${metrics.db_connections_active || '?'} / ${metrics.db_connections_max || '?'}` },
+            { id: 'mem', pct: ram.percent, label: `${ram.used_gb ?? '?'} / ${ram.total_gb ?? '?'} GB` },
+            { id: 'cpu', pct: 0, label: 'n/a' },
+            { id: 'disk', pct: disk.percent, label: `${disk.used_gb ?? '?'} / ${disk.total_gb ?? '?'} GB` },
+            { id: 'dbConn', pct: 0, label: 'n/a' },
         ];
 
         for (const bar of bars) {
@@ -493,6 +498,17 @@
                 <div class="error-item-msg">${esc(err.message || '')}</div>
             </div>
         `).join('');
+    }
+
+    function buildServiceErrors(statusMap) {
+        if (!statusMap || typeof statusMap !== 'object') return [];
+        return Object.entries(statusMap)
+            .filter(([, value]) => (value && value.status) !== 'up')
+            .map(([source, value]) => ({
+                source,
+                timestamp: new Date().toISOString(),
+                message: value?.error || `status=${value?.status || 'unknown'} code=${value?.code ?? 'n/a'}`,
+            }));
     }
 
     function formatTime(ts) {

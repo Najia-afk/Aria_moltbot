@@ -27,8 +27,6 @@ def create_app():
 
     # S-17: CSRF protection
     csrf = CSRFProtect(app)
-    # Exempt the API proxy route from CSRF (it forwards to the backend)
-    csrf.exempt('api_proxy')
 
     service_host = os.environ['SERVICE_HOST']
     api_base_url = os.environ['API_BASE_URL']
@@ -36,6 +34,8 @@ def create_app():
 
     # Internal API service URL (Docker network or localhost fallback)
     _api_internal_url = os.environ.get('API_INTERNAL_URL', 'http://aria-api:8000')
+    _api_key = os.environ.get('ARIA_API_KEY', '')
+    _admin_key = os.environ.get('ARIA_ADMIN_KEY', '')
     # WebSocket base URL (browser-accessible) — used for WS chat connections
     _ws_base_url = os.environ.get('WS_BASE_URL', '')
 
@@ -79,11 +79,21 @@ def create_app():
         """S-27: API reverse proxy with proper error handling."""
         url = f"{_api_internal_url}/{path}"
         try:
+            upstream_headers = {
+                k: v for k, v in request.headers
+                if k.lower() not in ('host', 'transfer-encoding')
+            }
+            if 'X-API-Key' not in upstream_headers:
+                if path.startswith('admin/') and _admin_key:
+                    upstream_headers['X-API-Key'] = _admin_key
+                elif _api_key:
+                    upstream_headers['X-API-Key'] = _api_key
+
             resp = http_requests.request(
                 method=request.method,
                 url=url,
                 params=request.args,
-                headers={k: v for k, v in request.headers if k.lower() not in ('host', 'transfer-encoding')},
+                headers=upstream_headers,
                 data=request.get_data(),
                 timeout=30,
             )
@@ -109,6 +119,9 @@ def create_app():
                 "error": "Proxy error",
                 "detail": str(e)[:200],
             }), 500
+
+    # Exempt API reverse proxy from CSRF checks (JSON API pass-through endpoint)
+    csrf.exempt(api_proxy)
 
     # REMOVED: legacy bot proxy route (Operation Independence)
     # Previously: forwarded to legacy bot service with Bearer token injection

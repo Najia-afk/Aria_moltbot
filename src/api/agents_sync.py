@@ -2,6 +2,8 @@
 Agent Sync — parse AGENTS.md and upsert into aria_engine.agent_state.
 
 Called by POST /agents/db/sync and optionally on startup.
+Respects ``app_managed`` flag — rows edited via API/UI are skipped
+unless ``force=True`` is passed.
 """
 import logging
 import re
@@ -117,11 +119,17 @@ def _parse_agents_md(text: str) -> list[dict[str, Any]]:
 
 async def sync_agents_from_markdown(
     session_factory: async_sessionmaker,
+    *,
+    force: bool = False,
 ) -> dict[str, Any]:
     """
     Parse AGENTS.md and upsert into aria_engine.agent_state.
 
-    Returns stats: {inserted, updated, total, agents[]}.
+    Args:
+        session_factory: Async session factory.
+        force: If True, overwrite even ``app_managed`` rows.
+
+    Returns stats: {inserted, updated, skipped, total, agents[]}.
     """
     from db.models import EngineAgentState
 
@@ -137,6 +145,7 @@ async def sync_agents_from_markdown(
 
     inserted = 0
     updated = 0
+    skipped = 0
     now = datetime.now(timezone.utc)
 
     async with session_factory() as db:
@@ -149,6 +158,11 @@ async def sync_agents_from_markdown(
             existing = result.scalar_one_or_none()
 
             if existing:
+                if existing.app_managed and not force:
+                    # Row was edited through the API/UI — don't overwrite
+                    skipped += 1
+                    continue
+
                 # Update only config fields, preserve runtime state
                 existing.display_name = agent["display_name"]
                 existing.agent_type = agent["agent_type"]
@@ -192,10 +206,11 @@ async def sync_agents_from_markdown(
         total_result = await db.execute(select(func.count()).select_from(EngineAgentState))
         total = total_result.scalar() or 0
 
-    logger.info("Agent sync complete: %d inserted, %d updated, %d total", inserted, updated, total)
+    logger.info("Agent sync complete: %d inserted, %d updated, %d skipped, %d total", inserted, updated, skipped, total)
     return {
         "inserted": inserted,
         "updated": updated,
+        "skipped": skipped,
         "total": total,
         "agents": [a["agent_id"] for a in agents_data],
     }

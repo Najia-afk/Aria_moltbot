@@ -35,10 +35,11 @@ services:
       MAX_CONCURRENT_SESSIONS: 5
       CONNECTION_TIMEOUT: 60000
       TOKEN: ${BROWSERLESS_TOKEN:-}
+      BROWSERLESS_INTERNAL_PORT: ${BROWSERLESS_INTERNAL_PORT:-3000}
     ports:
       - "${BROWSERLESS_PORT:-3000}:3000"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:$${BROWSERLESS_INTERNAL_PORT}/ || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -60,6 +61,7 @@ services:
       LITELLM_BASE_URL: http://litellm:4000/v1
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-change-me}
       ENGINE_DEBUG: ${ENGINE_DEBUG:-false}
+      ENGINE_HEALTH_PORT: ${ENGINE_HEALTH_PORT:-8081}
       # Full URL for heartbeat API posts (not the routing prefix API_BASE_URL)
       ENGINE_API_BASE_URL: http://aria-api:8000
       # S-103: API key for engine→API authentication
@@ -84,7 +86,7 @@ services:
       aria-api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/health')"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:$${ENGINE_HEALTH_PORT}/health || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 5
@@ -108,11 +110,13 @@ services:
     image: dperson/torproxy:latest@sha256:d8b5f1cf24f1b7a0aa334929a264b2606a107223dd0d51eb1cda8aae6fbeec53
     container_name: tor-proxy
     restart: unless-stopped
+    environment:
+      TOR_SOCKS_INTERNAL_PORT: ${TOR_SOCKS_INTERNAL_PORT:-9050}
     ports:
       - "${TOR_SOCKS_PORT:-9050}:9050"
       - "${TOR_CONTROL_PORT:-9051}:9051"
     healthcheck:
-      test: ["CMD", "curl", "--socks5", "localhost:9050", "-s", "https://check.torproject.org/api/ip"]
+      test: ["CMD-SHELL", "curl --socks5 localhost:$${TOR_SOCKS_INTERNAL_PORT} -s https://check.torproject.org/api/ip >/dev/null || exit 1"]
       interval: 60s
       timeout: 15s
       retries: 3
@@ -151,6 +155,8 @@ services:
     environment:
       SERVICE_HOST: ${SERVICE_HOST:-aria.local}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
+      ARIA_API_KEY: ${ARIA_API_KEY:-}
+      ARIA_ADMIN_KEY: ${ARIA_ADMIN_KEY:-}
       TRAEFIK_DASHBOARD_USER: ${TRAEFIK_DASHBOARD_USER:-admin}
       TRAEFIK_DASHBOARD_PASSWORD_HASH: ${TRAEFIK_DASHBOARD_PASSWORD_HASH:-}
     command:
@@ -206,16 +212,17 @@ services:
       DATABASE_URL: postgresql://${DB_USER:-admin}:${DB_PASSWORD:-admin}@aria-db:5432/${DB_NAME:-aria_warehouse}?options=-csearch_path%3Dlitellm,public
       MOONSHOT_KIMI_KEY: ${MOONSHOT_KIMI_KEY:-}
       OPEN_ROUTER_KEY: ${OPEN_ROUTER_KEY:-}
-      OPEN_ROUTER_KEY_DEEP: ${OPEN_ROUTER_KEY_DEEP:-}
+      OPEN_ROUTER_KEY_DEEP: ${OPEN_ROUTER_KEY_DEEP:-${OPEN_ROUTER_KEY:-}}
       STORE_MODEL_IN_DB: "True"
       OLLAMA_API_BASE: http://host.docker.internal:11434
+      LITELLM_INTERNAL_PORT: ${LITELLM_INTERNAL_PORT:-4000}
     volumes:
       - ./litellm-config.yaml:/app/config.yaml:ro
     ports:
       - "${LITELLM_PORT:-18793}:4000"
     command: ["--config", "/app/config.yaml"]
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4000/health/readiness')"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:$${LITELLM_INTERNAL_PORT}/health/readiness || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 5
@@ -250,10 +257,12 @@ services:
       - '--web.enable-lifecycle'
       - '--web.external-url=/prometheus/'
       - '--web.route-prefix=/prometheus/'
+    environment:
+      PROMETHEUS_INTERNAL_PORT: ${PROMETHEUS_INTERNAL_PORT:-9090}
     ports:
-      - "9090:9090"
+      - "${PROMETHEUS_PORT:-9090}:9090"
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/-/ready"]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:$${PROMETHEUS_INTERNAL_PORT}/-/ready || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -274,13 +283,14 @@ services:
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_SERVER_ROOT_URL: "%(protocol)s://%(domain)s/grafana/"
       GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      GRAFANA_INTERNAL_PORT: ${GRAFANA_INTERNAL_PORT:-3000}
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
     ports:
-      - "3001:3000"
+      - "${GRAFANA_PORT:-3001}:3000"
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/api/health || exit 1"]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:$${GRAFANA_INTERNAL_PORT}/api/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -362,10 +372,11 @@ services:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@aria.dev}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
       SCRIPT_NAME: /pgadmin
+      PGADMIN_INTERNAL_PORT: ${PGADMIN_INTERNAL_PORT:-80}
     ports:
       - "${PGADMIN_PORT:-5051}:80"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80/misc/ping"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:$${PGADMIN_INTERNAL_PORT}/misc/ping || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -387,23 +398,26 @@ services:
       SECRET_KEY: ${WEB_SECRET_KEY:-aria-dev-secret-key}
       SERVICE_HOST: ${SERVICE_HOST:-localhost}
       API_BASE_URL: ${API_BASE_URL:-/api}
+      ARIA_API_KEY: ${ARIA_API_KEY:-}
+      ARIA_ADMIN_KEY: ${ARIA_ADMIN_KEY:-}
       # WS_BASE_URL: browser-accessible host:port for WebSocket chat.
       # Leave empty to auto-detect (works via Traefik or direct API fallback).
       # Set explicitly if behind a custom reverse proxy, e.g. "myhost:8080"
       WS_BASE_URL: ${WS_BASE_URL:-}
-      GRAFANA_URL: http://grafana:3000
-      PROMETHEUS_URL: http://prometheus:9090
-      OLLAMA_URL: http://host.docker.internal:11434
-      LITELLM_URL: http://litellm:4000
+      WEB_INTERNAL_PORT: ${WEB_INTERNAL_PORT:-5000}
+      GRAFANA_URL: ${GRAFANA_URL:-http://grafana:3000}
+      PROMETHEUS_URL: ${PROMETHEUS_URL:-http://prometheus:9090}
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      LITELLM_URL: ${LITELLM_URL:-http://litellm:4000}
     volumes:
       # Mount templates for live reload during development
       - ../../src/web/templates:/app/templates:ro
       - ../../src/web/static:/app/static:ro
       - ../../src/web/app.py:/app/app.py:ro
     ports:
-      - "${ARIA_WEB_PORT:-5050}:5000"   # host 5050 (macOS 5000 reserved)
+      - "${ARIA_WEB_PORT:-5050}:5000"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/')"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:$${WEB_INTERNAL_PORT}/ || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 5
@@ -431,22 +445,23 @@ services:
     environment:
       # /aria_skills is bind-mounted; PYTHONPATH=/ makes it importable
       PYTHONPATH: /
+      API_INTERNAL_PORT: ${API_INTERNAL_PORT:-8000}
       DATABASE_URL: postgresql://${DB_USER:-admin}:${DB_PASSWORD:-admin}@aria-db:5432/${DB_NAME:-aria_warehouse}
       # S-103: API authentication keys
       ARIA_API_KEY: ${ARIA_API_KEY:-}
       ARIA_ADMIN_KEY: ${ARIA_ADMIN_KEY:-}
-      GRAFANA_URL: http://grafana:3000
-      PROMETHEUS_URL: http://prometheus:9090
-      OLLAMA_URL: http://host.docker.internal:11434
-      MLX_URL: http://host.docker.internal:8080
-      LITELLM_URL: http://litellm:4000
-      PGADMIN_URL: http://aria-pgadmin:80
+      GRAFANA_URL: ${GRAFANA_URL:-http://grafana:3000}
+      PROMETHEUS_URL: ${PROMETHEUS_URL:-http://prometheus:9090}
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      MLX_URL: ${MLX_URL:-http://host.docker.internal:8080}
+      LITELLM_URL: ${LITELLM_URL:-http://litellm:4000}
+      PGADMIN_URL: ${PGADMIN_URL:-http://aria-pgadmin:80}
       API_BASE_URL: ${API_BASE_URL:-/api}
       # API keys for provider balance checks
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-change-me}
       MOONSHOT_KIMI_KEY: ${MOONSHOT_KIMI_KEY:-}
       OPEN_ROUTER_KEY: ${OPEN_ROUTER_KEY:-}
-      OPEN_ROUTER_KEY_DEEP: ${OPEN_ROUTER_KEY_DEEP:-}
+      OPEN_ROUTER_KEY_DEEP: ${OPEN_ROUTER_KEY_DEEP:-${OPEN_ROUTER_KEY:-}}
       # Telegram + X credentials (for future API-side social integrations)
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
@@ -512,7 +527,7 @@ services:
       - backend
       - data
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health || exit 1"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:$${API_INTERNAL_PORT}/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -545,10 +560,11 @@ services:
       IMAGES: 0
       EXEC: 0
       SWARM: 0
+      DOCKER_SOCKET_PROXY_INTERNAL_PORT: ${DOCKER_SOCKET_PROXY_INTERNAL_PORT:-2375}
     volumes:
       - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock:ro
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:2375/version"]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:$${DOCKER_SOCKET_PROXY_INTERNAL_PORT}/version || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -568,8 +584,8 @@ services:
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
     ports:
-      - "16686:16686"   # Jaeger UI
-      - "4317:4317"     # OTLP gRPC receiver
+      - "${JAEGER_UI_PORT:-16686}:16686"
+      - "${JAEGER_OTLP_GRPC_PORT:-4317}:4317"
     networks:
       - monitoring
     mem_limit: 512m

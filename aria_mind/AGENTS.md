@@ -31,7 +31,7 @@ Priority: **Local → Free Cloud → Paid**. Never hardcode model names outside 
 |-------|-------|-------|--------|
 | aria | Orchestrator 🎯 | qwen3-mlx | goals, schedule, health |
 | devops | DevSecOps 🔒 | qwen3-coder-free | pytest_runner, database |
-| analyst | Data 📊 + Trader 📈 | deepseek-free | knowledge_graph, database |
+| analyst | Data 📊 + Trader 📈 | kimi | knowledge_graph, database |
 | creator | Creative 🎨 + Social 🌐 + Journalist 📰 | trinity-free | moltbook, social |
 | memory | - | qwen3-mlx | database, knowledge_graph |
 
@@ -116,7 +116,7 @@ Data analysis, MLOps, market research. Combines analytical focuses.
 ```yaml
 id: analyst
 focus: data  # Also handles trader tasks
-model: deepseek-free
+model: kimi
 fallback: qwen3-next-free
 parent: aria
 skills: [database, knowledge_graph, performance, llm, api_client, brainstorm, market_data]
