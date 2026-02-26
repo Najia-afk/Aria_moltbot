@@ -83,7 +83,7 @@
     },
     {
       "name": "spawn_focused_agent",
-      "description": "Spawn a sub-agent with scoped context and limited tool set.",
+      "description": "Spawn a sub-agent with scoped context, send it a task, and return its response. The session stays open for follow-ups or can be terminated.",
       "input_schema": {
         "type": "object",
         "properties": {

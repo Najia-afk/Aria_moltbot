@@ -356,10 +356,11 @@ class AgentManagerSkill(BaseSkill):
         tools: list[str],
         model: str | None = None,
     ) -> SkillResult:
-        """Spawn a sub-agent with scoped context via aria-api.
+        """Spawn a sub-agent, send the task, and return its response.
 
-        Does NOT hold a direct Coordinator reference. All orchestration
-        goes through aria-api HTTP endpoints.
+        Full lifecycle: create session → send task → collect result.
+        The session is left open so the caller can send follow-ups
+        or terminate it explicitly.
 
         Args:
             task: Task description for the sub-agent
@@ -377,7 +378,9 @@ class AgentManagerSkill(BaseSkill):
             if not valid:
                 return SkillResult.fail(f"Unknown or disabled model: {model}")
 
+        session_id = None
         try:
+            # 1. Create the scoped session
             body = {
                 "agent_id": f"sub-{focus}",
                 "session_type": "scoped",
@@ -392,14 +395,62 @@ class AgentManagerSkill(BaseSkill):
             if model:
                 body["model"] = model
             result = await self._api.post("/sessions", data=body)
-            if not result:
-                raise Exception(result.error)
-            data = result.data
-            self._log_usage("spawn_focused_agent", True, focus=focus)
-            return SkillResult.ok(data)
+            if not result or not result.success:
+                raise Exception(result.error if result else "No response from API")
+            session_id = (result.data or {}).get("id")
+            if not session_id:
+                raise Exception("Session created but no id returned")
+
+            self.logger.info(
+                "spawn_focused_agent: session %s created (focus=%s)",
+                session_id, focus,
+            )
+
+            # 2. Send the task as a message and get the LLM response
+            msg_result = await self._api.post(
+                f"/engine/chat/sessions/{session_id}/messages",
+                data={
+                    "content": task,
+                    "enable_thinking": False,
+                    "enable_tools": bool(tools),
+                },
+            )
+            if not msg_result or not msg_result.success:
+                err = msg_result.error if msg_result else "No response"
+                raise Exception(f"Task send failed: {err}")
+
+            response_data = msg_result.data or {}
+            content = response_data.get("content", "")
+            total_tokens = response_data.get("total_tokens", 0)
+            resp_model = response_data.get("model", model or "default")
+
+            self._log_usage(
+                "spawn_focused_agent", True,
+                focus=focus,
+                model=resp_model,
+                tokens=total_tokens,
+            )
+
+            # 3. Return the full result so the parent can read & decide
+            return SkillResult.ok({
+                "session_id": session_id,
+                "focus": focus,
+                "model": resp_model,
+                "content": content,
+                "tool_calls": response_data.get("tool_calls"),
+                "tool_results": response_data.get("tool_results"),
+                "total_tokens": total_tokens,
+                "cost_usd": response_data.get("cost_usd", 0),
+            })
         except Exception as e:
             self._log_usage("spawn_focused_agent", False, error=str(e))
-            return SkillResult.fail(f"Failed to spawn focused agent: {e}")
+            # Clean up session on failure if it was created
+            if session_id:
+                try:
+                    await self.terminate_agent(session_id)
+                except Exception:
+                    pass
+            return SkillResult.fail(f"Focused agent failed: {e}")
 
     # ── High-level delegation (S-11) ─────────────────────────────
 
