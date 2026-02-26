@@ -76,6 +76,7 @@ CREATE TABLE IF NOT EXISTS aria_engine.cron_jobs (
     name VARCHAR(200) NOT NULL,
     schedule VARCHAR(100) NOT NULL,
     agent_id VARCHAR(100) DEFAULT 'main',
+    model VARCHAR(200) DEFAULT NULL,
     enabled BOOLEAN DEFAULT true,
     payload_type VARCHAR(50) DEFAULT 'prompt',
     payload TEXT NOT NULL,

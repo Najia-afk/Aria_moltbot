@@ -363,7 +363,7 @@ services:
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
       SCRIPT_NAME: /pgadmin
     ports:
-      - "${PGADMIN_PORT:-5050}:80"
+      - "${PGADMIN_PORT:-5051}:80"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80/misc/ping"]
       interval: 30s
