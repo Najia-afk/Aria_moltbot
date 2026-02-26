@@ -26,10 +26,20 @@ def add_correlation_id(logger, method_name, event_dict):
 
 def configure_logging(level: int = logging.INFO):
     """Configure structured logging with structlog."""
+    # Always configure stdlib root logger so standard logging.getLogger()
+    # calls (used by scheduler, chat_engine, etc.) output to stderr.
+    # Use force=True to ensure handler is added even if basicConfig was
+    # called elsewhere (e.g. by an import side-effect).
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s [%(name)s] %(levelname)s %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        force=True,
+    )
+
     if not HAS_STRUCTLOG:
-        logging.basicConfig(level=level, format="%(asctime)s %(name)s %(levelname)s %(message)s")
         return
-        
+
     structlog.configure(
         processors=[
             structlog.contextvars.merge_contextvars,

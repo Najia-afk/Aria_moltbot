@@ -216,16 +216,24 @@ class AriaEngine:
 def main():
     """CLI entrypoint — called by Docker CMD."""
     # Use structured logging if available, otherwise fallback to basicConfig
+    # Ensure stdlib logging always outputs to stderr at INFO level.
+    # This is the definitive config — structlog may or may not bridge
+    # stdlib, so we always add a StreamHandler ourselves.
+    _handler = logging.StreamHandler(sys.stderr)
+    _handler.setFormatter(logging.Formatter(
+        "%(asctime)s [%(name)s] %(levelname)s %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    ))
+    logging.root.addHandler(_handler)
+    logging.root.setLevel(logging.INFO)
+
     try:
         from aria_mind.logging_config import configure_logging
         configure_logging()
-        logging.getLogger("aria_engine").info("Structured logging initialized")
     except ImportError:
-        logging.basicConfig(
-            level=logging.INFO,
-            format="%(asctime)s [%(name)s] %(levelname)s %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
-        )
+        pass  # stdlib handler already set above
+
+    logger.info("Logging initialized")
 
     engine = AriaEngine()
     loop = asyncio.new_event_loop()

@@ -590,7 +590,8 @@ class StreamManager:
                 cleaned.append(m)
         messages = cleaned
 
-        messages.append({"role": "user", "content": current_content})
+        # NOTE: user message is already persisted (flush) before _build_context
+        # is called, so the DB query above includes it — do NOT append again.
         return messages
 
     async def _keepalive(self, websocket: WebSocket, connection_id: str) -> None:

@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-from apscheduler import AsyncScheduler
+from apscheduler import AsyncScheduler, ConflictPolicy
 from apscheduler.datastores.sqlalchemy import SQLAlchemyDataStore
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
@@ -55,21 +55,33 @@ async def _scheduler_dispatch(
     max_duration: int,
     retry_count: int,
     model: str = "",
+    job_name: str = "",
 ) -> None:
-    """Module-level trampoline that APScheduler can serialize."""
-    if _active_scheduler is None:
-        logger.error("Scheduler dispatch called but no active scheduler")
-        return
-    await _active_scheduler._execute_job(
-        job_id=job_id,
-        agent_id=agent_id,
-        payload_type=payload_type,
-        payload=payload,
-        session_mode=session_mode,
-        max_duration=max_duration,
-        retry_count=retry_count,
-        model=model,
-    )
+    """Module-level trampoline that APScheduler can serialize.
+
+    IMPORTANT: This function MUST NOT raise — any unhandled exception
+    kills APScheduler's background task group and stops ALL scheduling.
+    """
+    try:
+        if _active_scheduler is None:
+            logger.error("Scheduler dispatch called but no active scheduler")
+            return
+        await _active_scheduler._execute_job(
+            job_id=job_id,
+            agent_id=agent_id,
+            payload_type=payload_type,
+            payload=payload,
+            session_mode=session_mode,
+            max_duration=max_duration,
+            retry_count=retry_count,
+            model=model,
+            job_name=job_name,
+        )
+    except Exception as exc:
+        logger.error(
+            "CRITICAL: _scheduler_dispatch for %s raised: %s",
+            job_id, exc, exc_info=True,
+        )
 
 
 def parse_schedule(schedule_str: str) -> CronTrigger | IntervalTrigger:
@@ -287,7 +299,10 @@ class EngineScheduler:
                         "max_duration": row["max_duration_seconds"],
                         "retry_count": row["retry_count"],
                         "model": row.get("model", "") or "",
+                        "job_name": row["name"],
                     },
+                    conflict_policy=ConflictPolicy.replace,
+                    misfire_grace_time=60,  # skip if >60s late (prevents backfill storm on restart)
                 )
                 registered += 1
                 logger.debug("Registered job: %s (%s)", row["name"], row["schedule"])
@@ -306,6 +321,7 @@ class EngineScheduler:
         max_duration: int,
         retry_count: int,
         model: str = "",
+        job_name: str = "",
     ) -> None:
         """
         Execute a single cron job with concurrency control, timeout,
@@ -337,6 +353,7 @@ class EngineScheduler:
                             payload=payload,
                             session_mode=session_mode,
                             model=model,
+                            job_name=job_name,
                         ),
                         timeout=max_duration,
                     ) or {}
@@ -420,6 +437,7 @@ class EngineScheduler:
         payload: str,
         session_mode: str,
         model: str = "",
+        job_name: str = "",
     ) -> dict:
         """
         Dispatch a job by creating a session via aria-api and sending
@@ -442,10 +460,15 @@ class EngineScheduler:
             if _api_key:
                 _headers["X-API-Key"] = _api_key
             # 1. Create a session via aria-api
+            # Build a human-readable title: "⏱ work_cycle · 14:30"
+            from datetime import datetime as _dt
+            _time_label = _dt.now().strftime("%H:%M")
+            _title = f"⏱ {job_name} · {_time_label}" if job_name else None
             session_body: dict = {
                 "agent_id": agent_id,
                 "session_type": "cron",
-                "metadata": {"cron_job_id": job_id},
+                "title": _title,
+                "metadata": {"cron_job_id": job_id, "job_name": job_name},
             }
             if model:
                 session_body["model"] = model
@@ -514,6 +537,7 @@ class EngineScheduler:
             # 3. Close the session
             await http.delete(
                 f"{_API_BASE}/api/engine/chat/sessions/{session_id}",
+                headers=_headers,
             )
 
             return result

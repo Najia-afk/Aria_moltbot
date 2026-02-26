@@ -44,6 +44,7 @@ class CreateSessionRequest(BaseModel):
     agent_id: str = Field(default="aria", description="Agent owning this session")
     model: str | None = Field(default=None, description="LLM model (defaults to config)")
     session_type: str = Field(default="interactive", description="Session type")
+    title: str | None = Field(default=None, max_length=200, description="Session title (auto-generated if omitted)")
     system_prompt: str | None = Field(default=None, description="Override system prompt")
     temperature: float | None = Field(default=None, ge=0.0, le=2.0)
     max_tokens: int | None = Field(default=None, ge=1, le=128000)
@@ -212,6 +213,7 @@ async def create_session(
             agent_id=body.agent_id,
             model=body.model,
             session_type=body.session_type,
+            title=body.title,
             system_prompt=system_prompt,
             temperature=body.temperature,
             max_tokens=body.max_tokens,

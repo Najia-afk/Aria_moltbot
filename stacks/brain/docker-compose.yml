@@ -37,7 +37,7 @@ services:
       TOKEN: ${BROWSERLESS_TOKEN:-}
       BROWSERLESS_INTERNAL_PORT: ${BROWSERLESS_INTERNAL_PORT:-3000}
     ports:
-      - "${BROWSERLESS_PORT:-3000}:3000"
+      - "${BROWSERLESS_PORT:-3000}:${BROWSERLESS_INTERNAL_PORT:-3000}"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:$${BROWSERLESS_INTERNAL_PORT}/ || exit 1"]
       interval: 30s
@@ -57,16 +57,17 @@ services:
     restart: unless-stopped
     command: ["python", "-m", "aria_engine"]
     environment:
-      DATABASE_URL: postgresql+asyncpg://${DB_USER:-admin}:${DB_PASSWORD:-admin}@aria-db:5432/${DB_NAME:-aria_warehouse}
-      LITELLM_BASE_URL: http://litellm:4000/v1
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-admin}:${DB_PASSWORD:-admin}@aria-db:${DB_PORT:-5432}/${DB_NAME:-aria_warehouse}
+      LITELLM_BASE_URL: http://litellm:${LITELLM_INTERNAL_PORT:-4000}/v1
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-change-me}
       ENGINE_DEBUG: ${ENGINE_DEBUG:-false}
       ENGINE_HEALTH_PORT: ${ENGINE_HEALTH_PORT:-8081}
       # Full URL for heartbeat API posts (not the routing prefix API_BASE_URL)
-      ENGINE_API_BASE_URL: http://aria-api:8000
+      ENGINE_API_BASE_URL: http://aria-api:${API_INTERNAL_PORT:-8000}
       # S-103: API key for engine→API authentication
       ARIA_API_KEY: ${ARIA_API_KEY:-}
       PYTHONPATH: /
+      PYTHONUNBUFFERED: "1"
     volumes:
       - ../../aria_memories:/app/aria_memories
       - ../../aria_mind:/aria_mind:ro
@@ -86,7 +87,7 @@ services:
       aria-api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:$${ENGINE_HEALTH_PORT}/health || exit 1"]
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:'+str($${ENGINE_HEALTH_PORT})+'/health')\" || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 5
@@ -113,8 +114,8 @@ services:
     environment:
       TOR_SOCKS_INTERNAL_PORT: ${TOR_SOCKS_INTERNAL_PORT:-9050}
     ports:
-      - "${TOR_SOCKS_PORT:-9050}:9050"
-      - "${TOR_CONTROL_PORT:-9051}:9051"
+      - "${TOR_SOCKS_PORT:-9050}:${TOR_SOCKS_INTERNAL_PORT:-9050}"
+      - "${TOR_CONTROL_PORT:-9051}:${TOR_CONTROL_INTERNAL_PORT:-9051}"
     healthcheck:
       test: ["CMD-SHELL", "curl --socks5 localhost:$${TOR_SOCKS_INTERNAL_PORT} -s https://check.torproject.org/api/ip >/dev/null || exit 1"]
       interval: 60s
@@ -165,19 +166,19 @@ services:
       # S-107: Removed --api.insecure=true — dashboard requires auth via Traefik middleware
       - "--ping=true"
       - "--providers.file.filename=/etc/traefik/dynamic.yaml"
-      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.address=:${TRAEFIK_INTERNAL_HTTP_PORT:-80}"
       - "--entrypoints.web.transport.respondingTimeouts.readTimeout=120s"
       - "--entrypoints.web.transport.respondingTimeouts.writeTimeout=120s"
       - "--entrypoints.web.transport.respondingTimeouts.idleTimeout=300s"
-      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.websecure.address=:${TRAEFIK_INTERNAL_HTTPS_PORT:-443}"
       - "--entrypoints.websecure.transport.respondingTimeouts.readTimeout=120s"
       - "--entrypoints.websecure.transport.respondingTimeouts.writeTimeout=120s"
       - "--entrypoints.websecure.transport.respondingTimeouts.idleTimeout=300s"
       - "--metrics.prometheus=true"
     ports:
-      - "${TRAEFIK_HTTP_PORT:-8080}:80"
-      - "${TRAEFIK_HTTPS_PORT:-8443}:443"
-      - "${TRAEFIK_DASH_PORT:-8081}:8080"
+      - "${TRAEFIK_HTTP_PORT:-8080}:${TRAEFIK_INTERNAL_HTTP_PORT:-80}"
+      - "${TRAEFIK_HTTPS_PORT:-8443}:${TRAEFIK_INTERNAL_HTTPS_PORT:-443}"
+      - "${TRAEFIK_DASH_PORT:-8081}:${TRAEFIK_INTERNAL_DASH_PORT:-8080}"
     volumes:
       - ./traefik-entrypoint.sh:/traefik-entrypoint.sh:ro
       - ./traefik-dynamic.template.yaml:/etc/traefik/dynamic.template.yaml:ro
@@ -209,24 +210,25 @@ services:
     restart: unless-stopped
     environment:
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-change-me}
-      DATABASE_URL: postgresql://${DB_USER:-admin}:${DB_PASSWORD:-admin}@aria-db:5432/${DB_NAME:-aria_warehouse}?options=-csearch_path%3Dlitellm,public
+      DATABASE_URL: postgresql://${DB_USER:-admin}:${DB_PASSWORD:-admin}@aria-db:${DB_PORT:-5432}/${DB_NAME:-aria_warehouse}?options=-csearch_path%3Dlitellm,public
       MOONSHOT_KIMI_KEY: ${MOONSHOT_KIMI_KEY:-}
       OPEN_ROUTER_KEY: ${OPEN_ROUTER_KEY:-}
       OPEN_ROUTER_KEY_DEEP: ${OPEN_ROUTER_KEY_DEEP:-${OPEN_ROUTER_KEY:-}}
       STORE_MODEL_IN_DB: "True"
-      OLLAMA_API_BASE: http://host.docker.internal:11434
+      OLLAMA_API_BASE: ${OLLAMA_API_BASE:-http://host.docker.internal:11434}
+      MLX_API_BASE: ${MLX_API_BASE:-http://host.docker.internal:8080/v1}
       LITELLM_INTERNAL_PORT: ${LITELLM_INTERNAL_PORT:-4000}
     volumes:
       - ./litellm-config.yaml:/app/config.yaml:ro
     ports:
-      - "${LITELLM_PORT:-18793}:4000"
+      - "${LITELLM_PORT:-18793}:${LITELLM_INTERNAL_PORT:-4000}"
     command: ["--config", "/app/config.yaml"]
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:$${LITELLM_INTERNAL_PORT}/health/readiness || exit 1"]
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:'+str($${LITELLM_INTERNAL_PORT})+'/health/readiness')\" || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 5
-      start_period: 300s
+      start_period: 60s
     depends_on:
       aria-db:
         condition: service_healthy
@@ -260,7 +262,7 @@ services:
     environment:
       PROMETHEUS_INTERNAL_PORT: ${PROMETHEUS_INTERNAL_PORT:-9090}
     ports:
-      - "${PROMETHEUS_PORT:-9090}:9090"
+      - "${PROMETHEUS_PORT:-9090}:${PROMETHEUS_INTERNAL_PORT:-9090}"
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:$${PROMETHEUS_INTERNAL_PORT}/-/ready || exit 1"]
       interval: 30s
@@ -288,7 +290,7 @@ services:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
     ports:
-      - "${GRAFANA_PORT:-3001}:3000"
+      - "${GRAFANA_PORT:-3001}:${GRAFANA_INTERNAL_PORT:-3000}"
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:$${GRAFANA_INTERNAL_PORT}/api/health || exit 1"]
       interval: 30s
@@ -311,9 +313,9 @@ services:
     restart: unless-stopped
     environment:
       # Database
-      DATABASE_URL: postgresql://${DB_USER:-admin}:${DB_PASSWORD:-admin}@aria-db:5432/${DB_NAME:-aria_warehouse}
+      DATABASE_URL: postgresql://${DB_USER:-admin}:${DB_PASSWORD:-admin}@aria-db:${DB_PORT:-5432}/${DB_NAME:-aria_warehouse}
       # Local LLM (Ollama - native on host)
-      OLLAMA_URL: http://host.docker.internal:11434
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-hf.co/unsloth/GLM-4.7-Flash-REAP-23B-A3B-GGUF:Q3_K_S}
       # LLM APIs (fallback)
       MOONSHOT_API_KEY: ${MOONSHOT_KIMI_KEY:-}
@@ -333,7 +335,7 @@ services:
       MOLT_CHURCH_URL: ${MOLT_CHURCH_URL:-https://molt.church}
       MOLT_CHURCH_AGENT: ${MOLT_CHURCH_AGENT:-Aria}
       # LiteLLM (internal)
-      LITELLM_URL: http://litellm:4000
+      LITELLM_URL: ${LITELLM_URL:-http://litellm:4000}
       # Aria Email
       ARIA_EMAIL: ${ARIA_EMAIL:-}
       ARIA_EMAIL_PASSWORD: ${ARIA_EMAIL_PASSWORD:-}
@@ -374,7 +376,7 @@ services:
       SCRIPT_NAME: /pgadmin
       PGADMIN_INTERNAL_PORT: ${PGADMIN_INTERNAL_PORT:-80}
     ports:
-      - "${PGADMIN_PORT:-5051}:80"
+      - "${PGADMIN_PORT:-5051}:${PGADMIN_INTERNAL_PORT:-80}"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:$${PGADMIN_INTERNAL_PORT}/misc/ping || exit 1"]
       interval: 30s
@@ -415,9 +417,9 @@ services:
       - ../../src/web/static:/app/static:ro
       - ../../src/web/app.py:/app/app.py:ro
     ports:
-      - "${ARIA_WEB_PORT:-5050}:5000"
+      - "${ARIA_WEB_PORT:-5050}:${WEB_INTERNAL_PORT:-5000}"
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:$${WEB_INTERNAL_PORT}/ || exit 1"]
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:'+str($${WEB_INTERNAL_PORT})+'/')\" || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 5
@@ -446,7 +448,7 @@ services:
       # /aria_skills is bind-mounted; PYTHONPATH=/ makes it importable
       PYTHONPATH: /
       API_INTERNAL_PORT: ${API_INTERNAL_PORT:-8000}
-      DATABASE_URL: postgresql://${DB_USER:-admin}:${DB_PASSWORD:-admin}@aria-db:5432/${DB_NAME:-aria_warehouse}
+      DATABASE_URL: postgresql://${DB_USER:-admin}:${DB_PASSWORD:-admin}@aria-db:${DB_PORT:-5432}/${DB_NAME:-aria_warehouse}
       # S-103: API authentication keys
       ARIA_API_KEY: ${ARIA_API_KEY:-}
       ARIA_ADMIN_KEY: ${ARIA_ADMIN_KEY:-}
@@ -473,7 +475,7 @@ services:
       ARIA_SERVICE_CONTROL_ENABLED: ${ARIA_SERVICE_CONTROL_ENABLED:-false}
       ARIA_ADMIN_TOKEN: ${ARIA_ADMIN_TOKEN:-}
       # S-100: Docker commands route through socket proxy
-      DOCKER_HOST: http://docker-socket-proxy:2375
+      DOCKER_HOST: http://docker-socket-proxy:${DOCKER_SOCKET_PROXY_INTERNAL_PORT:-2375}
       ARIA_SERVICE_CMD_LITELLM_RESTART: ${ARIA_SERVICE_CMD_LITELLM_RESTART:-docker restart litellm}
       ARIA_SERVICE_CMD_LITELLM_STOP: ${ARIA_SERVICE_CMD_LITELLM_STOP:-docker stop litellm}
       ARIA_SERVICE_CMD_OLLAMA_RESTART: ${ARIA_SERVICE_CMD_OLLAMA_RESTART:-}
@@ -518,7 +520,7 @@ services:
       # S-100: Docker socket removed — admin uses docker-socket-proxy
       # See docker-socket-proxy service below
     ports:
-      - "${ARIA_API_PORT:-8000}:8000"
+      - "${ARIA_API_PORT:-8000}:${API_INTERNAL_PORT:-8000}"
     depends_on:
       aria-db:
         condition: service_healthy
@@ -527,7 +529,7 @@ services:
       - backend
       - data
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:$${API_INTERNAL_PORT}/health || exit 1"]
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:'+str($${API_INTERNAL_PORT})+'/health')\" || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -584,8 +586,8 @@ services:
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
     ports:
-      - "${JAEGER_UI_PORT:-16686}:16686"
-      - "${JAEGER_OTLP_GRPC_PORT:-4317}:4317"
+      - "${JAEGER_UI_PORT:-16686}:${JAEGER_UI_INTERNAL_PORT:-16686}"
+      - "${JAEGER_OTLP_GRPC_PORT:-4317}:${JAEGER_OTLP_GRPC_INTERNAL_PORT:-4317}"
     networks:
       - monitoring
     mem_limit: 512m
@@ -602,8 +604,8 @@ services:
     restart: unless-stopped
     profiles: ["sandbox"]
     environment:
-      SANDBOX_PORT: "9999"
-      SANDBOX_TIMEOUT: "60"
+      SANDBOX_PORT: ${SANDBOX_PORT:-9999}
+      SANDBOX_TIMEOUT: ${SANDBOX_TIMEOUT:-60}
     read_only: true
     tmpfs:
       - /tmp:size=100m

@@ -132,6 +132,7 @@ class ChatEngine:
         agent_id: str = "main",
         model: str | None = None,
         session_type: str = "interactive",
+        title: str | None = None,
         system_prompt: str | None = None,
         temperature: float | None = None,
         max_tokens: int | None = None,
@@ -164,6 +165,7 @@ class ChatEngine:
                 id=session_id,
                 agent_id=agent_id,
                 session_type=session_type,
+                title=title,
                 model=model or self.config.default_model,
                 temperature=temperature or self.config.default_temperature,
                 max_tokens=max_tokens or self.config.default_max_tokens,
@@ -650,8 +652,8 @@ class ChatEngine:
                 cleaned.append(m)
         messages = cleaned
 
-        # Append current user message
-        messages.append({"role": "user", "content": current_content})
+        # NOTE: user message is already persisted (flush) before _build_context
+        # is called, so the DB query above includes it — do NOT append again.
 
         return messages
 

@@ -189,7 +189,25 @@ model_list:
     api_base: https://api.moonshot.ai/v1
   model_info:
     max_tokens: 16384
-# ── Ollama Local (disabled — Ollama not running) ──────────────
+# ── MLX Local (Mac Mini — always running) ─────────────────────
+- model_name: qwen3-mlx
+  litellm_params:
+    model: openai/mlx-community/Qwen3-4B-Instruct-2507-4bit
+    api_base: os.environ/MLX_API_BASE
+    api_key: not-needed
+  model_info:
+    max_tokens: 4096
+    input_cost_per_token: 0
+    output_cost_per_token: 0
+# ── Ollama Local (embedding + fallback) ───────────────────────
+- model_name: nomic-embed-text
+  litellm_params:
+    model: ollama/nomic-embed-text
+    api_base: os.environ/OLLAMA_API_BASE
+  model_info:
+    max_tokens: 8192
+    input_cost_per_token: 0
+    output_cost_per_token: 0
 # - model_name: qwen-cpu-fallback
 #   litellm_params:
 #     model: ollama/qwen2.5:3b
@@ -212,14 +230,6 @@ model_list:
 #     api_base: http://host.docker.internal:11434
 #   model_info:
 #     max_tokens: 4096
-#     input_cost_per_token: 0
-#     output_cost_per_token: 0
-# - model_name: nomic-embed-text
-#   litellm_params:
-#     model: ollama/nomic-embed-text
-#     api_base: http://host.docker.internal:11434
-#   model_info:
-#     max_tokens: 8192
 #     input_cost_per_token: 0
 #     output_cost_per_token: 0
 litellm_settings:
