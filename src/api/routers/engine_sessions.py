@@ -39,6 +39,8 @@ class SessionResponse(BaseModel):
     title: str = "Untitled"
     agent_id: str = "unknown"
     session_type: str = "chat"
+    model: str | None = None
+    status: str = "active"
     message_count: int = 0
     created_at: str
     updated_at: str | None = None
@@ -330,6 +332,12 @@ class TitleUpdateRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=500)
 
 
+class SessionUpdateRequest(BaseModel):
+    """Request body for updating session fields (model, title)."""
+    model: str | None = Field(default=None, description="LLM model to use for this session")
+    title: str | None = Field(default=None, min_length=1, max_length=500, description="Session title")
+
+
 async def _get_db_engine():
     """Get or create a cached async engine for direct ORM operations."""
     mgr = await _get_manager()
@@ -370,6 +378,48 @@ async def update_session_title(session_id: str, body: TitleUpdateRequest):
 
     logger.info("Title updated for session %s: %s", session_id, body.title[:60])
     return {"status": "updated", "session_id": session_id, "title": body.title}
+
+
+@router.patch("/{session_id}")
+async def update_session(session_id: str, body: SessionUpdateRequest):
+    """
+    Update session fields (model, title).
+
+    Used by the frontend to persist model selector changes so that the
+    correct LLM is used for subsequent messages in this session.
+    """
+    if body.model is None and body.title is None:
+        raise HTTPException(400, "At least one of 'model' or 'title' must be provided")
+
+    engine = await _get_db_engine()
+
+    try:
+        from db.models import EngineChatSession
+    except ImportError:
+        from .db.models import EngineChatSession
+
+    from sqlalchemy.ext.asyncio import AsyncSession as _AS
+    from sqlalchemy import select as _sel
+
+    async with _AS(engine) as db:
+        async with db.begin():
+            result = await db.execute(
+                _sel(EngineChatSession).where(
+                    EngineChatSession.id == session_id
+                )
+            )
+            session = result.scalar_one_or_none()
+            if not session:
+                raise HTTPException(404, f"Session {session_id} not found")
+
+            if body.model is not None:
+                session.model = body.model
+            if body.title is not None:
+                session.title = body.title
+            session.updated_at = datetime.now(timezone.utc)
+
+    logger.info("Session %s updated: model=%s title=%s", session_id, body.model, body.title)
+    return {"status": "updated", "session_id": session_id}
 
 
 @router.post("/{session_id}/archive")
