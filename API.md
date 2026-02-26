@@ -8,7 +8,7 @@ The API is the **sole database gateway** — all skills and agents access data t
 
 ### REST Routers
 
-All routers live in `src/api/routers/` — 31 router files containing 222 REST endpoints, 2 WebSocket endpoints, and 1 GraphQL schema.
+All routers live in `src/api/routers/` — 32 router files containing 235 REST endpoints, 2 WebSocket endpoints, and 1 GraphQL schema.
 
 **→ [`src/api/routers/`](src/api/routers/)**
 
@@ -33,7 +33,7 @@ Key endpoints:
 | `/artifacts` | File artifact CRUD in aria_memories/ |
 | `/rpg/campaigns` | RPG campaign dashboard, sessions, knowledge graph |
 
-**Totals:** 31 router files, 222 REST endpoints, 2 WebSocket endpoints, 1 GraphQL endpoint.
+**Totals:** 32 router files, 235 REST endpoints, 2 WebSocket endpoints, 1 GraphQL endpoint.
 
 Full interactive docs are served at `/api/docs` (Swagger) when the stack is running.
 
@@ -56,7 +56,7 @@ Source: `src/api/security_middleware.py`
 
 SQLAlchemy 2.0 async models and session management:
 
-- Models: `src/api/db/models.py` — 37 ORM models across two schemas (`aria_data`, `aria_engine`)
+- Models: `src/api/db/models.py` — 39 ORM models across two schemas (`aria_data`, `aria_engine`)
 - Session: `src/api/db/session.py` — auto-creates both schemas on startup
 - Documentation: `src/api/db/MODELS.md`
 - Migrations: `src/api/alembic/`
@@ -97,5 +97,5 @@ Browse `src/web/templates/*.html` for the full list.
 ## Related
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — System design and data flow
-- [AUDIT_REPORT.md](AUDIT_REPORT.md) — Per-page web audit with API call analysis
+- [AUDIT_REPORT.md](docs/archive/AUDIT_REPORT.md) — Per-page web audit with API call analysis
 - [DEPLOYMENT.md](DEPLOYMENT.md) — Service URLs and how to access

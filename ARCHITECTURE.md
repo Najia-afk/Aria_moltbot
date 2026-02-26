@@ -123,12 +123,13 @@ All data access follows a strict layered pattern. Lower layers never import from
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│  L4 — Orchestration: goals, schedule, agent_manager, performance       │
+│  L4 — Orchestration: schedule, hourly_goals, performance, pipeline_skill│
 ├─────────────────────────────────────────────────────────────────────────┤
-│  L3 — Domain Skills: research, moltbook, social, market_data, rpg, …   │
+│  L3 — Domain Skills: research, moltbook, social, market_data, rpg,    │
+│         goals, agent_manager, working_memory, sandbox, …               │
 ├─────────────────────────────────────────────────────────────────────────┤
 │  L2 — Core Services: moonshot, ollama, model_switcher, session_manager,│
-│         working_memory, sandbox                                        │
+│         litellm, health                                                │
 ├─────────────────────────────────────────────────────────────────────────┤
 │  L1 — Infrastructure: api_client, health, litellm, database            │
 ├─────────────────────────────────────────────────────────────────────────┤
@@ -158,9 +159,9 @@ All data access follows a strict layered pattern. Lower layers never import from
 
 **Data flows one direction:** Skills → api_client → FastAPI → SQLAlchemy ORM → PostgreSQL
 
-No raw SQL. No direct database access from skills. Enforced by `scripts/check_architecture.py`.
+No raw SQL in skills. No direct database access from skills. Enforced by `scripts/check_architecture.py`.
 
-Architecture layer enforcement is checked by `scripts/check_architecture.py`.
+> Note: API routers use `text()` for health checks and specific operations (e.g. `NOW()`, `SELECT 1`).
 
 ---
 
@@ -245,10 +246,10 @@ Focuses are defined in `aria_mind/soul/focus.py`. Agent roles and delegation pat
 | Database | Schema | Purpose |
 |----------|--------|---------|
 | `aria_warehouse` | `aria_data` | Knowledge, memories, goals, activities, social, logs, performance — all domain data (26 tables) |
-| `aria_warehouse` | `aria_engine` | Chat sessions, messages, cron jobs, agent state, config, LLM models — engine infrastructure (11 tables) |
+| `aria_warehouse` | `aria_engine` | Chat sessions, messages, cron jobs, agent state, config, LLM models, agent tools — engine infrastructure (13 tables) |
 | `litellm` | `public` | LiteLLM Prisma tables (isolated to prevent migration conflicts) |
 
-All 37 ORM models have explicit schema annotations in `src/api/db/models.py`. No tables in `public` schema. Zero raw SQL — all database access through SQLAlchemy ORM.
+All 39 ORM models have explicit schema annotations in `src/api/db/models.py`. No tables in `public` schema.
 
 Implementation details: `aria_mind/memory.py`, `aria_skills/working_memory/`, `aria_skills/knowledge_graph/`
 

@@ -80,7 +80,7 @@ Aria_moltbot/
 │   ├── aria_memories/            # Memory mount
 │   └── articles/                 # Article content
 │
-├── aria_skills/                  # Skill modules (40 skills)
+├── aria_skills/                  # Skill modules (41 skills)
 │   ├── __init__.py               # Package exports
 │   ├── base.py                   # BaseSkill, SkillConfig, SkillResult
 │   ├── catalog.py                # Skill catalog generator (--list-skills CLI)
@@ -249,7 +249,7 @@ Aria_moltbot/
 │   │   │   └── versions/
 │   │   ├── db/                   # SQLAlchemy 2.0 ORM layer
 │   │   │   ├── __init__.py
-│   │   │   ├── models.py         # 37 ORM models (aria_data + aria_engine schemas)
+│   │   │   ├── models.py         # 39 ORM models (aria_data + aria_engine schemas)
 │   │   │   ├── session.py        # Async engine + sessionmaker + schema bootstrap
 │   │   │   └── MODELS.md         # Model documentation
 │   │   ├── gql/                  # Strawberry GraphQL
@@ -257,13 +257,13 @@ Aria_moltbot/
 │   │   │   ├── schema.py         # GraphQL schema
 │   │   │   ├── types.py          # GraphQL type definitions
 │   │   │   └── resolvers.py      # Query resolvers
-│   │   └── routers/              # 31 REST router files
-│   │       ├── activities.py     # Activity log CRUD + stats (5 endpoints)
+│   │   └── routers/              # 32 REST router files
+│   │       ├── activities.py     # Activity log CRUD + stats (7 endpoints)
 │   │       ├── admin.py          # Admin operations (12 endpoints)
 │   │       ├── agents_crud.py    # Agent CRUD lifecycle (10 endpoints)
-│   │       ├── analysis.py       # Sentiment, patterns, compression (17 endpoints)
+│   │       ├── analysis.py       # Pattern analysis + compression (6 endpoints)
 │   │       ├── artifacts.py      # File artifact CRUD in aria_memories (4 endpoints)
-│   │       ├── engine_agents.py  # Engine agent proxy (2 endpoints)
+│   │       ├── engine_agents.py  # Engine agent proxy (3 endpoints)
 │   │       ├── engine_agent_metrics.py # Agent performance metrics (3 endpoints)
 │   │       ├── engine_chat.py    # Engine chat proxy + WS (7+1 endpoints)
 │   │       ├── engine_cron.py    # Cron/scheduler proxy (8 endpoints)
@@ -272,37 +272,37 @@ Aria_moltbot/
 │   │       ├── goals.py          # Goal tracking + progress (13 endpoints)
 │   │       ├── health.py         # Liveness, readiness, service status (6 endpoints)
 │   │       ├── knowledge.py      # Knowledge graph entities (14 endpoints)
-│   │       ├── lessons.py        # Lessons learned (4 endpoints)
+│   │       ├── lessons.py        # Lessons learned (6 endpoints)
 │   │       ├── litellm.py        # LiteLLM proxy stats + spend (4 endpoints)
-│   │       ├── memories.py       # Long-term memory storage (9 endpoints)
+│   │       ├── memories.py       # Long-term memory storage (11 endpoints)
 │   │       ├── models_config.py  # Dynamic model config from models.yaml (4 endpoints)
 │   │       ├── models_crud.py    # Model DB CRUD lifecycle (6 endpoints)
-│   │       ├── model_usage.py    # LLM usage metrics + cost tracking (3 endpoints)
+│   │       ├── model_usage.py    # LLM usage metrics + cost tracking (4 endpoints)
 │   │       ├── operations.py     # Operational metrics (19 endpoints)
-│   │       ├── proposals.py      # Feature proposals (4 endpoints)
+│   │       ├── proposals.py      # Feature proposals (5 endpoints)
 │   │       ├── providers.py      # Model provider management (1 endpoint)
 │   │       ├── records.py        # General record management (3 endpoints)
 │   │       ├── rpg.py            # RPG campaign dashboard (4 endpoints)
-│   │       ├── security.py       # Security audit log + threats (3 endpoints)
+│   │       ├── security.py       # Security audit log + threats (4 endpoints)
+│   │       ├── sentiment.py      # Sentiment analysis + NLP (11 endpoints)
 │   │       ├── sessions.py       # Session management + analytics (6 endpoints)
 │   │       ├── skills.py         # Skill registry endpoints (11 endpoints)
-│   │       ├── social.py         # Social posts + community (5 endpoints)
-│   │       ├── thoughts.py       # Thought stream + analysis (2 endpoints)
+│   │       ├── social.py         # Social posts + community (7 endpoints)
+│   │       ├── thoughts.py       # Thought stream + analysis (4 endpoints)
 │   │       └── working_memory.py # Working memory API (10 endpoints)
 │   ├── database/                 # Database utilities
 │   │   └── models.py
-│   └── web/                      # Flask dashboard (44 pages)
+│   └── web/                      # Flask dashboard (43 pages)
 │       ├── app.py                # Flask app + routes
 │       ├── static/               # CSS, JS, favicon
 │       │   ├── css/              # Component styles (base, layout, variables)
 │       │   ├── js/
 │       │   │   └── pricing.js    # Shared pricing helpers
 │       │   └── favicon.svg
-│       └── templates/            # 44 Jinja2 templates + Chart.js
+│       └── templates/            # 43 Jinja2 templates + Chart.js
 │           ├── base.html
 │           ├── index.html
 │           ├── activities.html
-│           ├── activity_visualization.html
 │           ├── agent_manager.html
 │           ├── api_key_rotations.html
 │           ├── creative_pulse.html
@@ -315,9 +315,11 @@ Aria_moltbot/
 │           ├── engine_operations.html
 │           ├── engine_prompt_editor.html
 │           ├── engine_roundtable.html
+│           ├── engine_swarm_recap.html
 │           ├── heartbeat.html
 │           ├── knowledge.html
 │           ├── memories.html
+│           ├── memory_explorer.html
 │           ├── models.html
 │           ├── models_manager.html
 │           ├── model_usage.html
@@ -325,7 +327,6 @@ Aria_moltbot/
 │           ├── patterns.html
 │           ├── performance.html
 │           ├── proposals.html
-│           ├── rate_limits.html
 │           ├── records.html
 │           ├── rpg.html
 │           ├── search.html
@@ -341,7 +342,6 @@ Aria_moltbot/
 │           ├── soul.html
 │           ├── sprint_board.html
 │           ├── thoughts.html
-│           ├── wallets.html
 │           └── working_memory.html
 │
 ├── scripts/                      # Utility scripts
@@ -399,7 +399,7 @@ Aria_moltbot/
 ├── tasks/                        # Task documentation
 │   └── lessons.md
 │
-└── tests/                        # Pytest test suite (38 test files, 427 test functions)
+└── tests/                        # Pytest test suite (79 test files, 948 test functions)
     ├── __init__.py
     ├── conftest.py               # Fixtures, DB health gate, API client
     ├── test_activities.py        # Activity CRUD tests
@@ -408,11 +408,14 @@ Aria_moltbot/
     ├── test_agents_crud.py       # Agent CRUD lifecycle tests
     ├── test_analysis.py          # Analysis endpoint tests
     ├── test_architecture.py      # Architecture validation tests
+    ├── test_artifacts_router.py  # Artifact router tests
     ├── test_cross_entity.py      # Cross-entity integration tests
+    ├── test_docker_health.py     # Docker health check tests
     ├── test_engine_agents.py     # Engine agent proxy tests
     ├── test_engine_chat.py       # Engine chat + messages tests
     ├── test_engine_cron.py       # Engine cron/scheduler tests
     ├── test_engine_internals.py  # Engine pure-function unit tests
+    ├── test_engine_roundtable_router.py # Roundtable router tests
     ├── test_engine_sessions.py   # Engine session proxy tests
     ├── test_goals.py             # Goal tracking tests
     ├── test_graphql.py           # GraphQL schema tests
@@ -429,6 +432,7 @@ Aria_moltbot/
     ├── test_proposals.py         # Proposal endpoint tests
     ├── test_providers.py         # Provider endpoint tests
     ├── test_records.py           # Record endpoint tests
+    ├── test_rpg_router.py        # RPG router tests
     ├── test_security.py          # Security tests
     ├── test_security_middleware.py # Security middleware tests
     ├── test_sessions.py          # Session management tests
@@ -440,7 +444,11 @@ Aria_moltbot/
     ├── test_websocket.py         # WebSocket tests
     ├── test_web_routes.py        # Flask web route tests
     ├── test_working_memory.py    # Working memory tests
+    ├── test_workflows.py         # Workflow end-to-end tests
+    ├── e2e/                      # End-to-end test suite
     ├── integration/              # Integration test suite
+    ├── load/                     # Load/performance tests
+    ├── skills/                   # Skill-specific tests (36 files)
     └── unit/                     # Unit test suite
 ```
 
@@ -483,7 +491,7 @@ init-scripts/
 └── 02-migrations.sql           # Schema migrations
 ```
 
-> **Schema layout:** One database `aria_warehouse` with two schemas — `aria_data` (26 domain tables) and `aria_engine` (11 infrastructure tables). LiteLLM uses a separate `litellm` database with its own Prisma-managed schema. All 37 ORM models have explicit `__table_args__ = {"schema": ...}` annotations.
+> **Schema layout:** One database `aria_warehouse` with two schemas — `aria_data` (26 domain tables) and `aria_engine` (13 infrastructure tables). LiteLLM uses a separate `litellm` database with its own Prisma-managed schema. All 39 ORM models have explicit `__table_args__ = {"schema": ...}` annotations.
 
 ---
 
@@ -611,15 +619,15 @@ docker compose up -d
 
 | Category | Count |
 |----------|-------|
-| Skill modules | 40 |
+| Skill modules | 41 |
 | Engine modules | 25 |
-| REST router files | 31 |
-| REST endpoints | 222 |
+| REST router files | 32 |
+| REST endpoints | 235 |
 | WebSocket endpoints | 2 |
 | GraphQL endpoint | 1 |
-| Dashboard pages | 44 |
-| Test files | 38 |
-| Test functions | 414 |
+| Dashboard pages | 43 |
+| Test files | 79 |
+| Test functions | 948 |
 
 ---
 

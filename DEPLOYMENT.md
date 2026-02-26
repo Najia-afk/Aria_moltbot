@@ -75,8 +75,8 @@ See [ROLLBACK.md](ROLLBACK.md) for detailed rollback procedures.
 ```bash
 git clone https://github.com/Najia-afk/Aria_moltbot.git
 cd Aria_moltbot
-cp stacks/brain/.env.example .env
-nano .env  # Edit with your values
+cp stacks/brain/.env.example stacks/brain/.env
+nano stacks/brain/.env  # Edit with your values
 ```
 
 ### 6. Start MLX Server (Metal GPU)
@@ -137,12 +137,55 @@ FREE models available:
 
 ## Environment Configuration (.env)
 
+> **Canonical reference**: `stacks/brain/.env.example` (~65 variables, fully commented).
+> The stack runs with defaults baked into `docker-compose.yml`. Override only what you need.
+
+### Required Variables (must set before first deploy)
+
+| Variable | Purpose | Example |
+|----------|---------|---------|
+| `DB_PASSWORD` | PostgreSQL password | `your_secure_password` |
+| `LITELLM_MASTER_KEY` | LiteLLM admin key | `sk-litellm-...` |
+| `WEB_SECRET_KEY` | Flask session secret | `openssl rand -hex 32` |
+| `GRAFANA_PASSWORD` | Grafana admin password | `your_grafana_password` |
+| `PGADMIN_PASSWORD` | pgAdmin login password | `your_pgadmin_password` |
+| `ARIA_API_KEY` | API authentication key | `python -c "import secrets; print(secrets.token_urlsafe(32))"` |
+
+### Optional Variables by Category
+
+| Category | Key Variables | Count |
+|----------|--------------|-------|
+| **Database** | `DB_USER`, `DB_NAME` | 3 |
+| **CORS** | `CORS_ALLOWED_ORIGINS` | 1 |
+| **API Routing** | `SERVICE_HOST`, `API_BASE_URL` | 2 |
+| **Service URLs** | `ARIA_API_URL`, `ARIA_WEB_URL`, `LITELLM_URL`, `MLX_URL`, `MLX_ENABLED` | 5 |
+| **Web** | `API_INTERNAL_URL` | 1 |
+| **API Keys** | `OPEN_ROUTER_KEY`, `OPEN_ROUTER_KEY_DEEP`, `MOONSHOT_KIMI_KEY` | 3 |
+| **Moltbook** | `MOLTBOOK_API_URL`, `MOLTBOOK_API_KEY`, `MOLTBOOK_TOKEN` | 3 |
+| **Molt Church** | `MOLT_CHURCH_API_KEY`, `MOLT_CHURCH_URL`, `MOLT_CHURCH_AGENT` | 3 |
+| **Monitoring** | `PGADMIN_EMAIL` | 1 |
+| **Tracing** | `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME` | 2 |
+| **Browserless** | `BROWSERLESS_TOKEN` | 1 |
+| **Traefik** | `TRAEFIK_DASHBOARD_USER`, `TRAEFIK_DASHBOARD_PASSWORD_HASH` | 2 |
+| **Ports** | 16 port vars (`API_PORT`, `ARIA_WEB_PORT`, `LITELLM_PORT`, etc.) | 16 |
+| **Network** | `MAC_LAN_IP`, `MAC_TAILSCALE_IP`, `NUC_HOST`, `NUC_USER`, `NUC_PASSWORD` | 5 |
+| **Social** | Telegram (`BOT_TOKEN`, `CHAT_ID`), X/Twitter (7 vars) | 10 |
+| **Tor** | `TOR_PROXY` | 1 |
+| **Ollama** | `OLLAMA_URL`, `OLLAMA_MODEL` | 2 |
+| **Email** | `ARIA_EMAIL`, SMTP config (6 vars) | 6 |
+| **Engine** | `ENGINE_DEBUG`, `ENGINE_MEM_LIMIT`, `ENGINE_CPU_LIMIT` | 3 |
+| **Logging** | `LOG_FORMAT`, `LOG_LEVEL`, `API_WORKERS` | 3 |
+| **Resources** | Per-service `*_MEM_LIMIT` / `*_CPU_LIMIT` (8 services) | 16 |
+| **Auth** | `ARIA_ADMIN_KEY`, `ARIA_ADMIN_TOKEN` | 2 |
+| **Service Control** | `ARIA_SERVICE_CONTROL_ENABLED`, restart/stop commands | 15 |
+| **Sentiment** | `SENTIMENT_METHOD`, `SENTIMENT_MODEL` | 2 |
+
+<details>
+<summary>Quick-start example (.env minimal)</summary>
+
 ```env
-# Database (creates TWO databases: aria_warehouse + litellm)
-# Defaults match docker-compose.yml: admin / admin / aria_warehouse
-DB_USER=admin
+# Database
 DB_PASSWORD=your_secure_password
-DB_NAME=aria_warehouse
 
 # LiteLLM
 LITELLM_MASTER_KEY=your_litellm_master_key
@@ -151,20 +194,21 @@ LITELLM_MASTER_KEY=your_litellm_master_key
 OPEN_ROUTER_KEY=sk-or-v1-...
 MOONSHOT_KIMI_KEY=your_kimi_key
 
-# Aria Engine Gateway
-ARIA_ENGINE_TOKEN=your_secure_gateway_token
+# Web
+WEB_SECRET_KEY=your_flask_secret
 
-# Moltbook Integration
-MOLTBOOK_API_URL=https://www.moltbook.com/api/v1
-MOLTBOOK_TOKEN=moltbook_sk_...
+# Monitoring
+GRAFANA_PASSWORD=your_grafana_password
+PGADMIN_PASSWORD=your_pgadmin_password
 
-# Host
-SERVICE_HOST=<MAC_HOST>
+# API Auth
+ARIA_API_KEY=your_api_key
 
-# Skill Environment
-DATABASE_URL=postgresql://aria_admin:password@aria-db:5432/aria_warehouse
-PYTHONPATH=/app:/app/skills
+# Host (your LAN IP)
+SERVICE_HOST=192.168.1.x
 ```
+
+</details>
 
 ---
 
@@ -174,8 +218,10 @@ PYTHONPATH=/app:/app/skills
 
 | Database | Purpose | Tables |
 |----------|---------|--------|
-| `aria_warehouse` | Aria's operational data | activity_log, memories, thoughts, goals, social_posts, heartbeat_log, knowledge_entities, knowledge_relations |
+| `aria_warehouse` | Aria's operational data | **26 tables** in `aria_data` schema (memories, goals, activities, knowledge, social, etc.) + **13 tables** in `aria_engine` schema (chat sessions, messages, cron, agent state, config, LLM models) |
 | `litellm` | LiteLLM internals | LiteLLM_* tables (Prisma-managed) |
+
+> 39 ORM models total. See `src/api/db/models.py` for complete schema definitions.
 
 > LiteLLM's Prisma migrations can drop unrecognized tables. Separate databases prevent data loss.
 
@@ -214,23 +260,24 @@ SELECT COUNT(*) FROM activity_log;
 | **tor-proxy** | dperson/torproxy:latest | 9050, 9051 | default | Privacy proxy |
 | **certs-init** | alpine:3.20 | — | default | TLS certificate generation (oneshot) |
 | **traefik** | traefik:v3.1 | 8080, 8443, 8081 | default | HTTPS reverse proxy + dashboard |
-| **litellm** | ghcr.io/berriai/litellm:main-v1.61.4 | 18793 | default | LLM model router |
+| **litellm** | ghcr.io/berriai/litellm:main-v1.81.12-stable | 18793 | default | LLM model router |
 | **aria-brain** | Custom (Python) | — | default | Agent runtime |
 | **aria-web** | Custom (Flask) | 5050 | default | Dashboard UI |
 | **aria-api** | Custom (FastAPI) | 8000 | default | REST API backend |
 | **docker-socket-proxy** | tecnativa/docker-socket-proxy:0.2 | — (internal) | default | Restricted Docker API proxy |
 | **prometheus** | prom/prometheus:v2.51.0 | 9090 | monitoring | Metrics collection |
 | **grafana** | grafana/grafana:11.4.0 | 3001 | monitoring | Monitoring dashboards |
-| **pgadmin** | dpage/pgadmin4:8.14 | 5050 | monitoring | Database admin UI |
+| **pgadmin** | dpage/pgadmin4:8.14 | 5051 | monitoring | Database admin UI |
 | **aria-sandbox** | Custom (Python) | — (internal) | sandbox | Isolated code execution (S-29) |
+| **jaeger** | jaegertracing/all-in-one:1.62 | 16686, 4317 | tracing | Distributed tracing |
 
-> **15 services total**: 11 default + 3 monitoring profile + 1 sandbox profile.
+> **16 services total**: 11 default + 3 monitoring profile + 1 sandbox profile + 1 tracing profile.
 > Traefik ports use env vars: `TRAEFIK_HTTP_PORT` (default 8080), `TRAEFIK_HTTPS_PORT` (default 8443), `TRAEFIK_DASH_PORT` (default 8081).
 > aria-web port uses `ARIA_WEB_PORT` (default 5050; macOS reserves 5000).
 
-**Volumes:** `aria_pg_data` · `prometheus_data` · `grafana_data` · `aria_data` · `aria_logs` · `aria_engine_data`
+**Volumes:** `aria_pg_data` · `prometheus_data` · `grafana_data` · `aria_data` · `aria_logs`
 
-**Network:** `aria-net` (bridge)
+**Networks:** `frontend` · `backend` · `data` · `monitoring` · `sandbox-net` (all bridge)
 
 ### Dependency Chain
 
@@ -515,14 +562,19 @@ Mac Mini (192.168.1.53)
 │   ├── aria_memories/ (persistent data)
 │   └── backups/ (deploy backups)
 └── Ports:
-    ├── 5050 — Flask dashboard (ARIA_WEB_PORT)
-    ├── 8080 — Traefik HTTP (TRAEFIK_HTTP_PORT)
-    ├── 8443 — Traefik HTTPS (TRAEFIK_HTTPS_PORT)
-    ├── 8081 — Traefik dashboard (TRAEFIK_DASH_PORT)
-    ├── 8000 — aria-api (FastAPI)
+    ├── 5050  — Flask dashboard (ARIA_WEB_PORT)
+    ├── 8080  — Traefik HTTP (TRAEFIK_HTTP_PORT)
+    ├── 8443  — Traefik HTTPS (TRAEFIK_HTTPS_PORT)
+    ├── 8081  — Traefik dashboard (TRAEFIK_DASH_PORT)
+    ├── 8000  — aria-api (FastAPI)
     ├── 18793 — LiteLLM
-    ├── 3000 — aria-browser
-    └── 9050 — tor-proxy
+    ├── 3000  — aria-browser
+    ├── 9050  — tor-proxy (SOCKS)
+    ├── 9090  — Prometheus [monitoring]
+    ├── 3001  — Grafana [monitoring]
+    ├── 5051  — pgAdmin [monitoring]
+    ├── 16686 — Jaeger UI [tracing]
+    └── 4317  — Jaeger OTLP gRPC [tracing]
 ```
 
 ---

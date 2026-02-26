@@ -16,9 +16,9 @@ Skills are organized in a strict layer hierarchy. Lower layers never import from
 |-------|---------|----------|
 | **0 — Kernel** | Read-only identity & security | `input_guard` |
 | **1 — API Client** | Sole database gateway | `api_client` |
-| **2 — Core** | Essential runtime services | `llm`, `litellm`, `health`, `session_manager`, `working_memory` |
-| **3 — Domain** | Feature-specific skills | `research`, `moltbook`, `social`, `market_data`, `security_scan` |
-| **4 — Orchestration** | Planning & scheduling | `goals`, `schedule`, `performance`, `agent_manager`, `pipeline_skill` |
+| **2 — Core** | Essential runtime services | `health`, `litellm`, `model_switcher`, `moonshot`, `ollama`, `session_manager` |
+| **3 — Domain** | Feature-specific skills | `research`, `moltbook`, `social`, `market_data`, `goals`, `agent_manager`, `working_memory`, `sandbox` |
+| **4 — Orchestration** | Planning & scheduling | `schedule`, `hourly_goals`, `performance`, `pipeline_skill` |
 
 The architecture rule is enforced by `scripts/check_architecture.py` — run it before every PR merge.
 
