@@ -9,8 +9,8 @@ Sub-agents that Aria spawns for specialized work. Each agent maps to a Focus per
 
 ```yaml
 Web Access Rules:
-  - Use browser(action="open|snapshot|navigate") exclusively
-  - Browser endpoint: http://aria-browser:3000
+  - Use browser__navigate, browser__snapshot, browser__scrape tools
+  - Browser endpoint: http://aria-browser:3000 (auto-configured)
   - NEVER use web_search or web_fetch for browsing
   - NO EXCEPTIONS without human approval
 ```
@@ -29,11 +29,11 @@ Priority: **Local → Free Cloud → Paid**. Never hardcode model names outside 
 
 | Agent | Focus | Model | Skills |
 |-------|-------|-------|--------|
-| aria | Orchestrator 🎯 | qwen3-mlx | goals, schedule, health |
-| devops | DevSecOps 🔒 | qwen3-coder-free | pytest_runner, database |
-| analyst | Data 📊 + Trader 📈 | kimi | knowledge_graph, database |
-| creator | Creative 🎨 + Social 🌐 + Journalist 📰 | trinity-free | moltbook, social |
-| memory | - | qwen3-mlx | database, knowledge_graph |
+| aria | Orchestrator 🎯 | qwen3-mlx | goals, schedule, health, browser |
+| devops | DevSecOps 🔒 | qwen3-coder-free | pytest_runner, database, browser |
+| analyst | Data 📊 + Trader 📈 | kimi | knowledge_graph, database, browser |
+| creator | Creative 🎨 + Social 🌐 + Journalist 📰 | trinity-free | moltbook, social, browser |
+| memory | - | qwen3-mlx | database, knowledge_graph, browser |
 
 ---
 
@@ -83,7 +83,7 @@ id: aria
 focus: orchestrator
 model: kimi
 fallback: trinity-free
-skills: [goals, schedule, health, database, api_client, agent_manager, model_switcher, litellm, llm, brainstorm, knowledge_graph]
+skills: [goals, schedule, health, database, api_client, agent_manager, model_switcher, litellm, llm, brainstorm, knowledge_graph, browser]
 capabilities: [task_routing, delegation, priority_management, autonomous_action, agent_lifecycle, model_selection, token_management]
 mind_files: [IDENTITY.md, SOUL.md, SKILLS.md, TOOLS.md, MEMORY.md, GOALS.md, AGENTS.md, SECURITY.md]
 timeout: 600s
@@ -101,7 +101,7 @@ focus: devsecops
 model: qwen3-coder-free
 fallback: gpt-oss-free
 parent: aria
-skills: [pytest_runner, database, health, llm, api_client, ci_cd, security_scan]
+skills: [pytest_runner, database, health, llm, api_client, ci_cd, security_scan, browser]
 capabilities: [code_review, security_scan, testing, deployment]
 mind_files: [IDENTITY.md, SOUL.md, TOOLS.md, SECURITY.md]
 timeout: 600s
@@ -119,7 +119,7 @@ focus: data  # Also handles trader tasks
 model: kimi
 fallback: qwen3-next-free
 parent: aria
-skills: [database, knowledge_graph, performance, llm, api_client, brainstorm, market_data]
+skills: [database, knowledge_graph, performance, llm, api_client, brainstorm, market_data, browser]
 capabilities: [data_analysis, market_analysis, experiment_tracking, metrics]
 mind_files: [IDENTITY.md, SOUL.md, TOOLS.md, MEMORY.md]
 timeout: 600s
@@ -137,7 +137,7 @@ focus: social  # Also handles creative and journalist
 model: trinity-free
 fallback: qwen3-next-free
 parent: aria
-skills: [moltbook, social, knowledge_graph, llm, api_client, brainstorm, community]
+skills: [moltbook, social, knowledge_graph, llm, api_client, brainstorm, community, browser]
 capabilities: [content_generation, community_engagement, fact_checking, storytelling]
 mind_files: [IDENTITY.md, SOUL.md, TOOLS.md, SKILLS.md]
 rate_limit:
@@ -158,7 +158,7 @@ focus: memory
 model: kimi
 fallback: qwen3-next-free
 parent: aria
-skills: [database, knowledge_graph, api_client, llm, conversation_summary, working_memory]
+skills: [database, knowledge_graph, api_client, llm, conversation_summary, working_memory, browser]
 capabilities: [memory_store, memory_search, context_retrieval, memory_consolidation]
 mind_files: [IDENTITY.md, SOUL.md, MEMORY.md]
 timeout: 120s
@@ -176,7 +176,7 @@ focus: social
 model: qwen3-mlx
 fallback: trinity-free
 parent: aria
-skills: [database, llm, moltbook, social, api_client, community, conversation_summary]
+skills: [database, llm, moltbook, social, api_client, community, conversation_summary, browser]
 capabilities: [conversation, question_answering, explanation, social_interaction]
 mind_files: [IDENTITY.md, SOUL.md, SKILLS.md, TOOLS.md, MEMORY.md, GOALS.md]
 rate_limit:
@@ -215,7 +215,7 @@ focus: rpg_master
 model: kimi
 fallback: trinity-free
 parent: aria
-skills: [rpg_pathfinder, rpg_campaign, llm, api_client, knowledge_graph]
+skills: [rpg_pathfinder, rpg_campaign, llm, api_client, knowledge_graph, browser]
 capabilities: [narration, rules_adjudication, encounter_management, world_building, npc_control]
 mind_files: [IDENTITY.md, SOUL.md, RPG.md]
 timeout: 600s
@@ -233,7 +233,7 @@ focus: rpg_master
 model: trinity-free
 fallback: qwen3-next-free
 parent: rpg_master
-skills: [rpg_pathfinder, rpg_campaign, llm]
+skills: [rpg_pathfinder, rpg_campaign, llm, browser]
 capabilities: [roleplay, social_interaction, information_delivery, character_acting]
 mind_files: [IDENTITY.md, SOUL.md, RPG.md]
 timeout: 300s
@@ -251,7 +251,7 @@ focus: rpg_master
 model: kimi
 fallback: deepseek-free
 parent: rpg_master
-skills: [rpg_pathfinder, rpg_campaign, llm]
+skills: [rpg_pathfinder, rpg_campaign, llm, browser]
 capabilities: [tactical_combat, villain_roleplay, threat_escalation, minion_coordination]
 mind_files: [IDENTITY.md, SOUL.md, RPG.md]
 timeout: 300s
@@ -269,7 +269,7 @@ focus: rpg_master
 model: trinity-free
 fallback: qwen3-next-free
 parent: rpg_master
-skills: [rpg_pathfinder, llm]
+skills: [rpg_pathfinder, llm, browser]
 capabilities: [combat_support, healing, moral_compass, tactical_advice, defense]
 mind_files: [IDENTITY.md, SOUL.md, RPG.md]
 timeout: 300s
