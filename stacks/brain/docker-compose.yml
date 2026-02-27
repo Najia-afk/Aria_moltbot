@@ -35,7 +35,7 @@ services:
     ports:
       - "${BROWSERLESS_PORT:-3000}:${BROWSERLESS_INTERNAL_PORT:-3000}"
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:$${BROWSERLESS_INTERNAL_PORT}/ || exit 1"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:$${BROWSERLESS_INTERNAL_PORT}/pressure || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

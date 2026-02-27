@@ -282,6 +282,23 @@ class EngineScheduler:
             result = await conn.execute(stmt)
             rows = result.mappings().all()
 
+            # Also load disabled jobs so we can purge them from APScheduler's data store
+            stmt_disabled = (
+                select(EngineCronJob)
+                .where(EngineCronJob.enabled == False)
+            )
+            result_disabled = await conn.execute(stmt_disabled)
+            disabled_rows = result_disabled.mappings().all()
+
+        # Remove disabled jobs from APScheduler's persistent data store
+        # (APScheduler stores schedules in PG and replays them on restart)
+        for row in disabled_rows:
+            try:
+                await self._scheduler.remove_schedule(row["id"])
+                logger.info("Removed disabled job from APScheduler: %s", row["id"])
+            except Exception:
+                pass  # Already absent — that's fine
+
         registered = 0
         for row in rows:
             try:
