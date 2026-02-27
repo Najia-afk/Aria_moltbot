@@ -3,7 +3,7 @@
 
 **Sprint Goal:** Security hardening, clean install reliability, API quality, engine resilience, observability, accessibility, UI consolidation, model pruning, agent delegation, full test coverage.
 
-**Total Tickets:** 30 | **Total Points:** 113 | **Estimated:** ~90 hours
+**Total Tickets:** 38 | **Total Points:** 157 | **Estimated:** ~125 hours
 
 **Audit Sources:**
 - Production Mac Mini audit (2026-02-26) — SSH + Docker + DB + Schema
@@ -34,6 +34,7 @@
 | **E15** | **Fresh Install** | **S-28** | **3** |
 | **E16** | **Missing API Endpoints** | **S-29** | **5** |
 | **E17** | **Testing** | **S-30** | **3** |
+| **E18** | **Visualization & Graph Execution** | **S-31, S-32, S-33, S-34, S-35, S-36, S-37, S-38** | **44** |
 
 ---
 
@@ -53,7 +54,7 @@
 | **S-18** | **XSS prevention (innerHTML + onclick)** | **5** | **E10** |
 | **S-26** | **Accessibility overhaul (ARIA, keyboard)** | **5** | **E14** |
 
-### Phase 2 (P1 — Should Have) — 52 pts
+### Phase 2 (P1 — Should Have) — 75 pts
 | Ticket | Title | Pts | Epic |
 |--------|-------|-----|------|
 | S-02 | Docker env var hardcoding fixes | 3 | E1 |
@@ -69,8 +70,12 @@
 | **S-25** | **Skill health API + OpenTelemetry** | **5** | **E13** |
 | **S-27** | **API proxy error handling + error display** | **3** | **E14** |
 | **S-28** | **First-run script + quickstart docs** | **3** | **E15** |
+| **S-31** | **Memory Graph (vis-network all memory types)** | **8** | **E18** |
+| **S-34** | **Chat Tool Execution Graph (LangGraph DAG)** | **8** | **E18** |
+| **S-37** | **Unified Memory Search (cross-type)** | **5** | **E18** |
+| **S-38** | **Navigation Update (all viz pages)** | **2** | **E18** |
 
-### Phase 3 (P2 — Nice to Have) — 21 pts
+### Phase 3 (P2 — Nice to Have) — 42 pts
 | Ticket | Title | Pts | Epic |
 |--------|-------|-----|------|
 | S-06 | Regroup nav: Agents & Skills | 3 | E3 |
@@ -80,6 +85,10 @@
 | S-15 | Drop public schema duplicates | 2 | E9 |
 | **S-29** | **Complete CRUD + Sentiment API + GraphQL** | **5** | **E16** |
 | **S-30** | **Load tests + E2E tests** | **3** | **E17** |
+| **S-32** | **Memory Timeline & Heatmap (Chart.js)** | **5** | **E18** |
+| **S-33** | **Embedding Cluster Explorer (PCA/t-SNE)** | **8** | **E18** |
+| **S-35** | **Memory Consolidation Dashboard** | **5** | **E18** |
+| **S-36** | **Lessons Learned Dashboard** | **3** | **E18** |
 
 ---
 
@@ -103,6 +112,15 @@ Phase 2 (P1) — Security + Quality:
 Phase 3 (P2) — Features + Testing:
   S-28 (first-run) → S-30 (E2E tests need Docker up)
   S-29 (CRUD) ────→ S-30 (load tests exercise DELETE)
+
+Phase 2-3 — Visualization (E18):
+  S-31 (memory graph) ──┐
+  S-32 (timeline)  ─────┤
+  S-33 (embeddings) ────┼──→ S-38 (nav update — all routes must exist)
+  S-34 (chat DAG) ──────┤
+  S-35 (consolidation) ─┤
+  S-36 (lessons) ───────┤
+  S-37 (unified search) ┘
 ```
 
 ---
@@ -155,6 +173,18 @@ Phase 3 (P2) — Features + Testing:
 | Ticket | File | Description |
 |--------|-------|-------------|
 | [S-30](S-30-load-tests-e2e.md) | `tests/load/`, `tests/e2e/`, `.github/workflows/` | Locust load tests, Playwright E2E, CI pipeline |
+
+### E18 — Visualization & Graph Execution (44 pts)
+| Ticket | File | Description |
+|--------|-------|-------------|
+| [S-31](S-31-memory-graph-visualization.md) | `memories.py`, `memory_graph.html`, `app.py` | vis-network graph of all memory types with category/source edges |
+| [S-32](S-32-memory-timeline-heatmap.md) | `memories.py`, `memory_timeline.html`, `app.py` | Chart.js temporal heatmap, stacked area, TTL decay bars |
+| [S-33](S-33-embedding-cluster-explorer.md) | `memories.py`, `embedding_explorer.html`, `app.py` | PCA/t-SNE 2D scatter plot of semantic memory embeddings |
+| [S-34](S-34-chat-tool-execution-graph.md) | `chat_engine.py`, `engine_chat.html` | LangGraph-style DAG for tool execution pipeline in chat UI |
+| [S-35](S-35-memory-consolidation-dashboard.md) | `memories.py`, `memory_consolidation.html`, `app.py` | Surface→Medium→Deep flow, compression stats, promotion candidates |
+| [S-36](S-36-lessons-learned-dashboard.md) | `lessons.py`, `lessons.html`, `app.py` | Skill→Error→Lesson vis-network graph, effectiveness charts |
+| [S-37](S-37-unified-memory-search.md) | `memories.py`, `memory_search.html`, `app.py` | Cross-memory-type search (vector+ILIKE) with ranked results |
+| [S-38](S-38-navigation-update-visualization.md) | `base.html` | Nav menu update — add all new visualization pages |
 
 ---
 
