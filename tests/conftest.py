@@ -5,6 +5,8 @@ Auto-detects Docker vs local environment.
 Integration tests hit the live API via synchronous httpx (no asyncio issues).
 Unit / skill tests use the mock_api_client fixture (S-150).
 """
+from __future__ import annotations
+
 import asyncio
 import os
 import time
