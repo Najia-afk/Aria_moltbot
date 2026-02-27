@@ -33,11 +33,14 @@ def create_app():
     # REMOVED: legacy bot proxy config (Operation Independence)
 
     # Internal API service URL (Docker network or localhost fallback)
-    _api_internal_url = os.environ.get('API_INTERNAL_URL', 'http://aria-api:8000')
+    _api_int_port = os.environ.get('API_INTERNAL_PORT', '8000')
+    _api_internal_url = os.environ.get('API_INTERNAL_URL', f'http://aria-api:{_api_int_port}')
     _api_key = os.environ.get('ARIA_API_KEY', '')
     _admin_key = os.environ.get('ARIA_ADMIN_KEY', '')
     # WebSocket base URL (browser-accessible) — used for WS chat connections
     _ws_base_url = os.environ.get('WS_BASE_URL', '')
+    # Host-exposed API port (for browser-side WS fallback)
+    _api_port = os.environ.get('ARIA_API_PORT', '8000')
 
     # Computed once at startup — used as ?v= cache-buster for static assets
     _build_ts = int(time.time())
@@ -49,6 +52,7 @@ def create_app():
             'api_base_url': api_base_url,
             'ws_base_url': _ws_base_url,
             'ws_api_key': _api_key,
+            'api_port': _api_port,
             'build_ts': _build_ts,
             # REMOVED: legacy bot proxy config
         }
@@ -373,4 +377,4 @@ def create_app():
 
 if __name__ == '__main__':
     app = create_app()
-    app.run(host='0.0.0.0', port=int(os.environ.get('WEB_PORT', '5000')), debug=True)
+    app.run(host='0.0.0.0', port=int(os.environ.get('WEB_INTERNAL_PORT', '5000')), debug=True)

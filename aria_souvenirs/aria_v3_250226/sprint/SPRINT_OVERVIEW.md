@@ -180,7 +180,7 @@ Phase 2-3 — Visualization (E18):
 | [S-31](S-31-memory-graph-visualization.md) | `memories.py`, `memory_graph.html`, `app.py` | vis-network graph of all memory types with category/source edges |
 | [S-32](S-32-memory-timeline-heatmap.md) | `memories.py`, `memory_timeline.html`, `app.py` | Chart.js temporal heatmap, stacked area, TTL decay bars |
 | [S-33](S-33-embedding-cluster-explorer.md) | `memories.py`, `embedding_explorer.html`, `app.py` | PCA/t-SNE 2D scatter plot of semantic memory embeddings |
-| [S-34](S-34-chat-tool-execution-graph.md) | `chat_engine.py`, `engine_chat.html` | LangGraph-style DAG for tool execution pipeline in chat UI |
+| [S-34](S-34-chat-tool-execution-graph.md) | `streaming.py`, `engine_chat.html` | LangGraph-style DAG for tool execution pipeline in chat UI |
 | [S-35](S-35-memory-consolidation-dashboard.md) | `memories.py`, `memory_consolidation.html`, `app.py` | Surface→Medium→Deep flow, compression stats, promotion candidates |
 | [S-36](S-36-lessons-learned-dashboard.md) | `lessons.py`, `lessons.html`, `app.py` | Skill→Error→Lesson vis-network graph, effectiveness charts |
 | [S-37](S-37-unified-memory-search.md) | `memories.py`, `memory_search.html`, `app.py` | Cross-memory-type search (vector+ILIKE) with ranked results |
@@ -209,4 +209,58 @@ Week 3: Features Sprint (P1-P2)
   Day 3:   S-10 (agent model) + S-06 (nav Agents) + S-07 (nav Ops)
   Day 4:   S-11 (delegate_task) + S-12 (cron model) + S-15 (public schema)
   Day 5:   S-29 (CRUD/sentiment/GraphQL) + S-30 (tests)
+
+Week 4: Visualization Sprint (E18)
+  Day 1:   S-31 (memory graph — foundational, adds imports used by others)
+  Day 2:   S-34 (chat DAG) + S-37 (unified search)
+  Day 3:   S-32 (timeline heatmap) + S-36 (lessons dashboard)
+  Day 4:   S-33 (embedding explorer) + S-35 (consolidation dashboard)
+  Day 5:   S-38 (nav update — all routes must exist first)
 ```
+
+---
+
+## E18 Design System Requirements
+
+All E18 visualization tickets **MUST** follow these shared standards:
+
+### vis-network Source
+Use the local bundled file: `/static/js/vis-network.min.js` (not CDN).
+
+### Chart.js Source
+Pin to: `https://cdn.jsdelivr.net/npm/chart.js@4.4.1` (consistent with majority of existing templates).
+
+### vis-network Physics (for force-directed graphs)
+```javascript
+physics: { solver: 'forceAtlas2Based',
+    forceAtlas2Based: { gravitationalConstant: -40, centralGravity: 0.005, springLength: 120, springConstant: 0.06 },
+    stabilization: { iterations: 100 }
+}
+```
+Exception: S-34 (chat DAG) uses hierarchical LR layout — no physics.
+
+### CSS Color Variables (use instead of hardcoded hex)
+```
+--accent-primary: #6366f1  (indigo)
+--accent-secondary: #8b5cf6  (purple — semantic memory)
+--accent-cyan: #06b6d4
+--accent-pink: #ec4899
+--success: #10b981  (green — thoughts, input nodes)
+--warning: #f59e0b  (orange — working memory, tools)
+--danger: #ef4444  (red — lessons, errors)
+--info: #3b82f6  (blue — KV memory, skills)
+```
+
+### Memory Type Color Mapping
+| Type | Color | Shape | CSS Variable |
+|------|-------|-------|-------------|
+| semantic_memory | Purple #8b5cf6 | Dot | --accent-secondary |
+| working_memory | Orange #f59e0b | Diamond | --warning |
+| kv_memory | Blue #3b82f6 | Square | --info |
+| thought | Green #10b981 | Triangle | --success |
+| lesson | Red #ef4444 | Star | --danger |
+
+### Docker Ports for Verification
+- API: `localhost:8000` (aria-api)
+- Web: `localhost:5050` (aria-web, external port)
+- DB: `localhost:5432` (aria-db)

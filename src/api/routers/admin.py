@@ -15,6 +15,10 @@ from config import ARIA_ADMIN_TOKEN, SERVICE_CONTROL_ENABLED
 from deps import get_db
 
 router = APIRouter(tags=["Admin"])
+# Separate router for read-only file browser endpoints — mounted with
+# standard API key auth (not admin) so the dashboard can access them
+# when requests arrive via Traefik (which bypasses Flask's proxy).
+files_router = APIRouter(tags=["Files"])
 logger = logging.getLogger("aria.api.admin")
 
 VACUUM_TABLES = ["activity_log", "model_usage", "heartbeat_log", "thoughts"]
@@ -90,7 +94,7 @@ async def api_service_control(service_id: str, action: str, request: Request):
         raise HTTPException(status_code=500, detail=str(exc))
 
 
-@router.get("/soul/{filename}")
+@files_router.get("/soul/{filename}")
 async def read_soul_file(filename: str):
     allowed = [
         "SOUL.md", "IDENTITY.md", "USER.md", "AGENTS.md",
@@ -177,49 +181,49 @@ def _read_root_file(kind: str, path: str) -> dict:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/admin/files/mind")
+@files_router.get("/admin/files/mind")
 async def list_mind_files():
     """List all files under /aria_mind (read-only)."""
     return _list_tree(_get_root_path("mind"))
 
 
-@router.get("/admin/files/memories")
+@files_router.get("/admin/files/memories")
 async def list_memories_files():
     """List all files under /aria_memories (read-only)."""
     return _list_tree(_get_root_path("memories"))
 
 
-@router.get("/admin/files/agents")
+@files_router.get("/admin/files/agents")
 async def list_agents_files():
     """List all files under /aria_agents (read-only)."""
     return _list_tree(_get_root_path("agents"))
 
 
-@router.get("/admin/files/souvenirs")
+@files_router.get("/admin/files/souvenirs")
 async def list_souvenirs_files():
     """List all files under /aria_souvenirs (read-only)."""
     return _list_tree(_get_root_path("souvenirs"))
 
 
-@router.get("/admin/files/mind/{path:path}")
+@files_router.get("/admin/files/mind/{path:path}")
 async def read_mind_file(path: str):
     """Read a text file from /aria_mind."""
     return _read_root_file("mind", path)
 
 
-@router.get("/admin/files/memories/{path:path}")
+@files_router.get("/admin/files/memories/{path:path}")
 async def read_memories_file(path: str):
     """Read a text file from /aria_memories."""
     return _read_root_file("memories", path)
 
 
-@router.get("/admin/files/agents/{path:path}")
+@files_router.get("/admin/files/agents/{path:path}")
 async def read_agents_file(path: str):
     """Read a text file from /aria_agents."""
     return _read_root_file("agents", path)
 
 
-@router.get("/admin/files/souvenirs/{path:path}")
+@files_router.get("/admin/files/souvenirs/{path:path}")
 async def read_souvenirs_file(path: str):
     """Read a text file from /aria_souvenirs."""
     return _read_root_file("souvenirs", path)

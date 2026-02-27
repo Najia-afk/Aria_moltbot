@@ -37,8 +37,8 @@ async def get_lessons_dashboard(
     - Effectiveness distribution
     - Recent lessons
     """
-    # All lessons
-    stmt = select(LessonLearned).order_by(LessonLearned.occurrences.desc())
+    # All lessons (cap at 500 for performance)
+    stmt = select(LessonLearned).order_by(LessonLearned.occurrences.desc()).limit(500)
     result = await db.execute(stmt)
     lessons = result.scalars().all()
     

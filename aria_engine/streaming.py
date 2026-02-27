@@ -89,6 +89,9 @@ class StreamManager:
         self.tools = tool_registry
         self._db_factory = db_session_factory
         self._active_connections: dict[str, WebSocket] = {}
+        # Per-session locks to serialize message handling and prevent DB deadlocks
+        # when multiple WS connections target the same session simultaneously.
+        self._session_locks: dict[str, asyncio.Lock] = {}
 
     async def handle_connection(
         self,
@@ -159,13 +162,19 @@ class StreamManager:
                         enable_thinking = data.get("enable_thinking", False)
                         enable_tools = data.get("enable_tools", True)
 
-                        await self._handle_message(
-                            websocket=websocket,
-                            session_id=session_id,
-                            content=content,
-                            enable_thinking=enable_thinking,
-                            enable_tools=enable_tools,
+                        # Acquire per-session lock to prevent concurrent DB
+                        # mutations (FK ShareLock + UPDATE deadlock pattern).
+                        lock = self._session_locks.setdefault(
+                            session_id, asyncio.Lock()
                         )
+                        async with lock:
+                            await self._handle_message(
+                                websocket=websocket,
+                                session_id=session_id,
+                                content=content,
+                                enable_thinking=enable_thinking,
+                                enable_tools=enable_tools,
+                            )
 
                     else:
                         await self._send_json(websocket, {
@@ -494,26 +503,47 @@ class StreamManager:
             )
             db.add(assistant_msg)
 
-            # ── Update session counters ───────────────────────────────────
-            msg_count = 2 + len(accumulator.tool_results)
-            session.message_count = (session.message_count or 0) + msg_count
-            session.total_tokens = (
-                (session.total_tokens or 0)
-                + accumulator.input_tokens
-                + accumulator.output_tokens
-            )
-            session.total_cost = float(session.total_cost or 0) + accumulator.cost_usd
-            session.updated_at = datetime.now(timezone.utc)
-
-            # Auto-title on first message
-            if not session.title and (session.message_count or 0) <= msg_count:
-                title = content.strip().replace("\n", " ")
-                title = " ".join(title.split())
-                if len(title) > 80:
-                    title = title[:77] + "..."
-                session.title = title
-
+            # Commit messages first (critical data).
             await db.commit()
+
+            # ── Update session counters (separate transaction) ────────────
+            # Done in its own transaction so a transient lock/deadlock doesn't
+            # roll back the already-committed messages.
+            try:
+                async with self._db_factory() as db2:
+                    from sqlalchemy import update
+                    msg_count = 2 + len(accumulator.tool_results)
+
+                    values: dict[str, Any] = {
+                        "message_count": (session.message_count or 0) + msg_count,
+                        "total_tokens": (
+                            (session.total_tokens or 0)
+                            + accumulator.input_tokens
+                            + accumulator.output_tokens
+                        ),
+                        "total_cost": float(session.total_cost or 0) + accumulator.cost_usd,
+                        "updated_at": datetime.now(timezone.utc),
+                    }
+
+                    # Auto-title on first message
+                    if not session.title and (session.message_count or 0) <= msg_count:
+                        title = content.strip().replace("\n", " ")
+                        title = " ".join(title.split())
+                        if len(title) > 80:
+                            title = title[:77] + "..."
+                        values["title"] = title
+
+                    await db2.execute(
+                        update(EngineChatSession)
+                        .where(EngineChatSession.id == uuid.UUID(session_id))
+                        .values(**values)
+                    )
+                    await db2.commit()
+            except Exception as counter_err:
+                logger.warning(
+                    "Session counter update failed for %s (messages safe): %s",
+                    session_id, counter_err,
+                )
 
             # Telemetry → aria_data.model_usage
             asyncio.ensure_future(log_model_usage(

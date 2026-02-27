@@ -284,7 +284,7 @@ grep -n "memory-graph" src/web/templates/base.html
 # EXPECTED: link in Memory nav dropdown
 
 # 5. vis-network loads (Docker):
-curl -s http://localhost:5000/memory-graph | grep -c "vis-network"
+curl -s http://localhost:5050/memory-graph | grep -c "vis-network"
 # EXPECTED: 1 (script tag present)
 
 # 6. No architecture violations:

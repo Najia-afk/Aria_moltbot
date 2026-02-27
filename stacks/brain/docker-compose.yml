@@ -65,6 +65,9 @@ services:
       ENGINE_API_BASE_URL: http://aria-api:${API_INTERNAL_PORT:-8000}
       # S-103: API key for engine→API authentication
       ARIA_API_KEY: ${ARIA_API_KEY:-}
+      # Browserless (headless Chrome for browser skill)
+      BROWSERLESS_TOKEN: ${BROWSERLESS_TOKEN:-}
+      BROWSERLESS_INTERNAL_PORT: ${BROWSERLESS_INTERNAL_PORT:-3000}
       # Moltbook (engine executes skill tools directly)
       MOLTBOOK_TOKEN: ${MOLTBOOK_TOKEN:-}
       MOLTBOOK_API_URL: ${MOLTBOOK_API_URL:-https://www.moltbook.com/api/v1}
@@ -336,6 +339,9 @@ services:
       MOLT_CHURCH_API_KEY: ${MOLT_CHURCH_API_KEY:-}
       MOLT_CHURCH_URL: ${MOLT_CHURCH_URL:-https://molt.church}
       MOLT_CHURCH_AGENT: ${MOLT_CHURCH_AGENT:-Aria}
+      # Browserless (headless Chrome for browser skill)
+      BROWSERLESS_TOKEN: ${BROWSERLESS_TOKEN:-}
+      BROWSERLESS_INTERNAL_PORT: ${BROWSERLESS_INTERNAL_PORT:-3000}
       # LiteLLM (internal)
       LITELLM_URL: ${LITELLM_URL:-http://litellm:4000}
       # Aria Email
@@ -409,6 +415,10 @@ services:
       # Set explicitly if behind a custom reverse proxy, e.g. "myhost:8080"
       WS_BASE_URL: ${WS_BASE_URL:-}
       WEB_INTERNAL_PORT: ${WEB_INTERNAL_PORT:-5000}
+      # Host-exposed API port — passed to templates for browser-side WS fallback
+      ARIA_API_PORT: ${ARIA_API_PORT:-8000}
+      # Internal API URL for server-to-server calls (Docker network)
+      API_INTERNAL_URL: http://aria-api:${API_INTERNAL_PORT:-8000}
       USER_DISPLAY_NAME: ${USER_DISPLAY_NAME:-User}
       GRAFANA_URL: ${GRAFANA_URL:-http://grafana:3000}
       PROMETHEUS_URL: ${PROMETHEUS_URL:-http://prometheus:9090}

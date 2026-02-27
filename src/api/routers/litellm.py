@@ -6,6 +6,7 @@ the HTTP proxy, which OOMs / times out with 15K+ spend rows.
 """
 
 import logging
+import os
 
 import httpx
 from fastapi import APIRouter, Depends
@@ -20,7 +21,7 @@ router = APIRouter(tags=["LiteLLM"])
 
 
 def _litellm_base() -> str:
-    return SERVICE_URLS.get("litellm", ("http://litellm:4000",))[0]
+    return SERVICE_URLS.get("litellm", (os.getenv("LITELLM_URL", "http://litellm:4000"),))[0]
 
 
 def _auth_headers() -> dict:

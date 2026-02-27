@@ -78,25 +78,30 @@ async def get_memory_consolidation_dashboard(
     - Recent consolidation activity
     - WorkingMemory → SemanticMemory promotion candidates
     """
+    import asyncio
     import os
+    from datetime import datetime, timedelta
     from pathlib import Path
     
-    base = Path(os.environ.get("ARIA_MEMORIES_PATH", "aria_memories"))
+    def _scan_tier(tier_path: Path) -> dict:
+        """Synchronous filesystem scan — run via to_thread to avoid blocking event loop."""
+        if not tier_path.exists():
+            return {"count": 0, "total_bytes": 0, "newest": 0, "oldest": 0}
+        files = [f for f in tier_path.glob("*") if f.is_file()]
+        file_stats = [f.stat() for f in files]
+        return {
+            "count": len(file_stats),
+            "total_bytes": sum(s.st_size for s in file_stats),
+            "newest": max((s.st_mtime for s in file_stats), default=0),
+            "oldest": min((s.st_mtime for s in file_stats), default=0),
+        }
     
-    # 1. File tier counts
+    base = Path(os.environ.get("ARIA_MEMORIES_PATH", "/aria_memories"))
+    
+    # 1. File tier counts (async-safe filesystem scan)
     tiers = {}
     for tier in ["surface", "medium", "deep"]:
-        tier_path = base / "memory" / tier
-        if tier_path.exists():
-            files = list(tier_path.glob("*"))
-            tiers[tier] = {
-                "count": len(files),
-                "total_bytes": sum(f.stat().st_size for f in files if f.is_file()),
-                "newest": max((f.stat().st_mtime for f in files if f.is_file()), default=0),
-                "oldest": min((f.stat().st_mtime for f in files if f.is_file()), default=0),
-            }
-        else:
-            tiers[tier] = {"count": 0, "total_bytes": 0, "newest": 0, "oldest": 0}
+        tiers[tier] = await asyncio.to_thread(_scan_tier, base / "memory" / tier)
     
     # 2. SemanticMemory source distribution
     source_stmt = select(

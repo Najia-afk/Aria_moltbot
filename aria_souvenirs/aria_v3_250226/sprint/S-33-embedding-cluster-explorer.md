@@ -47,8 +47,8 @@ This endpoint:
 ```python
 @router.get("/memories/embedding-projection")
 async def get_embedding_projection(
-    limit: int = Query(300, ge=10, le=1000),
-    method: str = Query("pca", regex="^(pca|tsne)$"),
+    limit: int = Query(200, ge=10, le=1000, description="Default 200; >500 may be slow due to PCA on 768-dim vectors"),
+    method: str = Query("pca", pattern="^(pca|tsne)$"),
     category: Optional[str] = Query(None),
     min_importance: float = Query(0.0, ge=0.0, le=1.0),
     db: AsyncSession = Depends(get_db),

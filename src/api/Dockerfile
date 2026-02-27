@@ -25,10 +25,11 @@ COPY . ./
 # S-101: Non-root user for security
 RUN addgroup --system --gid 1001 aria && \
     adduser --system --uid 1001 --ingroup aria aria && \
+    chmod +x /app/entrypoint.sh && \
     chown -R aria:aria /app
 
 USER aria
 
 EXPOSE 8000
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2", "--timeout-keep-alive", "300"]
+ENTRYPOINT ["/app/entrypoint.sh"]

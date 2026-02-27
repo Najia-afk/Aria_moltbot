@@ -60,8 +60,6 @@
 
 .chat-status .dot.connected { background: #00d26a; }
 .chat-status .dot.connecting { background: #ffc107; animation: pulse 1s infinite; }
-.chat-status .dot.ready { background: #4a9eff; }
-.chat-status .dot.disconnected { background: #ffa500; animation: pulse 1.5s infinite; }
 .chat-status .dot.error { background: #ff4444; }
 
 @keyframes pulse {
@@ -1034,8 +1032,8 @@
                 <h2 id="chatTitle">New Chat</h2>
             </div>
             <div class="chat-status">
-                <span class="dot ready" id="statusDot"></span>
-                <span id="statusText">Ready</span>
+                <span class="dot" id="statusDot"></span>
+                <span id="statusText">Disconnected</span>
             </div>
             <div style="display:flex;align-items:center;gap:8px;">
                 <select id="modelSelector" class="page-limit-select" title="Select model">
@@ -1386,11 +1384,7 @@
             const nonGhost = allSessions.find(s => (s.message_count || 0) > 0);
             if (nonGhost) {
                 switchSession(nonGhost.id);
-            } else {
-                setStatus('ready');
             }
-        } else {
-            setStatus('ready');
         }
         // Mobile: start sidebar collapsed
         if (window.innerWidth <= 768) {
@@ -1818,7 +1812,6 @@
         `;
         document.getElementById('chatTitle').textContent = 'New Chat';
         history.replaceState(null, '', '/chat/');
-        setStatus('ready');  // "Ready" (blue) instead of confusing "Disconnected"
 
         document.querySelectorAll('.session-item').forEach(el => el.classList.remove('active'));
 
@@ -1873,9 +1866,10 @@
         // Priority 2: same host (works when accessed via Traefik)
         urls.push(`${proto}//${location.host}/ws/chat/${sid}${qp}`);
 
-        // Priority 3: API direct on port 8000 (fallback for Flask direct access)
-        if (location.port !== '8000') {
-            urls.push(`${proto}//${location.hostname}:8000/ws/chat/${sid}${qp}`);
+        // Priority 3: API direct on host-exposed port (fallback for Flask direct access)
+        const apiPort = '{{ api_port }}';
+        if (apiPort && location.port !== apiPort) {
+            urls.push(`${proto}//${location.hostname}:${apiPort}/ws/chat/${sid}${qp}`);
         }
 
         // Deduplicate
@@ -1907,13 +1901,6 @@
             wsAttempts = 0;  // reset on successful connection
             setStatus('connected');
             console.log('WebSocket connected to session:', sessionId);
-            // Client-side keepalive: send ping every 25s to prevent Traefik/proxy idle-timeout
-            if (ws._pingInterval) clearInterval(ws._pingInterval);
-            ws._pingInterval = setInterval(() => {
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({type: 'ping'}));
-                }
-            }, 25000);
             // Flush any pending message that was waiting for connection
             if (pendingMessage) {
                 const msg = pendingMessage;
@@ -1928,7 +1915,6 @@
         };
 
         ws.onclose = (e) => {
-            if (ws && ws._pingInterval) clearInterval(ws._pingInterval);
             console.log('WebSocket closed:', e.code, e.reason);
             // Don't auto-retry if the close was intentional (switchSession / createNewSession)
             if (e.target._intentionalClose) return;
@@ -1983,9 +1969,6 @@
                 break;
             case 'stream_end':
                 finalizeStreamingMessage(msg);
-                break;
-            case 'pong':
-                // Server keepalive — just acknowledge silently
                 break;
             case 'error':
                 showError(msg.content || msg.message || msg.error || 'Unknown error');
@@ -2388,8 +2371,7 @@
         const dot = document.getElementById('statusDot');
         const text = document.getElementById('statusText');
         dot.className = `dot ${status}`;
-        const labels = { ready: 'Ready', connected: 'Connected', connecting: 'Connecting…', disconnected: 'Reconnecting…', error: 'Error' };
-        text.textContent = labels[status] || status.charAt(0).toUpperCase() + status.slice(1);
+        text.textContent = status.charAt(0).toUpperCase() + status.slice(1);
     }
 
     // ── Errors ──────────────────────────────────────────────────

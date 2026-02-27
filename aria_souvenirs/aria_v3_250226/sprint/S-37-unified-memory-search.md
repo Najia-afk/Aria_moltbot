@@ -35,7 +35,7 @@ Also add:
 from sqlalchemy import or_, cast, String
 ```
 
-**⚠️ Route ordering:** Like S-33, place this endpoint **BEFORE** `GET /memories/{key}` at line 486 to avoid the catch-all intercepting `/memory-search`.
+**⚠️ Note:** The `/memory-search` route is safe from the `GET /memories/{key}` catch-all at line 486 because it's a different path prefix (`/memory-search` vs `/memories/...`). No special ordering needed for this endpoint. However, it should still be placed logically near other memory endpoints.
 
 ```python
 @router.get("/memory-search")

@@ -63,7 +63,7 @@ SERVICE_URLS: dict[str, tuple[str, str]] = {
     "browser":    (os.getenv("BROWSER_URL", "http://aria-browser:3000"),         "/"),
     "traefik":    (os.getenv("TRAEFIK_URL",     "http://traefik:8080"),          "/api/overview"),
     "aria-web":   (os.getenv("ARIA_WEB_URL",    "http://aria-web:5000"),         "/"),
-    "aria-api":   (os.getenv("ARIA_API_SELF_URL", "http://localhost:8000"),      "/health"),
+    "aria-api":   (os.getenv("ARIA_API_SELF_URL", f"http://localhost:{os.getenv('API_INTERNAL_PORT', '8000')}"), "/health"),
 }
 
 if MLX_ENABLED:

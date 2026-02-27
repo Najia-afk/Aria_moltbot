@@ -148,8 +148,8 @@ async def ensure_schema() -> None:
         # ── Column migrations (add columns to existing tables) ─────────
         _column_migrations = [
             # (table, column, type_sql, default)
-            ("sentiment_events", "speaker", "VARCHAR(20)", None),
-            ("sentiment_events", "agent_id", "VARCHAR(100)", None),
+            ("aria_data.sentiment_events", "speaker", "VARCHAR(20)", None),
+            ("aria_data.sentiment_events", "agent_id", "VARCHAR(100)", None),
             # Agent state new columns for agent management
             ("aria_engine.agent_state", "agent_type", "VARCHAR(30)", "'agent'"),
             ("aria_engine.agent_state", "parent_agent_id", "VARCHAR(100)", None),
@@ -214,10 +214,10 @@ async def ensure_schema() -> None:
 
         # ── Backfill speaker/agent_id from session_messages ──────────
         await _run_isolated(conn, "backfill_speaker", """
-            UPDATE sentiment_events se
+            UPDATE aria_data.sentiment_events se
             SET speaker  = sm.role,
                 agent_id = sm.agent_id
-            FROM session_messages sm
+            FROM aria_data.session_messages sm
             WHERE se.message_id = sm.id
               AND se.speaker IS NULL
         """)

@@ -22,7 +22,7 @@ The roundtable page (`engine_roundtable.html` lines 861–1007) already implemen
 
 ## Root Cause
 
-The chat engine WebSocket (`src/api/routers/engine_chat.py` line 480) streams events: `token`, `tool_call_start`, `tool_call_end`, `done`. However:
+The chat engine WebSocket (`src/api/routers/engine_chat.py` line 480) delegates to the streaming manager in `aria_engine/streaming.py`, which streams structured JSON events: `token`, `thinking`, `tool_call`, `tool_result`, `done`, `error`. However:
 
 1. **No iteration-level events**: The WS doesn't emit "LLM iteration start/end" — you get flat `tool_call_start`/`tool_call_end` but can't distinguish which LLM call triggered which tools.
 2. **No graph container**: The chat HTML has no `<div>` for vis-network.
@@ -45,11 +45,13 @@ This needs to be enhanced with iteration-level data for the graph.
 
 ### 1. Enhance WebSocket events with iteration tracking
 
-**File:** `src/api/routers/engine_chat.py`
+**File:** `aria_engine/streaming.py`
 
-**⚠️ Architecture note:** The iteration events should be emitted from the WebSocket handler in `engine_chat.py` (line 480), NOT from `aria_engine/chat_engine.py` directly. The engine layer returns `ChatResponse` objects; the WS handler in `engine_chat.py` is responsible for streaming events to the frontend. The tool loop lives in `aria_engine/chat_engine.py` (line 401) but the WS event emission must happen at the transport layer.
+**Architecture clarification:** The tool iteration loop lives in `aria_engine/streaming.py` at line 280 (`for iteration in range(max_tool_iterations)`). The WebSocket handler in `src/api/routers/engine_chat.py` line 480 delegates to `_stream_manager.handle_connection()` which calls the streaming engine. The iteration events MUST be added inside the streaming.py loop, NOT in the router.
 
-In the WebSocket handler (around line 480), after each tool iteration:
+Existing event types in streaming.py: `token`, `thinking`, `tool_call`, `tool_result`, `done`, `error`.
+
+In the tool loop (around line 280), add iteration-level events:
 
 ```python
 # Add to the streaming handler in the tool loop:
@@ -231,7 +233,7 @@ Add before the main chat script (around line 1335):
 ## Constraints
 | # | Constraint | Applies | Notes |
 |---|-----------|---------|-------|
-| 1 | 5-layer (DB→ORM→API→api_client→Skills→Agents) | ✅ | WebSocket event changes in chat_engine.py (engine layer). Frontend renders from WS events. No layer violation. |
+| 1 | 5-layer (DB→ORM→API→api_client→Skills→Agents) | ✅ | Streaming event changes in aria_engine/streaming.py (engine layer). Frontend renders from WS events. No layer violation. |
 | 2 | .env for secrets (zero in code) | ❌ | No secrets involved. |
 | 3 | models.yaml single source of truth | ❌ | No model references. |
 | 4 | Docker-first testing | ✅ | Must test WebSocket streaming with tool calls in Docker. |
@@ -252,8 +254,8 @@ grep -n "vis-network" src/web/templates/engine_chat.html
 grep -n "ExecutionGraphVisualizer" src/web/templates/engine_chat.html
 # EXPECTED: class definition line
 
-# 3. Iteration events in chat engine:
-grep -n "iteration_start\|iteration_end" aria_engine/chat_engine.py
+# 3. Iteration events in streaming engine:
+grep -n "iteration_start\|iteration_end" aria_engine/streaming.py
 # EXPECTED: 2+ matches (event emissions in tool loop)
 
 # 4. Graph container in HTML:
@@ -278,9 +280,9 @@ FILES TO READ FIRST:
   - Lines 335-420: tool-call-card CSS (existing tool viz)
   - Lines 1196-1340: ToolVisualizer class (existing flat tool cards)
   - Lines 1340-2465: main chat JS (WebSocket handlers at ~1946)
-- src/web/templates/engine_roundtable.html (lines 861-1007) — REFERENCE for vis-network graph pattern
-- aria_engine/chat_engine.py (lines 380-580) — tool execution loop
-- src/api/routers/engine_chat.py (lines 480-537) — WebSocket endpoint
+- aria_engine/streaming.py (lines 260-460) — streaming tool loop (line 280) where iteration events must be added
+- aria_engine/chat_engine.py (lines 380-580) — non-streaming tool execution loop (reference only)
+- src/api/routers/engine_chat.py (lines 480-537) — WebSocket endpoint (delegates to streaming.py)
 
 CONSTRAINTS:
 1. Do NOT break existing ToolVisualizer — the execution graph is ADDITIONAL (shown below tool cards)
@@ -290,11 +292,11 @@ CONSTRAINTS:
 5. Must handle messages with 0 tool calls gracefully (don't show graph panel)
 
 STEPS:
-1. Add iteration_start/iteration_end events to engine_chat.py WebSocket handler (line 480)
+1. Add iteration_start/iteration_end events to aria_engine/streaming.py tool loop (line 280)
 2. Add <script src="/static/js/vis-network.min.js"></script> to engine_chat.html
 3. Add ExecutionGraphVisualizer class (see Fix section for full code)
 4. Add CSS for .execution-graph-panel (collapsible, 300px height)
-5. Wire up WS event handlers: iteration_start → addLLMCall, tool_call_start → addToolCall, tool_call_end → completeToolCall, done → addFinalResponse
+5. Wire up WS event handlers: iteration_start → addLLMCall, tool_call → addToolCall, tool_result → completeToolCall, done → addFinalResponse
 6. After each assistant message with tools: insert graph panel, call initGraph(), show summary badge
 7. Test with a chat that triggers tool calls (e.g., "What skills do you have?")
 

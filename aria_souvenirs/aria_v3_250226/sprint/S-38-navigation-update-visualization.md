@@ -40,7 +40,7 @@ Intelligence
   └── 📚 /lessons    — Lessons Learned (S-36)
 ```
 
-**Also**: `/memory-explorer` is currently **NOT in the nav menu** at all (route exists at `src/web/app.py` line 333 but no nav link). This is a pre-existing gap.
+**Also**: `/memory-explorer` is currently **NOT in the nav menu** at all (route exists at `src/web/app.py` line 363 but no nav link). This is a pre-existing gap.
 
 ## Root Cause
 
@@ -52,30 +52,42 @@ Each S-31–S-37 ticket mentions "update nav" but doing it in each ticket risks 
 
 **File:** `src/web/templates/base.html`
 
-Find the Memory dropdown section and replace it with the expanded version. The exact HTML depends on the existing dropdown pattern — look for the `💾 Memory` heading and its `<a>` children.
+Find the Memory dropdown section and replace it with the expanded version. The nav uses `<div class="nav-dropdown">` wrappers with `<div class="nav-dropdown-menu">` for the items. Links inside dropdowns are plain `<a>` tags with conditional `active` class — **there is no `dropdown-item` CSS class** in the existing nav. Match the existing pattern exactly.
+
+**Nav structure pattern (from base.html):**
+```html
+<div class="nav-dropdown">
+    <button class="nav-dropdown-toggle">... 💾 Memory</button>
+    <div class="nav-dropdown-menu">
+        <a href="/route" class="{% if request.path == '/route' %}active{% endif %}">Label</a>
+    </div>
+</div>  
+```
 
 **New Memory dropdown items (in order):**
 ```html
-<a href="/memory-search" class="dropdown-item">🔍 Memory Search</a>
-<a href="/memory-graph" class="dropdown-item">🕸️ Memory Graph</a>
-<a href="/memory-timeline" class="dropdown-item">📊 Memory Timeline</a>
-<a href="/embedding-explorer" class="dropdown-item">🔮 Embedding Clusters</a>
-<a href="/memory-dashboard" class="dropdown-item">🔄 Consolidation</a>
-<div class="dropdown-divider"></div>
-<a href="/memories" class="dropdown-item">Memories (KV)</a>
-<a href="/memory-explorer" class="dropdown-item">Semantic Explorer</a>
-<a href="/knowledge" class="dropdown-item">Knowledge Graph</a>
-<a href="/working-memory" class="dropdown-item">Working Memory</a>
-<a href="/records" class="dropdown-item">Records</a>
-<a href="/activities" class="dropdown-item">Activities</a>
-<a href="/thoughts" class="dropdown-item">Thoughts</a>
+<a href="/memory-search" class="{% if request.path == '/memory-search' %}active{% endif %}">🔍 Memory Search</a>
+<a href="/memory-graph" class="{% if request.path == '/memory-graph' %}active{% endif %}">🕸️ Memory Graph</a>
+<a href="/memory-timeline" class="{% if request.path == '/memory-timeline' %}active{% endif %}">📊 Memory Timeline</a>
+<a href="/embedding-explorer" class="{% if request.path == '/embedding-explorer' %}active{% endif %}">🔮 Embedding Clusters</a>
+<a href="/memory-dashboard" class="{% if request.path == '/memory-dashboard' %}active{% endif %}">🔄 Consolidation</a>
+<hr style="border-color: var(--border-color); margin: 4px 0;">
+<a href="/memories" class="{% if request.path == '/memories' %}active{% endif %}">Memories (KV)</a>
+<a href="/memory-explorer" class="{% if request.path == '/memory-explorer' %}active{% endif %}">Semantic Explorer</a>
+<a href="/knowledge" class="{% if request.path == '/knowledge' %}active{% endif %}">Knowledge Graph</a>
+<a href="/working-memory" class="{% if request.path == '/working-memory' %}active{% endif %}">Working Memory</a>
+<a href="/records" class="{% if request.path == '/records' %}active{% endif %}">Records</a>
+<a href="/activities" class="{% if request.path == '/activities' %}active{% endif %}">Activities</a>
+<a href="/thoughts" class="{% if request.path == '/thoughts' %}active{% endif %}">Thoughts</a>
 ```
+
+**Note:** Use `<hr>` for the divider since the nav has no dedicated `.dropdown-divider` class.
 
 ### 2. Add Lessons to Intelligence dropdown
 
 Find the Intelligence dropdown and add:
 ```html
-<a href="/lessons" class="dropdown-item">📚 Lessons Learned</a>
+<a href="/lessons" class="{% if request.path == '/lessons' %}active{% endif %}">📚 Lessons Learned</a>
 ```
 
 ### 3. (Optional) Add Chat Execution Graph note
@@ -109,8 +121,8 @@ done
 grep -c "memory-explorer" src/web/templates/base.html
 # EXPECTED: >= 1
 
-# 3. Dropdown divider present:
-grep -c "dropdown-divider" src/web/templates/base.html
+# 3. Divider rendered (using <hr> since no .dropdown-divider class exists):
+grep -c "hr.*border-color\|divider" src/web/templates/base.html
 # EXPECTED: >= 1 (in Memory dropdown)
 
 # 4. No broken links (all routes exist in app.py):

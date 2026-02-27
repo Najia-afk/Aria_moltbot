@@ -415,8 +415,32 @@
         // ==== Global Config ====
         const API_BASE_URL = "{{ api_base_url }}";
         window.ARIA_API_BASE_URL = API_BASE_URL;
+        // API key for authenticated fetch calls (injected by Flask context processor)
+        const ARIA_API_KEY = "{{ ws_api_key }}";
+        window.ARIA_API_KEY = ARIA_API_KEY;
         // Chat URL (native)
         window.ARIA_CHAT_URL = `${window.location.protocol}//${window.location.hostname}/chat/`;
+
+        // ── Auto-inject X-API-Key for all /api/* fetch calls ──────────────
+        // When accessed via Traefik, requests go directly to aria-api
+        // (bypassing Flask proxy that normally injects auth). This override
+        // ensures every browser fetch to the API carries the key.
+        (function() {
+            const _origFetch = window.fetch;
+            window.fetch = function(input, init) {
+                const url = typeof input === 'string' ? input
+                          : (input instanceof Request ? input.url : String(input));
+                if (ARIA_API_KEY && (url.startsWith('/api/') || url.startsWith(API_BASE_URL + '/'))) {
+                    init = Object.assign({}, init);
+                    const h = new Headers(init.headers || {});
+                    if (!h.has('X-API-Key')) {
+                        h.set('X-API-Key', ARIA_API_KEY);
+                    }
+                    init.headers = h;
+                }
+                return _origFetch.call(this, input, init);
+            };
+        })();
 
         function toggleMenu() {
             const navLinks = document.getElementById('nav-links');

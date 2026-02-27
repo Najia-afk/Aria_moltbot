@@ -333,8 +333,10 @@ app = FastAPI(
 
 # ── Middleware ────────────────────────────────────────────────────────────────
 
+_web_port = os.getenv("WEB_INTERNAL_PORT", "5000")
 _CORS_ORIGINS = os.getenv(
-    "CORS_ALLOWED_ORIGINS", "http://localhost:5000,http://aria-web:5000"
+    "CORS_ALLOWED_ORIGINS",
+    f"http://localhost:{_web_port},http://aria-web:{_web_port}",
 ).split(",")
 
 app.add_middleware(
@@ -468,7 +470,7 @@ try:
     from .routers.social import router as social_router
     from .routers.operations import router as operations_router
     from .routers.records import router as records_router
-    from .routers.admin import router as admin_router
+    from .routers.admin import router as admin_router, files_router
     from .routers.models_config import router as models_config_router
     from .routers.models_crud import router as models_crud_router
     from .routers.working_memory import router as working_memory_router
@@ -501,7 +503,7 @@ except ImportError:
     from routers.social import router as social_router
     from routers.operations import router as operations_router
     from routers.records import router as records_router
-    from routers.admin import router as admin_router
+    from routers.admin import router as admin_router, files_router
     from routers.models_config import router as models_config_router
     from routers.models_crud import router as models_crud_router
     from routers.working_memory import router as working_memory_router
@@ -538,6 +540,7 @@ app.include_router(social_router, dependencies=_api_deps)
 app.include_router(operations_router, dependencies=_api_deps)
 app.include_router(records_router, dependencies=_api_deps)
 app.include_router(admin_router, dependencies=_admin_deps)  # Admin needs elevated key
+app.include_router(files_router, dependencies=_api_deps)  # Read-only file browser (standard key)
 app.include_router(models_config_router, dependencies=_api_deps)
 app.include_router(models_crud_router, dependencies=_api_deps)
 app.include_router(working_memory_router, dependencies=_api_deps)
@@ -581,4 +584,4 @@ app.include_router(gql_router, prefix="/graphql", dependencies=_api_deps)
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("API_PORT", "8000")))
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("API_INTERNAL_PORT", "8000")))

@@ -73,16 +73,16 @@ class BrowserSkill(BaseSkill):
             or default_url
         )
 
-        # Optional token auth
+        # Token auth — browserless uses ?token= query param, not headers
         token = os.environ.get("BROWSERLESS_TOKEN", "")
-        headers: dict[str, str] = {}
+        params: dict[str, str] = {}
         if token:
-            headers["Authorization"] = f"Basic {token}"
+            params["token"] = token
 
         self._client = httpx.AsyncClient(
             base_url=self._browser_url,
             timeout=httpx.Timeout(60.0, connect=10.0),
-            headers=headers,
+            params=params,
         )
 
         # Quick connectivity check

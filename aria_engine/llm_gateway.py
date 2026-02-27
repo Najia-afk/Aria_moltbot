@@ -70,6 +70,10 @@ class LLMGateway:
         self._models_config: dict[str, Any] | None = None
         self._cb = CircuitBreaker(name="llm", threshold=5, reset_after=30.0)
         self._latency_samples: list[float] = []
+        # Manual circuit-breaker state used by stream()
+        self._circuit_failures: int = 0
+        self._circuit_threshold: int = 5
+        self._circuit_opened_at: float = 0.0
 
         # Configure litellm
         # Note: Do NOT set litellm.api_base globally — each model specifies

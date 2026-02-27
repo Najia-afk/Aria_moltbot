@@ -29,8 +29,8 @@ from aria_engine.config import EngineConfig
 from aria_engine.exceptions import SchedulerError
 from db.models import EngineCronJob, ActivityLog
 
-# aria-api base URL (inside Docker network)
-_API_BASE = "http://aria-api:8000"
+# aria-api base URL (inside Docker network) — dynamic port via env var
+_API_BASE = os.getenv("ENGINE_API_BASE_URL", "http://aria-api:8000")
 
 logger = logging.getLogger("aria.engine.scheduler")
 

@@ -22,6 +22,7 @@ COPY . .
 # S-101: Non-root user for security
 RUN addgroup --system --gid 1001 aria && \
     adduser --system --uid 1001 --ingroup aria aria && \
+    chmod +x /app/entrypoint.sh && \
     chown -R aria:aria /app
 
 USER aria
@@ -34,4 +35,4 @@ ENV FLASK_APP=app.py
 ENV FLASK_ENV=production
 
 # Run with gunicorn - sync workers are more stable, increased timeout
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--threads", "2", "--timeout", "120", "--keep-alive", "5", "--graceful-timeout", "30", "--max-requests", "1000", "--max-requests-jitter", "50", "app:create_app()"]
+ENTRYPOINT ["/app/entrypoint.sh"]
