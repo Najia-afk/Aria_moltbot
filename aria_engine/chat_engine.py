@@ -96,6 +96,13 @@ class ChatEngine:
     # Maximum tool call iterations to prevent infinite loops
     MAX_TOOL_ITERATIONS = 10
 
+    # Per-tool consecutive failure cap — after this many failures of the
+    # *same* tool in one turn, we inject a rejection so the LLM stops retrying.
+    MAX_PER_TOOL_FAILURES = 3
+
+    # Window (seconds) for deduplicating identical user messages
+    DEDUP_WINDOW_SECONDS = 5
+
     # Slash commands that trigger multi-agent orchestration
     SLASH_COMMANDS = {"/roundtable", "/swarm"}
 
@@ -303,9 +310,32 @@ class ChatEngine:
             if session.status == "ended":
                 raise SessionError(f"Session {sid} has ended — create a new session")
 
-            # ── 2. Persist user message ───────────────────────────────────
-            user_msg_id = uuid.uuid4()
+            # ── 2. Persist user message (with dedup) ─────────────────
             now = datetime.now(timezone.utc)
+            dedup_cutoff = now - __import__('datetime').timedelta(
+                seconds=self.DEDUP_WINDOW_SECONDS,
+            )
+            dup_check = await db.execute(
+                select(EngineChatMessage.id)
+                .where(
+                    EngineChatMessage.session_id == sid,
+                    EngineChatMessage.role == "user",
+                    EngineChatMessage.content == content,
+                    EngineChatMessage.created_at >= dedup_cutoff,
+                )
+                .limit(1)
+            )
+            if dup_check.scalar_one_or_none() is not None:
+                logger.warning(
+                    "Duplicate user message suppressed in session %s (within %ds)",
+                    sid, self.DEDUP_WINDOW_SECONDS,
+                )
+                raise SessionError(
+                    "Duplicate message — same content sent within "
+                    f"{self.DEDUP_WINDOW_SECONDS}s"
+                )
+
+            user_msg_id = uuid.uuid4()
             user_msg = EngineChatMessage(
                 id=user_msg_id,
                 session_id=sid,
@@ -359,6 +389,8 @@ class ChatEngine:
             )
             accumulated_tool_calls: list[dict[str, Any]] = []
             accumulated_tool_results: list[dict[str, Any]] = []
+            # Per-tool failure tracking (P0 — prevent infinite retry loops)
+            tool_failure_counts: dict[str, int] = {}
             total_input_tokens = 0
             total_output_tokens = 0
             total_cost = 0.0
@@ -428,8 +460,25 @@ class ChatEngine:
                 for tc in llm_response.tool_calls:
                     fn_name = tc["function"]["name"]
 
+                    # ── Per-tool failure cap ──────────────────────────────
+                    if tool_failure_counts.get(fn_name, 0) >= self.MAX_PER_TOOL_FAILURES:
+                        logger.warning(
+                            "Tool %s failed %d times in session %s — blocking further calls",
+                            fn_name, tool_failure_counts[fn_name], sid,
+                        )
+                        tool_result = ToolResult(
+                            tool_call_id=tc["id"],
+                            name=fn_name,
+                            content=json.dumps({
+                                "error": f"Tool '{fn_name}' has failed "
+                                f"{tool_failure_counts[fn_name]} consecutive times "
+                                "this turn. Do NOT call it again — use an "
+                                "alternative approach or inform the user."
+                            }),
+                            success=False,
+                        )
                     # Capability enforcement: reject tools outside agent's skills
-                    if allowed_skills:
+                    elif allowed_skills:
                         skill_part = fn_name.split("__")[0] if "__" in fn_name else ""
                         if skill_part and skill_part not in allowed_skills:
                             logger.warning(
@@ -464,6 +513,12 @@ class ChatEngine:
                         "success": tool_result.success,
                         "duration_ms": tool_result.duration_ms,
                     })
+
+                    # Track per-tool failures for circuit-break
+                    if tool_result.success:
+                        tool_failure_counts.pop(fn_name, None)
+                    else:
+                        tool_failure_counts[fn_name] = tool_failure_counts.get(fn_name, 0) + 1
 
                     # Telemetry → aria_data.skill_invocations
                     asyncio.ensure_future(log_skill_invocation(

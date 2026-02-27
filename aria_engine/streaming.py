@@ -237,14 +237,34 @@ class StreamManager:
             # Signal frontend to create streaming message bubble
             await self._send_json(websocket, {"type": "stream_start"})
 
-            # Persist user message
+            # Persist user message (with dedup)
+            now = datetime.now(timezone.utc)
+            dedup_cutoff = now - __import__('datetime').timedelta(seconds=5)
+            dup_check = await db.execute(
+                select(EngineChatMessage.id)
+                .where(
+                    EngineChatMessage.session_id == uuid.UUID(session_id),
+                    EngineChatMessage.role == "user",
+                    EngineChatMessage.content == content,
+                    EngineChatMessage.created_at >= dedup_cutoff,
+                )
+                .limit(1)
+            )
+            if dup_check.scalar_one_or_none() is not None:
+                logger.warning("Duplicate user message suppressed (streaming) %s", session_id)
+                await self._send_json(websocket, {
+                    "type": "error",
+                    "message": "Duplicate message — same content sent within 5s",
+                })
+                return
+
             user_msg_id = uuid.uuid4()
             user_msg = EngineChatMessage(
                 id=user_msg_id,
                 session_id=uuid.UUID(session_id),
                 role="user",
                 content=content,
-                created_at=datetime.now(timezone.utc),
+                created_at=now,
             )
             db.add(user_msg)
             await db.flush()
@@ -255,6 +275,8 @@ class StreamManager:
 
             # ── Stream LLM response ───────────────────────────────────────
             max_tool_iterations = 10
+            max_per_tool_failures = 3
+            tool_failure_counts: dict[str, int] = {}
             for iteration in range(max_tool_iterations):
                 try:
                     async for chunk in self.gateway.stream(
@@ -336,20 +358,46 @@ class StreamManager:
                     messages.append(assistant_entry)
 
                     for tc in llm_response.tool_calls:
+                        fn_name = tc["function"]["name"]
+
                         # Notify client about tool call
                         await self._send_json(websocket, {
                             "type": "tool_call",
-                            "name": tc["function"]["name"],
+                            "name": fn_name,
                             "arguments": tc["function"]["arguments"],
                             "id": tc["id"],
                         })
 
-                        # Execute tool
-                        tool_result: ToolResult = await self.tools.execute(
-                            tool_call_id=tc["id"],
-                            function_name=tc["function"]["name"],
-                            arguments=tc["function"]["arguments"],
-                        )
+                        # Per-tool failure cap
+                        if tool_failure_counts.get(fn_name, 0) >= max_per_tool_failures:
+                            logger.warning(
+                                "Tool %s failed %d times in stream %s — blocking",
+                                fn_name, tool_failure_counts[fn_name], session_id,
+                            )
+                            tool_result = ToolResult(
+                                tool_call_id=tc["id"],
+                                name=fn_name,
+                                content=json.dumps({
+                                    "error": f"Tool '{fn_name}' has failed "
+                                    f"{tool_failure_counts[fn_name]} consecutive "
+                                    "times this turn. Do NOT call it again — "
+                                    "use an alternative or inform the user."
+                                }),
+                                success=False,
+                            )
+                        else:
+                            # Execute tool
+                            tool_result = await self.tools.execute(
+                                tool_call_id=tc["id"],
+                                function_name=fn_name,
+                                arguments=tc["function"]["arguments"],
+                            )
+
+                        # Track failures
+                        if tool_result.success:
+                            tool_failure_counts.pop(fn_name, None)
+                        else:
+                            tool_failure_counts[fn_name] = tool_failure_counts.get(fn_name, 0) + 1
 
                         accumulator.tool_results.append({
                             "tool_call_id": tool_result.tool_call_id,
@@ -362,8 +410,8 @@ class StreamManager:
                         # Telemetry → aria_data.skill_invocations
                         asyncio.ensure_future(log_skill_invocation(
                             self._db_factory,
-                            skill_name=_parse_skill_from_tool(tc["function"]["name"]),
-                            tool_name=tc["function"]["name"],
+                            skill_name=_parse_skill_from_tool(fn_name),
+                            tool_name=fn_name,
                             duration_ms=tool_result.duration_ms,
                             success=tool_result.success,
                             model_used=accumulator.model,
@@ -393,7 +441,7 @@ class StreamManager:
                             content=tool_result.content,
                             tool_results={
                                 "tool_call_id": tc["id"],
-                                "name": tc["function"]["name"],
+                                "name": fn_name,
                             },
                             latency_ms=tool_result.duration_ms,
                             created_at=datetime.now(timezone.utc),

@@ -451,17 +451,28 @@ class ToolRegistry:
             if hasattr(result, "to_dict"):
                 content = json.dumps(result.to_dict())
             elif hasattr(result, "data"):
-                content = json.dumps({"success": getattr(result, "success", True), "data": result.data})
+                # Preserve error message from SkillResult.fail()
+                payload: dict[str, Any] = {
+                    "success": getattr(result, "success", True),
+                    "data": result.data,
+                }
+                error_msg = getattr(result, "error", None)
+                if error_msg:
+                    payload["error"] = str(error_msg)
+                content = json.dumps(payload)
             elif isinstance(result, (dict, list)):
                 content = json.dumps(result)
             else:
                 content = str(result)
 
+            # Propagate skill-level success/failure
+            skill_success = getattr(result, "success", True) if hasattr(result, "success") else True
+
             return ToolResult(
                 tool_call_id=tool_call_id,
                 name=function_name,
                 content=content,
-                success=True,
+                success=bool(skill_success),
                 duration_ms=elapsed_ms,
             )
 

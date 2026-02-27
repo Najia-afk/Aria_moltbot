@@ -395,14 +395,28 @@ class AgentManagerSkill(BaseSkill):
 
         session_id = None
         try:
+            # Derive human-readable identity from focus
+            _FOCUS_BADGES: dict[str, str] = {
+                "research": "\U0001f50d",
+                "devsecops": "\U0001f6e1\ufe0f",
+                "creative": "\U0001f3a8",
+                "data": "\U0001f4ca",
+                "orchestrator": "\U0001f3af",
+                "social": "\U0001f310",
+            }
+            display_name = focus.replace("_", " ").title()
+            badge = _FOCUS_BADGES.get(focus.lower(), "\u2699\ufe0f")
+
             # 1. Create the scoped session (engine table so messages work)
             body = {
                 "agent_id": f"sub-{focus}",
                 "session_type": "scoped",
-                "title": f"Agent: {focus} — {task[:80]}",
+                "title": f"Agent: {focus} \u2014 {task[:80]}",
                 "metadata": {
                     "task": task,
                     "focus": focus,
+                    "display_name": display_name,
+                    "badge": badge,
                     "tools_allowed": tools,
                     "constraints": [f"Use ONLY these tools: {', '.join(tools)}"],
                     "parent_id": "agent_manager",
@@ -469,6 +483,8 @@ class AgentManagerSkill(BaseSkill):
             return SkillResult.ok({
                 "session_id": session_id,
                 "focus": focus,
+                "display_name": display_name,
+                "badge": badge,
                 "model": resp_model,
                 "persistent": persistent,
                 "content": content,

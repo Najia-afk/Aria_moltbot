@@ -44,6 +44,10 @@
           "chat_id": {
             "type": "string",
             "description": "Optional target Telegram chat id for telegram platform"
+          },
+          "reply_to": {
+            "type": "string",
+            "description": "Optional post ID to reply to (creates a comment/reply)"
           }
         },
         "required": ["content", "platform"]

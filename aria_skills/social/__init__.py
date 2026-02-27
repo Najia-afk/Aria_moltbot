@@ -94,6 +94,7 @@ class SocialSkill(BaseSkill):
         visibility: str = "public",
         simulate: bool = True,
         chat_id: str | None = None,
+        reply_to: str | None = None,
     ) -> SkillResult:
         """
         Create a social media post, routed to the specified platform.
@@ -123,6 +124,7 @@ class SocialSkill(BaseSkill):
                     chat_id=chat_id,
                     mood=mood,
                     media_urls=media_urls,
+                    reply_to=reply_to,
                 )
                 if routed.success and normalized_platform in {"telegram"}:
                     simulated_state = simulate
@@ -183,6 +185,7 @@ class SocialSkill(BaseSkill):
             "visibility": visibility,
             "simulated": simulate,
             "chat_id": chat_id,
+            "reply_to": reply_to,
             "status": "draft",
             "created_at": datetime.now(timezone.utc).isoformat(),
             "published_at": None,
@@ -209,6 +212,7 @@ class SocialSkill(BaseSkill):
         visibility: str = "public",
         simulate: bool = True,
         chat_id: str | None = None,
+        reply_to: str | None = None,
     ) -> SkillResult:
         """Tool-compatible wrapper for creating posts across platforms."""
         return await self.create_post(
@@ -219,6 +223,7 @@ class SocialSkill(BaseSkill):
             visibility=visibility,
             simulate=simulate,
             chat_id=chat_id,
+            reply_to=reply_to,
         )
 
     @logged_method()
