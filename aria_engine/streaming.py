@@ -357,6 +357,25 @@ class StreamManager:
                         assistant_entry["reasoning_content"] = llm_response.thinking
                     messages.append(assistant_entry)
 
+                    # Persist intermediate assistant message so tool results
+                    # aren't orphaned if the session ends mid-iteration.
+                    intermediate_msg = EngineChatMessage(
+                        id=uuid.uuid4(),
+                        session_id=uuid.UUID(session_id),
+                        role="assistant",
+                        content=llm_response.content or "",
+                        thinking=llm_response.thinking or None,
+                        tool_calls=llm_response.tool_calls,
+                        model=accumulator.model,
+                        tokens_input=llm_response.input_tokens if hasattr(llm_response, 'input_tokens') else 0,
+                        tokens_output=llm_response.output_tokens if hasattr(llm_response, 'output_tokens') else 0,
+                        cost=llm_response.cost_usd if hasattr(llm_response, 'cost_usd') else 0,
+                        latency_ms=accumulator.latency_ms,
+                        created_at=datetime.now(timezone.utc),
+                    )
+                    db.add(intermediate_msg)
+                    await db.flush()
+
                     for tc in llm_response.tool_calls:
                         fn_name = tc["function"]["name"]
 
