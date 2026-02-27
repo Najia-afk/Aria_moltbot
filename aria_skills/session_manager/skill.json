@@ -1,7 +1,7 @@
 {
   "name": "aria-session-manager",
   "version": "2.0.0",
-  "description": "Two-layer session management: delete from filesystem (live) + mark ended in aria-api PG (history). Reads sessions.json directly, archives .jsonl transcripts.",
+  "description": "Session management via aria-api REST layer. All data in PostgreSQL (aria_engine.chat_sessions). List, prune stale, delete, stats.",
   "author": "Aria Team",
   "layer": 2,
   "dependencies": [],
@@ -9,7 +9,7 @@
   "tools": [
     {
       "name": "list_sessions",
-      "description": "List all active sessions from the filesystem (sessions.json) across all agents. Returns sessionId, agentId, session_type, label, updatedAt, model, contextTokens.",
+      "description": "List all sessions from the database. Returns id, agent_id, session_type, status, title, model, message_count, updated_at.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -23,7 +23,7 @@
     },
     {
       "name": "delete_session",
-      "description": "Delete a session: removes keys from sessions.json, archives .jsonl transcript, and PATCHes aria-api to mark status=ended (preserves history on /sessions dashboard).",
+      "description": "Delete a session and all its messages from the database.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -42,7 +42,7 @@
     },
     {
       "name": "prune_sessions",
-      "description": "Prune stale sessions older than a threshold. Two-layer: filesystem delete + PG mark ended. Use dry_run=true to preview.",
+      "description": "Prune stale sessions older than a threshold from the database. Use dry_run=true to preview.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -83,7 +83,7 @@
     },
     {
       "name": "cleanup_orphans",
-      "description": "Clean up filesystem inconsistencies left by the gateway's own session management: stale keys in index, orphan .jsonl transcripts not in index, and old .deleted files (>7 days). Run this periodically or after noticing session bloat.",
+      "description": "Clean up ghost sessions (0 messages, stale >15min) from the database. Run this periodically.",
       "parameters": {
         "type": "object",
         "properties": {
