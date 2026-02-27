@@ -1852,21 +1852,23 @@
 
     // ── WebSocket ───────────────────────────────────────────────
     let wsAttempts = 0;
+    const wsApiKey = '{{ ws_api_key }}';
 
     function buildWsUrls(sid) {
         const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const qp = wsApiKey ? `?api_key=${encodeURIComponent(wsApiKey)}` : '';
         const urls = [];
 
         // Priority 1: explicitly configured WS base URL
         const configured = '{{ ws_base_url }}'.trim();
-        if (configured) urls.push(`${proto}//${configured}/ws/chat/${sid}`);
+        if (configured) urls.push(`${proto}//${configured}/ws/chat/${sid}${qp}`);
 
         // Priority 2: same host (works when accessed via Traefik)
-        urls.push(`${proto}//${location.host}/ws/chat/${sid}`);
+        urls.push(`${proto}//${location.host}/ws/chat/${sid}${qp}`);
 
         // Priority 3: API direct on port 8000 (fallback for Flask direct access)
         if (location.port !== '8000') {
-            urls.push(`${proto}//${location.hostname}:8000/ws/chat/${sid}`);
+            urls.push(`${proto}//${location.hostname}:8000/ws/chat/${sid}${qp}`);
         }
 
         // Deduplicate

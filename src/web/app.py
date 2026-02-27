@@ -48,6 +48,7 @@ def create_app():
             'service_host': service_host,
             'api_base_url': api_base_url,
             'ws_base_url': _ws_base_url,
+            'ws_api_key': _api_key,
             'build_ts': _build_ts,
             # REMOVED: legacy bot proxy config
         }
