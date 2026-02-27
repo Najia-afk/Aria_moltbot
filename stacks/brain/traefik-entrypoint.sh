@@ -11,6 +11,8 @@ sed \
   -e "s|\${SERVICE_HOST}|${SERVICE_HOST}|g" \
   -e "s|\${CORS_ALLOWED_ORIGINS}|${CORS_ALLOWED_ORIGINS}|g" \
   -e "s|\${ARIA_API_KEY}|${ARIA_API_KEY}|g" \
+  -e "s|\${TRAEFIK_HTTP_PORT}|${TRAEFIK_HTTP_PORT}|g" \
+  -e "s|\${TRAEFIK_HTTPS_PORT}|${TRAEFIK_HTTPS_PORT}|g" \
   -e "s|\${TRAEFIK_DASHBOARD_USER}|${TRAEFIK_DASHBOARD_USER}|g" \
   -e "s|\${TRAEFIK_DASHBOARD_PASSWORD_HASH}|${TRAEFIK_DASHBOARD_PASSWORD_HASH}|g" \
   /etc/traefik/dynamic.template.yaml > /etc/traefik/dynamic.yaml
