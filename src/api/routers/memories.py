@@ -9,7 +9,7 @@ import math
 import os
 import re
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -377,7 +377,6 @@ async def summarize_session(
     hours_back = body.hours_back
 
     from db.models import ActivityLog
-    from datetime import datetime, timedelta, timezone
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours_back)
 
     stmt = (
