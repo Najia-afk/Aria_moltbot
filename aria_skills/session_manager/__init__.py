@@ -8,8 +8,9 @@ All session data lives in PostgreSQL (aria_engine.chat_sessions / chat_messages)
 Tools:
   - list_sessions        — list active sessions (from DB via API)
   - delete_session       — delete a session + its messages
-  - prune_sessions       — prune stale sessions older than N minutes
+  - prune_sessions       — archive stale sessions (hidden from chat, kept for Aria)
   - get_session_stats    — summary statistics
+  - list_archived_sessions — browse archived sessions (pruned from chat)
   - cleanup_after_delegation — delete a sub-agent session after completion
   - cleanup_orphans      — purge ghost sessions (0 messages, stale)
 """
@@ -55,11 +56,11 @@ class SessionManagerSkill(BaseSkill):
 
     async def _fetch_sessions(
         self,
-        limit: int = 500,
+        limit: int = 200,
     ) -> list[dict[str, Any]]:
-        """Fetch sessions from the engine sessions API."""
+        """Fetch sessions from the engine sessions API (max 200 per API constraint)."""
         params: dict[str, Any] = {
-            "limit": limit,
+            "limit": min(limit, 200),
             "sort": "updated_at",
             "order": "desc",
         }
@@ -150,11 +151,14 @@ class SessionManagerSkill(BaseSkill):
         **kwargs,
     ) -> SkillResult:
         """
-        Prune stale sessions older than threshold.
+        Archive stale sessions older than threshold.
+
+        Sessions are moved to archive tables — hidden from chat UI but
+        still accessible to Aria via list_archived_sessions.
 
         Args:
-            max_age_minutes: Delete sessions older than this (default: config value or 60).
-            dry_run: If true, list candidates without deleting.
+            max_age_minutes: Archive sessions older than this (default: config value or 60).
+            dry_run: If true, list candidates without archiving.
         """
         if not max_age_minutes:
             max_age_minutes = kwargs.get("max_age_minutes", self._stale_threshold_minutes)
@@ -165,7 +169,7 @@ class SessionManagerSkill(BaseSkill):
         if isinstance(dry_run, str):
             dry_run = dry_run.lower() in ("true", "1", "yes")
 
-        sessions = await self._fetch_sessions(limit=500)
+        sessions = await self._fetch_sessions(limit=200)
         now = datetime.now(timezone.utc)
         cutoff = now - timedelta(minutes=int(max_age_minutes))
 
@@ -202,7 +206,7 @@ class SessionManagerSkill(BaseSkill):
                     pass
             to_delete.append(sess)
 
-        deleted_ids: list[str] = []
+        archived_ids: list[str] = []
         errors: list[dict[str, str]] = []
 
         if not dry_run:
@@ -210,9 +214,11 @@ class SessionManagerSkill(BaseSkill):
                 sid = sess.get("session_id") or sess.get("id", "")
                 if sid:
                     try:
-                        r = await self._api.delete(f"/engine/sessions/{sid}")
+                        # Archive (copy to archive table + remove from chat)
+                        # NOT delete — data is preserved for Aria to query
+                        r = await self._api.post(f"/engine/sessions/{sid}/archive")
                         if r.success:
-                            deleted_ids.append(sid)
+                            archived_ids.append(sid)
                         else:
                             errors.append({"id": sid, "error": r.error or "unknown"})
                     except Exception as e:
@@ -223,7 +229,7 @@ class SessionManagerSkill(BaseSkill):
             "pruned_count": len(to_delete),
             "kept_count": len(kept),
             "dry_run": dry_run,
-            "deleted_ids": deleted_ids if not dry_run else [
+            "archived_ids": archived_ids if not dry_run else [
                 s.get("session_id") or s.get("id", "") for s in to_delete
             ],
             "errors": errors,
@@ -234,7 +240,7 @@ class SessionManagerSkill(BaseSkill):
     async def get_session_stats(self, **kwargs) -> SkillResult:
         """Get summary statistics about current sessions."""
         try:
-            sessions = await self._fetch_sessions(limit=500)
+            sessions = await self._fetch_sessions(limit=200)
             now = datetime.now(timezone.utc)
             agent_counts: dict[str, int] = {}
             type_counts: dict[str, int] = {}
@@ -278,6 +284,43 @@ class SessionManagerSkill(BaseSkill):
             return SkillResult.fail(f"Error getting session stats: {e}")
 
     @logged_method()
+    async def list_archived_sessions(self, agent: str = "", limit: int = 50, **kwargs) -> SkillResult:
+        """
+        List sessions that have been archived (pruned from chat but preserved).
+
+        Archived sessions are no longer visible in the chat UI but Aria can
+        browse them here for historical context, past conversations, and auditing.
+
+        Args:
+            agent: Filter by agent_id (default: all agents).
+            limit: Max sessions to return (default 50, max 200).
+        """
+        agent = agent or kwargs.get("agent", "")
+        if isinstance(limit, str):
+            limit = int(limit) if limit else 50
+        limit = min(limit, 200)
+
+        try:
+            params: dict[str, Any] = {"limit": limit}
+            if agent:
+                params["agent_id"] = agent
+
+            result = await self._api.get("/engine/sessions/archived", params=params)
+            if not result.success:
+                return SkillResult.fail(f"Failed to fetch archived sessions: {result.error}")
+
+            data = result.data if isinstance(result.data, dict) else {}
+            sessions = data.get("sessions", [])
+
+            return SkillResult.ok({
+                "archived_count": len(sessions),
+                "total": data.get("total", len(sessions)),
+                "sessions": sessions,
+            })
+        except Exception as e:
+            return SkillResult.fail(f"Error listing archived sessions: {e}")
+
+    @logged_method()
     async def cleanup_after_delegation(self, session_id: str = "", **kwargs) -> SkillResult:
         """Clean up a session after a sub-agent delegation completes."""
         if not session_id:
@@ -302,7 +345,7 @@ class SessionManagerSkill(BaseSkill):
 
         try:
             if dry_run:
-                sessions = await self._fetch_sessions(limit=500)
+                sessions = await self._fetch_sessions(limit=200)
                 ghosts = [s for s in sessions if s.get("message_count", 0) == 0]
                 return SkillResult.ok({
                     "dry_run": True,

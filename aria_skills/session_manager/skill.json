@@ -42,7 +42,7 @@
     },
     {
       "name": "prune_sessions",
-      "description": "Prune stale sessions older than a threshold from the database. Use dry_run=true to preview.",
+      "description": "Archive stale sessions older than a threshold. Sessions are moved to archive tables (hidden from chat but Aria can still access them). Use dry_run=true to preview.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -79,6 +79,25 @@
           }
         },
         "required": ["session_id"]
+      }
+    },
+    {
+      "name": "list_archived_sessions",
+      "description": "Browse archived sessions. These were pruned from chat but preserved for historical context. Aria can see past conversations here.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "agent": {
+            "type": "string",
+            "description": "Filter by agent_id (default: all agents)",
+            "default": ""
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max sessions to return (default 50, max 200)",
+            "default": 50
+          }
+        }
       }
     },
     {

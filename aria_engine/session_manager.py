@@ -996,6 +996,66 @@ class NativeSessionManager:
         logger.info("Archived session %s to archive tables", session_id)
         return True
 
+    async def list_archived_sessions(
+        self,
+        limit: int = 200,
+        offset: int = 0,
+        agent_id: str | None = None,
+    ) -> dict[str, Any]:
+        """
+        List sessions that have been archived.
+
+        Returns:
+            Dict with 'sessions' list and 'total' count.
+        """
+        await self._ensure_archive_tables()
+
+        filters = []
+        if agent_id:
+            filters.append(EngineChatSessionArchive.agent_id == agent_id)
+
+        count_stmt = select(func.count(EngineChatSessionArchive.id))
+        if filters:
+            count_stmt = count_stmt.where(and_(*filters))
+
+        stmt = (
+            select(EngineChatSessionArchive)
+            .where(and_(*filters)) if filters
+            else select(EngineChatSessionArchive)
+        )
+        stmt = stmt.order_by(EngineChatSessionArchive.archived_at.desc()).limit(limit).offset(offset)
+
+        async with self._async_session() as session:
+            total_result = await session.execute(count_stmt)
+            total = total_result.scalar() or 0
+
+            result = await session.execute(stmt)
+            rows = result.scalars().all()
+
+        sessions = []
+        for r in rows:
+            sessions.append({
+                "session_id": str(r.id),
+                "agent_id": r.agent_id,
+                "session_type": r.session_type,
+                "title": r.title or "Untitled",
+                "model": r.model,
+                "status": r.status,
+                "message_count": r.message_count,
+                "total_tokens": r.total_tokens,
+                "total_cost": float(r.total_cost) if r.total_cost else 0,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+                "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+                "archived_at": r.archived_at.isoformat() if r.archived_at else None,
+            })
+
+        return {
+            "sessions": sessions,
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+        }
+
     async def delete_ghost_sessions(self, older_than_minutes: int = 15) -> int:
         """
         Delete sessions with 0 messages older than ``older_than_minutes``.

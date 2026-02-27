@@ -299,6 +299,74 @@ async def get_session_messages(
     return [MessageResponse(**m) for m in messages]
 
 
+# ── Static-path DELETE/POST before /{session_id} to avoid route shadowing ─
+
+@router.get("/archived")
+async def list_archived_sessions(
+    agent_id: str | None = Query(default=None, description="Filter by agent ID"),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+):
+    """
+    List archived sessions.
+
+    Archived sessions have been moved from the working tables to the archive
+    tables. They no longer appear in the main session list or chat UI,
+    but Aria can still browse them for historical context.
+    """
+    mgr = await _get_manager()
+    result = await mgr.list_archived_sessions(
+        limit=limit,
+        offset=offset,
+        agent_id=agent_id,
+    )
+    return result
+
+
+@router.delete("/ghosts")
+async def purge_ghost_sessions(
+    older_than_minutes: int = Query(
+        default=15,
+        ge=0,
+        le=1440,
+        description="Delete sessions with 0 messages older than N minutes (0 = all ghosts)",
+    ),
+):
+    """
+    Delete all sessions with 0 messages older than N minutes.
+
+    Ghost sessions are created by cron tasks or page visits that never
+    received a message. They are safe to purge — no data is lost.
+    The background task runs this automatically every 10 minutes.
+    """
+    mgr = await _get_manager()
+    deleted = await mgr.delete_ghost_sessions(older_than_minutes=older_than_minutes)
+    logger.info("Ghost purge via API: deleted %d sessions (>%d min)", deleted, older_than_minutes)
+    return {"status": "ok", "deleted": deleted, "older_than_minutes": older_than_minutes}
+
+
+@router.post("/cleanup")
+async def cleanup_sessions(
+    days: int = Query(default=30, ge=1, le=365, description="Prune sessions inactive for this many days"),
+    dry_run: bool = Query(default=True, description="If true, only count — don't delete"),
+):
+    """
+    Archive + prune stale sessions older than N days (S-67 session auto-cleanup).
+
+    Behavior:
+    - stale sessions/messages are copied into internal archive tables
+    - only then removed from working tables
+    - archive tables are not exposed via API/UI yet
+    """
+    mgr = await _get_manager()
+    result = await mgr.prune_old_sessions(days=days, dry_run=dry_run)
+    logger.info(
+        "Session cleanup: %s (days=%d, dry_run=%s)",
+        result, days, dry_run,
+    )
+    return result
+
+
 @router.delete("/{session_id}")
 async def delete_session(session_id: str):
     """Delete a session and all its messages."""
@@ -437,52 +505,6 @@ async def archive_session(session_id: str):
         raise HTTPException(404, f"Session {session_id} not found")
     logger.info("Physically archived session %s", session_id)
     return {"status": "archived", "session_id": session_id}
-
-
-@router.delete("/ghosts")
-async def purge_ghost_sessions(
-    older_than_minutes: int = Query(
-        default=15,
-        ge=0,
-        le=1440,
-        description="Delete sessions with 0 messages older than N minutes (0 = all ghosts)",
-    ),
-):
-    """
-    Delete all sessions with 0 messages older than N minutes.
-
-    Ghost sessions are created by cron tasks or page visits that never
-    received a message. They are safe to purge — no data is lost.
-    The background task runs this automatically every 10 minutes.
-    """
-    mgr = await _get_manager()
-    deleted = await mgr.delete_ghost_sessions(older_than_minutes=older_than_minutes)
-    logger.info("Ghost purge via API: deleted %d sessions (>%d min)", deleted, older_than_minutes)
-    return {"status": "ok", "deleted": deleted, "older_than_minutes": older_than_minutes}
-
-
-@router.post("/cleanup")
-async def cleanup_sessions(
-    days: int = Query(default=30, ge=1, le=365, description="Prune sessions inactive for this many days"),
-    dry_run: bool = Query(default=True, description="If true, only count — don't delete"),
-):
-    """
-    Archive + prune stale sessions older than N days (S-67 session auto-cleanup).
-
-    Behavior:
-    - stale sessions/messages are copied into internal archive tables
-    - only then removed from working tables
-    - archive tables are not exposed via API/UI yet
-
-    Default is dry_run=true for safety. Set dry_run=false to actually remove.
-    """
-    mgr = await _get_manager()
-    result = await mgr.prune_old_sessions(days=days, dry_run=dry_run)
-    logger.info(
-        "Session cleanup: %s (days=%d, dry_run=%s)",
-        result, days, dry_run,
-    )
-    return result
 
 
 ### SQL indexes for performance (add via Alembic migration)
