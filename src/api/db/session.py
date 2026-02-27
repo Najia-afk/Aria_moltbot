@@ -241,7 +241,7 @@ async def ensure_schema() -> None:
         await _run_isolated(
             conn, "hnsw_session_messages_embedding",
             "CREATE INDEX IF NOT EXISTS idx_session_messages_embedding_hnsw "
-            "ON aria_engine.session_messages USING hnsw (embedding vector_cosine_ops) "
+            "ON aria_engine.chat_messages USING hnsw (embedding vector_cosine_ops) "
             "WITH (m = 16, ef_construction = 64) "
             "WHERE embedding IS NOT NULL",
         )
