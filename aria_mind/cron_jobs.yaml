@@ -188,7 +188,7 @@ jobs:
   # ── Telegram Bot Long-Poll (S-46) ──
   - name: telegram_poll
     every: "2m"
-    text: "Poll Telegram for new messages and commands. Use exec python3 skills/run_skill.py social telegram_poll '{}'. Process any /status /goals /memory commands and reply."
+    text: "Poll Telegram for new messages using telegram__get_updates. For each update: if message text starts with /status reply with current health (api_client__get /api/health), if /goals reply with active goals count, if /memory reply with latest 3 semantic memories. Send replies with telegram__send_message to the chat_id from the update. If no updates, do nothing silently."
     agent: aria
     session: isolated
     delivery: none

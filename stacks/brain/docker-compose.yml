@@ -68,6 +68,9 @@ services:
       # Moltbook (engine executes skill tools directly)
       MOLTBOOK_TOKEN: ${MOLTBOOK_TOKEN:-}
       MOLTBOOK_API_URL: ${MOLTBOOK_API_URL:-https://www.moltbook.com/api/v1}
+      # Telegram (engine executes telegram skill tools for cron jobs)
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
       PYTHONPATH: /
       PYTHONUNBUFFERED: "1"
     volumes:
