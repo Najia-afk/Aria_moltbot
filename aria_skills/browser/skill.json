@@ -1,0 +1,98 @@
+{
+  "name": "aria-browser",
+  "version": "1.0.0",
+  "layer": 2,
+  "description": "Headless browser for web access — navigate, snapshot, screenshot, and scrape pages via the aria-browser (browserless/chrome) service.",
+  "author": "Aria Blue",
+  "dependencies": [],
+  "focus_affinity": ["research", "devsecops"],
+  "tools": [
+    {
+      "name": "navigate",
+      "description": "Navigate to a URL and return the full page HTML content, title, and status. Use this for fetching complete web pages or checking service responses. Returns HTML body, page title, and HTTP status.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The URL to navigate to (e.g. https://example.com or http://aria-api:8000/health)"
+          },
+          "wait_for": {
+            "type": "string",
+            "description": "Optional CSS selector to wait for before capturing content (e.g. '#main', '.loaded')"
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "Page load timeout in milliseconds (default: 30000)"
+          }
+        },
+        "required": ["url"]
+      }
+    },
+    {
+      "name": "snapshot",
+      "description": "Take a structured snapshot of a web page — extracts title, headings, links, meta tags, and visible text. More useful than raw HTML for understanding page content.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The URL to snapshot"
+          },
+          "selectors": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Optional CSS selectors to extract (default: title, h1-h3, p, a, meta). Each selector returns matching elements with text and attributes."
+          }
+        },
+        "required": ["url"]
+      }
+    },
+    {
+      "name": "screenshot",
+      "description": "Capture a PNG screenshot of a web page. Returns a base64-encoded image. Useful for visual verification of page rendering.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The URL to screenshot"
+          },
+          "full_page": {
+            "type": "boolean",
+            "description": "Capture full scrollable page (default: false, viewport only)"
+          }
+        },
+        "required": ["url"]
+      }
+    },
+    {
+      "name": "scrape",
+      "description": "Extract specific elements from a web page by CSS selector. Returns text, HTML, and attributes for each matching element. Use for targeted data extraction.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The URL to scrape"
+          },
+          "elements": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "selector": {
+                  "type": "string",
+                  "description": "CSS selector to match (e.g. 'h1', '.article-body', '#price')"
+                }
+              },
+              "required": ["selector"]
+            },
+            "description": "Array of CSS selectors to extract"
+          }
+        },
+        "required": ["url", "elements"]
+      }
+    }
+  ]
+}
