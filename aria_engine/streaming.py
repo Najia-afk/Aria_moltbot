@@ -283,7 +283,7 @@ class StreamManager:
             tools_for_llm = self.tools.get_tools_for_llm() if enable_tools else None
 
             # ── Stream LLM response ───────────────────────────────────────
-            max_tool_iterations = 10
+            max_tool_iterations = 20
             max_per_tool_failures = 3
             tool_failure_counts: dict[str, int] = {}
             for iteration in range(max_tool_iterations):

@@ -94,7 +94,7 @@ class ChatEngine:
     """
 
     # Maximum tool call iterations to prevent infinite loops
-    MAX_TOOL_ITERATIONS = 10
+    MAX_TOOL_ITERATIONS = 20
 
     # Per-tool consecutive failure cap — after this many failures of the
     # *same* tool in one turn, we inject a rejection so the LLM stops retrying.
