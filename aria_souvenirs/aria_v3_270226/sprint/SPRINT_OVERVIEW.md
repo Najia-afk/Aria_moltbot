@@ -162,6 +162,6 @@ Exception: S-34 (chat DAG) uses hierarchical LR layout — no physics.
 | lesson | Red #ef4444 | Star | --danger |
 
 ### Docker Ports for Verification
-- API: `localhost:8000` (aria-api)
-- Web: `localhost:5050` (aria-web, external port)
-- DB: `localhost:5432` (aria-db)
+- API: `localhost:${ARIA_API_PORT:-8000}` (aria-api)
+- Web: `localhost:${ARIA_WEB_PORT:-5050}` (aria-web, external port)
+- DB: `localhost:${DB_PORT:-5432}` (aria-db)
