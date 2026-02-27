@@ -1739,11 +1739,7 @@
     async function switchSession(sid) {
         if (sid === sessionId) return;
 
-        if (ws && ws.readyState <= 1) {
-            ws._intentionalClose = true;  // flag so onclose doesn't auto-retry
-            ws.close();
-            ws = null;
-        }
+        closeWsIntentional();
 
         sessionId = sid;
         wsAttempts = 0;  // reset retry counter for new session
@@ -1793,10 +1789,7 @@
     }
 
     async function createNewSession() {
-        if (ws && ws.readyState <= 1) {
-            ws._intentionalClose = true;
-            ws.close();
-        }
+        closeWsIntentional();
         sessionId = '';
         currentAgentId = 'aria';  // reset for new session
         streamingMessageEl = null;
@@ -1852,7 +1845,43 @@
 
     // ── WebSocket ───────────────────────────────────────────────
     let wsAttempts = 0;
+    let wsReconnectTimer = null;
+    let wsPingTimer = null;
     const wsApiKey = '{{ ws_api_key }}';
+    const WS_PING_MS = 20000;
+    const WS_MAX_BACKOFF_MS = 15000;
+
+    function clearWsTimers() {
+        if (wsReconnectTimer) {
+            clearTimeout(wsReconnectTimer);
+            wsReconnectTimer = null;
+        }
+        if (wsPingTimer) {
+            clearInterval(wsPingTimer);
+            wsPingTimer = null;
+        }
+    }
+
+    function closeWsIntentional() {
+        clearWsTimers();
+        if (ws && ws.readyState <= 1) {
+            ws._intentionalClose = true;
+            ws.close();
+        }
+        ws = null;
+    }
+
+    function startWsPing() {
+        if (wsPingTimer) clearInterval(wsPingTimer);
+        wsPingTimer = setInterval(() => {
+            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+            try {
+                ws.send(JSON.stringify({ type: 'ping' }));
+            } catch (e) {
+                console.debug('WS ping failed:', e);
+            }
+        }, WS_PING_MS);
+    }
 
     function buildWsUrls(sid) {
         const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -1879,13 +1908,9 @@
     function connectWS() {
         if (ws && ws.readyState <= 1) return;
         if (!sessionId) return;
-
-        // Stop retrying after too many failed attempts
-        const MAX_WS_RETRIES = 10;
-        if (wsAttempts >= MAX_WS_RETRIES) {
-            setStatus('disconnected');
-            console.warn(`WebSocket: gave up after ${wsAttempts} attempts for session ${sessionId}`);
-            return;
+        if (wsReconnectTimer) {
+            clearTimeout(wsReconnectTimer);
+            wsReconnectTimer = null;
         }
 
         const urls = buildWsUrls(sessionId);
@@ -1893,7 +1918,7 @@
         const url = urls[urlIdx];
 
         setStatus('connecting');
-        console.log(`WebSocket connecting (attempt ${wsAttempts + 1}/${MAX_WS_RETRIES}):`, url);
+        console.log(`WebSocket connecting (attempt ${wsAttempts + 1}):`, url);
 
         ws = new WebSocket(url);
 
@@ -1901,6 +1926,7 @@
             wsAttempts = 0;  // reset on successful connection
             setStatus('connected');
             console.log('WebSocket connected to session:', sessionId);
+            startWsPing();
             // Flush any pending message that was waiting for connection
             if (pendingMessage) {
                 const msg = pendingMessage;
@@ -1916,21 +1942,25 @@
 
         ws.onclose = (e) => {
             console.log('WebSocket closed:', e.code, e.reason);
+            if (wsPingTimer) {
+                clearInterval(wsPingTimer);
+                wsPingTimer = null;
+            }
             // Don't auto-retry if the close was intentional (switchSession / createNewSession)
             if (e.target._intentionalClose) return;
             setStatus('disconnected');
             wsAttempts++;
-            if (sessionId && wsAttempts < MAX_WS_RETRIES) {
-                // Quick retry (1s) when cycling through fallback URLs,
-                // slower retry (3s) once all URLs have been tried, back off further
-                const urls = buildWsUrls(sessionId);
-                const delay = wsAttempts < urls.length ? 1000 : Math.min(3000 * wsAttempts, 15000);
-                setTimeout(() => connectWS(), delay);
-            }
+            if (!sessionId) return;
+            // Quick retry (1s) when cycling through fallback URLs,
+            // then exponential-ish backoff capped to avoid reconnect storms.
+            const urls = buildWsUrls(sessionId);
+            const delay = wsAttempts < urls.length
+                ? 1000
+                : Math.min(1000 * (2 ** Math.min(wsAttempts, 4)), WS_MAX_BACKOFF_MS);
+            wsReconnectTimer = setTimeout(() => connectWS(), delay);
         };
 
         ws.onerror = (e) => {
-            setStatus('error');
             console.error('WebSocket error:', e);
         };
     }

@@ -110,11 +110,12 @@ services:
       options:
         max-size: "50m"
         max-file: "5"
-  # Tor Proxy for privacy
+  # Tor Proxy for privacy (optional: docker compose --profile tor up -d)
   tor-proxy:
     # Aria v3 freeze: pinned to digest (no versioned tags available)
     image: dperson/torproxy:latest@sha256:d8b5f1cf24f1b7a0aa334929a264b2606a107223dd0d51eb1cda8aae6fbeec53
     container_name: tor-proxy
+    profiles: ["tor"]
     restart: unless-stopped
     environment:
       TOR_SOCKS_INTERNAL_PORT: ${TOR_SOCKS_INTERNAL_PORT:-9050}

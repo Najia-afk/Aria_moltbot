@@ -24,11 +24,11 @@ _AGENT_SESSIONS_SQL = text(
         NULLIF(tokens_used, 0) AS tokens_used,
         NULL::text AS model_used,
         started_at AS created_at
-      FROM agent_sessions
+      FROM aria_data.agent_sessions
       WHERE session_type = 'skill_exec'
         AND metadata ? 'skill'
     ), ins AS (
-      INSERT INTO skill_invocations (
+      INSERT INTO aria_data.skill_invocations (
         skill_name,
         tool_name,
         duration_ms,
@@ -42,7 +42,7 @@ _AGENT_SESSIONS_SQL = text(
       FROM src s
       WHERE NOT EXISTS (
         SELECT 1
-        FROM skill_invocations si
+        FROM aria_data.skill_invocations si
         WHERE si.skill_name = s.skill_name
           AND si.tool_name = s.tool_name
           AND si.created_at = s.created_at
@@ -65,10 +65,10 @@ _MODEL_USAGE_SQL = text(
         NULL::int AS tokens_used,
         LEFT(model, 100) AS model_used,
         created_at
-      FROM model_usage
+      FROM aria_data.model_usage
       WHERE model LIKE 'skill:%:%'
     ), ins AS (
-      INSERT INTO skill_invocations (
+      INSERT INTO aria_data.skill_invocations (
         skill_name,
         tool_name,
         duration_ms,
@@ -82,7 +82,7 @@ _MODEL_USAGE_SQL = text(
       FROM src s
       WHERE NOT EXISTS (
         SELECT 1
-        FROM skill_invocations si
+        FROM aria_data.skill_invocations si
         WHERE si.skill_name = s.skill_name
           AND si.tool_name = s.tool_name
           AND si.created_at = s.created_at
@@ -108,11 +108,11 @@ _ACTIVITY_LOG_SQL = text(
         NULL::int AS tokens_used,
         NULL::text AS model_used,
         created_at
-      FROM activity_log
+      FROM aria_data.activity_log
       WHERE COALESCE(skill, '') <> ''
         AND skill <> 'pytest'
     ), ins AS (
-      INSERT INTO skill_invocations (
+      INSERT INTO aria_data.skill_invocations (
         skill_name,
         tool_name,
         duration_ms,
@@ -126,7 +126,7 @@ _ACTIVITY_LOG_SQL = text(
       FROM src s
       WHERE NOT EXISTS (
         SELECT 1
-        FROM skill_invocations si
+        FROM aria_data.skill_invocations si
         WHERE si.skill_name = s.skill_name
           AND si.tool_name = s.tool_name
           AND si.created_at = s.created_at

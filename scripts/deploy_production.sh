@@ -20,14 +20,32 @@ set -euo pipefail
 #
 # ============================================================================
 
+# Load stack environment (stacks/brain/.env) if present
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT_DIR="$(dirname "$SCRIPT_DIR")"
+STACK_ENV_FILE="${ROOT_DIR}/stacks/brain/.env"
+
+if [ -f "$STACK_ENV_FILE" ]; then
+    while IFS='=' read -r key value; do
+        [[ "$key" =~ ^#.*$ || -z "$key" ]] && continue
+        value="${value%\r}"
+        value="${value%\"}"
+        value="${value#\"}"
+        value="${value%\'}"
+        value="${value#\'}"
+        export "$key=$value"
+    done < <(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "$STACK_ENV_FILE")
+fi
+
 # --- Configuration ---
-REMOTE_USER="najia"
-REMOTE_HOST="192.168.1.53"
-SSH_KEY="$HOME/.ssh/najia_mac_key"
-REMOTE_DIR="/home/najia/aria"
-COMPOSE_FILE="stacks/brain/docker-compose.yml"
-BACKUP_DIR="/home/najia/aria/backups"
-DEPLOY_LOG="/home/najia/aria/deploy.log"
+REMOTE_USER="${ARIA_DEPLOY_USER:-${MAC_USER:-}}"
+REMOTE_HOST="${ARIA_DEPLOY_HOST:-${MAC_HOST:-}}"
+SSH_KEY="${ARIA_DEPLOY_SSH_KEY:-${SSH_KEY_PATH:-}}"
+REMOTE_DIR="${ARIA_DEPLOY_DIR:-}"
+COMPOSE_FILE="${ARIA_DEPLOY_COMPOSE_FILE:-stacks/brain/docker-compose.yml}"
+BACKUP_DIR="${ARIA_DEPLOY_BACKUP_DIR:-/Users/${REMOTE_USER:-aria}/aria_vault/deploy_backups}"
+DEPLOY_LOG="${ARIA_DEPLOY_LOG:-/Users/${REMOTE_USER:-aria}/aria/deploy.log}"
+DEPLOY_DISK_CHECK_PATH="${ARIA_DEPLOY_DISK_CHECK_PATH:-${REMOTE_DIR:-/}}"
 
 # --- Flags ---
 DRY_RUN=false
@@ -53,6 +71,14 @@ NC='\033[0m' # No Color
 log() { echo -e "${GREEN}[DEPLOY]${NC} $1"; }
 warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 error() { echo -e "${RED}[ERROR]${NC} $1"; }
+
+validate_config() {
+    [ -n "${REMOTE_USER}" ] || { error "Missing ARIA_DEPLOY_USER"; exit 1; }
+    [ -n "${REMOTE_HOST}" ] || { error "Missing ARIA_DEPLOY_HOST"; exit 1; }
+    [ -n "${SSH_KEY}" ] || { error "Missing ARIA_DEPLOY_SSH_KEY"; exit 1; }
+    [ -n "${REMOTE_DIR}" ] || { error "Missing ARIA_DEPLOY_DIR"; exit 1; }
+    [ -f "${SSH_KEY}" ] || { error "SSH key not found: ${SSH_KEY}"; exit 1; }
+}
 
 ssh_cmd() {
     ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$REMOTE_USER@$REMOTE_HOST" "$@"
@@ -88,7 +114,7 @@ preflight() {
     log "  Docker Compose: OK"
 
     # Disk space (need at least 5GB free)
-    FREE_KB=$(ssh_cmd "df -k /home/najia | tail -1 | awk '{print \$4}'")
+    FREE_KB=$(ssh_cmd "df -k $DEPLOY_DISK_CHECK_PATH | tail -1 | awk '{print \$4}'")
     FREE_GB=$((FREE_KB / 1024 / 1024))
     if [ "$FREE_GB" -lt 5 ]; then
         error "Insufficient disk space: ${FREE_GB}GB free (need 5GB)"
@@ -324,6 +350,8 @@ if [ "$ROLLBACK" = true ]; then
 fi
 echo "============================================"
 echo ""
+
+validate_config
 
 preflight
 
