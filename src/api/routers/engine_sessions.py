@@ -237,6 +237,28 @@ async def get_session_stats():
     return SessionStatsResponse(**stats)
 
 
+@router.get("/archived")
+async def list_archived_sessions(
+    agent_id: str | None = Query(default=None, description="Filter by agent ID"),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+):
+    """
+    List archived sessions.
+
+    Archived sessions have been moved from the working tables to the archive
+    tables. They no longer appear in the main session list or chat UI,
+    but Aria can still browse them for historical context.
+    """
+    mgr = await _get_manager()
+    result = await mgr.list_archived_sessions(
+        limit=limit,
+        offset=offset,
+        agent_id=agent_id,
+    )
+    return result
+
+
 @router.get("/{session_id}", response_model=SessionDetailResponse)
 async def get_session(session_id: str):
     """Get session details with recent messages."""
@@ -300,28 +322,6 @@ async def get_session_messages(
 
 
 # ── Static-path DELETE/POST before /{session_id} to avoid route shadowing ─
-
-@router.get("/archived")
-async def list_archived_sessions(
-    agent_id: str | None = Query(default=None, description="Filter by agent ID"),
-    limit: int = Query(default=50, ge=1, le=200),
-    offset: int = Query(default=0, ge=0),
-):
-    """
-    List archived sessions.
-
-    Archived sessions have been moved from the working tables to the archive
-    tables. They no longer appear in the main session list or chat UI,
-    but Aria can still browse them for historical context.
-    """
-    mgr = await _get_manager()
-    result = await mgr.list_archived_sessions(
-        limit=limit,
-        offset=offset,
-        agent_id=agent_id,
-    )
-    return result
-
 
 @router.delete("/ghosts")
 async def purge_ghost_sessions(
