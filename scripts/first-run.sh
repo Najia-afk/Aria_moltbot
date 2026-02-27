@@ -128,7 +128,62 @@ fill_env "PGADMIN_PASSWORD" "$PGADMIN_PASS"
 fill_env "ARIA_API_KEY" "$API_KEY"
 fill_env "ARIA_ADMIN_KEY" "$ADMIN_KEY"
 
+ADMIN_TOKEN=$(generate_secret)
+BROWSER_TOKEN=$(generate_secret)
+fill_env "ARIA_ADMIN_TOKEN" "$ADMIN_TOKEN"
+fill_env "BROWSERLESS_TOKEN" "$BROWSER_TOKEN"
+
 info "Required secrets generated and written to .env"
+
+# ── Randomize host-exposed ports ──────────────────────────────
+# Each service gets a random high port (20000-60000) to avoid conflicts.
+
+info "Randomizing host-exposed ports..."
+
+random_port() {
+    python3 -c "import random; print(random.randint(20000, 60000))" 2>/dev/null \
+        || echo $(( RANDOM % 40000 + 20000 ))
+}
+
+ARIA_API_PORT=$(random_port)
+ARIA_WEB_PORT=$(random_port)
+LITELLM_PORT=$(random_port)
+PGADMIN_PORT=$(random_port)
+BROWSERLESS_PORT=$(random_port)
+TOR_SOCKS_PORT=$(random_port)
+TOR_CONTROL_PORT=$(random_port)
+TRAEFIK_HTTP_PORT=$(random_port)
+TRAEFIK_HTTPS_PORT=$(random_port)
+TRAEFIK_DASH_PORT=$(random_port)
+PROMETHEUS_PORT=$(random_port)
+GRAFANA_PORT=$(random_port)
+JAEGER_UI_PORT=$(random_port)
+JAEGER_OTLP_GRPC_PORT=$(random_port)
+SANDBOX_PORT=$(random_port)
+
+# Overwrite the default port values (not empty, so use direct sed)
+set_port() {
+    local key="$1" val="$2"
+    eval "$SED_I 's|^${key}=.*|${key}=${val}|' \"$ENV_FILE\""
+}
+
+set_port "ARIA_API_PORT" "$ARIA_API_PORT"
+set_port "ARIA_WEB_PORT" "$ARIA_WEB_PORT"
+set_port "LITELLM_PORT" "$LITELLM_PORT"
+set_port "PGADMIN_PORT" "$PGADMIN_PORT"
+set_port "BROWSERLESS_PORT" "$BROWSERLESS_PORT"
+set_port "TOR_SOCKS_PORT" "$TOR_SOCKS_PORT"
+set_port "TOR_CONTROL_PORT" "$TOR_CONTROL_PORT"
+set_port "TRAEFIK_HTTP_PORT" "$TRAEFIK_HTTP_PORT"
+set_port "TRAEFIK_HTTPS_PORT" "$TRAEFIK_HTTPS_PORT"
+set_port "TRAEFIK_DASH_PORT" "$TRAEFIK_DASH_PORT"
+set_port "PROMETHEUS_PORT" "$PROMETHEUS_PORT"
+set_port "GRAFANA_PORT" "$GRAFANA_PORT"
+set_port "JAEGER_UI_PORT" "$JAEGER_UI_PORT"
+set_port "JAEGER_OTLP_GRPC_PORT" "$JAEGER_OTLP_GRPC_PORT"
+set_port "SANDBOX_PORT" "$SANDBOX_PORT"
+
+info "Host ports randomized (no conflicts with existing services)"
 
 # ── Optional: prompt for API keys ─────────────────────────────
 
@@ -167,9 +222,17 @@ echo "    ARIA_ADMIN_KEY    = ${ADMIN_KEY:0:8}..."
 echo "    GRAFANA_PASSWORD  = ${GRAFANA_PASS:0:8}..."
 echo "    PGADMIN_PASSWORD  = ${PGADMIN_PASS:0:8}..."
 echo ""
+echo "  Randomized ports:"
+echo "    API:       http://localhost:${ARIA_API_PORT}"
+echo "    Web UI:    http://localhost:${ARIA_WEB_PORT}"
+echo "    LiteLLM:   http://localhost:${LITELLM_PORT}"
+echo "    Traefik:   http://localhost:${TRAEFIK_HTTP_PORT} (HTTP)"
+echo "               https://localhost:${TRAEFIK_HTTPS_PORT} (HTTPS)"
+echo ""
 echo "  Next steps:"
-echo "    1. Review/edit:  nano $ENV_FILE"
-echo "    2. Start stack:  cd $STACK_DIR && $COMPOSE_CMD up -d"
-echo "    3. Open web UI:  http://localhost:5000"
-echo "    4. Open API docs: http://localhost:8000/docs"
+echo "    1. Review/edit:   nano $ENV_FILE"
+echo "    2. Build stack:   cd $REPO_ROOT && docker compose build"
+echo "    3. Start stack:   docker compose up -d"
+echo "    4. Open web UI:   http://localhost:${ARIA_WEB_PORT}"
+echo "    5. Open API docs: http://localhost:${ARIA_API_PORT}/docs"
 echo ""

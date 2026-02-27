@@ -1,10 +1,7 @@
--- Aria Engine Schema — Standalone runtime tables
--- Creates the aria_engine schema and all engine tables
--- Required by: aria_engine container (agent_pool, scheduler, chat_engine, etc.)
-
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS vector;
-CREATE SCHEMA IF NOT EXISTS aria_engine;
+-- ============================================================================
+-- Schema: aria_engine
+-- Engine infrastructure — sessions, agents, scheduling, models
+-- ============================================================================
 
 -- ============================================================================
 -- Chat Sessions
@@ -28,9 +25,8 @@ CREATE TABLE IF NOT EXISTS aria_engine.chat_sessions (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     ended_at TIMESTAMP WITH TIME ZONE
 );
-
-CREATE INDEX IF NOT EXISTS idx_ae_cs_agent ON aria_engine.chat_sessions(agent_id);
-CREATE INDEX IF NOT EXISTS idx_ae_cs_status ON aria_engine.chat_sessions(status);
+CREATE INDEX IF NOT EXISTS idx_ae_cs_agent   ON aria_engine.chat_sessions(agent_id);
+CREATE INDEX IF NOT EXISTS idx_ae_cs_status  ON aria_engine.chat_sessions(status);
 CREATE INDEX IF NOT EXISTS idx_ae_cs_created ON aria_engine.chat_sessions(created_at);
 
 -- ============================================================================
@@ -54,19 +50,10 @@ CREATE TABLE IF NOT EXISTS aria_engine.chat_messages (
     metadata JSONB DEFAULT '{}',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
-
 CREATE INDEX IF NOT EXISTS idx_ae_cm_session ON aria_engine.chat_messages(session_id);
-CREATE INDEX IF NOT EXISTS idx_ae_cm_agent ON aria_engine.chat_messages(agent_id);
-CREATE INDEX IF NOT EXISTS idx_ae_cm_role ON aria_engine.chat_messages(role);
+CREATE INDEX IF NOT EXISTS idx_ae_cm_agent   ON aria_engine.chat_messages(agent_id);
+CREATE INDEX IF NOT EXISTS idx_ae_cm_role    ON aria_engine.chat_messages(role);
 CREATE INDEX IF NOT EXISTS idx_ae_cm_created ON aria_engine.chat_messages(created_at);
-
--- Compatibility hardening for existing deployments:
--- some runtime paths expect aria_engine.chat_messages.agent_id to exist.
-ALTER TABLE aria_engine.chat_messages
-    ADD COLUMN IF NOT EXISTS agent_id VARCHAR(100);
-
-CREATE INDEX IF NOT EXISTS idx_ae_cm_agent
-    ON aria_engine.chat_messages(agent_id);
 
 -- ============================================================================
 -- Cron Jobs
@@ -95,8 +82,7 @@ CREATE TABLE IF NOT EXISTS aria_engine.cron_jobs (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
-
-CREATE INDEX IF NOT EXISTS idx_ae_cj_enabled ON aria_engine.cron_jobs(enabled);
+CREATE INDEX IF NOT EXISTS idx_ae_cj_enabled  ON aria_engine.cron_jobs(enabled);
 CREATE INDEX IF NOT EXISTS idx_ae_cj_next_run ON aria_engine.cron_jobs(next_run_at);
 
 -- ============================================================================
@@ -154,7 +140,6 @@ CREATE TABLE IF NOT EXISTS aria_engine.agent_tools (
     enabled BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
-
 CREATE INDEX IF NOT EXISTS idx_ae_at_agent ON aria_engine.agent_tools(agent_id);
 
 -- ============================================================================
@@ -170,7 +155,6 @@ CREATE TABLE IF NOT EXISTS aria_engine.rate_limits (
     last_post TIMESTAMP WITH TIME ZONE,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
-
 CREATE INDEX IF NOT EXISTS idx_ae_rl_skill ON aria_engine.rate_limits(skill);
 
 -- ============================================================================
@@ -184,7 +168,6 @@ CREATE TABLE IF NOT EXISTS aria_engine.api_key_rotations (
     rotated_by VARCHAR(100) DEFAULT 'system',
     metadata JSONB DEFAULT '{}'
 );
-
 CREATE INDEX IF NOT EXISTS idx_ae_akr_service ON aria_engine.api_key_rotations(service);
 
 -- ============================================================================
@@ -230,7 +213,6 @@ CREATE TABLE IF NOT EXISTS aria_engine.scheduled_jobs (
     updated_at_ms INTEGER,
     synced_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
-
 CREATE INDEX IF NOT EXISTS idx_ae_sj_name    ON aria_engine.scheduled_jobs(name);
 CREATE INDEX IF NOT EXISTS idx_ae_sj_enabled ON aria_engine.scheduled_jobs(enabled);
 CREATE INDEX IF NOT EXISTS idx_ae_sj_next    ON aria_engine.scheduled_jobs(next_run_at);
@@ -264,13 +246,12 @@ CREATE TABLE IF NOT EXISTS aria_engine.llm_models (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
-
 CREATE INDEX IF NOT EXISTS idx_ae_lm_provider ON aria_engine.llm_models(provider);
 CREATE INDEX IF NOT EXISTS idx_ae_lm_tier     ON aria_engine.llm_models(tier);
 CREATE INDEX IF NOT EXISTS idx_ae_lm_enabled  ON aria_engine.llm_models(enabled);
 
 -- ============================================================================
--- Seed default agent (aria = orchestrator)
+-- Seed default agent
 -- ============================================================================
 INSERT INTO aria_engine.agent_state (agent_id, display_name, model, system_prompt, status)
 VALUES ('aria', 'Aria (Orchestrator)', 'kimi', 'You are Aria, an autonomous AI agent.', 'idle')

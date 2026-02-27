@@ -1,14 +1,8 @@
 -- ============================================================================
--- Aria Blue Database Schema  (aria_data)
--- All Aria domain data lives under the aria_data schema.
--- Engine infrastructure lives under aria_engine (see 03-aria-engine-schema.sql).
--- Version: 3.0.0  — public schema eliminated
+-- Schema: aria_data
+-- All Aria domain data — memories, thoughts, goals, knowledge, skills
+-- Version: 3.0.0
 -- ============================================================================
-
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "pg_trgm";
-
-CREATE SCHEMA IF NOT EXISTS aria_data;
 
 -- ============================================================================
 -- Memories — Long-term storage
@@ -111,7 +105,7 @@ CREATE TABLE IF NOT EXISTS aria_data.heartbeat_log (
     duration_ms INTEGER,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
-CREATE INDEX IF NOT EXISTS idx_heartbeat_created ON aria_data.heartbeat_log(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_heartbeat_created  ON aria_data.heartbeat_log(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_heartbeat_job_name ON aria_data.heartbeat_log(job_name);
 
 -- ============================================================================
@@ -393,7 +387,6 @@ CREATE INDEX IF NOT EXISTS idx_wm_checkpoint ON aria_data.working_memory(checkpo
 -- ============================================================================
 -- Semantic Memories (pgvector)
 -- ============================================================================
-CREATE EXTENSION IF NOT EXISTS vector;
 CREATE TABLE IF NOT EXISTS aria_data.semantic_memories (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     content TEXT NOT NULL,
@@ -412,9 +405,6 @@ CREATE INDEX IF NOT EXISTS idx_semantic_importance ON aria_data.semantic_memorie
 CREATE INDEX IF NOT EXISTS idx_semantic_created    ON aria_data.semantic_memories(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_semantic_source     ON aria_data.semantic_memories(source);
 
--- HNSW vector index for fast approximate nearest-neighbor cosine search.
--- ef_construction=128 gives good recall; m=16 keeps the graph compact.
--- Requires pgvector >= 0.5.0 (we ship 0.8.0).
 CREATE INDEX IF NOT EXISTS idx_semantic_embedding_hnsw
     ON aria_data.semantic_memories
     USING hnsw (embedding vector_cosine_ops)
@@ -498,7 +488,7 @@ SELECT 'system_init', 'system', '{"message": "Aria Blue initialized", "version":
 WHERE NOT EXISTS (SELECT 1 FROM aria_data.activity_log WHERE action = 'system_init' LIMIT 1);
 
 -- ============================================================================
--- Table Comments
+-- Comments
 -- ============================================================================
 COMMENT ON SCHEMA aria_data IS 'Aria domain data — memories, thoughts, goals, knowledge, skills';
 COMMENT ON TABLE aria_data.memories IS 'Long-term persistent memories for Aria';
