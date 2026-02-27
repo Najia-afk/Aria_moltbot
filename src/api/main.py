@@ -488,6 +488,7 @@ try:
     from .routers.engine_chat import register_engine_chat, configure_engine
     from .routers.artifacts import router as artifacts_router
     from .routers.rpg import router as rpg_router
+    from .routers.telegram import router as telegram_router
 except ImportError:
     from routers.health import router as health_router
     from routers.activities import router as activities_router
@@ -521,6 +522,7 @@ except ImportError:
     from routers.engine_chat import register_engine_chat, configure_engine
     from routers.artifacts import router as artifacts_router
     from routers.rpg import router as rpg_router
+    from routers.telegram import router as telegram_router
 
 app.include_router(health_router)  # S-103: Health exempt from auth (monitoring)
 # S-103: All data routers require API key
@@ -556,6 +558,9 @@ app.include_router(engine_agents_router, dependencies=_api_deps)
 app.include_router(agents_crud_router, dependencies=_api_deps)
 app.include_router(artifacts_router, dependencies=_api_deps)
 app.include_router(rpg_router, dependencies=_api_deps)
+# Telegram webhook: no API key (Telegram calls /webhook directly, validated by TELEGRAM_WEBHOOK_SECRET)
+# Admin endpoints /register-webhook, /webhook-info protected by the secret + token
+app.include_router(telegram_router)
 
 # ── Static file serving (RPG Dashboard at /rpg/) ─────────────────────────────
 # Mounted AFTER API routers so /api/* takes priority.

@@ -484,6 +484,8 @@ services:
       # Telegram + X credentials (for future API-side social integrations)
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      TELEGRAM_ALLOWED_USER_ID: ${TELEGRAM_ALLOWED_USER_ID:-}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
       X_API_KEY: ${X_API_KEY:-}
       X_API_SECRET: ${X_API_SECRET:-}
       X_ACCESS_TOKEN: ${X_ACCESS_TOKEN:-}

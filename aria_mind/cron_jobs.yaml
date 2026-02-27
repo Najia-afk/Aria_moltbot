@@ -185,10 +185,13 @@ jobs:
   # Replaced by background auto-scorer in aria-api (sentiment_autoscorer.py).
   # Zero LLM tokens, runs every 60s, handles JSONL sync + scoring automatically.
 
-  # ── Telegram Bot Long-Poll (S-46) ──
-  - name: telegram_poll
-    every: "2m"
-    text: "Poll Telegram for new messages using telegram__get_updates. For each update: if message text starts with /status reply with current health (api_client__get /api/health), if /goals reply with active goals count, if /memory reply with latest 3 semantic memories. Send replies with telegram__send_message to the chat_id from the update. If no updates, do nothing silently."
-    agent: aria
-    session: isolated
-    delivery: none
+  # ── Telegram Bot (S-46) ──
+  # DISABLED: replaced by webhook push model (POST /api/telegram/webhook)
+  # Polling every 2m wastes LLM tokens. Webhook is instant and free.
+  # To re-enable: remove the 'disabled: true' line below.
+  # - name: telegram_poll
+  #   every: "2m"
+  #   text: "Poll Telegram for new messages using telegram__get_updates..."
+  #   agent: aria
+  #   session: isolated
+  #   delivery: none
