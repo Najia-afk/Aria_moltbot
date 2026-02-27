@@ -500,6 +500,18 @@ async def telegram_poll_loop() -> None:
 
                     logger.info(f"[telegram] message from {chat_id}: {text[:80]}")
 
+                    # /reset — start a fresh session
+                    if text.lower() in ("/reset", "/new", "/start"):
+                        if chat_id in session_map:
+                            del session_map[chat_id]
+                            _tg_save_sessions(session_map)
+                        await client.post(
+                            f"{tg_base}/sendMessage",
+                            json={"chat_id": chat_id, "text": "🔄 New conversation started. Hi, I'm Aria — what's on your mind?"},
+                            timeout=15,
+                        )
+                        continue
+
                     try:
                         # Send typing indicator
                         await client.post(
