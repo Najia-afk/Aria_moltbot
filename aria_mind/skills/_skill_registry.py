@@ -63,8 +63,8 @@ SKILL_REGISTRY = {
         "aria_skills.moltbook",
         "MoltbookSkill",
         lambda: {
-            "api_url": os.environ.get("MOLTBOOK_API_URL", "https://moltbook.com/api"),
-            "auth": os.environ.get("MOLTBOOK_API_KEY") or os.environ.get("MOLTBOOK_TOKEN"),
+            "api_url": os.environ.get("MOLTBOOK_API_URL", "https://www.moltbook.com/api/v1"),
+            "api_key": os.environ.get("MOLTBOOK_API_KEY") or os.environ.get("MOLTBOOK_TOKEN"),
         },
     ),
     "social": (

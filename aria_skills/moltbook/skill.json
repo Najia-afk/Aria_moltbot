@@ -4,8 +4,12 @@
   "description": "Moltbook social network â€” post, comment, vote, search, and join communities. API: https://www.moltbook.com/api/v1",
   "author": "Aria Team",
   "layer": 3,
-  "dependencies": ["api_client"],
-  "focus_affinity": ["social"],
+  "dependencies": [
+    "api_client"
+  ],
+  "focus_affinity": [
+    "social"
+  ],
   "tools": [
     {
       "name": "create_post",
@@ -30,18 +34,25 @@
             "description": "Optional link URL for link posts"
           }
         },
-        "required": ["content"]
+        "required": [
+          "content"
+        ]
       }
     },
     {
       "name": "get_feed",
-      "description": "Get posts feed â€” global, personalized, or per submolt. Sort: hot, new, top, rising.",
+      "description": "Get posts feed — global, personalized, or per submolt. Sort: hot, new, top, rising. Supports cursor pagination.",
       "parameters": {
         "type": "object",
         "properties": {
           "sort": {
             "type": "string",
-            "enum": ["hot", "new", "top", "rising"],
+            "enum": [
+              "hot",
+              "new",
+              "top",
+              "rising"
+            ],
             "description": "Sort order (default: hot)"
           },
           "limit": {
@@ -55,6 +66,18 @@
           "personalized": {
             "type": "boolean",
             "description": "If true, show only subscribed submolts + followed moltys"
+          },
+          "filter": {
+            "type": "string",
+            "enum": [
+              "all",
+              "following"
+            ],
+            "description": "Feed filter: all (default) or following (only followed moltys)"
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Pagination cursor from previous response next_cursor"
           }
         }
       }
@@ -70,7 +93,9 @@
             "description": "The post ID"
           }
         },
-        "required": ["post_id"]
+        "required": [
+          "post_id"
+        ]
       }
     },
     {
@@ -84,7 +109,9 @@
             "description": "The post ID to delete"
           }
         },
-        "required": ["post_id"]
+        "required": [
+          "post_id"
+        ]
       }
     },
     {
@@ -106,7 +133,10 @@
             "description": "Optional parent comment ID for threaded replies"
           }
         },
-        "required": ["post_id", "content"]
+        "required": [
+          "post_id",
+          "content"
+        ]
       }
     },
     {
@@ -121,11 +151,17 @@
           },
           "sort": {
             "type": "string",
-            "enum": ["top", "new", "controversial"],
+            "enum": [
+              "top",
+              "new",
+              "controversial"
+            ],
             "description": "Sort order (default: top)"
           }
         },
-        "required": ["post_id"]
+        "required": [
+          "post_id"
+        ]
       }
     },
     {
@@ -139,7 +175,9 @@
             "description": "The post ID to upvote"
           }
         },
-        "required": ["post_id"]
+        "required": [
+          "post_id"
+        ]
       }
     },
     {
@@ -153,7 +191,9 @@
             "description": "The post ID to downvote"
           }
         },
-        "required": ["post_id"]
+        "required": [
+          "post_id"
+        ]
       }
     },
     {
@@ -167,7 +207,9 @@
             "description": "The comment ID to upvote"
           }
         },
-        "required": ["comment_id"]
+        "required": [
+          "comment_id"
+        ]
       }
     },
     {
@@ -182,7 +224,11 @@
           },
           "search_type": {
             "type": "string",
-            "enum": ["posts", "comments", "all"],
+            "enum": [
+              "posts",
+              "comments",
+              "all"
+            ],
             "description": "What to search (default: all)"
           },
           "limit": {
@@ -190,7 +236,9 @@
             "description": "Max results (default: 20, max: 50)"
           }
         },
-        "required": ["query"]
+        "required": [
+          "query"
+        ]
       }
     },
     {
@@ -212,7 +260,9 @@
             "description": "The submolt name"
           }
         },
-        "required": ["submolt_name"]
+        "required": [
+          "submolt_name"
+        ]
       }
     },
     {
@@ -234,7 +284,11 @@
             "description": "Community description"
           }
         },
-        "required": ["name", "display_name", "description"]
+        "required": [
+          "name",
+          "display_name",
+          "description"
+        ]
       }
     },
     {
@@ -248,7 +302,9 @@
             "description": "The submolt to subscribe to"
           }
         },
-        "required": ["submolt_name"]
+        "required": [
+          "submolt_name"
+        ]
       }
     },
     {
@@ -262,7 +318,9 @@
             "description": "The submolt to unsubscribe from"
           }
         },
-        "required": ["submolt_name"]
+        "required": [
+          "submolt_name"
+        ]
       }
     },
     {
@@ -284,7 +342,9 @@
             "description": "The agent name to look up"
           }
         },
-        "required": ["agent_name"]
+        "required": [
+          "agent_name"
+        ]
       }
     },
     {
@@ -315,7 +375,9 @@
             "description": "The molty to follow"
           }
         },
-        "required": ["agent_name"]
+        "required": [
+          "agent_name"
+        ]
       }
     },
     {
@@ -329,7 +391,9 @@
             "description": "The molty to unfollow"
           }
         },
-        "required": ["agent_name"]
+        "required": [
+          "agent_name"
+        ]
       }
     },
     {
@@ -338,6 +402,72 @@
       "parameters": {
         "type": "object",
         "properties": {}
+      }
+    },
+    {
+      "name": "get_home",
+      "description": "Get Moltbook home dashboard — activity on your posts, DMs, announcements, followed posts, and what to do next. Start every check-in here.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "get_notifications",
+      "description": "Get your notifications (replies, mentions, upvotes).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "description": "Max notifications to return (default: 50)"
+          }
+        }
+      }
+    },
+    {
+      "name": "mark_notifications_read",
+      "description": "Mark all notifications as read.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "mark_post_notifications_read",
+      "description": "Mark notifications for a specific post as read (after responding to it).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "post_id": {
+            "type": "string",
+            "description": "The post ID to mark notifications read for"
+          }
+        },
+        "required": [
+          "post_id"
+        ]
+      }
+    },
+    {
+      "name": "verify_challenge",
+      "description": "Manually submit a verification challenge answer for a pending post/comment.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "verification_code": {
+            "type": "string",
+            "description": "The verification code from the content creation response"
+          },
+          "answer": {
+            "type": "string",
+            "description": "Numeric answer with 2 decimal places (e.g. '15.00')"
+          }
+        },
+        "required": [
+          "verification_code",
+          "answer"
+        ]
       }
     }
   ],

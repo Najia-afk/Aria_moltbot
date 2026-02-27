@@ -66,6 +66,9 @@ services:
       ENGINE_API_BASE_URL: http://aria-api:${API_INTERNAL_PORT:-8000}
       # S-103: API key for engine→API authentication
       ARIA_API_KEY: ${ARIA_API_KEY:-}
+      # Moltbook (engine executes skill tools directly)
+      MOLTBOOK_TOKEN: ${MOLTBOOK_TOKEN:-}
+      MOLTBOOK_API_URL: ${MOLTBOOK_API_URL:-https://www.moltbook.com/api/v1}
       PYTHONPATH: /
       PYTHONUNBUFFERED: "1"
     volumes:

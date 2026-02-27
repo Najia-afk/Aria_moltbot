@@ -199,10 +199,23 @@ class MoltbookSkill(BaseSkill):
 
             resp = await self._client.post("/posts", json=payload)
 
-            if resp.status_code == 200:
+            if resp.status_code in (200, 201):
                 data = resp.json()
+
+                # Handle verification challenge flow
+                post_data = data.get("post", data)
+                if data.get("verification_required") or post_data.get("verification_status") == "pending":
+                    verification = post_data.get("verification", {})
+                    if verification:
+                        verify_result = await self._solve_verification(verification)
+                        if verify_result:
+                            data["verification_solved"] = True
+                        else:
+                            data["verification_solved"] = False
+                            data["verification_pending"] = True
+
                 # Backup to local aria-api
-                await self._backup_to_local({"id": data.get("id"), "content": content, "title": title, "submolt": submolt})
+                await self._backup_to_local({"id": data.get("id") or post_data.get("id"), "content": content, "title": title, "submolt": submolt})
                 return SkillResult.ok({**data, "api_synced": True})
             elif resp.status_code == 429:
                 info = resp.json()
@@ -256,6 +269,8 @@ class MoltbookSkill(BaseSkill):
         limit: int = 25,
         submolt: str | None = None,
         personalized: bool = False,
+        filter: str | None = None,
+        cursor: str | None = None,
     ) -> SkillResult:
         """
         Get posts feed.
@@ -265,19 +280,26 @@ class MoltbookSkill(BaseSkill):
             limit: Max posts (default 25)
             submolt: Filter to a specific submolt
             personalized: If True, use /feed (subscribed submolts + followed moltys)
+            filter: "all" (default) or "following" (only posts from followed moltys)
+            cursor: Pagination cursor from previous response's next_cursor
 
         Returns:
-            SkillResult with posts array
+            SkillResult with posts array (includes has_more and next_cursor for pagination)
         """
         if not self._client:
             return SkillResult.fail("API client not initialized")
         try:
-            if personalized:
+            if personalized or filter:
                 endpoint = f"/feed?sort={sort}&limit={limit}"
+                if filter:
+                    endpoint += f"&filter={filter}"
             elif submolt:
                 endpoint = f"/submolts/{submolt}/feed?sort={sort}&limit={limit}"
             else:
                 endpoint = f"/posts?sort={sort}&limit={limit}"
+
+            if cursor:
+                endpoint += f"&cursor={cursor}"
 
             resp = await self._client.get(endpoint)
             if resp.status_code == 200:
@@ -319,8 +341,21 @@ class MoltbookSkill(BaseSkill):
                 payload["parent_id"] = parent_id
 
             resp = await self._client.post(f"/posts/{post_id}/comments", json=payload)
-            if resp.status_code == 200:
-                return SkillResult.ok(resp.json())
+            if resp.status_code in (200, 201):
+                data = resp.json()
+
+                # Handle verification challenge flow
+                comment_data = data.get("comment", data)
+                if data.get("verification_required") or comment_data.get("verification_status") == "pending":
+                    verification = comment_data.get("verification", {})
+                    if verification:
+                        verify_result = await self._solve_verification(verification)
+                        if verify_result:
+                            data["verification_solved"] = True
+                        else:
+                            data["verification_solved"] = False
+
+                return SkillResult.ok(data)
             elif resp.status_code == 429:
                 info = resp.json()
                 return SkillResult.fail(
@@ -590,6 +625,207 @@ class MoltbookSkill(BaseSkill):
             return SkillResult.fail(f"Status check failed ({resp.status_code})")
         except Exception as e:
             return SkillResult.fail(f"Status check failed: {e}")
+
+    # ------------------------------------------------------------------
+    # Verification Challenge Solver
+    # ------------------------------------------------------------------
+
+    async def _solve_verification(self, verification: dict) -> bool:
+        """
+        Solve a Moltbook verification math challenge.
+
+        The challenge_text is an obfuscated math word problem with two numbers
+        and one operation (+, -, *, /). We strip the obfuscation, extract
+        the numbers and operation, compute the answer, and POST /verify.
+
+        Returns True if verification succeeded, False otherwise.
+        """
+        import re
+
+        challenge_text = verification.get("challenge_text", "")
+        verification_code = verification.get("verification_code", "")
+
+        if not challenge_text or not verification_code:
+            self.logger.warning("Verification challenge missing text or code")
+            return False
+
+        try:
+            # Strip obfuscation: remove symbols like ^[]/-
+            cleaned = re.sub(r'[\^\[\]\-/\\]', '', challenge_text)
+            # Normalize: lowercase, collapse whitespace
+            cleaned = ' '.join(cleaned.lower().split())
+
+            # Number word mapping
+            num_words = {
+                'zero': 0, 'one': 1, 'two': 2, 'three': 3, 'four': 4,
+                'five': 5, 'six': 6, 'seven': 7, 'eight': 8, 'nine': 9,
+                'ten': 10, 'eleven': 11, 'twelve': 12, 'thirteen': 13,
+                'fourteen': 14, 'fifteen': 15, 'sixteen': 16, 'seventeen': 17,
+                'eighteen': 18, 'nineteen': 19, 'twenty': 20, 'thirty': 30,
+                'forty': 40, 'fifty': 50, 'sixty': 60, 'seventy': 70,
+                'eighty': 80, 'ninety': 90, 'hundred': 100, 'thousand': 1000,
+            }
+
+            # Extract numbers (words or digits)
+            numbers = []
+            # First try digit sequences
+            digit_matches = re.findall(r'\b\d+(?:\.\d+)?\b', cleaned)
+            for d in digit_matches:
+                numbers.append(float(d))
+
+            # Also try word numbers (compound like "twenty five" = 25)
+            words = cleaned.split()
+            i = 0
+            while i < len(words):
+                w = words[i].rstrip('y')  # handle "twentyy" etc
+                if w in num_words or words[i] in num_words:
+                    val = num_words.get(words[i], num_words.get(w, 0))
+                    # Check for compound: "twenty five", "three hundred"
+                    if i + 1 < len(words):
+                        next_w = words[i + 1].rstrip('y')
+                        if next_w in num_words or words[i + 1] in num_words:
+                            next_val = num_words.get(words[i + 1], num_words.get(next_w, 0))
+                            if val >= 100 and next_val < val:
+                                val = val * next_val if next_val > 0 else val
+                                i += 1
+                            elif val >= 20 and next_val < 20:
+                                val += next_val
+                                i += 1
+                    numbers.append(float(val))
+                i += 1
+
+            # Detect operation from words
+            operation = None
+            if any(w in cleaned for w in ['adds', 'add', 'plus', 'gains', 'gain', 'increases', 'increase', 'more']):
+                operation = '+'
+            elif any(w in cleaned for w in ['slows', 'slow', 'minus', 'loses', 'lose', 'decreases', 'decrease', 'less', 'drops', 'drop', 'subtracts']):
+                operation = '-'
+            elif any(w in cleaned for w in ['times', 'multiplied', 'multiplies', 'multiply', 'doubles', 'triples']):
+                operation = '*'
+            elif any(w in cleaned for w in ['divided', 'divides', 'divide', 'splits', 'split', 'halves']):
+                operation = '/'
+
+            if len(numbers) >= 2 and operation:
+                a, b = numbers[0], numbers[1]
+                if operation == '+':
+                    answer = a + b
+                elif operation == '-':
+                    answer = a - b
+                elif operation == '*':
+                    answer = a * b
+                elif operation == '/':
+                    answer = a / b if b != 0 else 0
+                else:
+                    answer = 0
+
+                answer_str = f"{answer:.2f}"
+
+                resp = await self._client.post("/verify", json={
+                    "verification_code": verification_code,
+                    "answer": answer_str,
+                })
+
+                if resp.status_code == 200:
+                    result = resp.json()
+                    if result.get("success"):
+                        self.logger.info("Verification challenge solved: %s", answer_str)
+                        return True
+
+                self.logger.warning("Verification failed for answer %s", answer_str)
+                return False
+            else:
+                self.logger.warning(
+                    "Could not parse verification challenge: numbers=%s, op=%s, text=%s",
+                    numbers, operation, cleaned[:100],
+                )
+                return False
+
+        except Exception as e:
+            self.logger.error("Verification solver error: %s", e)
+            return False
+
+    # ------------------------------------------------------------------
+    # Home Dashboard & Notifications
+    # ------------------------------------------------------------------
+
+    @logged_method()
+    async def get_home(self) -> SkillResult:
+        """
+        Get the Moltbook home dashboard — one call for everything.
+
+        Returns activity on your posts, DMs, announcements,
+        posts from followed moltys, and suggested next actions.
+        """
+        if not self._client:
+            return SkillResult.fail("API client not initialized")
+        try:
+            resp = await self._client.get("/home")
+            if resp.status_code == 200:
+                return SkillResult.ok(resp.json())
+            return SkillResult.fail(f"Home fetch failed ({resp.status_code})")
+        except Exception as e:
+            return SkillResult.fail(f"Home fetch failed: {e}")
+
+    @logged_method()
+    async def get_notifications(self, limit: int = 50) -> SkillResult:
+        """Get your notifications (replies, mentions, upvotes)."""
+        if not self._client:
+            return SkillResult.fail("API client not initialized")
+        try:
+            resp = await self._client.get(f"/notifications?limit={limit}")
+            if resp.status_code == 200:
+                return SkillResult.ok(resp.json())
+            return SkillResult.fail(f"Notifications fetch failed ({resp.status_code})")
+        except Exception as e:
+            return SkillResult.fail(f"Notifications fetch failed: {e}")
+
+    @logged_method()
+    async def mark_notifications_read(self) -> SkillResult:
+        """Mark all notifications as read."""
+        if not self._client:
+            return SkillResult.fail("API client not initialized")
+        try:
+            resp = await self._client.post("/notifications/read-all")
+            if resp.status_code == 200:
+                return SkillResult.ok(resp.json())
+            return SkillResult.fail(f"Mark read failed ({resp.status_code})")
+        except Exception as e:
+            return SkillResult.fail(f"Mark read failed: {e}")
+
+    @logged_method()
+    async def mark_post_notifications_read(self, post_id: str) -> SkillResult:
+        """Mark notifications for a specific post as read."""
+        if not self._client:
+            return SkillResult.fail("API client not initialized")
+        try:
+            resp = await self._client.post(f"/notifications/read-by-post/{post_id}")
+            if resp.status_code == 200:
+                return SkillResult.ok(resp.json())
+            return SkillResult.fail(f"Mark post read failed ({resp.status_code})")
+        except Exception as e:
+            return SkillResult.fail(f"Mark post read failed: {e}")
+
+    @logged_method()
+    async def verify_challenge(self, verification_code: str, answer: str) -> SkillResult:
+        """
+        Manually submit a verification challenge answer.
+
+        Args:
+            verification_code: The code from the content creation response
+            answer: Numeric answer with 2 decimal places (e.g. "15.00")
+        """
+        if not self._client:
+            return SkillResult.fail("API client not initialized")
+        try:
+            resp = await self._client.post("/verify", json={
+                "verification_code": verification_code,
+                "answer": answer,
+            })
+            if resp.status_code == 200:
+                return SkillResult.ok(resp.json())
+            return SkillResult.fail(f"Verify failed ({resp.status_code}): {resp.text}")
+        except Exception as e:
+            return SkillResult.fail(f"Verify failed: {e}")
 
     # ------------------------------------------------------------------
     # SocialPlatform protocol aliases
