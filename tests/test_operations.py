@@ -217,6 +217,40 @@ class TestScheduleAndJobs:
         assert r.status_code in (200, 404, 422)
 
 
+class TestHeartbeatPayloadCompat:
+    """S-42: Heartbeat payload contract hardening — details accepts dict, str, list, None."""
+
+    def test_heartbeat_string_details(self, api):
+        """POST /heartbeat with `details` as a plain string must return 200."""
+        r = api.post('/heartbeat', json={"status": "healthy", "details": "ok"})
+        if r.status_code in (502, 503):
+            pytest.skip('heartbeat service unavailable')
+        assert r.status_code in (200, 201), f'Expected 200/201 for string details, got {r.status_code}: {r.text}'
+        data = r.json()
+        assert 'id' in data or 'created' in data
+
+    def test_heartbeat_list_details(self, api):
+        """POST /heartbeat with `details` as a list must return 200."""
+        r = api.post('/heartbeat', json={"status": "healthy", "details": ["event_a", "event_b"]})
+        if r.status_code in (502, 503):
+            pytest.skip('heartbeat service unavailable')
+        assert r.status_code in (200, 201), f'Expected 200/201 for list details, got {r.status_code}: {r.text}'
+
+    def test_heartbeat_null_details(self, api):
+        """POST /heartbeat with `details` omitted (null) must return 200."""
+        r = api.post('/heartbeat', json={"status": "healthy"})
+        if r.status_code in (502, 503):
+            pytest.skip('heartbeat service unavailable')
+        assert r.status_code in (200, 201), f'Expected 200/201 for null details, got {r.status_code}: {r.text}'
+
+    def test_heartbeat_dict_details_still_works(self, api):
+        """POST /heartbeat with `details` as a dict must still return 200 (regression guard)."""
+        r = api.post('/heartbeat', json={"status": "healthy", "details": {"uptime": 99}})
+        if r.status_code in (502, 503):
+            pytest.skip('heartbeat service unavailable')
+        assert r.status_code in (200, 201), f'Expected 200/201 for dict details, got {r.status_code}: {r.text}'
+
+
 class TestApiKeyRotations:
     """API key rotation tracking."""
 

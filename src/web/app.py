@@ -41,6 +41,8 @@ def create_app():
     _ws_base_url = os.environ.get('WS_BASE_URL', '')
     # Host-exposed API port (for browser-side WS fallback)
     _api_port = os.environ.get('ARIA_API_PORT', '8000')
+    # LiteLLM external port (for browser-side model router link)
+    _litellm_port = os.environ.get('LITELLM_PORT', '18793')
 
     # Computed once at startup — used as ?v= cache-buster for static assets
     _build_ts = int(time.time())
@@ -53,6 +55,7 @@ def create_app():
             'ws_base_url': _ws_base_url,
             'ws_api_key': _api_key,
             'api_port': _api_port,
+            'litellm_port': _litellm_port,
             'build_ts': _build_ts,
             # REMOVED: legacy bot proxy config
         }
@@ -168,6 +171,10 @@ def create_app():
     @app.route('/memories')
     def memories():
         return render_template('memories.html')
+
+    @app.route('/memory-graph')
+    def memory_graph():
+        return render_template('memory_graph.html')
 
     @app.route('/sentiment')
     def sentiment():

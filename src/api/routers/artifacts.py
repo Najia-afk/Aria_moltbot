@@ -70,6 +70,16 @@ async def write_artifact(body: ArtifactWriteRequest):
         folder.mkdir(parents=True, exist_ok=True)
         filepath = folder / body.filename
 
+        # Validate JSON payloads when filename ends with .json
+        if body.filename.lower().endswith(".json"):
+            try:
+                json.loads(body.content)
+            except json.JSONDecodeError as exc:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid JSON content for '{body.filename}': {exc.msg}",
+                )
+
         with open(filepath, "w", encoding="utf-8") as f:
             f.write(body.content)
 

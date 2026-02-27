@@ -127,7 +127,7 @@ class CreateHeartbeat(BaseModel):
     beat_number: int = 0
     job_name: str | None = None
     status: str = "healthy"
-    details: dict = Field(default_factory=dict)
+    details: dict | str | list | None = Field(default_factory=dict)
     executed_at: str | None = None
     duration_ms: int | None = None
 

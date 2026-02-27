@@ -52,7 +52,7 @@ def _litellm_url_from(url: str) -> str:
     """
     # Strip any existing query params, then add search_path
     base = url.split("?")[0]
-    return f"{base}?options=-csearch_path%3Dlitellm,public"
+    return f"{base}?options=-csearch_path%3Dlitellm"
 
 
 # ── Engine + session factory ─────────────────────────────────────────────────
@@ -124,7 +124,7 @@ async def ensure_schema() -> None:
     """
     async with async_engine.begin() as conn:
         # Create named schemas — nothing in public
-        for schema_name in ("aria_data", "aria_engine"):
+        for schema_name in ("aria_data", "aria_engine", "litellm"):
             await _run_isolated(conn, f"schema_{schema_name}",
                                 f"CREATE SCHEMA IF NOT EXISTS {schema_name}")
 
@@ -229,6 +229,22 @@ async def ensure_schema() -> None:
                     conn, f"idx_{index.name}",
                     CreateIndex(index, if_not_exists=True),
                 )
+
+        # HNSW vector indexes (pgvector 0.5+) — not in ORM metadata, added manually
+        # vector_cosine_ops matches the cosine_distance() calls in memories.py
+        await _run_isolated(
+            conn, "hnsw_semantic_embedding",
+            "CREATE INDEX IF NOT EXISTS idx_semantic_embedding_hnsw "
+            "ON aria_data.semantic_memories USING hnsw (embedding vector_cosine_ops) "
+            "WITH (m = 16, ef_construction = 64)",
+        )
+        await _run_isolated(
+            conn, "hnsw_session_messages_embedding",
+            "CREATE INDEX IF NOT EXISTS idx_session_messages_embedding_hnsw "
+            "ON aria_engine.session_messages USING hnsw (embedding vector_cosine_ops) "
+            "WITH (m = 16, ef_construction = 64) "
+            "WHERE embedding IS NOT NULL",
+        )
 
         if failed:
             logger.warning("Schema bootstrap: %d tables created, %d failed: %s",

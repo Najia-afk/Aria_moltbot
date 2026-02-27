@@ -347,3 +347,38 @@ Created aria_souvenirs/aria_v3_240226 with 8 reports + 17 sprint ticket files (5
    individual files per ticket creates too many files. Combine related tickets into
    themed files (e.g., S-107-108-109 for network exposure, S-150-159 for testing).
    Keep individual files only for complex standalone tickets.
+
+## S-45 — Resilient Endpoint Pattern (2026-02-27)
+
+**Lesson:** All specific endpoint methods in `api_client` must call `self._request_with_retry("METHOD", path, ...)` directly — never `self._client.METHOD()`.
+
+**Pattern established:**
+```python
+# WRONG — bypasses retry + circuit breaker
+resp = await self._client.get("/activities")
+resp.raise_for_status()
+return SkillResult.ok(resp.json())
+
+# CORRECT — uses retry + circuit breaker
+resp = await self._request_with_retry("GET", "/activities")
+return SkillResult.ok(resp.json())  # raise_for_status() is internally called
+
+# SPECIAL CASE — 404 as valid "not found" response
+resp = await self._request_with_retry("GET", f"/memories/{key}")
+return SkillResult.ok(resp.json())
+# except:
+#   if hasattr(e, "response") and e.response.status_code == 404:
+#       return SkillResult.ok(None)
+```
+
+**LLM fallback chain pattern:**
+- Create `LLMSkill` with `LLM_FALLBACK_CHAIN` list (model id, tier, priority).
+- Per-model circuit breaker state in `_circuit_open_until[model]`.
+- `complete_with_fallback()` iterates sorted by priority, skips open circuits.
+
+**Health degradation pattern:**
+- `HealthDegradationLevel` enum (HEALTHY / DEGRADED / CRITICAL / RECOVERY).
+- Count failing subsystems → 0=HEALTHY, 1-2=DEGRADED, 3+=CRITICAL.
+- `apply_degradation_mode()` returns suspension plan (never suspends heartbeat).
+
+**Key constraint:** heartbeat and health_check are NEVER suspended at any degradation level.

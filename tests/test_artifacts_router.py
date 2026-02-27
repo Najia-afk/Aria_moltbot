@@ -116,6 +116,42 @@ def test_read_artifact_not_found(client, tmp_path):
     assert resp.status_code == 404
 
 
+def test_read_artifact_nested_path_success(client, tmp_path):
+    """S-40: Nested artifact paths must be readable with category + subfolder/filename."""
+    (tmp_path / "memory" / "logs").mkdir(parents=True)
+    (tmp_path / "memory" / "logs" / "work_cycle_2026-02-27_0416.json").write_text('{"ok": true}')
+    with patch("routers.artifacts.ARIA_MEMORIES_PATH", tmp_path):
+        resp = client.get("/artifacts/memory/logs/work_cycle_2026-02-27_0416.json")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["success"] is True
+    assert data["path"] == "memory/logs/work_cycle_2026-02-27_0416.json"
+
+
+def test_write_artifact_json_content_validation(client, tmp_path):
+    """S-39: Writing Markdown content to a .json file must be rejected with HTTP 400."""
+    with patch("routers.artifacts.ARIA_MEMORIES_PATH", tmp_path):
+        resp = client.post("/artifacts", json={
+            "content": "# Work Cycle\n\nThis is markdown, not JSON.",
+            "filename": "work_cycle_2026-02-27.json",
+            "category": "logs",
+        })
+    assert resp.status_code == 400
+    assert "Invalid JSON" in resp.json()["detail"]
+
+
+def test_write_artifact_valid_json_content(client, tmp_path):
+    """S-39: Writing valid JSON to a .json file must succeed."""
+    with patch("routers.artifacts.ARIA_MEMORIES_PATH", tmp_path):
+        resp = client.post("/artifacts", json={
+            "content": '{"timestamp": "2026-02-27T14:01:00Z", "job": "work_cycle"}',
+            "filename": "work_cycle_2026-02-27.json",
+            "category": "logs",
+        })
+    assert resp.status_code == 200
+    assert resp.json()["success"] is True
+
+
 # ---------------------------------------------------------------------------
 # List Artifacts
 # ---------------------------------------------------------------------------

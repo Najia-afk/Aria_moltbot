@@ -9,11 +9,11 @@ import os
 import re
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.models import Memory, SemanticMemory
+from db.models import Memory, SemanticMemory, WorkingMemory, Thought, LessonLearned
 from deps import get_db
 from pagination import paginate_query, build_paginated_response
 from schemas.requests import CreateMemory, CreateSemanticMemory, SearchByVector, SummarizeSession, UpdateMemory
@@ -511,3 +511,181 @@ async def update_memory(key: str, body: UpdateMemory, db: AsyncSession = Depends
     await db.commit()
     await db.refresh(row)
     return row.to_dict()
+
+
+@router.get("/memory-graph")
+async def get_memory_graph(
+    limit: int = Query(200, ge=1, le=2000),
+    include_types: str = Query(
+        "all",
+        description="Comma-separated types to include: semantic,working,kv,thought,lesson",
+    ),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Build a vis-network graph of all memory types and inferred relationships.
+
+    Node types: semantic_memory, working_memory, kv_memory, thought, lesson
+    Edge types: same_category (star topology), shared_source (star topology)
+    """
+    types = (
+        ["semantic", "working", "kv", "thought", "lesson"]
+        if include_types == "all"
+        else [t.strip() for t in include_types.split(",")]
+    )
+
+    nodes: list[dict] = []
+    edges: list[dict] = []
+    category_index: dict[str, list[str]] = {}
+    source_index: dict[str, list[str]] = {}
+    edge_id = 0
+
+    # ── Semantic Memories ──────────────────────────────────────────
+    if "semantic" in types:
+        stmt = (
+            select(SemanticMemory)
+            .order_by(SemanticMemory.importance.desc())
+            .limit(limit)
+        )
+        rows = (await db.execute(stmt)).scalars().all()
+        for mem in rows:
+            nid = f"sem_{mem.id}"
+            nodes.append({
+                "id": nid,
+                "label": (mem.summary or mem.content or "")[:60],
+                "type": "semantic_memory",
+                "category": mem.category,
+                "importance": float(mem.importance or 0),
+                "source": mem.source,
+                "access_count": mem.access_count,
+                "created_at": mem.created_at.isoformat() if mem.created_at else None,
+            })
+            category_index.setdefault(mem.category or "general", []).append(nid)
+            if mem.source:
+                source_index.setdefault(mem.source, []).append(nid)
+
+    # ── Working Memory ─────────────────────────────────────────────
+    if "working" in types:
+        stmt = (
+            select(WorkingMemory)
+            .order_by(WorkingMemory.importance.desc())
+            .limit(limit)
+        )
+        rows = (await db.execute(stmt)).scalars().all()
+        for wm in rows:
+            nid = f"wm_{wm.id}"
+            nodes.append({
+                "id": nid,
+                "label": f"{wm.category}/{wm.key}"[:60],
+                "type": "working_memory",
+                "category": wm.category,
+                "importance": float(wm.importance or 0),
+                "source": wm.source,
+                "ttl_hours": wm.ttl_hours,
+                "created_at": wm.created_at.isoformat() if wm.created_at else None,
+            })
+            category_index.setdefault(wm.category or "general", []).append(nid)
+            if wm.source:
+                source_index.setdefault(wm.source, []).append(nid)
+
+    # ── KV Memories ────────────────────────────────────────────────
+    if "kv" in types:
+        stmt = select(Memory).order_by(Memory.updated_at.desc()).limit(limit)
+        rows = (await db.execute(stmt)).scalars().all()
+        for m in rows:
+            nid = f"kv_{m.id}"
+            nodes.append({
+                "id": nid,
+                "label": (m.key or "")[:60],
+                "type": "kv_memory",
+                "category": m.category,
+                "created_at": m.created_at.isoformat() if m.created_at else None,
+            })
+            category_index.setdefault(m.category or "general", []).append(nid)
+
+    # ── Thoughts ───────────────────────────────────────────────────
+    if "thought" in types:
+        stmt = (
+            select(Thought)
+            .order_by(Thought.created_at.desc())
+            .limit(min(limit, 100))
+        )
+        rows = (await db.execute(stmt)).scalars().all()
+        for t in rows:
+            nid = f"th_{t.id}"
+            nodes.append({
+                "id": nid,
+                "label": (t.content or "")[:60],
+                "type": "thought",
+                "category": t.category,
+                "created_at": t.created_at.isoformat() if t.created_at else None,
+            })
+            category_index.setdefault(t.category or "general", []).append(nid)
+
+    # ── Lessons Learned ───────────────────────────────────────────
+    if "lesson" in types:
+        stmt = (
+            select(LessonLearned)
+            .order_by(LessonLearned.occurrences.desc())
+            .limit(min(limit, 100))
+        )
+        rows = (await db.execute(stmt)).scalars().all()
+        for ll in rows:
+            nid = f"ll_{ll.id}"
+            nodes.append({
+                "id": nid,
+                "label": (ll.error_pattern or "")[:60],
+                "type": "lesson",
+                "category": ll.skill_name or "general",
+                "occurrences": ll.occurrences,
+                "effectiveness": float(ll.effectiveness or 0),
+                "created_at": ll.created_at.isoformat() if ll.created_at else None,
+            })
+            if ll.skill_name:
+                category_index.setdefault(ll.skill_name, []).append(nid)
+
+    # ── Build edges: same_category (star topology per category) ───
+    for cat, nids in category_index.items():
+        if len(nids) < 2:
+            continue
+        hub = nids[0]
+        for spoke in nids[1 : min(len(nids), 9)]:  # max 8 spokes per hub
+            edges.append({
+                "id": f"e_{edge_id}",
+                "from": hub,
+                "to": spoke,
+                "type": "same_category",
+                "label": cat,
+            })
+            edge_id += 1
+
+    # ── Build edges: shared_source ─────────────────────────────────
+    for src, nids in source_index.items():
+        if len(nids) < 2:
+            continue
+        hub = nids[0]
+        for spoke in nids[1 : min(len(nids), 7)]:
+            edges.append({
+                "id": f"e_{edge_id}",
+                "from": hub,
+                "to": spoke,
+                "type": "shared_source",
+                "label": src,
+            })
+            edge_id += 1
+
+    type_counts: dict[str, int] = {}
+    for n in nodes:
+        t = n["type"]
+        type_counts[t] = type_counts.get(t, 0) + 1
+
+    return {
+        "nodes": nodes,
+        "edges": edges,
+        "stats": {
+            "total_nodes": len(nodes),
+            "total_edges": len(edges),
+            "by_type": type_counts,
+            "categories": list(category_index.keys()),
+        },
+    }

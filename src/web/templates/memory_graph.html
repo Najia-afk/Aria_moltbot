@@ -1,0 +1,635 @@
+{% extends "base.html" %}
+{% block title %}Memory Graph{% endblock %}
+
+{% block extra_css %}
+<style>
+    .memory-graph-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+    .memory-graph-header h1 {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+    .graph-stats {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+    .stat-box {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        padding: 0.5rem 1rem;
+        text-align: center;
+    }
+    .stat-box .value {
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: var(--accent-primary);
+    }
+    .stat-box .label {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+    }
+    .graph-controls {
+        display: flex;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+    .graph-controls input,
+    .graph-controls select {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        color: var(--text-primary);
+        padding: 0.4rem 0.75rem;
+        border-radius: var(--radius-md);
+        font-size: 0.85rem;
+    }
+    .graph-controls input {
+        min-width: 180px;
+    }
+    .graph-controls button {
+        padding: 0.4rem 0.75rem;
+        background: var(--accent-primary);
+        color: white;
+        border: none;
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        font-size: 0.85rem;
+        transition: opacity 0.15s;
+    }
+    .graph-controls button:hover { opacity: 0.85; }
+    .graph-controls button.secondary {
+        background: var(--bg-tertiary);
+        color: var(--text-secondary);
+        border: 1px solid var(--border-color);
+    }
+    .type-filters {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        margin-bottom: 0.75rem;
+    }
+    .type-filter-chip {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.3rem 0.65rem;
+        border-radius: 20px;
+        font-size: 0.78rem;
+        cursor: pointer;
+        border: 1.5px solid transparent;
+        transition: all 0.15s;
+        user-select: none;
+    }
+    .type-filter-chip .chip-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+    }
+    .type-filter-chip.active {
+        opacity: 1;
+    }
+    .type-filter-chip.inactive {
+        opacity: 0.35;
+    }
+    .graph-layout {
+        display: grid;
+        grid-template-columns: 1fr 310px;
+        gap: 1rem;
+        height: calc(100vh - 320px);
+        min-height: 500px;
+    }
+    @media (max-width: 900px) {
+        .graph-layout { grid-template-columns: 1fr; height: auto; }
+    }
+    .graph-container {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        position: relative;
+    }
+    #memory-network {
+        width: 100%;
+        height: 100%;
+        min-height: 500px;
+    }
+    .sidebar {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        overflow-y: auto;
+    }
+    .sidebar-panel {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        flex-shrink: 0;
+    }
+    .sidebar-panel .panel-header {
+        padding: 0.75rem 1rem;
+        background: var(--bg-tertiary);
+        border-bottom: 1px solid var(--border-color);
+        font-size: 0.85rem;
+        font-weight: 600;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .sidebar-panel .panel-content {
+        padding: 0.75rem;
+        max-height: 320px;
+        overflow-y: auto;
+        font-size: 0.85rem;
+    }
+    .node-detail { display: none; }
+    .node-detail.active { display: block; }
+    .detail-field { margin-bottom: 0.5rem; }
+    .detail-field .field-label {
+        color: var(--text-muted);
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        margin-bottom: 0.15rem;
+    }
+    .detail-field .field-value { color: var(--text-primary); }
+    .type-badge {
+        display: inline-block;
+        padding: 0.15rem 0.5rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+    .type-semantic_memory  { background: #8b5cf622; color: #a78bfa; border: 1px solid #8b5cf644; }
+    .type-working_memory   { background: #f59e0b22; color: #fbbf24; border: 1px solid #f59e0b44; }
+    .type-kv_memory        { background: #3b82f622; color: #60a5fa; border: 1px solid #3b82f644; }
+    .type-thought          { background: #22c55e22; color: #4ade80; border: 1px solid #22c55e44; }
+    .type-lesson           { background: #ef444422; color: #f87171; border: 1px solid #ef444444; }
+    .legend {
+        padding: 0.75rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+    }
+    .legend-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+    .search-result-item {
+        padding: 0.4rem 0.25rem;
+        cursor: pointer;
+        border-bottom: 1px solid var(--border-color);
+        transition: background 0.1s;
+    }
+    .search-result-item:hover { background: var(--bg-tertiary); }
+    .search-result-item:last-child { border-bottom: none; }
+    .empty-state {
+        padding: 1rem;
+        text-align: center;
+        color: var(--text-muted);
+        font-size: 0.85rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="memory-graph-header">
+    <h1>🧠 Memory Graph</h1>
+    <div class="graph-stats">
+        <div class="stat-box">
+            <div class="value" id="stat-nodes">—</div>
+            <div class="label">Nodes</div>
+        </div>
+        <div class="stat-box">
+            <div class="value" id="stat-edges">—</div>
+            <div class="label">Edges</div>
+        </div>
+        <div class="stat-box">
+            <div class="value" id="stat-semantic">—</div>
+            <div class="label">Semantic</div>
+        </div>
+        <div class="stat-box">
+            <div class="value" id="stat-working">—</div>
+            <div class="label">Working</div>
+        </div>
+    </div>
+</div>
+
+<div class="graph-controls">
+    <input
+        type="text"
+        id="search-input"
+        placeholder="Search nodes…"
+        oninput="onSearchInput(this.value)"
+    />
+    <select id="filter-category" onchange="applyFilter()">
+        <option value="">All categories</option>
+    </select>
+    <select id="limit-select" onchange="reloadGraph()">
+        <option value="100">100 nodes</option>
+        <option value="200" selected>200 nodes</option>
+        <option value="500">500 nodes</option>
+        <option value="1000">1000 nodes</option>
+    </select>
+    <button onclick="toggleLayout()" class="secondary" id="layout-btn">⚡ Physics layout</button>
+    <button onclick="reloadGraph()">↻ Refresh</button>
+</div>
+
+<div class="type-filters" id="type-filters">
+    <!-- populated by JS -->
+</div>
+
+<div class="graph-layout">
+    <div class="graph-container">
+        <div id="memory-network"></div>
+    </div>
+    <div class="sidebar">
+        <div class="sidebar-panel">
+            <div class="panel-header">🔎 Node Inspector</div>
+            <div class="panel-content">
+                <div id="no-selection" class="empty-state">Click a node to inspect</div>
+                <div id="node-detail" class="node-detail">
+                    <div class="detail-field">
+                        <div class="field-label">Label</div>
+                        <div class="field-value" id="detail-label" style="font-weight:600;"></div>
+                    </div>
+                    <div class="detail-field">
+                        <div class="field-label">Type</div>
+                        <div class="field-value" id="detail-type"></div>
+                    </div>
+                    <div class="detail-field">
+                        <div class="field-label">Category</div>
+                        <div class="field-value" id="detail-category"></div>
+                    </div>
+                    <div class="detail-field" id="detail-importance-row">
+                        <div class="field-label">Importance</div>
+                        <div class="field-value" id="detail-importance"></div>
+                    </div>
+                    <div class="detail-field">
+                        <div class="field-label">Created</div>
+                        <div class="field-value" id="detail-created"></div>
+                    </div>
+                    <div class="detail-field" id="detail-extra-row">
+                        <div class="field-label">Extra</div>
+                        <div class="field-value" id="detail-extra" style="font-family:monospace;font-size:0.75rem;white-space:pre-wrap;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="sidebar-panel">
+            <div class="panel-header">
+                🔍 Search Results
+                <span id="search-count" style="font-weight:normal;color:var(--text-muted);">0</span>
+            </div>
+            <div class="panel-content" id="search-results">
+                <div class="empty-state">Type to search…</div>
+            </div>
+        </div>
+
+        <div class="sidebar-panel">
+            <div class="panel-header">🎨 Legend</div>
+            <div class="legend" id="legend">
+                <div class="legend-item"><div class="legend-dot" style="background:#8b5cf6;"></div>Semantic Memory</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#f59e0b;"></div>Working Memory</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#3b82f6;"></div>KV Memory</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#22c55e;"></div>Thought</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#ef4444;"></div>Lesson</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/vis-network.min.js"></script>
+<script>
+const API_BASE = '{{ api_base_url }}';
+
+// ── Node type constants ───────────────────────────────────────────────────────
+const TYPE_COLOR = {
+    semantic_memory: '#8b5cf6',
+    working_memory:  '#f59e0b',
+    kv_memory:       '#3b82f6',
+    thought:         '#22c55e',
+    lesson:          '#ef4444',
+};
+const TYPE_SHAPE = {
+    semantic_memory: 'dot',
+    working_memory:  'diamond',
+    kv_memory:       'square',
+    thought:         'triangle',
+    lesson:          'star',
+};
+const TYPE_SIZE_BASE = {
+    semantic_memory: 15,
+    working_memory:  12,
+    kv_memory:       10,
+    thought:         8,
+    lesson:          14,
+};
+const TYPE_LABELS = {
+    semantic_memory: 'Semantic Memory',
+    working_memory:  'Working Memory',
+    kv_memory:       'KV Memory',
+    thought:         'Thought',
+    lesson:          'Lesson Learned',
+};
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let allNodes = [];
+let allEdges = [];
+let network = null;
+let nodesDS = null;
+let edgesDS = null;
+let currentLayout = 'physics';
+let activeTypes = new Set(Object.keys(TYPE_COLOR));
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+function esc(s) {
+    if (s == null) return '';
+    const d = document.createElement('div');
+    d.textContent = String(s);
+    return d.innerHTML;
+}
+
+// ── Graph loading ─────────────────────────────────────────────────────────────
+async function loadGraph(limit) {
+    limit = limit || document.getElementById('limit-select').value || 200;
+    try {
+        const resp = await fetch(`${API_BASE}/memory-graph?limit=${limit}`);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+
+        allNodes = data.nodes || [];
+        allEdges = data.edges || [];
+        const stats = data.stats || {};
+
+        document.getElementById('stat-nodes').textContent  = stats.total_nodes || 0;
+        document.getElementById('stat-edges').textContent  = stats.total_edges || 0;
+        document.getElementById('stat-semantic').textContent = (stats.by_type || {}).semantic_memory || 0;
+        document.getElementById('stat-working').textContent  = (stats.by_type || {}).working_memory  || 0;
+
+        // Populate category filter
+        const catSel = document.getElementById('filter-category');
+        const cats = stats.categories || [];
+        catSel.innerHTML = '<option value="">All categories</option>' +
+            cats.sort().map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+
+        buildTypeFilterChips();
+        drawGraph(allNodes, allEdges);
+    } catch (err) {
+        console.error('Failed to load memory graph:', err);
+    }
+}
+
+function reloadGraph() {
+    loadGraph(document.getElementById('limit-select').value);
+}
+
+// ── Type filter chips ─────────────────────────────────────────────────────────
+function buildTypeFilterChips() {
+    const container = document.getElementById('type-filters');
+    container.innerHTML = '';
+    const types = [...new Set(allNodes.map(n => n.type))];
+    types.forEach(t => {
+        const chip = document.createElement('div');
+        chip.className = 'type-filter-chip active';
+        chip.dataset.type = t;
+        chip.innerHTML = `
+            <div class="chip-dot" style="background:${TYPE_COLOR[t] || '#888'};"></div>
+            ${esc(TYPE_LABELS[t] || t)}
+            <span style="color:var(--text-muted);font-size:0.7rem;">(${allNodes.filter(n=>n.type===t).length})</span>
+        `;
+        chip.onclick = () => toggleTypeFilter(t);
+        container.appendChild(chip);
+    });
+}
+
+function toggleTypeFilter(type) {
+    if (activeTypes.has(type)) {
+        activeTypes.delete(type);
+    } else {
+        activeTypes.add(type);
+    }
+    document.querySelectorAll('.type-filter-chip').forEach(chip => {
+        chip.className = 'type-filter-chip ' + (activeTypes.has(chip.dataset.type) ? 'active' : 'inactive');
+    });
+    applyFilter();
+}
+
+// ── Filter & draw ─────────────────────────────────────────────────────────────
+function applyFilter() {
+    const cat = document.getElementById('filter-category').value;
+    let filtered = allNodes.filter(n => activeTypes.has(n.type));
+    if (cat) filtered = filtered.filter(n => n.category === cat);
+    const ids = new Set(filtered.map(n => n.id));
+    const filteredEdges = allEdges.filter(e => ids.has(e.from) && ids.has(e.to));
+    drawGraph(filtered, filteredEdges);
+}
+
+function drawGraph(nodes, edges) {
+    const container = document.getElementById('memory-network');
+
+    const visNodes = nodes.map(n => {
+        const color = TYPE_COLOR[n.type] || '#888';
+        const sizeBase = TYPE_SIZE_BASE[n.type] || 12;
+        const importance = n.importance || 0;
+        const size = sizeBase + Math.round(importance * 6);  // scale by importance
+        return {
+            id: n.id,
+            label: n.label || n.id,
+            title: buildTooltip(n),
+            color: {
+                background: color,
+                border: color + 'cc',
+                highlight: { background: color, border: '#fff' },
+                hover:      { background: color + 'dd', border: '#fff' },
+            },
+            font: { color: '#e0e0e0', size: 11 },
+            shape: TYPE_SHAPE[n.type] || 'dot',
+            size: size,
+            _data: n,
+        };
+    });
+
+    const visEdges = edges.map(e => ({
+        id: e.id,
+        from: e.from,
+        to: e.to,
+        label: (e.label && e.label.length > 20) ? e.label.substring(0, 18) + '…' : (e.label || ''),
+        arrows: '',
+        dashes: e.type === 'shared_source' ? [5, 5] : false,
+        color: {
+            color: e.type === 'shared_source' ? '#3b82f688' : '#55555577',
+            highlight: '#a78bfa',
+            hover: '#a78bfa',
+        },
+        font: { color: '#666', size: 8, strokeWidth: 0 },
+        smooth: { type: 'curvedCW', roundness: 0.1 },
+        width: e.type === 'shared_source' ? 1.5 : 1.0,
+        _data: e,
+    }));
+
+    nodesDS = new vis.DataSet(visNodes);
+    edgesDS = new vis.DataSet(visEdges);
+
+    const opts = getLayoutOptions();
+    if (network) {
+        network.setData({ nodes: nodesDS, edges: edgesDS });
+        network.setOptions(opts);
+    } else {
+        network = new vis.Network(container, { nodes: nodesDS, edges: edgesDS }, opts);
+        network.on('click', onNodeClick);
+    }
+}
+
+function buildTooltip(n) {
+    const lines = [
+        `[${n.type}]`,
+        n.label || '',
+        n.category ? `Category: ${n.category}` : '',
+        n.importance ? `Importance: ${n.importance.toFixed(2)}` : '',
+        n.source ? `Source: ${n.source}` : '',
+        n.occurrences ? `Occurrences: ${n.occurrences}` : '',
+    ].filter(Boolean);
+    return lines.join('\n');
+}
+
+// ── Layout ────────────────────────────────────────────────────────────────────
+function getLayoutOptions() {
+    const base = {
+        nodes: { borderWidth: 1.5, shadow: { enabled: true, size: 5 } },
+        edges: { shadow: false },
+        interaction: { hover: true, tooltipDelay: 150, zoomView: true, dragView: true },
+    };
+    if (currentLayout === 'hierarchical') {
+        return {
+            ...base,
+            layout: {
+                hierarchical: { direction: 'UD', sortMethod: 'hubsize', levelSeparation: 130, nodeSpacing: 90 },
+            },
+            physics: false,
+        };
+    }
+    return {
+        ...base,
+        layout: { hierarchical: false },
+        physics: {
+            enabled: true,
+            solver: 'forceAtlas2Based',
+            forceAtlas2Based: {
+                gravitationalConstant: -45,
+                centralGravity: 0.005,
+                springLength: 130,
+                springConstant: 0.06,
+            },
+            stabilization: { iterations: 200 },
+        },
+    };
+}
+
+function toggleLayout() {
+    currentLayout = currentLayout === 'physics' ? 'hierarchical' : 'physics';
+    document.getElementById('layout-btn').textContent =
+        currentLayout === 'physics' ? '⚡ Physics layout' : '📐 Hierarchical layout';
+    if (network) network.setOptions(getLayoutOptions());
+}
+
+// ── Node inspector ────────────────────────────────────────────────────────────
+function onNodeClick(params) {
+    if (params.nodes.length === 0) {
+        document.getElementById('no-selection').style.display = 'block';
+        document.getElementById('node-detail').classList.remove('active');
+        return;
+    }
+    const nodeId = params.nodes[0];
+    const node = allNodes.find(n => n.id === nodeId);
+    if (!node) return;
+
+    document.getElementById('no-selection').style.display = 'none';
+    document.getElementById('node-detail').classList.add('active');
+
+    document.getElementById('detail-label').textContent = node.label || node.id;
+    const tc = String(node.type || '').replace(/[^a-zA-Z0-9_-]/g, '');
+    document.getElementById('detail-type').innerHTML =
+        `<span class="type-badge type-${tc}">${esc(TYPE_LABELS[node.type] || node.type)}</span>`;
+    document.getElementById('detail-category').textContent = node.category || '—';
+    document.getElementById('detail-importance').textContent =
+        node.importance != null ? node.importance.toFixed(3) : '—';
+    document.getElementById('detail-created').textContent =
+        node.created_at ? new Date(node.created_at).toLocaleString() : '—';
+
+    // Extra fields
+    const extra = {};
+    if (node.source)       extra.source       = node.source;
+    if (node.access_count) extra.access_count = node.access_count;
+    if (node.ttl_hours)    extra.ttl_hours    = node.ttl_hours;
+    if (node.occurrences)  extra.occurrences  = node.occurrences;
+    if (node.effectiveness)extra.effectiveness= node.effectiveness;
+    document.getElementById('detail-extra').textContent =
+        Object.keys(extra).length ? JSON.stringify(extra, null, 2) : '—';
+}
+
+// ── Search ────────────────────────────────────────────────────────────────────
+let searchTimer;
+function onSearchInput(q) {
+    clearTimeout(searchTimer);
+    const resEl = document.getElementById('search-results');
+    if (!q || q.length < 2) {
+        resEl.innerHTML = '<div class="empty-state">Type to search…</div>';
+        document.getElementById('search-count').textContent = '0';
+        return;
+    }
+    searchTimer = setTimeout(() => {
+        const ql = q.toLowerCase();
+        const results = allNodes.filter(n =>
+            (n.label || '').toLowerCase().includes(ql) ||
+            (n.category || '').toLowerCase().includes(ql) ||
+            (n.type || '').toLowerCase().includes(ql)
+        ).slice(0, 25);
+        document.getElementById('search-count').textContent = results.length;
+        if (!results.length) {
+            resEl.innerHTML = '<div class="empty-state">No results</div>';
+            return;
+        }
+        resEl.innerHTML = results.map(n => {
+            const tc = String(n.type || '').replace(/[^a-zA-Z0-9_-]/g, '');
+            return `<div class="search-result-item" onclick="focusNode('${esc(n.id)}')">
+                <span class="type-badge type-${tc}">${esc(TYPE_LABELS[n.type] || n.type)}</span>
+                <strong>${esc(n.label)}</strong>
+                <div style="color:var(--text-muted);font-size:0.7rem;">${esc(n.category)}</div>
+            </div>`;
+        }).join('');
+    }, 250);
+}
+
+function focusNode(nodeId) {
+    if (network) {
+        network.focus(nodeId, { scale: 1.8, animation: { duration: 500, easingFunction: 'easeInOutQuad' } });
+        network.selectNodes([nodeId]);
+        onNodeClick({ nodes: [nodeId] });
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => loadGraph());
+</script>
+{% endblock %}

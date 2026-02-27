@@ -86,9 +86,13 @@ The `api_client` skill exposes file artifact CRUD via REST endpoints on the API 
 | Endpoint | Method | Tool Name | Description |
 |---|---|---|---|
 | `/artifacts` | POST | `api_client__write_artifact` | Write a file to a category |
-| `/artifacts/{category}/{filename}` | GET | `api_client__read_artifact` | Read a file |
+| `/artifacts/{category}/{filename:path}` | GET | `api_client__read_artifact` | Read a file (filename may include subfolders) |
 | `/artifacts` | GET | `api_client__list_artifacts` | List files (optional category/pattern/limit) |
 | `/artifacts/{category}/{filename}` | DELETE | `api_client__delete_artifact` | Delete a file |
+
+> **Nested path example:** For `aria_memories/memory/logs/work_cycle_2026-02-27_0416.json`
+> use `category=memory` and `filename=logs/work_cycle_2026-02-27_0416.json`.
+> Or use `api_client__read_artifact_by_path` with the full relative path `memory/logs/work_cycle_2026-02-27_0416.json`.
 
 All artifact operations are restricted to the `ALLOWED_CATEGORIES` whitelist and enforce path traversal protection.
 

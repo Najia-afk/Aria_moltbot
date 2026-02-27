@@ -240,45 +240,20 @@ class SessionManagerSkill(BaseSkill):
     async def get_session_stats(self, **kwargs) -> SkillResult:
         """Get summary statistics about current sessions."""
         try:
-            sessions = await self._fetch_sessions(limit=200)
-            now = datetime.now(timezone.utc)
-            agent_counts: dict[str, int] = {}
-            type_counts: dict[str, int] = {}
-            stale_count = 0
-            total_messages = 0
+            stats_resp = await self._api.get(
+                "/sessions/stats",
+                params={"include_runtime_events": True, "include_cron_events": True},
+            )
+            if not stats_resp.success:
+                return SkillResult.fail(f"Error getting session stats: {stats_resp.error}")
 
-            for sess in sessions:
-                agent = sess.get("agent_id") or "unknown"
-                stype = sess.get("session_type") or "interactive"
-                agent_counts[agent] = agent_counts.get(agent, 0) + 1
-                type_counts[stype] = type_counts.get(stype, 0) + 1
-                total_messages += sess.get("message_count", 0)
-
-                ts_str = (
-                    sess.get("last_message_at")
-                    or sess.get("updated_at")
-                    or ""
-                )
-                if ts_str:
-                    try:
-                        ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
-                        if ts.tzinfo is None:
-                            ts = ts.replace(tzinfo=timezone.utc)
-                        if (now - ts).total_seconds() > self._stale_threshold_minutes * 60:
-                            stale_count += 1
-                    except (ValueError, TypeError):
-                        stale_count += 1
-                else:
-                    stale_count += 1
-
+            data = stats_resp.data if isinstance(stats_resp.data, dict) else {}
             return SkillResult.ok({
-                "total_sessions": len(sessions),
-                "stale_sessions": stale_count,
-                "active_sessions": len(sessions) - stale_count,
-                "total_messages": total_messages,
-                "by_agent": agent_counts,
-                "by_type": type_counts,
-                "stale_threshold_minutes": self._stale_threshold_minutes,
+                "total_sessions": data.get("total_sessions", 0),
+                "active_sessions": data.get("active_sessions", 0),
+                "by_agent": data.get("by_agent", []),
+                "by_type": data.get("by_type", []),
+                "source": "engine_sessions_status",
             })
         except Exception as e:
             return SkillResult.fail(f"Error getting session stats: {e}")

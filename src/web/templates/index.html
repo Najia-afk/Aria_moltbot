@@ -351,7 +351,7 @@
             </div>
             <span class="service-status loading" id="status-pgadmin">...</span>
         </a>
-        <a href="http://{{ request.host.split(':')[0] }}:18793" target="_blank" class="service-card">
+        <a href="http://{{ request.host.split(':')[0] }}:{{ litellm_port }}" target="_blank" class="service-card">
             <div class="service-icon litellm">🔗</div>
             <div class="service-info">
                 <h3>LiteLLM</h3>

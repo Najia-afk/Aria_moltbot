@@ -66,7 +66,7 @@ async def list_goals(
     status: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
-    base = select(Goal).order_by(Goal.priority.asc(), Goal.created_at.desc())
+    base = select(Goal).order_by(Goal.priority.desc(), Goal.created_at.desc())
     if status:
         base = base.where(Goal.status == status)
 

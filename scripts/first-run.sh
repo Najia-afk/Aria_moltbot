@@ -5,6 +5,11 @@
 # ──────────────────────────────────────────────────────────────
 set -euo pipefail
 
+AUTO=false
+if [[ "${1:-}" == "--auto" ]]; then
+    AUTO=true
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 STACK_DIR="$REPO_ROOT/stacks/brain"
@@ -82,6 +87,10 @@ if [ ! -f "$ENV_EXAMPLE" ]; then
 fi
 
 if [ -f "$ENV_FILE" ]; then
+    if [[ "$AUTO" == "true" ]]; then
+        info ".env already exists — skipping auto-bootstrap."
+        exit 0
+    fi
     warn ".env already exists at $ENV_FILE"
     read -rp "Overwrite? (y/N) " choice
     if [[ ! "$choice" =~ ^[Yy]$ ]]; then
@@ -134,7 +143,12 @@ fill_env "ARIA_ADMIN_TOKEN" "$ADMIN_TOKEN"
 fill_env "BROWSERLESS_TOKEN" "$BROWSER_TOKEN"
 
 info "Required secrets generated and written to .env"
-
+# In --auto mode skip port randomization (keep .env.example port defaults)
+if [[ "$AUTO" == "true" ]]; then
+    info "Auto-bootstrap complete — using default ports from .env.example."
+    info "Run scripts/first-run.sh interactively to randomize ports."
+    exit 0
+fi
 # ── Randomize host-exposed ports ──────────────────────────────
 # Each service gets a random high port (20000-60000) to avoid conflicts.
 

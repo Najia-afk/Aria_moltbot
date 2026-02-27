@@ -53,9 +53,10 @@ class ScheduleSkill(BaseSkill):
         self,
         name: str,
         schedule: str,  # cron-like or "every X minutes/hours"
-        action: str,
+        action: str | None = None,
         params: dict | None = None,
         enabled: bool = True,
+        **kwargs,
     ) -> SkillResult:
         """
         Create a scheduled job.
@@ -63,13 +64,18 @@ class ScheduleSkill(BaseSkill):
         Args:
             name: Job name
             schedule: Schedule expression
-            action: Action to perform
+            action: Action to perform (also accepts ``type`` alias from model payloads)
             params: Action parameters
             enabled: Whether job is active
+            **kwargs: Extra fields are absorbed for caller compatibility
             
         Returns:
             SkillResult with job details
         """
+        # Compatibility: some callers send `type` instead of `action`
+        normalized_action = action or kwargs.get("type")
+        if not normalized_action:
+            return SkillResult.fail("action (or type) is required")
         self._job_counter += 1
         job_id = f"job_{self._job_counter}"
         
@@ -77,7 +83,7 @@ class ScheduleSkill(BaseSkill):
             "id": job_id,
             "name": name,
             "schedule": schedule,
-            "action": action,
+            "action": normalized_action,
             "params": params or {},
             "enabled": enabled,
             "created_at": datetime.now(timezone.utc).isoformat(),

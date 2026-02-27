@@ -1,7 +1,7 @@
 services:
   # PostgreSQL Database (pgvector enabled for semantic memory)
   aria-db:
-    image: pgvector/pgvector:0.8.0-pg16
+    image: pgvector/pgvector:0.8.2-pg17
     container_name: aria-db
     restart: unless-stopped
     environment:
@@ -24,15 +24,12 @@ services:
     mem_limit: ${POSTGRES_MEM_LIMIT:-512m}
     cpus: ${POSTGRES_CPU_LIMIT:-1.0}
 
-  # Headless Chrome for browser automation
+  # Headless Chrome for browser automation (S-50: upgraded browserless v1→v2)
   aria-browser:
-    # Aria v3 freeze: pinned to digest (no versioned arm64 tags available)
-    image: browserless/chrome:latest@sha256:57d19e414d9fe4ae9d2ab12ba768c97f38d51246c5b31af55a009205c136012f
+    image: ghcr.io/browserless/chromium:v2.42.0
     container_name: aria-browser
     restart: unless-stopped
     environment:
-      MAX_CONCURRENT_SESSIONS: 5
-      CONNECTION_TIMEOUT: 60000
       TOKEN: ${BROWSERLESS_TOKEN:-}
       BROWSERLESS_INTERNAL_PORT: ${BROWSERLESS_INTERNAL_PORT:-3000}
     ports:
@@ -218,7 +215,7 @@ services:
     restart: unless-stopped
     environment:
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-change-me}
-      DATABASE_URL: postgresql://${DB_USER:-admin}:${DB_PASSWORD:-admin}@aria-db:${DB_INTERNAL_PORT:-5432}/${DB_NAME:-aria_warehouse}?options=-csearch_path%3Dlitellm,public
+      DATABASE_URL: postgresql://${DB_USER:-admin}:${DB_PASSWORD:-admin}@aria-db:${DB_INTERNAL_PORT:-5432}/${DB_NAME:-aria_warehouse}?options=-csearch_path%3Dlitellm
       MOONSHOT_KIMI_KEY: ${MOONSHOT_KIMI_KEY:-}
       OPEN_ROUTER_KEY: ${OPEN_ROUTER_KEY:-}
       OPEN_ROUTER_KEY_DEEP: ${OPEN_ROUTER_KEY_DEEP:-${OPEN_ROUTER_KEY:-}}
@@ -420,6 +417,7 @@ services:
       WEB_INTERNAL_PORT: ${WEB_INTERNAL_PORT:-5000}
       # Host-exposed API port — passed to templates for browser-side WS fallback
       ARIA_API_PORT: ${ARIA_API_PORT:-8000}
+      LITELLM_PORT: ${LITELLM_PORT:-18793}
       # Internal API URL for server-to-server calls (Docker network)
       API_INTERNAL_URL: http://aria-api:${API_INTERNAL_PORT:-8000}
       USER_DISPLAY_NAME: ${USER_DISPLAY_NAME:-User}

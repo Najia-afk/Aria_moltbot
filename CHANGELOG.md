@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [Unreleased] — aria_v3_270226 Sprint (2026-02-27)
+
+**Theme:** Session/artifact integrity guardrails, self-healing resilience, infrastructure hardening, memory accessibility.
+
+### Added
+- **S-45 (E20):** Self-Healing Phase 2–5 — `api_client` retry migration (112 endpoint methods now use `_request_with_retry`), `LLMSkill` with `LLM_FALLBACK_CHAIN` and per-model circuit breakers, `HealthDegradationLevel` enum with degradation detection + job suspension logic, chaos tests (`tests/test_self_healing.py`) covering backoff, circuit breaker, LLM fallback, and activity resilience.
+- **S-44 (E20):** `aria_memories/HEARTBEAT.md` — read-accessible operational guide for cron jobs; `cron_jobs.yaml` and `DEPLOYMENT.md` updated to prefer artifact path.
+- **S-40 (E19):** `api_client.read_artifact_by_path()` helper for nested path resolution; `MEMORY.md` docs updated; regression tests added.
+- **S-41 (E19):** `schedule.create_job()` now accepts `type` kwarg as alias for `action` — backward compatible.
+
+### Fixed
+- **S-39 (E19):** JSON artifacts validated before write (HTTP 400 on invalid JSON); `get_session_stats()` uses canonical `/sessions/stats` endpoint; work_cycle log enforces strict JSON schema; goal ordering fixed to `priority DESC`.
+- **S-42 (E19):** `create_heartbeat` accepts `details` as `dict | str | list | None` — normalizes to `dict` before DB insert; eliminates 422 errors.
+- **S-47 (P0):** LiteLLM schema isolation — removed `,public` from `search_path` in 4 locations; `ensure_schema()` creates `litellm` schema; eliminates cross-schema Prisma table leakage.
+- **S-48 (P0):** LiteLLM port hardcoded as `:18793` in `index.html` and `services.html` — now uses `{{ litellm_port }}` from Flask context; `docker-compose.yml` injects `LITELLM_PORT` env var.
+- **S-49 (P0):** `make up` now auto-bootstraps `stacks/brain/.env` via `check-env` prerequisite; `first-run.sh --auto` flag skips interactive prompts on fresh clone.
+- **S-50 (E20):** Upgraded `aria-browser` from frozen `browserless/chrome:latest` (2-year-old SHA) to `ghcr.io/browserless/chromium:v2.42.0`; removed deprecated env vars.
+- **S-51 (P0):** pgvector Python package added to `pyproject.toml`; pg16→pg17 + pgvector 0.8.0→0.8.2 upgrade; HNSW indexes for `semantic_memories` and `session_messages`; Alembic migration `s52_pg17_pgvector_hnsw_upgrade.py`.
+
+### Changed
+- **S-43 (E20):** Identity manifest `identity_aria_v1.md` updated to v1.1 with sprint learnings (pre-existing at sprint start).
+
+---
+
 ## [3.0.0] — 2026-02-21 (Multi-Agent v3 — Roundtable, Swarm & Artifacts)
 
 **Theme:** Multi-agent orchestration, file-based memory artifacts, per-agent mind configuration, production hardening.  

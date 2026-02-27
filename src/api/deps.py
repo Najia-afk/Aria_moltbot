@@ -25,7 +25,7 @@ async def get_litellm_db() -> AsyncGenerator[AsyncSession, None]:
     async with LiteLLMSessionLocal() as session:
         try:
             # Ensure we're reading from the litellm schema
-            await session.execute(text("SET search_path TO litellm, public"))
+            await session.execute(text("SET search_path TO litellm"))
             yield session
         except Exception:
             await session.rollback()

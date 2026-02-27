@@ -72,6 +72,40 @@ async def test_create_job_success(mock_api):
 
 
 @pytest.mark.asyncio
+async def test_create_job_accepts_type_alias(mock_api):
+    """S-41: create_job must accept 'type' kwarg as an alias for 'action'."""
+    skill = _make_skill()
+    skill._api = mock_api
+    skill._status = SkillStatus.AVAILABLE
+    mock_api.post = AsyncMock(return_value=SkillResult.ok({
+        "id": "job_1", "name": "demo", "action": "heartbeat"
+    }))
+
+    result = await skill.create_job(
+        name="demo",
+        schedule="*/15 * * * *",
+        type="heartbeat",
+    )
+    assert result.success
+    assert result.data.get("action") == "heartbeat"
+
+
+@pytest.mark.asyncio
+async def test_create_job_missing_action_and_type(mock_api):
+    """S-41: create_job without action or type must fail gracefully."""
+    skill = _make_skill()
+    skill._api = mock_api
+    skill._status = SkillStatus.AVAILABLE
+
+    result = await skill.create_job(
+        name="demo",
+        schedule="*/15 * * * *",
+    )
+    assert not result.success
+    assert "required" in result.error.lower()
+
+
+@pytest.mark.asyncio
 async def test_create_job_api_fallback(mock_api):
     skill = _make_skill()
     skill._api = mock_api

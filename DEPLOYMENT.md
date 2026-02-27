@@ -340,7 +340,7 @@ Periodic agent turns every 30 minutes:
   "heartbeat": {
     "every": "30m",
     "target": "last",
-    "prompt": "Read HEARTBEAT.md if it exists. Follow it strictly. If nothing needs attention, reply HEARTBEAT_OK."
+    "prompt": "Read aria_memories/HEARTBEAT.md (preferred) or fall back to /HEARTBEAT.md if artifact read fails. Follow it strictly. If nothing needs attention, reply HEARTBEAT_OK."
   }
 }
 ```

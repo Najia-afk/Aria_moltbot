@@ -113,8 +113,7 @@ class AriaAPIClient(BaseSkill):
     async def get_activities(self, limit: int = 50, page: int = 1) -> SkillResult:
         """Get recent activities (paginated)."""
         try:
-            resp = await self._client.get(f"/activities?limit={limit}&page={page}")
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", f"/activities?limit={limit}&page={page}")
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to get activities: {e}")
@@ -129,14 +128,13 @@ class AriaAPIClient(BaseSkill):
     ) -> SkillResult:
         """Log an activity."""
         try:
-            resp = await self._client.post("/activities", json={
+            resp = await self._request_with_retry("POST", "/activities", json={
                 "action": action,
                 "skill": skill,
                 "details": details or {},
                 "success": success,
                 "error_message": error_message
             })
-            resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to create activity: {e}")
@@ -158,8 +156,7 @@ class AriaAPIClient(BaseSkill):
                 url += f"&threat_level={threat_level}"
             if blocked_only:
                 url += "&blocked_only=true"
-            resp = await self._client.get(url)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", url)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to get security events: {e}")
@@ -177,7 +174,7 @@ class AriaAPIClient(BaseSkill):
     ) -> SkillResult:
         """Log a security event."""
         try:
-            resp = await self._client.post("/security-events", json={
+            resp = await self._request_with_retry("POST", "/security-events", json={
                 "threat_level": threat_level,
                 "threat_type": threat_type,
                 "threat_patterns": threat_patterns or [],
@@ -187,7 +184,6 @@ class AriaAPIClient(BaseSkill):
                 "blocked": blocked,
                 "details": details or {}
             })
-            resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to create security event: {e}")
@@ -195,8 +191,7 @@ class AriaAPIClient(BaseSkill):
     async def get_security_stats(self) -> SkillResult:
         """Get security event statistics."""
         try:
-            resp = await self._client.get("/security-events/stats")
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", "/security-events/stats")
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to get security stats: {e}")
@@ -207,8 +202,7 @@ class AriaAPIClient(BaseSkill):
     async def get_thoughts(self, limit: int = 25, page: int = 1) -> SkillResult:
         """Get recent thoughts (paginated)."""
         try:
-            resp = await self._client.get(f"/thoughts?limit={limit}&page={page}")
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", f"/thoughts?limit={limit}&page={page}")
             data = resp.json()
             return SkillResult.ok(data.get("thoughts", data))
         except Exception as e:
@@ -222,12 +216,11 @@ class AriaAPIClient(BaseSkill):
     ) -> SkillResult:
         """Create a thought."""
         try:
-            resp = await self._client.post("/thoughts", json={
+            resp = await self._request_with_retry("POST", "/thoughts", json={
                 "content": content,
                 "category": category,
                 "metadata": metadata or {}
             })
-            resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to create thought: {e}")
@@ -246,8 +239,7 @@ class AriaAPIClient(BaseSkill):
             url = f"/memories?limit={limit}&page={page}"
             if category:
                 url += f"&category={category}"
-            resp = await self._client.get(url)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", url)
             data = resp.json()
             return SkillResult.ok(data.get("memories", data))
         except Exception as e:
@@ -256,12 +248,11 @@ class AriaAPIClient(BaseSkill):
     async def get_memory(self, key: str) -> SkillResult:
         """Get a specific memory by key."""
         try:
-            resp = await self._client.get(f"/memories/{key}")
-            if resp.status_code == 404:
-                return SkillResult.ok(None)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", f"/memories/{key}")
             return SkillResult.ok(resp.json())
         except Exception as e:
+            if hasattr(e, "response") and getattr(e.response, "status_code", None) == 404:
+                return SkillResult.ok(None)
             return SkillResult.fail(f"Failed to get memory: {e}")
     
     async def set_memory(
@@ -272,12 +263,11 @@ class AriaAPIClient(BaseSkill):
     ) -> SkillResult:
         """Create or update a memory."""
         try:
-            resp = await self._client.post("/memories", json={
+            resp = await self._request_with_retry("POST", "/memories", json={
                 "key": key,
                 "value": value,
                 "category": category
             })
-            resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to set memory: {e}")
@@ -285,8 +275,7 @@ class AriaAPIClient(BaseSkill):
     async def delete_memory(self, key: str) -> SkillResult:
         """Delete a memory."""
         try:
-            resp = await self._client.delete(f"/memories/{key}")
-            resp.raise_for_status()
+            resp = await self._request_with_retry("DELETE", f"/memories/{key}")
             return SkillResult.ok({"deleted": True, "key": key})
         except Exception as e:
             return SkillResult.fail(f"Failed to delete memory: {e}")
@@ -305,8 +294,7 @@ class AriaAPIClient(BaseSkill):
             url = f"/goals?limit={limit}&page={page}"
             if status:
                 url += f"&status={status}"
-            resp = await self._client.get(url)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", url)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to get goals: {e}")
@@ -348,8 +336,7 @@ class AriaAPIClient(BaseSkill):
             if tags:
                 data["tags"] = tags
             
-            resp = await self._client.post("/goals", json=data)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("POST", "/goals", json=data)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to create goal: {e}")
@@ -371,8 +358,7 @@ class AriaAPIClient(BaseSkill):
             if priority is not None:
                 data["priority"] = priority
             
-            resp = await self._client.patch(f"/goals/{goal_id}", json=data)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("PATCH", f"/goals/{goal_id}", json=data)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to update goal: {e}")
@@ -380,8 +366,7 @@ class AriaAPIClient(BaseSkill):
     async def delete_goal(self, goal_id: str) -> SkillResult:
         """Delete a goal."""
         try:
-            resp = await self._client.delete(f"/goals/{goal_id}")
-            resp.raise_for_status()
+            resp = await self._request_with_retry("DELETE", f"/goals/{goal_id}")
             return SkillResult.ok({"deleted": True})
         except Exception as e:
             return SkillResult.fail(f"Failed to delete goal: {e}")
@@ -392,8 +377,7 @@ class AriaAPIClient(BaseSkill):
     async def get_goal_board(self, sprint: str = "current") -> SkillResult:
         """Get goals organized by board column."""
         try:
-            resp = await self._client.get(f"/goals/board?sprint={sprint}")
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", f"/goals/board?sprint={sprint}")
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to get goal board: {e}")
@@ -401,8 +385,7 @@ class AriaAPIClient(BaseSkill):
     async def get_goal_archive(self, page: int = 1, limit: int = 25) -> SkillResult:
         """Get completed/cancelled goals archive."""
         try:
-            resp = await self._client.get(f"/goals/archive?page={page}&limit={limit}")
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", f"/goals/archive?page={page}&limit={limit}")
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to get goal archive: {e}")
@@ -410,11 +393,10 @@ class AriaAPIClient(BaseSkill):
     async def move_goal(self, goal_id: str, board_column: str, position: int = 0) -> SkillResult:
         """Move goal to a different board column."""
         try:
-            resp = await self._client.patch(f"/goals/{goal_id}/move", json={
+            resp = await self._request_with_retry("PATCH", f"/goals/{goal_id}/move", json={
                 "board_column": board_column,
                 "position": position,
             })
-            resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to move goal: {e}")
@@ -422,8 +404,7 @@ class AriaAPIClient(BaseSkill):
     async def get_sprint_summary(self, sprint: str = "current") -> SkillResult:
         """Get lightweight sprint summary (token-efficient)."""
         try:
-            resp = await self._client.get(f"/goals/sprint-summary?sprint={sprint}")
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", f"/goals/sprint-summary?sprint={sprint}")
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to get sprint summary: {e}")
@@ -431,8 +412,7 @@ class AriaAPIClient(BaseSkill):
     async def get_goal_history(self, days: int = 14) -> SkillResult:
         """Get goal status distribution by day for charts."""
         try:
-            resp = await self._client.get(f"/goals/history?days={days}")
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", f"/goals/history?days={days}")
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to get goal history: {e}")
@@ -448,8 +428,7 @@ class AriaAPIClient(BaseSkill):
                 params["status"] = status
             if hour is not None:
                 params["hour"] = hour
-            resp = await self._client.get("/hourly-goals", params=params)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", "/hourly-goals", params=params)
             data = resp.json()
             return SkillResult.ok(data.get("goals", data))
         except Exception as e:
@@ -464,13 +443,12 @@ class AriaAPIClient(BaseSkill):
     ) -> SkillResult:
         """Create an hourly goal."""
         try:
-            resp = await self._client.post("/hourly-goals", json={
+            resp = await self._request_with_retry("POST", "/hourly-goals", json={
                 "hour_slot": hour_slot,
                 "goal_type": goal_type,
                 "description": description,
                 "status": status
             })
-            resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to create hourly goal: {e}")
@@ -482,10 +460,9 @@ class AriaAPIClient(BaseSkill):
     ) -> SkillResult:
         """Update an hourly goal status."""
         try:
-            resp = await self._client.patch(f"/hourly-goals/{goal_id}", json={
+            resp = await self._request_with_retry("PATCH", f"/hourly-goals/{goal_id}", json={
                 "status": status
             })
-            resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to update hourly goal: {e}")
@@ -496,8 +473,7 @@ class AriaAPIClient(BaseSkill):
     async def get_knowledge_graph(self) -> SkillResult:
         """Get full knowledge graph."""
         try:
-            resp = await self._client.get("/knowledge-graph")
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", "/knowledge-graph")
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to get knowledge graph: {e}")
@@ -512,8 +488,7 @@ class AriaAPIClient(BaseSkill):
             url = f"/knowledge-graph/entities?limit={limit}"
             if entity_type:
                 url += f"&type={entity_type}"
-            resp = await self._client.get(url)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", url)
             data = resp.json()
             return SkillResult.ok(data.get("entities", data))
         except Exception as e:
@@ -527,12 +502,11 @@ class AriaAPIClient(BaseSkill):
     ) -> SkillResult:
         """Create a knowledge entity."""
         try:
-            resp = await self._client.post("/knowledge-graph/entities", json={
+            resp = await self._request_with_retry("POST", "/knowledge-graph/entities", json={
                 "name": name,
                 "type": entity_type,
                 "properties": properties or {}
             })
-            resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to create entity: {e}")
@@ -546,13 +520,12 @@ class AriaAPIClient(BaseSkill):
     ) -> SkillResult:
         """Create a knowledge relation."""
         try:
-            resp = await self._client.post("/knowledge-graph/relations", json={
+            resp = await self._request_with_retry("POST", "/knowledge-graph/relations", json={
                 "from_entity": from_entity,
                 "to_entity": to_entity,
                 "relation_type": relation_type,
                 "properties": properties or {}
             })
-            resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to create relation: {e}")
@@ -569,8 +542,7 @@ class AriaAPIClient(BaseSkill):
             params = {"start": start, "max_depth": max_depth, "direction": direction}
             if relation_type:
                 params["relation_type"] = relation_type
-            resp = await self._client.get("/knowledge-graph/traverse", params=params)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", "/knowledge-graph/traverse", params=params)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to traverse graph: {e}")
@@ -586,8 +558,7 @@ class AriaAPIClient(BaseSkill):
             params: dict[str, Any] = {"q": query, "limit": limit}
             if entity_type:
                 params["entity_type"] = entity_type
-            resp = await self._client.get("/knowledge-graph/search", params=params)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", "/knowledge-graph/search", params=params)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to search graph: {e}")
@@ -604,8 +575,7 @@ class AriaAPIClient(BaseSkill):
             params: dict[str, Any] = {"start": start, "max_depth": max_depth, "direction": direction}
             if relation_type:
                 params["relation_type"] = relation_type
-            resp = await self._client.get("/knowledge-graph/kg-traverse", params=params)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", "/knowledge-graph/kg-traverse", params=params)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to traverse KG: {e}")
@@ -621,8 +591,7 @@ class AriaAPIClient(BaseSkill):
             params: dict[str, Any] = {"q": query, "limit": limit}
             if entity_type:
                 params["entity_type"] = entity_type
-            resp = await self._client.get("/knowledge-graph/kg-search", params=params)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", "/knowledge-graph/kg-search", params=params)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to search KG: {e}")
@@ -630,11 +599,10 @@ class AriaAPIClient(BaseSkill):
     async def find_skill_for_task(self, task: str, limit: int = 5) -> SkillResult:
         """Find the best skill for a given task description. ~100-200 tokens."""
         try:
-            resp = await self._client.get(
+            resp = await self._request_with_retry("GET", 
                 "/knowledge-graph/skill-for-task",
                 params={"task": task, "limit": limit},
             )
-            resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to find skill for task: {e}")
@@ -642,8 +610,7 @@ class AriaAPIClient(BaseSkill):
     async def delete_auto_generated_graph(self) -> SkillResult:
         """Delete all auto-generated knowledge graph entities + relations."""
         try:
-            resp = await self._client.delete("/knowledge-graph/auto-generated")
-            resp.raise_for_status()
+            resp = await self._request_with_retry("DELETE", "/knowledge-graph/auto-generated")
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to delete auto-generated graph: {e}")
@@ -651,8 +618,7 @@ class AriaAPIClient(BaseSkill):
     async def sync_skill_graph(self) -> SkillResult:
         """Trigger skill graph sync (idempotent regeneration)."""
         try:
-            resp = await self._client.post("/knowledge-graph/sync-skills")
-            resp.raise_for_status()
+            resp = await self._request_with_retry("POST", "/knowledge-graph/sync-skills")
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to sync skill graph: {e}")
@@ -660,8 +626,7 @@ class AriaAPIClient(BaseSkill):
     async def get_query_log(self, limit: int = 50) -> SkillResult:
         """Get recent knowledge graph query log entries."""
         try:
-            resp = await self._client.get("/knowledge-graph/query-log", params={"limit": limit})
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", "/knowledge-graph/query-log", params={"limit": limit})
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to get query log: {e}")
@@ -680,8 +645,7 @@ class AriaAPIClient(BaseSkill):
             url = f"/social?limit={limit}&page={page}"
             if platform:
                 url += f"&platform={platform}"
-            resp = await self._client.get(url)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", url)
             data = resp.json()
             return SkillResult.ok(data.get("posts", data))
         except Exception as e:
@@ -713,8 +677,7 @@ class AriaAPIClient(BaseSkill):
             if metadata:
                 data["metadata"] = metadata
             
-            resp = await self._client.post("/social", json=data)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("POST", "/social", json=data)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to create social post: {e}")
@@ -725,8 +688,7 @@ class AriaAPIClient(BaseSkill):
     async def get_heartbeats(self, limit: int = 50) -> SkillResult:
         """Get heartbeat logs."""
         try:
-            resp = await self._client.get(f"/heartbeat?limit={limit}")
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", f"/heartbeat?limit={limit}")
             data = resp.json()
             return SkillResult.ok(data.get("heartbeats", data))
         except Exception as e:
@@ -735,8 +697,7 @@ class AriaAPIClient(BaseSkill):
     async def get_latest_heartbeat(self) -> SkillResult:
         """Get latest heartbeat."""
         try:
-            resp = await self._client.get("/heartbeat/latest")
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", "/heartbeat/latest")
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to get latest heartbeat: {e}")
@@ -749,12 +710,11 @@ class AriaAPIClient(BaseSkill):
     ) -> SkillResult:
         """Log a heartbeat."""
         try:
-            resp = await self._client.post("/heartbeat", json={
+            resp = await self._request_with_retry("POST", "/heartbeat", json={
                 "beat_number": beat_number,
                 "status": status,
                 "details": details or {}
             })
-            resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to create heartbeat: {e}")
@@ -765,8 +725,7 @@ class AriaAPIClient(BaseSkill):
     async def get_performance_logs(self, limit: int = 50) -> SkillResult:
         """Get performance logs."""
         try:
-            resp = await self._client.get(f"/performance?limit={limit}")
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", f"/performance?limit={limit}")
             data = resp.json()
             return SkillResult.ok(data.get("logs", data))
         except Exception as e:
@@ -781,13 +740,12 @@ class AriaAPIClient(BaseSkill):
     ) -> SkillResult:
         """Create a performance log."""
         try:
-            resp = await self._client.post("/performance", json={
+            resp = await self._request_with_retry("POST", "/performance", json={
                 "review_period": review_period,
                 "successes": successes,
                 "failures": failures,
                 "improvements": improvements
             })
-            resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to create performance log: {e}")
@@ -801,8 +759,7 @@ class AriaAPIClient(BaseSkill):
             url = "/tasks"
             if status:
                 url += f"?status={status}"
-            resp = await self._client.get(url)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", url)
             data = resp.json()
             return SkillResult.ok(data.get("tasks", data))
         except Exception as e:
@@ -827,8 +784,7 @@ class AriaAPIClient(BaseSkill):
             if task_id:
                 data["task_id"] = task_id
             
-            resp = await self._client.post("/tasks", json=data)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("POST", "/tasks", json=data)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to create task: {e}")
@@ -841,11 +797,10 @@ class AriaAPIClient(BaseSkill):
     ) -> SkillResult:
         """Update a task status."""
         try:
-            resp = await self._client.patch(f"/tasks/{task_id}", json={
+            resp = await self._request_with_retry("PATCH", f"/tasks/{task_id}", json={
                 "status": status,
                 "result": result
             })
-            resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to update task: {e}")
@@ -856,8 +811,7 @@ class AriaAPIClient(BaseSkill):
     async def get_schedule(self) -> SkillResult:
         """Get schedule tick status."""
         try:
-            resp = await self._client.get("/schedule")
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", "/schedule")
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to get schedule: {e}")
@@ -865,8 +819,7 @@ class AriaAPIClient(BaseSkill):
     async def trigger_schedule_tick(self) -> SkillResult:
         """Trigger a manual schedule tick."""
         try:
-            resp = await self._client.post("/schedule/tick")
-            resp.raise_for_status()
+            resp = await self._request_with_retry("POST", "/schedule/tick")
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to trigger tick: {e}")
@@ -875,8 +828,7 @@ class AriaAPIClient(BaseSkill):
         """Get scheduled jobs."""
         try:
             url = "/jobs/live" if live else "/jobs"
-            resp = await self._client.get(url)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", url)
             data = resp.json()
             return SkillResult.ok(data.get("jobs", data))
         except Exception as e:
@@ -885,8 +837,7 @@ class AriaAPIClient(BaseSkill):
     async def sync_jobs(self) -> SkillResult:
         """Sync jobs from scheduler."""
         try:
-            resp = await self._client.post("/jobs/sync")
-            resp.raise_for_status()
+            resp = await self._request_with_retry("POST", "/jobs/sync")
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to sync jobs: {e}")
@@ -905,8 +856,7 @@ class AriaAPIClient(BaseSkill):
             url = f"/sessions?limit={limit}&page={page}"
             if status:
                 url += f"&status={status}"
-            resp = await self._client.get(url)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", url)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to get sessions: {e}")
@@ -919,12 +869,11 @@ class AriaAPIClient(BaseSkill):
     ) -> SkillResult:
         """Start a new agent session."""
         try:
-            resp = await self._client.post("/sessions", json={
+            resp = await self._request_with_retry("POST", "/sessions", json={
                 "agent_id": agent_id,
                 "session_type": session_type,
                 "metadata": metadata or {},
             })
-            resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to create session: {e}")
@@ -948,8 +897,7 @@ class AriaAPIClient(BaseSkill):
                 data["tokens_used"] = tokens_used
             if cost_usd is not None:
                 data["cost_usd"] = cost_usd
-            resp = await self._client.patch(f"/sessions/{session_id}", json=data)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("PATCH", f"/sessions/{session_id}", json=data)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to update session: {e}")
@@ -957,8 +905,7 @@ class AriaAPIClient(BaseSkill):
     async def get_session_stats(self) -> SkillResult:
         """Get session statistics."""
         try:
-            resp = await self._client.get("/sessions/stats")
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", "/sessions/stats")
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to get session stats: {e}")
@@ -969,8 +916,7 @@ class AriaAPIClient(BaseSkill):
     async def get_model_usage(self, limit: int = 50, page: int = 1) -> SkillResult:
         """Get model usage records (paginated)."""
         try:
-            resp = await self._client.get(f"/model-usage?limit={limit}&page={page}")
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", f"/model-usage?limit={limit}&page={page}")
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to get model usage: {e}")
@@ -1003,8 +949,7 @@ class AriaAPIClient(BaseSkill):
                 data["error_message"] = error_message
             if session_id:
                 data["session_id"] = session_id
-            resp = await self._client.post("/model-usage", json=data)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("POST", "/model-usage", json=data)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to log model usage: {e}")
@@ -1012,8 +957,7 @@ class AriaAPIClient(BaseSkill):
     async def get_model_usage_stats(self, hours: int = 24) -> SkillResult:
         """Get model usage statistics (merged with LiteLLM data)."""
         try:
-            resp = await self._client.get(f"/model-usage/stats?hours={hours}")
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", f"/model-usage/stats?hours={hours}")
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to get model usage stats: {e}")
@@ -1024,8 +968,7 @@ class AriaAPIClient(BaseSkill):
     async def get_litellm_models(self) -> SkillResult:
         """Get available LiteLLM models."""
         try:
-            resp = await self._client.get("/litellm/models")
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", "/litellm/models")
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to get LiteLLM models: {e}")
@@ -1033,8 +976,7 @@ class AriaAPIClient(BaseSkill):
     async def get_litellm_health(self) -> SkillResult:
         """Get LiteLLM health status."""
         try:
-            resp = await self._client.get("/litellm/health")
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", "/litellm/health")
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to get LiteLLM health: {e}")
@@ -1042,8 +984,7 @@ class AriaAPIClient(BaseSkill):
     async def get_litellm_spend(self, limit: int = 100) -> SkillResult:
         """Get LiteLLM spend logs."""
         try:
-            resp = await self._client.get(f"/litellm/spend?limit={limit}")
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", f"/litellm/spend?limit={limit}")
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to get LiteLLM spend: {e}")
@@ -1054,8 +995,7 @@ class AriaAPIClient(BaseSkill):
     async def get_provider_balances(self) -> SkillResult:
         """Get provider balance info (Kimi, OpenRouter, local)."""
         try:
-            resp = await self._client.get("/providers/balances")
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", "/providers/balances")
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to get provider balances: {e}")
@@ -1068,11 +1008,10 @@ class AriaAPIClient(BaseSkill):
                        source: str | None = None) -> SkillResult:
         """Store a working memory item."""
         try:
-            resp = await self._client.post("/working-memory", json={
+            resp = await self._request_with_retry("POST", "/working-memory", json={
                 "key": key, "value": value, "category": category,
                 "importance": importance, "ttl_hours": ttl_hours, "source": source,
             })
-            resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to store working memory: {e}")
@@ -1087,8 +1026,7 @@ class AriaAPIClient(BaseSkill):
                 params["key"] = key
             if category:
                 params["category"] = category
-            resp = await self._client.get("/working-memory", params=params)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", "/working-memory", params=params)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to recall working memory: {e}")
@@ -1100,8 +1038,7 @@ class AriaAPIClient(BaseSkill):
             params: dict[str, Any] = {"limit": limit}
             if category:
                 params["category"] = category
-            resp = await self._client.get("/working-memory/context", params=params)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", "/working-memory/context", params=params)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to get working memory context: {e}")
@@ -1109,8 +1046,7 @@ class AriaAPIClient(BaseSkill):
     async def working_memory_checkpoint(self) -> SkillResult:
         """Snapshot current working memory."""
         try:
-            resp = await self._client.post("/working-memory/checkpoint", json={})
-            resp.raise_for_status()
+            resp = await self._request_with_retry("POST", "/working-memory/checkpoint", json={})
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to checkpoint working memory: {e}")
@@ -1118,8 +1054,7 @@ class AriaAPIClient(BaseSkill):
     async def restore_working_memory_checkpoint(self) -> SkillResult:
         """Restore from latest working memory checkpoint."""
         try:
-            resp = await self._client.get("/working-memory/checkpoint")
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", "/working-memory/checkpoint")
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to restore checkpoint: {e}")
@@ -1127,8 +1062,7 @@ class AriaAPIClient(BaseSkill):
     async def forget_working_memory(self, item_id: str) -> SkillResult:
         """Delete a working memory item."""
         try:
-            resp = await self._client.delete(f"/working-memory/{item_id}")
-            resp.raise_for_status()
+            resp = await self._request_with_retry("DELETE", f"/working-memory/{item_id}")
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to forget working memory item: {e}")
@@ -1136,8 +1070,7 @@ class AriaAPIClient(BaseSkill):
     async def update_working_memory(self, item_id: str, **kwargs) -> SkillResult:
         """Update a working memory item."""
         try:
-            resp = await self._client.patch(f"/working-memory/{item_id}", json=kwargs)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("PATCH", f"/working-memory/{item_id}", json=kwargs)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to update working memory item: {e}")
@@ -1327,8 +1260,7 @@ class AriaAPIClient(BaseSkill):
                 data["summary"] = summary
             if metadata:
                 data["metadata"] = metadata
-            resp = await self._client.post("/memories/semantic", json=data)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("POST", "/memories/semantic", json=data)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to store semantic memory: {e}")
@@ -1358,8 +1290,7 @@ class AriaAPIClient(BaseSkill):
                 data["source_channel"] = source_channel
             if metadata:
                 data["metadata"] = metadata
-            resp = await self._client.post("/analysis/sentiment/reply", json=data)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("POST", "/analysis/sentiment/reply", json=data)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to store sentiment event: {e}")
@@ -1375,8 +1306,7 @@ class AriaAPIClient(BaseSkill):
                 params["category"] = category
             if min_importance > 0:
                 params["min_importance"] = min_importance
-            resp = await self._client.get("/memories/search", params=params)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", "/memories/search", params=params)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to search semantic memories: {e}")
@@ -1395,8 +1325,7 @@ class AriaAPIClient(BaseSkill):
                 params["source"] = source
             if min_importance > 0:
                 params["min_importance"] = min_importance
-            resp = await self._client.get("/memories/semantic", params=params)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", "/memories/semantic", params=params)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to list semantic memories: {e}")
@@ -1404,10 +1333,9 @@ class AriaAPIClient(BaseSkill):
     async def summarize_session(self, hours_back: int = 24) -> SkillResult:
         """Summarize recent session into episodic memory."""
         try:
-            resp = await self._client.post(
+            resp = await self._request_with_retry("POST", 
                 "/memories/summarize-session", json={"hours_back": hours_back}
             )
-            resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to summarize session: {e}")
@@ -1425,11 +1353,10 @@ class AriaAPIClient(BaseSkill):
         sentiment analysis, and semantic search.
         """
         try:
-            resp = await self._client.post(
+            resp = await self._request_with_retry("POST", 
                 "/analysis/seed-memories",
                 params={"limit": limit, "skip_existing": skip_existing},
             )
-            resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to seed memories: {e}")
@@ -1444,8 +1371,7 @@ class AriaAPIClient(BaseSkill):
                 data["category"] = category
             if limit:
                 data["limit"] = limit
-            resp = await self._client.post("/analysis/patterns/detect", json=data)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("POST", "/analysis/patterns/detect", json=data)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to detect patterns: {e}")
@@ -1453,8 +1379,7 @@ class AriaAPIClient(BaseSkill):
     async def get_memory_stats(self) -> SkillResult:
         """Get statistics about semantic memories (counts, categories, sources)."""
         try:
-            resp = await self._client.get("/memories/semantic/stats")
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", "/memories/semantic/stats")
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to get memory stats: {e}")
@@ -1477,8 +1402,7 @@ class AriaAPIClient(BaseSkill):
                 data["skill_name"] = skill_name
             if context:
                 data["context"] = context
-            resp = await self._client.post("/lessons", json=data)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("POST", "/lessons", json=data)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to record lesson: {e}")
@@ -1493,8 +1417,7 @@ class AriaAPIClient(BaseSkill):
                 params["error_type"] = error_type
             if skill_name:
                 params["skill_name"] = skill_name
-            resp = await self._client.get("/lessons/check", params=params)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", "/lessons/check", params=params)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to check known errors: {e}")
@@ -1502,10 +1425,9 @@ class AriaAPIClient(BaseSkill):
     async def get_lessons(self, page: int = 1, per_page: int = 25) -> SkillResult:
         """List lessons learned."""
         try:
-            resp = await self._client.get(
+            resp = await self._request_with_retry("GET", 
                 "/lessons", params={"page": page, "per_page": per_page}
             )
-            resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to get lessons: {e}")
@@ -1532,8 +1454,7 @@ class AriaAPIClient(BaseSkill):
                 data["current_code"] = current_code
             if proposed_code is not None:
                 data["proposed_code"] = proposed_code
-            resp = await self._client.post("/proposals", json=data)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("POST", "/proposals", json=data)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to propose improvement: {e}")
@@ -1544,8 +1465,7 @@ class AriaAPIClient(BaseSkill):
             params: dict[str, Any] = {"page": page}
             if status:
                 params["status"] = status
-            resp = await self._client.get("/proposals", params=params)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", "/proposals", params=params)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to get proposals: {e}")
@@ -1553,8 +1473,7 @@ class AriaAPIClient(BaseSkill):
     async def get_proposal(self, proposal_id: str) -> SkillResult:
         """Get a single improvement proposal by ID."""
         try:
-            resp = await self._client.get(f"/proposals/{proposal_id}")
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", f"/proposals/{proposal_id}")
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to get proposal: {e}")
@@ -1569,11 +1488,10 @@ class AriaAPIClient(BaseSkill):
         if status not in ("approved", "rejected", "implemented"):
             return SkillResult.fail("status must be approved, rejected, or implemented")
         try:
-            resp = await self._client.patch(
+            resp = await self._request_with_retry("PATCH", 
                 f"/proposals/{proposal_id}",
                 json={"status": status, "reviewed_by": reviewed_by},
             )
-            resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to review proposal: {e}")
@@ -1611,8 +1529,7 @@ class AriaAPIClient(BaseSkill):
                 data["tokens_used"] = tokens_used
             if model_used:
                 data["model_used"] = model_used
-            resp = await self._client.post("/skills/invocations", json=data)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("POST", "/skills/invocations", json=data)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to record invocation: {e}")
@@ -1620,8 +1537,7 @@ class AriaAPIClient(BaseSkill):
     async def get_skill_stats(self, hours: int = 24) -> SkillResult:
         """Get skill performance stats."""
         try:
-            resp = await self._client.get("/skills/stats", params={"hours": hours})
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", "/skills/stats", params={"hours": hours})
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to get skill stats: {e}")
@@ -1640,8 +1556,7 @@ class AriaAPIClient(BaseSkill):
             data: dict = {"content": content, "filename": filename, "category": category}
             if subfolder:
                 data["subfolder"] = subfolder
-            resp = await self._client.post("/artifacts", json=data)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("POST", "/artifacts", json=data)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to write artifact: {e}")
@@ -1649,11 +1564,28 @@ class AriaAPIClient(BaseSkill):
     async def read_artifact(self, category: str, filename: str) -> SkillResult:
         """Read a file artifact from aria_memories/<category>/<filename>."""
         try:
-            resp = await self._client.get(f"/artifacts/{category}/{filename}")
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", f"/artifacts/{category}/{filename}")
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to read artifact: {e}")
+
+    async def read_artifact_by_path(self, path: str) -> SkillResult:
+        """Read an artifact using canonical list_artifacts path, e.g. memory/logs/file.json.
+
+        Use this when you have a full relative path returned by list_artifacts
+        (e.g. ``memory/logs/work_cycle_2026-02-27_0416.json``) and want a safe
+        read without manually splitting category from nested filename.
+        """
+        try:
+            clean = path.strip("/")
+            if "/" not in clean:
+                return SkillResult.fail(
+                    f"Path must include category and filename, got: '{path}'"
+                )
+            category, filename = clean.split("/", 1)
+            return await self.read_artifact(category=category, filename=filename)
+        except Exception as e:
+            return SkillResult.fail(f"Failed to read artifact by path: {e}")
 
     async def list_artifacts(
         self,
@@ -1668,8 +1600,7 @@ class AriaAPIClient(BaseSkill):
                 params["category"] = category
             if pattern:
                 params["pattern"] = pattern
-            resp = await self._client.get("/artifacts", params=params)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", "/artifacts", params=params)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to list artifacts: {e}")
@@ -1677,8 +1608,7 @@ class AriaAPIClient(BaseSkill):
     async def delete_artifact(self, category: str, filename: str) -> SkillResult:
         """Delete a file artifact from aria_memories/<category>/<filename>."""
         try:
-            resp = await self._client.delete(f"/artifacts/{category}/{filename}")
-            resp.raise_for_status()
+            resp = await self._request_with_retry("DELETE", f"/artifacts/{category}/{filename}")
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to delete artifact: {e}")
@@ -1692,10 +1622,9 @@ class AriaAPIClient(BaseSkill):
     async def get_goal(self, goal_id: str) -> SkillResult:
         """Get a single goal by ID."""
         try:
-            resp = await self._client.get(f"/goals/{goal_id}")
+            resp = await self._request_with_retry("GET", f"/goals/{goal_id}")
             if resp.status_code == 404:
                 return SkillResult.fail(f"Goal not found: {goal_id}")
-            resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to get goal: {e}")
@@ -1717,8 +1646,7 @@ class AriaAPIClient(BaseSkill):
     async def list_agents(self, limit: int = 50, page: int = 1) -> SkillResult:
         """List registered agents."""
         try:
-            resp = await self._client.get(f"/agents?limit={limit}&page={page}")
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", f"/agents?limit={limit}&page={page}")
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to list agents: {e}")
@@ -1726,10 +1654,9 @@ class AriaAPIClient(BaseSkill):
     async def get_agent(self, agent_id: str) -> SkillResult:
         """Get agent details by ID."""
         try:
-            resp = await self._client.get(f"/agents/{agent_id}")
+            resp = await self._request_with_retry("GET", f"/agents/{agent_id}")
             if resp.status_code == 404:
                 return SkillResult.fail(f"Agent not found: {agent_id}")
-            resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to get agent: {e}")
@@ -1747,8 +1674,7 @@ class AriaAPIClient(BaseSkill):
                 data["config"] = config
             if name:
                 data["name"] = name
-            resp = await self._client.post("/agents", json=data)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("POST", "/agents", json=data)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to spawn agent: {e}")
@@ -1756,8 +1682,7 @@ class AriaAPIClient(BaseSkill):
     async def terminate_agent(self, agent_id: str) -> SkillResult:
         """Terminate (delete) an agent."""
         try:
-            resp = await self._client.delete(f"/agents/{agent_id}")
-            resp.raise_for_status()
+            resp = await self._request_with_retry("DELETE", f"/agents/{agent_id}")
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to terminate agent: {e}")
@@ -1820,8 +1745,7 @@ class AriaAPIClient(BaseSkill):
             params: dict[str, Any] = {"q": name, "limit": 1}
             if entity_type:
                 params["entity_type"] = entity_type
-            resp = await self._client.get("/knowledge-graph/kg-search", params=params)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", "/knowledge-graph/kg-search", params=params)
             data = resp.json()
             results = data.get("results", [])
             if results:
@@ -1835,8 +1759,7 @@ class AriaAPIClient(BaseSkill):
     async def create_job(self, job: dict) -> SkillResult:
         """Create a scheduled job."""
         try:
-            resp = await self._client.post("/schedule", json=job)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("POST", "/schedule", json=job)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to create job: {e}")
@@ -1844,10 +1767,9 @@ class AriaAPIClient(BaseSkill):
     async def get_job(self, job_id: str) -> SkillResult:
         """Get a scheduled job by ID."""
         try:
-            resp = await self._client.get(f"/schedule/{job_id}")
+            resp = await self._request_with_retry("GET", f"/schedule/{job_id}")
             if resp.status_code == 404:
                 return SkillResult.fail(f"Job not found: {job_id}")
-            resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to get job: {e}")
@@ -1862,8 +1784,7 @@ class AriaAPIClient(BaseSkill):
                 params["enabled"] = enabled
             if due:
                 params["due"] = True
-            resp = await self._client.get("/schedule", params=params)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", "/schedule", params=params)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to list jobs: {e}")
@@ -1871,8 +1792,7 @@ class AriaAPIClient(BaseSkill):
     async def update_job(self, job_id: str, data: dict) -> SkillResult:
         """Update a scheduled job."""
         try:
-            resp = await self._client.put(f"/schedule/{job_id}", json=data)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("PUT", f"/schedule/{job_id}", json=data)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to update job: {e}")
@@ -1880,8 +1800,7 @@ class AriaAPIClient(BaseSkill):
     async def delete_job(self, job_id: str) -> SkillResult:
         """Delete a scheduled job."""
         try:
-            resp = await self._client.delete(f"/schedule/{job_id}")
-            resp.raise_for_status()
+            resp = await self._request_with_retry("DELETE", f"/schedule/{job_id}")
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to delete job: {e}")
@@ -1907,13 +1826,12 @@ class AriaAPIClient(BaseSkill):
     ) -> SkillResult:
         """Log a performance review."""
         try:
-            resp = await self._client.post("/performance", json={
+            resp = await self._request_with_retry("POST", "/performance", json={
                 "period": period,
                 "successes": successes,
                 "failures": failures,
                 "improvements": improvements,
             })
-            resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to log review: {e}")
@@ -1921,8 +1839,7 @@ class AriaAPIClient(BaseSkill):
     async def get_reviews(self, limit: int = 25) -> SkillResult:
         """Get performance reviews."""
         try:
-            resp = await self._client.get("/performance", params={"limit": limit})
-            resp.raise_for_status()
+            resp = await self._request_with_retry("GET", "/performance", params={"limit": limit})
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to get reviews: {e}")
@@ -1940,11 +1857,10 @@ class AriaAPIClient(BaseSkill):
         results: list[dict] = []
         for gid in goal_ids:
             try:
-                resp = await self._client.patch(f"/goals/{gid}", json={
+                resp = await self._request_with_retry("PATCH", f"/goals/{gid}", json={
                     "sprint": sprint_name,
                     "board_column": "todo",
                 })
-                resp.raise_for_status()
                 results.append({"goal_id": gid, "success": True})
             except Exception as e:
                 results.append({"goal_id": gid, "success": False, "error": str(e)})
@@ -1968,13 +1884,12 @@ class AriaAPIClient(BaseSkill):
     ) -> SkillResult:
         """Set an hourly goal."""
         try:
-            resp = await self._client.post("/hourly-goals", json={
+            resp = await self._request_with_retry("POST", "/hourly-goals", json={
                 "hour": hour,
                 "goal": goal,
                 "priority": priority,
                 "status": "pending",
             })
-            resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to set hourly goal: {e}")
@@ -1982,10 +1897,9 @@ class AriaAPIClient(BaseSkill):
     async def complete_hourly_goal(self, goal_id: str) -> SkillResult:
         """Mark an hourly goal as completed."""
         try:
-            resp = await self._client.patch(f"/hourly-goals/{goal_id}", json={
+            resp = await self._request_with_retry("PATCH", f"/hourly-goals/{goal_id}", json={
                 "status": "completed",
             })
-            resp.raise_for_status()
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to complete hourly goal: {e}")
@@ -1997,8 +1911,7 @@ class AriaAPIClient(BaseSkill):
     ) -> SkillResult:
         """Update a social post."""
         try:
-            resp = await self._client.put(f"/social/{post_id}", json=data)
-            resp.raise_for_status()
+            resp = await self._request_with_retry("PUT", f"/social/{post_id}", json=data)
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to update social post: {e}")
@@ -2006,8 +1919,7 @@ class AriaAPIClient(BaseSkill):
     async def delete_social_post(self, post_id: str) -> SkillResult:
         """Delete a social post."""
         try:
-            resp = await self._client.delete(f"/social/{post_id}")
-            resp.raise_for_status()
+            resp = await self._request_with_retry("DELETE", f"/social/{post_id}")
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to delete social post: {e}")

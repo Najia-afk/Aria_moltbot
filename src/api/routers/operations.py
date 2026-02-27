@@ -183,12 +183,13 @@ async def get_heartbeats(limit: int = 50, db: AsyncSession = Depends(get_db)):
 
 @router.post("/heartbeat")
 async def create_heartbeat(body: CreateHeartbeat, db: AsyncSession = Depends(get_db)):
+    normalized_details = body.details if isinstance(body.details, dict) else {"raw": body.details}
     hb = HeartbeatLog(
         id=uuid.uuid4(),
         beat_number=body.beat_number,
         job_name=body.job_name,
         status=body.status,
-        details=body.details,
+        details=normalized_details,
         executed_at=body.executed_at,
         duration_ms=body.duration_ms,
     )

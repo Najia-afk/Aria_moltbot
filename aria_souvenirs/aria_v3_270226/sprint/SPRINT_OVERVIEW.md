@@ -81,7 +81,7 @@ E19 — Session & Artifact Integrity:
 ### E18 — Visualization & Graph Execution (44 pts)
 | Ticket | File | Description |
 |--------|-------|-------------|
-| [S-31](S-31-memory-graph-visualization.md) | `memories.py`, `memory_graph.html`, `app.py` | vis-network graph of all memory types with category/source edges |
+| [S-31](S-31-memory-graph-visualization.md) | `memories.py`, `memory_graph.html`, `app.py` | vis-network graph of all memory types with category/source edges | ✅ Done |
 | [S-32](S-32-memory-timeline-heatmap.md) | `memories.py`, `memory_timeline.html`, `app.py` | Chart.js temporal heatmap, stacked area, TTL decay bars |
 | [S-33](S-33-embedding-cluster-explorer.md) | `memories.py`, `embedding_explorer.html`, `app.py` | PCA/t-SNE 2D scatter plot of semantic memory embeddings |
 | [S-34](S-34-chat-tool-execution-graph.md) | `streaming.py`, `engine_chat.html` | LangGraph-style DAG for tool execution pipeline in chat UI |
@@ -245,7 +245,7 @@ New tickets identified via full `aria_memories/` audit. All written to AA++ stan
 |--------|-------|--------|----------|--------------------|--------|
 | [S-43](S-43-identity-manifest-v1-1.md) | Identity Manifest v1.1 (Remove OpenClaw) | 2 | P1 | 4 steps | Ready |
 | [S-44](S-44-heartbeat-md-in-aria-memories.md) | HEARTBEAT.md Accessible in aria_memories/ | 1 | P1 | 5 steps | Ready |
-| [S-45](S-45-self-healing-error-recovery-phase2-5.md) | Self-Healing Error Recovery Phase 2–5 | 5 | P1 | 6 steps | Ready |
+| [S-45](S-45-self-healing-error-recovery-phase2-5.md) | Self-Healing Error Recovery Phase 2–5 | 5 | P1 | 6 steps | ✅ Done |
 | [S-46](S-46-telegram-bot-integration.md) | Telegram Bot Integration | 5 | P2 | 8 steps | Ready |
 | [S-47](S-47-litellm-public-schema-isolation.md) | LiteLLM Writing to Public Schema | 2 | **P0** | 5 steps | Ready |
 | [S-48](S-48-browser-hardcoded-litellm-port.md) | Browser Hardcoded LiteLLM Port :18793 | 2 | **P0** | 7 steps | Ready |

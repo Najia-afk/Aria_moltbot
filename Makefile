@@ -29,12 +29,15 @@ test-coverage: ## Run tests with coverage report
 # Docker
 # ============================================================================
 
-.PHONY: build up down logs restart
+.PHONY: build up down logs restart check-env
 
 build: ## Build all containers
 	$(COMPOSE) build
 
-up: ## Start all services
+check-env: ## Bootstrap stacks/brain/.env from .env.example if absent (safe no-op when .env exists)
+	@bash scripts/first-run.sh --auto
+
+up: check-env ## Start all services (auto-bootstraps .env on fresh clone)
 	$(COMPOSE) up -d
 
 down: ## Stop all services
