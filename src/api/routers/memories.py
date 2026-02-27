@@ -516,7 +516,7 @@ async def get_embedding_projection(
     for m in memories:
         emb = m.embedding
         if emb is not None and len(emb) > 0:
-            embeddings.append(emb)
+            embeddings.append(list(emb))  # cast Vector to plain list for numpy
             valid_memories.append(m)
 
     if len(embeddings) < 3:
@@ -956,7 +956,7 @@ async def get_memory_timeline(
     db: AsyncSession = Depends(get_db),
 ):
     """Time-bucketed memory creation data for Chart.js timeline charts."""
-    cutoff = datetime.utcnow() - timedelta(hours=hours)
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
 
     sem_stmt = (
         select(
@@ -1006,7 +1006,7 @@ async def get_memory_timeline(
     )
     ttl_result = await db.execute(ttl_stmt)
     ttl_items = []
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     for wm in ttl_result.scalars().all():
         expires_at = (
             wm.created_at + timedelta(hours=wm.ttl_hours)
@@ -1097,7 +1097,7 @@ async def get_memory_consolidation_dashboard(
         for r in source_result.all()
     }
 
-    cutoff_24h = datetime.utcnow() - timedelta(hours=24)
+    cutoff_24h = datetime.now(timezone.utc) - timedelta(hours=24)
     recent_stmt = (
         select(SemanticMemory)
         .where(SemanticMemory.created_at >= cutoff_24h)
