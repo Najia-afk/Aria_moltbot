@@ -1335,6 +1335,189 @@
 })();
 </script>
 
+<script src="/static/js/vis-network.min.js"></script>
+
+<!-- S-34: Chat Tool Execution Graph Visualizer -->
+<style>
+.execution-graph-panel {
+    margin-top: 8px;
+    border: 1px solid var(--border-color, #3a3a3a);
+    border-radius: 8px;
+    background: var(--bg-secondary, #1a1a1a);
+    overflow: hidden;
+}
+.execution-graph-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--text-secondary, #888);
+    user-select: none;
+    background: transparent;
+    border: none;
+    width: 100%;
+    text-align: left;
+}
+.execution-graph-toggle:hover { color: var(--text-primary, #eee); }
+.execution-graph-toggle .arrow { transition: transform .2s; }
+.execution-graph-toggle.open .arrow { transform: rotate(90deg); }
+.execution-graph-container {
+    display: none;
+    height: 280px;
+    border-top: 1px solid var(--border-color, #3a3a3a);
+}
+.execution-graph-container.visible { display: block; }
+.exec-graph-summary-badges {
+    display: flex; gap: 6px; flex-wrap: wrap; padding: 4px 12px 8px;
+    border-top: 1px solid var(--border-color, #3a3a3a);
+}
+.exec-badge {
+    font-size: 11px; padding: 2px 7px; border-radius: 10px;
+    background: var(--bg-tertiary, #252525); color: var(--text-secondary, #888);
+}
+</style>
+<script>
+(function() {
+    'use strict';
+
+    class ExecutionGraphVisualizer {
+        constructor() {
+            this.nodes = null;
+            this.edges = null;
+            this.network = null;
+            this.currentIteration = 0;
+            this.toolNodeMap = {};   // toolCallId → nodeId
+            this.totalTools = 0;
+            this.startTime = null;
+            this._pendingMsgEl = null;
+            this._hadTools = false;
+        }
+
+        reset() {
+            this.nodes = new (window.vis ? window.vis.DataSet : Array)();
+            this.edges = new (window.vis ? window.vis.DataSet : Array)();
+            this.network = null;
+            this.currentIteration = 0;
+            this.toolNodeMap = {};
+            this.totalTools = 0;
+            this.startTime = Date.now();
+            this._pendingMsgEl = null;
+            this._hadTools = false;
+        }
+
+        _addNode(id, label, opts) {
+            if (!this.nodes || !this.nodes.add) return;
+            this.nodes.add({ id, label, ...opts });
+        }
+        _addEdge(from, to, label) {
+            if (!this.edges || !this.edges.add) return;
+            this.edges.add({ from, to, label, arrows: 'to', font: { size: 10, color: '#888' } });
+        }
+
+        addUserInput(content) {
+            const preview = (content || '').substring(0, 40) + ((content || '').length > 40 ? '...' : '');
+            this._addNode('user', preview || 'User', {
+                shape: 'box',
+                color: { background: '#1e3a2f', border: '#2ea86f', highlight: { background: '#2ea86f33' } },
+                font: { color: '#2ea86f', size: 12 },
+                level: 0
+            });
+        }
+
+        addLLMCall(iteration) {
+            this.currentIteration = iteration;
+            const nodeId = `llm_${iteration}`;
+            this._addNode(nodeId, `LLM #${iteration}`, {
+                shape: 'ellipse',
+                color: { background: '#1a2a3e', border: '#4a9fd4', highlight: { background: '#4a9fd433' } },
+                font: { color: '#4a9fd4', size: 12 },
+                level: iteration
+            });
+            const prevNode = iteration === 1 ? 'user' : `llm_${iteration - 1}`;
+            this._addEdge(prevNode, nodeId, '');
+        }
+
+        addToolCall(tc) {
+            this._hadTools = true;
+            this.totalTools++;
+            const nodeId = `tool_${tc.id || this.totalTools}`;
+            this.toolNodeMap[tc.id || String(this.totalTools)] = nodeId;
+            const label = (tc.name || 'tool').replace(/_/g, '\n');
+            this._addNode(nodeId, label, {
+                shape: 'diamond',
+                color: { background: '#2d2010', border: '#c98a2f', highlight: { background: '#c98a2f33' } },
+                font: { color: '#c98a2f', size: 11 },
+                level: this.currentIteration + 0.5
+            });
+            this._addEdge(`llm_${this.currentIteration}`, nodeId, 'call');
+        }
+
+        completeToolCall(result) {
+            const nodeId = this.toolNodeMap[result.id];
+            if (!nodeId || !this.nodes || !this.nodes.update) return;
+            const success = !(result.error);
+            this.nodes.update({
+                id: nodeId,
+                color: success
+                    ? { background: '#1e3a2f', border: '#2ea86f', highlight: { background: '#2ea86f33' } }
+                    : { background: '#3a1e1e', border: '#d44a4a', highlight: { background: '#d44a4a33' } }
+            });
+        }
+
+        addFinalResponse(latencyMs) {
+            const nodeId = 'response';
+            const label = latencyMs ? `Response\n${(latencyMs / 1000).toFixed(1)}s` : 'Response';
+            this._addNode(nodeId, label, {
+                shape: 'star',
+                color: { background: '#2a1a3e', border: '#9b59d4', highlight: { background: '#9b59d433' } },
+                font: { color: '#9b59d4', size: 12 },
+                level: this.currentIteration + 1
+            });
+            const fromNode = this._hadTools ? `llm_${this.currentIteration}` : (this.currentIteration > 0 ? `llm_${this.currentIteration}` : 'user');
+            this._addEdge(fromNode, nodeId, '');
+        }
+
+        initGraph(container) {
+            if (!window.vis || !this.nodes || !this.nodes.add) return;
+            const options = {
+                layout: { hierarchical: { direction: 'LR', sortMethod: 'directed', levelSeparation: 100, nodeSpacing: 60 } },
+                physics: { enabled: false },
+                interaction: { tooltipDelay: 100, hover: true },
+                nodes: { borderWidth: 1.5 },
+                edges: { smooth: { type: 'curvedCW', roundness: 0.1 }, width: 1, color: { color: '#555', hover: '#888' } }
+            };
+            this.network = new vis.Network(container, { nodes: this.nodes, edges: this.edges }, options);
+        }
+
+        attachToMessage(msgEl) {
+            if (!msgEl || !this._hadTools) return;
+            const latency = this.startTime ? Date.now() - this.startTime : null;
+            const panel = document.createElement('div');
+            panel.className = 'execution-graph-panel';
+            panel.innerHTML = `
+                <button class="execution-graph-toggle" type="button">
+                    <span class="arrow">▶</span>
+                    <span>Execution Graph — ${this.currentIteration} LLM call${this.currentIteration !== 1 ? 's' : ''}, ${this.totalTools} tool${this.totalTools !== 1 ? 's' : ''}${latency ? ', ' + (latency / 1000).toFixed(1) + 's' : ''}</span>
+                </button>
+                <div class="execution-graph-container" id="exec-graph-${Date.now()}"></div>
+            `;
+            const toggle = panel.querySelector('.execution-graph-toggle');
+            const container = panel.querySelector('.execution-graph-container');
+            toggle.addEventListener('click', () => {
+                const open = container.classList.toggle('visible');
+                toggle.classList.toggle('open', open);
+                if (open && !this.network) this.initGraph(container);
+            });
+            msgEl.appendChild(panel);
+        }
+    }
+
+    window._execGraph = new ExecutionGraphVisualizer();
+})();
+</script>
+
 <!-- Main Chat Engine Script (S6-01 + S6-03 sidebar + S6-04 model selector) -->
 <script>
 (function() {
@@ -1969,6 +2152,7 @@
         switch(msg.type) {
             case 'stream_start':
                 startStreamingMessage();
+                window._execGraph.reset();
                 break;
             case 'content':
                 appendStreamContent(msg.content || '');
@@ -1977,25 +2161,34 @@
                 appendStreamThinking(msg.content || '');
                 break;
             case 'tool_call':
-            case 'tool_call_start':
+            case 'tool_call_start': {
+                const _tc = {
+                    id: msg.id || msg.tool_call_id || ('tool-' + Date.now()),
+                    name: msg.name || msg.function?.name || 'unknown_tool',
+                    arguments: msg.arguments || msg.function?.arguments || msg.params || {},
+                };
                 if (streamingMessageEl) {
                     const body = streamingMessageEl.querySelector('.message-body');
-                    window._toolVisualizer.createToolCard(body, {
-                        id: msg.id || msg.tool_call_id || ('tool-' + Date.now()),
-                        name: msg.name || msg.function?.name || 'unknown_tool',
-                        arguments: msg.arguments || msg.function?.arguments || msg.params || {},
-                    });
+                    window._toolVisualizer.createToolCard(body, _tc);
                 }
+                window._execGraph.addToolCall(_tc);
                 break;
+            }
             case 'tool_result':
-            case 'tool_call_end':
-                window._toolVisualizer.completeToolCall({
+            case 'tool_call_end': {
+                const _tr = {
                     id: msg.id || msg.tool_call_id,
                     result: msg.result || msg.output,
                     error: msg.error,
                     status: msg.status,
                     duration_ms: msg.duration_ms,
-                });
+                };
+                window._toolVisualizer.completeToolCall(_tr);
+                window._execGraph.completeToolCall(_tr);
+                break;
+            }
+            case 'iteration_start':
+                window._execGraph.addLLMCall(msg.iteration || 1);
                 break;
             case 'stream_end':
                 finalizeStreamingMessage(msg);
@@ -2119,6 +2312,14 @@
                 streamingMessageEl.querySelector('.message-body').appendChild(meta);
             }
         }
+        // S-34: attach execution graph if tools were invoked
+        const _elBeforeClear = streamingMessageEl;
+        const _latencyMs = window._execGraph.startTime ? Date.now() - window._execGraph.startTime : null;
+        if (window._execGraph._hadTools && _elBeforeClear) {
+            window._execGraph.addFinalResponse(_latencyMs);
+            window._execGraph.attachToMessage(_elBeforeClear);
+        }
+
         streamingMessageEl = null;
         streamingMessageId = '';
         streamContent = '';

@@ -184,3 +184,11 @@ jobs:
   # ── Sentiment Backfill — REMOVED ──
   # Replaced by background auto-scorer in aria-api (sentiment_autoscorer.py).
   # Zero LLM tokens, runs every 60s, handles JSONL sync + scoring automatically.
+
+  # ── Telegram Bot Long-Poll (S-46) ──
+  - name: telegram_poll
+    every: "2m"
+    text: "Poll Telegram for new messages and commands. Use exec python3 skills/run_skill.py social telegram_poll '{}'. Process any /status /goals /memory commands and reply."
+    agent: aria
+    session: isolated
+    delivery: none

@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}Memory Search{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>🔍 Unified Memory Search</h1>
+    <p class="subtitle">Search across all memory types simultaneously</p>
+</div>
+
+<div class="search-hero">
+    <div class="search-box-wrapper">
+        <input type="text" id="searchInput" class="search-input-hero" placeholder="Search memories… (⌘K)" autocomplete="off" />
+        <button class="search-btn" onclick="doSearch()">Search</button>
+    </div>
+    <div class="type-chips" id="typeChips">
+        <span class="chip active" data-type="semantic" onclick="toggleChip(this)">🧠 Semantic</span>
+        <span class="chip active" data-type="kv" onclick="toggleChip(this)">📦 KV Memory</span>
+        <span class="chip active" data-type="working" onclick="toggleChip(this)">⚡ Working</span>
+        <span class="chip active" data-type="thought" onclick="toggleChip(this)">💭 Thoughts</span>
+        <span class="chip active" data-type="lesson" onclick="toggleChip(this)">📚 Lessons</span>
+    </div>
+    <div class="search-meta" id="searchMeta" style="display:none;">
+        <span id="resultCount"></span>
+        <span class="type-breakdown" id="typeSummary"></span>
+    </div>
+</div>
+
+<div id="resultsContainer"></div>
+
+<style>
+.search-hero { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 2rem; margin-bottom: 1.5rem; }
+.search-box-wrapper { display: flex; gap: 0.75rem; margin-bottom: 1rem; }
+.search-input-hero { flex: 1; padding: 0.85rem 1.25rem; background: var(--bg-secondary); border: 2px solid var(--border-color); border-radius: 10px; color: var(--text-primary); font-size: 1rem; transition: border-color 0.2s; }
+.search-input-hero:focus { outline: none; border-color: var(--accent-primary); }
+.search-btn { padding: 0.85rem 1.75rem; background: var(--accent-primary); color: #fff; border: none; border-radius: 10px; font-size: 0.95rem; cursor: pointer; white-space: nowrap; }
+.search-btn:hover { opacity: 0.9; }
+.type-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem; }
+.chip { padding: 0.35rem 0.85rem; border-radius: 20px; background: var(--bg-secondary); border: 1px solid var(--border-color); cursor: pointer; font-size: 0.83rem; transition: all 0.15s; user-select: none; }
+.chip.active { background: var(--accent-primary); border-color: var(--accent-primary); color: #fff; }
+.search-meta { font-size: 0.85rem; color: var(--text-muted); display: flex; gap: 1rem; align-items: center; }
+.result-card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 0.75rem; transition: border-color 0.15s; }
+.result-card:hover { border-color: var(--accent-primary); }
+.result-header { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.4rem; }
+.type-badge { padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+.badge-semantic_memory { background: rgba(139,92,246,0.2); color: #8b5cf6; }
+.badge-kv_memory { background: rgba(59,130,246,0.2); color: #3b82f6; }
+.badge-working_memory { background: rgba(245,158,11,0.2); color: #f59e0b; }
+.badge-thought { background: rgba(16,185,129,0.2); color: #10b981; }
+.badge-lesson { background: rgba(239,68,68,0.2); color: #ef4444; }
+.result-title { font-size: 0.95rem; font-weight: 600; color: var(--text-primary); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.result-content { font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 0.5rem; }
+.result-footer { display: flex; gap: 1rem; font-size: 0.78rem; color: var(--text-muted); align-items: center; }
+.relevance-bar { height: 3px; background: var(--bg-elevated); border-radius: 2px; width: 80px; display: inline-block; position: relative; overflow: hidden; }
+.relevance-fill { height: 100%; background: var(--accent-primary); border-radius: 2px; }
+.no-results { text-align: center; color: var(--text-muted); padding: 3rem; }
+.results-loading { text-align: center; padding: 2rem; color: var(--text-muted); }
+</style>
+
+<script>
+const API = window.API_BASE || '/api';
+let activeTypes = new Set(['semantic','kv','working','thought','lesson']);
+
+document.addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        document.getElementById('searchInput').focus();
+    }
+});
+document.getElementById('searchInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doSearch();
+});
+
+function toggleChip(el) {
+    const t = el.dataset.type;
+    if (activeTypes.has(t)) { activeTypes.delete(t); el.classList.remove('active'); }
+    else { activeTypes.add(t); el.classList.add('active'); }
+}
+
+const TYPE_LABELS = {
+    semantic_memory: '🧠 Semantic', kv_memory: '📦 KV', working_memory: '⚡ Working',
+    thought: '💭 Thought', lesson: '📚 Lesson'
+};
+
+async function doSearch() {
+    const q = document.getElementById('searchInput').value.trim();
+    if (!q) return;
+    const container = document.getElementById('resultsContainer');
+    container.innerHTML = '<div class="results-loading">Searching across all memory types…</div>';
+    document.getElementById('searchMeta').style.display = 'none';
+
+    const types = activeTypes.size === 5 ? 'all' : [...activeTypes].join(',');
+    try {
+        const res = await fetch(`${API}/memory-search?query=${encodeURIComponent(q)}&limit=20&types=${types}`);
+        const data = await res.json();
+        renderResults(data, q);
+    } catch (e) {
+        container.innerHTML = `<div class="no-results">Search failed: ${e.message}</div>`;
+    }
+}
+
+function renderResults(data, q) {
+    const container = document.getElementById('resultsContainer');
+    const meta = document.getElementById('searchMeta');
+
+    document.getElementById('resultCount').textContent = `${data.total} result${data.total !== 1 ? 's' : ''}`;
+    const breakdown = Object.entries(data.by_type || {})
+        .map(([t, n]) => `${TYPE_LABELS[t] || t}: ${n}`).join(' · ');
+    document.getElementById('typeSummary').textContent = breakdown;
+    meta.style.display = 'flex';
+
+    if (!data.results || data.results.length === 0) {
+        container.innerHTML = `<div class="no-results">No results found for "<strong>${esc(q)}</strong>"</div>`;
+        return;
+    }
+
+    const highlight = (text, query) => {
+        const re = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+        return (text || '').replace(re, '<mark>$1</mark>');
+    };
+
+    container.innerHTML = data.results.map(r => {
+        const relevancePct = Math.round((r.relevance || 0) * 100);
+        const date = r.created_at ? new Date(r.created_at).toLocaleString() : '';
+        const extras = [];
+        if (r.importance != null) extras.push(`⭐ ${(r.importance * 100).toFixed(0)}%`);
+        if (r.occurrences != null) extras.push(`🔁 ${r.occurrences}x`);
+        if (r.category) extras.push(`📁 ${esc(r.category)}`);
+        if (date) extras.push(date);
+        return `<div class="result-card">
+            <div class="result-header">
+                <span class="type-badge badge-${r.type}">${TYPE_LABELS[r.type] || r.type}</span>
+                <span class="result-title" title="${esc(r.title)}">${highlight(esc(r.title), q)}</span>
+            </div>
+            <div class="result-content">${highlight(esc(r.content), q)}</div>
+            <div class="result-footer">
+                <span><span class="relevance-bar"><span class="relevance-fill" style="width:${relevancePct}%"></span></span> ${relevancePct}% relevance</span>
+                ${extras.join(' · ')}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+</script>
+{% endblock %}

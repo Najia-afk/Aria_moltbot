@@ -167,14 +167,27 @@
 
                     <!-- Memory Dropdown (reorganized) -->
                     <div class="nav-dropdown">
-                        <button class="nav-dropdown-toggle {% if '/memories' in request.path or '/knowledge' in request.path or '/memory-graph' in request.path or '/working-memory' in request.path or '/records' in request.path or '/activities' in request.path or '/thoughts' in request.path %}active{% endif %}">
+                        <button class="nav-dropdown-toggle {% if '/memories' in request.path or '/knowledge' in request.path or '/memory-graph' in request.path or '/working-memory' in request.path or '/records' in request.path or '/activities' in request.path or '/thoughts' in request.path or '/memory-search' in request.path or '/memory-timeline' in request.path or '/embedding-explorer' in request.path or '/memory-dashboard' in request.path %}active{% endif %}">
                             💾 Memory
                             <svg class="chevron" viewBox="0 0 16 16" fill="currentColor">
                                 <path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
                             </svg>
                         </button>
                         <div class="nav-dropdown-menu">
-                            <a href="/memories" class="{% if '/memories' in request.path %}active{% endif %}">
+                            <a href="/memory-search" class="{% if '/memory-search' in request.path %}active{% endif %}">
+                                🔍 Memory Search
+                            </a>
+                            <a href="/memory-timeline" class="{% if '/memory-timeline' in request.path %}active{% endif %}">
+                                📊 Memory Timeline
+                            </a>
+                            <a href="/embedding-explorer" class="{% if '/embedding-explorer' in request.path %}active{% endif %}">
+                                🔮 Embedding Clusters
+                            </a>
+                            <a href="/memory-dashboard" class="{% if '/memory-dashboard' in request.path %}active{% endif %}">
+                                🔄 Consolidation
+                            </a>
+                            <hr style="border-color: var(--border-color); margin: 4px 0;">
+                            <a href="/memories" class="{% if '/memories' in request.path and '/memory-' not in request.path %}active{% endif %}">
                                 💾 Memories
                             </a>
                             <a href="/knowledge" class="{% if '/knowledge' == request.path %}active{% endif %}">
@@ -200,7 +213,7 @@
 
                     <!-- Intelligence Dropdown (reorganized) -->
                     <div class="nav-dropdown">
-                        <button class="nav-dropdown-toggle {% if '/sprint-board' in request.path or '/sentiment' in request.path or '/patterns' in request.path or '/proposals' in request.path or '/creative-pulse' in request.path %}active{% endif %}">
+                        <button class="nav-dropdown-toggle {% if '/sprint-board' in request.path or '/sentiment' in request.path or '/patterns' in request.path or '/proposals' in request.path or '/creative-pulse' in request.path or '/lessons' in request.path %}active{% endif %}">
                             Intelligence
                             <svg class="chevron" viewBox="0 0 16 16" fill="currentColor">
                                 <path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
@@ -221,6 +234,9 @@
                             </a>
                             <a href="/creative-pulse" class="{% if '/creative-pulse' in request.path %}active{% endif %}">
                                 ✨ Creative Pulse
+                            </a>
+                            <a href="/lessons" class="{% if '/lessons' in request.path %}active{% endif %}">
+                                📚 Lessons Learned
                             </a>
                         </div>
                     </div>

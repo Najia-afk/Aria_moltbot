@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% block title %}Embedding Explorer{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>🔮 Embedding Cluster Explorer</h1>
+    <p class="subtitle">2D projection of semantic memory embedding space (PCA / t-SNE)</p>
+</div>
+
+<div class="controls-bar" style="display:flex;gap:1rem;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap;background:var(--card-bg);border:1px solid var(--border-color);border-radius:10px;padding:1rem 1.25rem;">
+    <div style="display:flex;gap:0.5rem;align-items:center;">
+        <label style="font-size:0.85rem;color:var(--text-muted);">Method:</label>
+        <label style="font-size:0.85rem;cursor:pointer;"><input type="radio" name="method" value="pca" checked onchange="loadData()"> PCA</label>
+        <label style="font-size:0.85rem;cursor:pointer;"><input type="radio" name="method" value="tsne" onchange="loadData()"> t-SNE</label>
+    </div>
+    <div style="display:flex;gap:0.5rem;align-items:center;">
+        <label style="font-size:0.85rem;color:var(--text-muted);">Points:</label>
+        <input type="range" id="limitSlider" min="50" max="500" step="50" value="200" oninput="document.getElementById('limitVal').textContent=this.value">
+        <span id="limitVal" style="font-size:0.85rem;min-width:30px;">200</span>
+    </div>
+    <div style="display:flex;gap:0.5rem;align-items:center;">
+        <label style="font-size:0.85rem;color:var(--text-muted);">Min importance:</label>
+        <input type="range" id="importanceSlider" min="0" max="0.9" step="0.1" value="0" oninput="document.getElementById('impVal').textContent=parseFloat(this.value).toFixed(1)">
+        <span id="impVal" style="font-size:0.85rem;min-width:25px;">0.0</span>
+    </div>
+    <div style="display:flex;gap:0.5rem;align-items:center;">
+        <label style="font-size:0.85rem;color:var(--text-muted);">Category:</label>
+        <select id="catFilter" class="form-control" style="width:160px;"><option value="">All categories</option></select>
+    </div>
+    <button class="btn btn-sm btn-primary" onclick="loadData()">Project</button>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 300px;gap:1.25rem;">
+    <div class="card">
+        <div class="card-header">
+            <h3>Memory Space</h3>
+            <span id="pointCount" class="badge badge-secondary">0 points</span>
+        </div>
+        <div class="card-body" style="height:520px;position:relative;">
+            <div id="loadingOverlay" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.4);border-radius:8px;z-index:10;display:none;">
+                <span style="color:#fff;">Computing projection…</span>
+            </div>
+            <canvas id="scatterChart" style="cursor:crosshair;"></canvas>
+        </div>
+    </div>
+    <div>
+        <div class="card" style="margin-bottom:1rem;">
+            <div class="card-header"><h3>Inspector</h3></div>
+            <div class="card-body" id="inspector" style="font-size:0.83rem;color:var(--text-muted);">
+                <em>Click a point to inspect</em>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header"><h3>Categories</h3></div>
+            <div class="card-body" id="legendPanel"></div>
+        </div>
+    </div>
+</div>
+
+<style>
+.legend-item { display:flex; align-items:center; gap:0.5rem; margin-bottom:0.4rem; cursor:pointer; font-size:0.83rem; user-select:none; }
+.legend-dot { width:12px; height:12px; border-radius:50%; flex-shrink:0; }
+.legend-item.hidden { opacity:0.4; }
+.inspector-field { margin-bottom:0.6rem; }
+.inspector-label { font-size:0.72rem; text-transform:uppercase; color:var(--text-muted); margin-bottom:0.1rem; }
+.inspector-value { color:var(--text-primary); }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+<script>
+const API = window.API_BASE || '/api';
+const PALETTE = ['#8b5cf6','#06b6d4','#10b981','#f59e0b','#ef4444','#ec4899','#6366f1','#3b82f6','#a78bfa','#34d399'];
+let scatterChart = null;
+let allPoints = [];
+let catColors = {};
+let hiddenCats = new Set();
+
+async function loadData() {
+    const method = document.querySelector('input[name="method"]:checked').value;
+    const limit = document.getElementById('limitSlider').value;
+    const minImp = document.getElementById('importanceSlider').value;
+    const cat = document.getElementById('catFilter').value;
+
+    const ov = document.getElementById('loadingOverlay');
+    ov.style.display = 'flex';
+
+    let url = `${API}/memories/embedding-projection?limit=${limit}&method=${method}&min_importance=${minImp}`;
+    if (cat) url += `&category=${encodeURIComponent(cat)}`;
+
+    try {
+        const res = await fetch(url);
+        const d = await res.json();
+        ov.style.display = 'none';
+
+        if (d.error) { alert(d.error); return; }
+        allPoints = d.points || [];
+        document.getElementById('pointCount').textContent = `${allPoints.length} points`;
+
+        // Populate category filter
+        const cats = [...new Set(allPoints.map(p => p.category).filter(Boolean))].sort();
+        const sel = document.getElementById('catFilter');
+        const curVal = sel.value;
+        sel.innerHTML = '<option value="">All categories</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
+        sel.value = curVal;
+
+        // Assign colors
+        cats.forEach((c, i) => { catColors[c] = PALETTE[i % PALETTE.length]; });
+
+        renderChart();
+        renderLegend(cats);
+    } catch(e) {
+        ov.style.display = 'none';
+        console.error(e);
+    }
+}
+
+function renderChart() {
+    const cats = [...new Set(allPoints.map(p => p.category))].filter(c => !hiddenCats.has(c));
+    const datasets = cats.map(cat => {
+        const pts = allPoints.filter(p => p.category === cat && !hiddenCats.has(p.category));
+        return {
+            label: cat,
+            data: pts.map(p => ({ x: p.x, y: p.y, _point: p })),
+            backgroundColor: catColors[cat] || '#6366f1',
+            pointRadius: pts.map(p => 4 + (p.importance || 0) * 12),
+            pointHoverRadius: pts.map(p => 6 + (p.importance || 0) * 14),
+        };
+    });
+
+    const ctx = document.getElementById('scatterChart').getContext('2d');
+    if (scatterChart) scatterChart.destroy();
+    scatterChart = new Chart(ctx, {
+        type: 'scatter',
+        data: { datasets },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => {
+                            const p = ctx.raw._point;
+                            return [`${p.label || '(no label)'}`, `Cat: ${p.category}`, `Imp: ${((p.importance||0)*100).toFixed(0)}%`];
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: { min: -1.1, max: 1.1, ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                y: { min: -1.1, max: 1.1, ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+            },
+            onClick: (evt, elements) => {
+                if (elements.length > 0) {
+                    const el = elements[0];
+                    const p = datasets[el.datasetIndex].data[el.index]._point;
+                    renderInspector(p);
+                }
+            }
+        }
+    });
+}
+
+function renderInspector(p) {
+    document.getElementById('inspector').innerHTML = `
+        <div class="inspector-field"><div class="inspector-label">Label</div><div class="inspector-value">${esc(p.label)}</div></div>
+        <div class="inspector-field"><div class="inspector-label">Category</div><div class="inspector-value">${esc(p.category)}</div></div>
+        <div class="inspector-field"><div class="inspector-label">Importance</div><div class="inspector-value"><div style="width:100%;background:var(--bg-elevated);border-radius:2px;height:6px;"><div style="width:${Math.round((p.importance||0)*100)}%;background:var(--accent-primary);height:100%;border-radius:2px;"></div></div> ${((p.importance||0)*100).toFixed(0)}%</div></div>
+        <div class="inspector-field"><div class="inspector-label">Source</div><div class="inspector-value">${esc(p.source||'—')}</div></div>
+        <div class="inspector-field"><div class="inspector-label">Accesses</div><div class="inspector-value">${p.access_count||0}</div></div>
+        <div class="inspector-field"><div class="inspector-label">Created</div><div class="inspector-value">${p.created_at ? new Date(p.created_at).toLocaleString() : '—'}</div></div>
+        <div class="inspector-field"><div class="inspector-label">Coordinates</div><div class="inspector-value">(${p.x}, ${p.y})</div></div>
+    `;
+}
+
+function renderLegend(cats) {
+    document.getElementById('legendPanel').innerHTML = cats.map(cat => {
+        const cnt = allPoints.filter(p => p.category === cat).length;
+        return `<div class="legend-item ${hiddenCats.has(cat) ? 'hidden' : ''}" onclick="toggleCat('${cat}', this)">
+            <div class="legend-dot" style="background:${catColors[cat] || '#6366f1'}"></div>
+            <span>${esc(cat)}</span>
+            <span style="margin-left:auto;color:var(--text-muted);font-size:0.75rem;">${cnt}</span>
+        </div>`;
+    }).join('');
+}
+
+function toggleCat(cat, el) {
+    if (hiddenCats.has(cat)) { hiddenCats.delete(cat); el.classList.remove('hidden'); }
+    else { hiddenCats.add(cat); el.classList.add('hidden'); }
+    renderChart();
+}
+
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+loadData();
+</script>
+{% endblock %}

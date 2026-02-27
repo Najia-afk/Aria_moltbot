@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% block title %}Memory Consolidation{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>🔄 Memory Consolidation Dashboard</h1>
+    <p class="subtitle">Surface → Medium → Deep memory flow, compression stats, and promotion candidates</p>
+</div>
+
+<div id="loadingState" style="text-align:center;padding:3rem;color:var(--text-muted);">Loading consolidation data…</div>
+<div id="mainContent" style="display:none;">
+
+<!-- File Tier Flow -->
+<div class="tier-flow" style="display:flex;gap:1rem;align-items:stretch;margin-bottom:1.5rem;flex-wrap:wrap;">
+    <div class="tier-card tier-surface" id="tierSurface">
+        <div class="tier-icon">🌊</div>
+        <div class="tier-label">Surface</div>
+        <div class="tier-count" id="surfaceCount">—</div>
+        <div class="tier-size" id="surfaceSize">—</div>
+        <div class="tier-desc">Transient 1-beat snapshots</div>
+    </div>
+    <div class="tier-arrow">→</div>
+    <div class="tier-card tier-medium" id="tierMedium">
+        <div class="tier-icon">🌿</div>
+        <div class="tier-label">Medium</div>
+        <div class="tier-count" id="mediumCount">—</div>
+        <div class="tier-size" id="mediumSize">—</div>
+        <div class="tier-desc">6h consolidated summaries</div>
+    </div>
+    <div class="tier-arrow">→</div>
+    <div class="tier-card tier-deep" id="tierDeep">
+        <div class="tier-icon">🪨</div>
+        <div class="tier-label">Deep</div>
+        <div class="tier-count" id="deepCount">—</div>
+        <div class="tier-size" id="deepSize">—</div>
+        <div class="tier-desc">Permanent synthesized insights</div>
+    </div>
+    <div class="tier-arrow">→</div>
+    <div class="tier-card tier-semantic" id="tierSemantic">
+        <div class="tier-icon">🧠</div>
+        <div class="tier-label">SemanticDB</div>
+        <div class="tier-count" id="semanticCount">—</div>
+        <div class="tier-size" id="semanticSize">—</div>
+        <div class="tier-desc">Vector-embedded & searchable</div>
+    </div>
+</div>
+
+<div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem;">
+    <div class="card">
+        <div class="card-header"><h3>Source Distribution</h3></div>
+        <div class="card-body" style="height:260px;display:flex;align-items:center;justify-content:center;">
+            <canvas id="sourceChart"></canvas>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-header"><h3>Compression Ratio by Category</h3></div>
+        <div class="card-body" style="height:260px;"><canvas id="compressionChart"></canvas></div>
+    </div>
+</div>
+
+<div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem;">
+    <div class="card">
+        <div class="card-header">
+            <h3>Recent Consolidations <span id="recentBadge" class="badge badge-secondary">0</span></h3>
+            <small style="color:var(--text-muted);">Last 24 hours</small>
+        </div>
+        <div class="card-body" style="max-height:340px;overflow-y:auto;">
+            <table class="table table-sm" id="recentTable">
+                <thead><tr><th>Summary</th><th>Source</th><th>Category</th><th>Imp.</th><th>When</th></tr></thead>
+                <tbody id="recentBody"></tbody>
+            </table>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-header">
+            <h3>Promotion Candidates <span id="promoBadge" class="badge badge-warning">0</span></h3>
+            <small style="color:var(--text-muted);">High-importance WorkingMemory</small>
+        </div>
+        <div class="card-body" style="max-height:340px;overflow-y:auto;">
+            <table class="table table-sm" id="promoTable">
+                <thead><tr><th>Key</th><th>Importance</th><th>Accesses</th><th>Age</th></tr></thead>
+                <tbody id="promoBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+</div><!-- end mainContent -->
+
+<style>
+.tier-flow { align-items:center; }
+.tier-card { flex:1; min-width:140px; background:var(--card-bg); border:1px solid var(--border-color); border-radius:10px; padding:1.25rem; text-align:center; }
+.tier-icon { font-size:1.8rem; margin-bottom:0.4rem; }
+.tier-label { font-weight:700; font-size:1rem; margin-bottom:0.2rem; }
+.tier-count { font-size:1.5rem; font-weight:700; color:var(--accent-primary); }
+.tier-size { font-size:0.78rem; color:var(--text-muted); margin-bottom:0.4rem; }
+.tier-desc { font-size:0.72rem; color:var(--text-muted); }
+.tier-arrow { font-size:1.5rem; color:var(--text-muted); align-self:center; flex-shrink:0; }
+.tier-surface { border-color:#22d3ee66; }
+.tier-medium { border-color:#a78bfa66; }
+.tier-deep { border-color:#f59e0b66; }
+.tier-semantic { border-color:#8b5cf666; }
+@media(max-width:768px){ .tier-flow { flex-direction:column; } .tier-arrow { transform:rotate(90deg); } }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+<script>
+const API = window.API_BASE || '/api';
+
+function fmtBytes(b) {
+    if (b < 1024) return b + ' B';
+    if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+    return (b/1048576).toFixed(1) + ' MB';
+}
+function timeAgo(ts) {
+    if (!ts) return '—';
+    const s = (Date.now() - new Date(ts)) / 1000;
+    if (s < 60) return s.toFixed(0) + 's ago';
+    if (s < 3600) return (s/60).toFixed(0) + 'm ago';
+    if (s < 86400) return (s/3600).toFixed(0) + 'h ago';
+    return (s/86400).toFixed(0) + 'd ago';
+}
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+async function loadData() {
+    try {
+        const res = await fetch(`${API}/memory-consolidation`);
+        const d = await res.json();
+        document.getElementById('loadingState').style.display = 'none';
+        document.getElementById('mainContent').style.display = '';
+        renderTiers(d.file_tiers || {});
+        renderSourceChart(d.source_distribution || {});
+        renderCompressionChart(d.compression_stats || {});
+        renderRecent(d.recent_consolidations || []);
+        renderPromo(d.promotion_candidates || []);
+    } catch(e) {
+        document.getElementById('loadingState').textContent = 'Failed to load: ' + e.message;
+    }
+}
+
+function renderTiers(tiers) {
+    for (const [tier, data] of Object.entries(tiers)) {
+        const cnt = document.getElementById(tier + 'Count');
+        const sz = document.getElementById(tier + 'Size');
+        if (cnt) cnt.textContent = data.count;
+        if (sz) sz.textContent = fmtBytes(data.total_bytes);
+    }
+    // Semantic count from recent_consolidations source
+    document.getElementById('semanticCount').textContent = '—';
+    document.getElementById('semanticSize').textContent = 'pgvector';
+}
+
+function renderSourceChart(sources) {
+    const labels = Object.keys(sources);
+    const counts = labels.map(k => sources[k].count);
+    const COLORS = ['#6366f1','#8b5cf6','#06b6d4','#10b981','#f59e0b','#ef4444','#ec4899','#3b82f6'];
+    const ctx = document.getElementById('sourceChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: { labels, datasets: [{ data: counts, backgroundColor: COLORS.slice(0, labels.length), borderWidth: 0 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#94a3b8', font: { size: 11 } } } } }
+    });
+}
+
+function renderCompressionChart(stats) {
+    const cats = Object.keys(stats).slice(0, 15);
+    const ratios = cats.map(k => stats[k].compression_ratio);
+    const ctx = document.getElementById('compressionChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: cats,
+            datasets: [{ label: 'Compression Ratio (summary/content)', data: ratios, backgroundColor: 'rgba(99,102,241,0.7)', borderRadius: 4 }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+            plugins: { legend: { display: false } },
+            scales: { x: { min: 0, max: 1, ticks: { color: '#64748b' } }, y: { ticks: { color: '#94a3b8', font: { size: 10 } } } }
+        }
+    });
+}
+
+function renderRecent(items) {
+    document.getElementById('recentBadge').textContent = items.length;
+    const body = document.getElementById('recentBody');
+    if (!items.length) { body.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">No consolidations in last 24h</td></tr>'; return; }
+    body.innerHTML = items.map(m => `<tr>
+        <td title="${esc(m.summary)}" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(m.summary)}</td>
+        <td><span class="badge badge-secondary" style="font-size:0.7rem;">${esc(m.source||'—')}</span></td>
+        <td style="color:var(--text-muted);font-size:0.8rem;">${esc(m.category||'—')}</td>
+        <td><div style="width:50px;background:var(--bg-elevated);border-radius:2px;height:6px;"><div style="width:${Math.round((m.importance||0)*100)}%;background:var(--accent-primary);height:100%;border-radius:2px;"></div></div></td>
+        <td style="color:var(--text-muted);font-size:0.78rem;">${timeAgo(m.created_at)}</td>
+    </tr>`).join('');
+}
+
+function renderPromo(items) {
+    document.getElementById('promoBadge').textContent = items.length;
+    const body = document.getElementById('promoBody');
+    if (!items.length) { body.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">No candidates</td></tr>'; return; }
+    body.innerHTML = items.map(m => `<tr>
+        <td style="font-size:0.82rem;">${esc(m.key)}</td>
+        <td><span style="color:var(--accent-primary);font-weight:600;">${((m.importance||0)*100).toFixed(0)}%</span></td>
+        <td style="color:var(--text-muted);">${m.access_count||0}</td>
+        <td style="color:var(--text-muted);font-size:0.78rem;">${timeAgo(m.created_at)}</td>
+    </tr>`).join('');
+}
+
+loadData();
+</script>
+{% endblock %}

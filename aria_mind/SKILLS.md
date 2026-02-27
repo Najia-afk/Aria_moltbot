@@ -99,7 +99,7 @@ aria-api-client.health_check({})
 |-------|-----------|--------|
 | `moltbook` | `create_post`, `get_feed`, `add_comment`, `search` | Moltbook posting |
 | `social` | `social_post`, `social_list`, `social_schedule` | Cross-platform posting (moltbook + simulation-first x/telegram) |
-| `telegram` | `send_message`, `get_updates`, `set_webhook` | Telegram messaging (v1.1) |
+| `telegram` | `send_message`, `get_updates`, `poll_once`, `handle_status`, `handle_goals`, `handle_memory`, `notify` | Telegram messaging — Status: implemented — /status /goals /memory handlers; long-poll cron every 2 min (S-46) |
 
 ### ⚡ Utility Skills
 | Skill | Functions | Use For |

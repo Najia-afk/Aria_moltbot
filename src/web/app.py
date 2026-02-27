@@ -176,6 +176,26 @@ def create_app():
     def memory_graph():
         return render_template('memory_graph.html')
 
+    @app.route('/memory-search')
+    def memory_search():
+        return render_template('memory_search.html')
+
+    @app.route('/memory-timeline')
+    def memory_timeline():
+        return render_template('memory_timeline.html')
+
+    @app.route('/memory-dashboard')
+    def memory_dashboard():
+        return render_template('memory_consolidation.html')
+
+    @app.route('/embedding-explorer')
+    def embedding_explorer():
+        return render_template('embedding_explorer.html')
+
+    @app.route('/lessons')
+    def lessons_page():
+        return render_template('lessons.html')
+
     @app.route('/sentiment')
     def sentiment():
         return render_template('sentiment.html')

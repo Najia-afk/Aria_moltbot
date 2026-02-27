@@ -76,19 +76,19 @@ E19 — Session & Artifact Integrity:
 ### E17 — Testing (3 pts)
 | Ticket | File | Description |
 |--------|-------|-------------|
-| [S-30](S-30-load-tests-e2e.md) | `tests/load/`, `tests/e2e/`, `.github/workflows/` | Locust load tests, Playwright E2E, CI pipeline |
+| [S-30](S-30-load-tests-e2e.md) | `tests/load/`, `tests/e2e/`, `.github/workflows/` | Locust load tests, Playwright E2E, CI pipeline | ✅ Done |
 
 ### E18 — Visualization & Graph Execution (44 pts)
 | Ticket | File | Description |
 |--------|-------|-------------|
 | [S-31](S-31-memory-graph-visualization.md) | `memories.py`, `memory_graph.html`, `app.py` | vis-network graph of all memory types with category/source edges | ✅ Done |
-| [S-32](S-32-memory-timeline-heatmap.md) | `memories.py`, `memory_timeline.html`, `app.py` | Chart.js temporal heatmap, stacked area, TTL decay bars |
-| [S-33](S-33-embedding-cluster-explorer.md) | `memories.py`, `embedding_explorer.html`, `app.py` | PCA/t-SNE 2D scatter plot of semantic memory embeddings |
-| [S-34](S-34-chat-tool-execution-graph.md) | `streaming.py`, `engine_chat.html` | LangGraph-style DAG for tool execution pipeline in chat UI |
-| [S-35](S-35-memory-consolidation-dashboard.md) | `memories.py`, `memory_consolidation.html`, `app.py` | Surface→Medium→Deep flow, compression stats, promotion candidates |
-| [S-36](S-36-lessons-learned-dashboard.md) | `lessons.py`, `lessons.html`, `app.py` | Skill→Error→Lesson vis-network graph, effectiveness charts |
-| [S-37](S-37-unified-memory-search.md) | `memories.py`, `memory_search.html`, `app.py` | Cross-memory-type search (vector+ILIKE) with ranked results |
-| [S-38](S-38-navigation-update-visualization.md) | `base.html` | Nav menu update — add all new visualization pages |
+| [S-32](S-32-memory-timeline-heatmap.md) | `memories.py`, `memory_timeline.html`, `app.py` | Chart.js temporal heatmap, stacked area, TTL decay bars | ✅ Done |
+| [S-33](S-33-embedding-cluster-explorer.md) | `memories.py`, `embedding_explorer.html`, `app.py` | PCA/t-SNE 2D scatter plot of semantic memory embeddings | ✅ Done |
+| [S-34](S-34-chat-tool-execution-graph.md) | `streaming.py`, `engine_chat.html` | LangGraph-style DAG for tool execution pipeline in chat UI | ✅ Done |
+| [S-35](S-35-memory-consolidation-dashboard.md) | `memories.py`, `memory_consolidation.html`, `app.py` | Surface→Medium→Deep flow, compression stats, promotion candidates | ✅ Done |
+| [S-36](S-36-lessons-learned-dashboard.md) | `lessons.py`, `lessons.html`, `app.py` | Skill→Error→Lesson vis-network graph, effectiveness charts | ✅ Done |
+| [S-37](S-37-unified-memory-search.md) | `memories.py`, `memory_search.html`, `app.py` | Cross-memory-type search (vector+ILIKE) with ranked results | ✅ Done |
+| [S-38](S-38-navigation-update-visualization.md) | `base.html` | Nav menu update — add all new visualization pages | ✅ Done |
 
 ### E19 — Session & Artifact Integrity (13 pts)
 | Ticket | File | Description |
@@ -243,15 +243,15 @@ New tickets identified via full `aria_memories/` audit. All written to AA++ stan
 
 | Ticket | Title | Points | Priority | ARIA-to-ARIA Steps | Status |
 |--------|-------|--------|----------|--------------------|--------|
-| [S-43](S-43-identity-manifest-v1-1.md) | Identity Manifest v1.1 (Remove OpenClaw) | 2 | P1 | 4 steps | Ready |
-| [S-44](S-44-heartbeat-md-in-aria-memories.md) | HEARTBEAT.md Accessible in aria_memories/ | 1 | P1 | 5 steps | Ready |
+| [S-43](S-43-identity-manifest-v1-1.md) | Identity Manifest v1.1 (Remove OpenClaw) | 2 | P1 | 4 steps | ✅ Done |
+| [S-44](S-44-heartbeat-md-in-aria-memories.md) | HEARTBEAT.md Accessible in aria_memories/ | 1 | P1 | 5 steps | ✅ Done |
 | [S-45](S-45-self-healing-error-recovery-phase2-5.md) | Self-Healing Error Recovery Phase 2–5 | 5 | P1 | 6 steps | ✅ Done |
-| [S-46](S-46-telegram-bot-integration.md) | Telegram Bot Integration | 5 | P2 | 8 steps | Ready |
-| [S-47](S-47-litellm-public-schema-isolation.md) | LiteLLM Writing to Public Schema | 2 | **P0** | 5 steps | Ready |
-| [S-48](S-48-browser-hardcoded-litellm-port.md) | Browser Hardcoded LiteLLM Port :18793 | 2 | **P0** | 7 steps | Ready |
-| [S-49](S-49-fresh-clone-env-bootstrap.md) | Fresh-Clone Auto-Bootstrap `.env` | 2 | **P0** | 5 steps | Ready |
-| [S-50](S-50-upgrade-browserless-v1-to-v2.md) | Upgrade browserless/chrome v1 → ghcr.io/browserless/chromium v2 | 1 | P1 | 5 steps | Ready |
-| [S-51](S-51-pg17-pgvector-upgrade-hnsw.md) | Upgrade pg16→pg17, pgvector 0.8.0→0.8.2, fix missing Python pkg, add HNSW indexes | 3 | **P0** | 5 steps | Ready |
+| [S-46](S-46-telegram-bot-integration.md) | Telegram Bot Integration | 5 | P2 | 8 steps | ✅ Done |
+| [S-47](S-47-litellm-public-schema-isolation.md) | LiteLLM Writing to Public Schema | 2 | **P0** | 5 steps | ✅ Done |
+| [S-48](S-48-browser-hardcoded-litellm-port.md) | Browser Hardcoded LiteLLM Port :18793 | 2 | **P0** | 7 steps | ✅ Done |
+| [S-49](S-49-fresh-clone-env-bootstrap.md) | Fresh-Clone Auto-Bootstrap `.env` | 2 | **P0** | 5 steps | ✅ Done |
+| [S-50](S-50-upgrade-browserless-v1-to-v2.md) | Upgrade browserless/chrome v1 → ghcr.io/browserless/chromium v2 | 1 | P1 | 5 steps | ✅ Done |
+| [S-51](S-51-pg17-pgvector-upgrade-hnsw.md) | Upgrade pg16→pg17, pgvector 0.8.0→0.8.2, fix missing Python pkg, add HNSW indexes | 3 | **P0** | 5 steps | ✅ Done |
 
 ### E20 Root Causes
 

@@ -2,15 +2,18 @@
 Memories endpoints — CRUD with upsert by key + semantic memory (S5-01).
 """
 
+import asyncio
 import json as json_lib
 import logging
 import math
 import os
 import re
 import uuid
+from datetime import datetime, timedelta
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select, delete
+from sqlalchemy import cast, func, or_, select, delete, String
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import Memory, SemanticMemory, WorkingMemory, Thought, LessonLearned
@@ -479,6 +482,100 @@ async def summarize_session(
 
 
 # ===========================================================================
+# Embedding projection — MUST be before /memories/{key} catch-all
+# ===========================================================================
+
+
+@router.get("/memories/embedding-projection")
+async def get_embedding_projection(
+    limit: int = Query(200, ge=10, le=1000, description="Default 200; >500 may be slow"),
+    method: str = Query("pca", pattern="^(pca|tsne)$"),
+    category: Optional[str] = Query(None),
+    min_importance: float = Query(0.0, ge=0.0, le=1.0),
+    db: AsyncSession = Depends(get_db),
+):
+    """Project semantic memory embeddings to 2D for scatter plot visualization."""
+    import numpy as np
+
+    stmt = select(SemanticMemory).where(
+        SemanticMemory.embedding.isnot(None),
+        SemanticMemory.importance >= min_importance,
+    )
+    if category:
+        stmt = stmt.where(SemanticMemory.category == category)
+    stmt = stmt.order_by(SemanticMemory.importance.desc()).limit(limit)
+
+    result = await db.execute(stmt)
+    memories = result.scalars().all()
+
+    if len(memories) < 3:
+        return {"points": [], "method": method, "error": "Need at least 3 memories with embeddings"}
+
+    embeddings = []
+    valid_memories = []
+    for m in memories:
+        emb = m.embedding
+        if emb is not None and len(emb) > 0:
+            embeddings.append(emb)
+            valid_memories.append(m)
+
+    if len(embeddings) < 3:
+        return {"points": [], "method": method, "error": "Not enough valid embeddings"}
+
+    X = np.array(embeddings, dtype=np.float32)
+
+    if method == "tsne":
+        try:
+            from sklearn.manifold import TSNE
+            perplexity = min(30, len(X) - 1)
+            reducer = TSNE(n_components=2, perplexity=perplexity, random_state=42, n_iter=500)
+            coords = reducer.fit_transform(X)
+        except ImportError:
+            method = "pca"
+
+    if method == "pca":
+        X_centered = X - X.mean(axis=0)
+        cov = np.cov(X_centered, rowvar=False)
+        eigenvalues, eigenvectors = np.linalg.eigh(cov)
+        idx = np.argsort(eigenvalues)[::-1][:2]
+        coords = X_centered @ eigenvectors[:, idx]
+
+    coords_min = coords.min(axis=0)
+    coords_max = coords.max(axis=0)
+    coords_range = coords_max - coords_min
+    coords_range[coords_range == 0] = 1
+    coords_normalized = 2 * (coords - coords_min) / coords_range - 1
+
+    points = []
+    for i, m in enumerate(valid_memories):
+        points.append({
+            "id": str(m.id),
+            "x": round(float(coords_normalized[i][0]), 4),
+            "y": round(float(coords_normalized[i][1]), 4),
+            "label": (m.summary or m.content or "")[:80],
+            "category": m.category,
+            "importance": m.importance,
+            "source": m.source,
+            "access_count": m.access_count,
+            "created_at": m.created_at.isoformat() if m.created_at else None,
+        })
+
+    categories: dict = {}
+    for p in points:
+        cat = p["category"]
+        categories.setdefault(cat, {"count": 0, "avg_x": 0.0, "avg_y": 0.0})
+        categories[cat]["count"] += 1
+        categories[cat]["avg_x"] += p["x"]
+        categories[cat]["avg_y"] += p["y"]
+    for cat in categories:
+        n = categories[cat]["count"]
+        categories[cat]["avg_x"] = round(categories[cat]["avg_x"] / n, 4)
+        categories[cat]["avg_y"] = round(categories[cat]["avg_y"] / n, 4)
+
+    return {"points": points, "method": method, "total": len(points), "categories": categories}
+
+
+# ===========================================================================
 # Key-value memory by key (MUST be after /memories/search to avoid collision)
 # ===========================================================================
 
@@ -688,4 +785,379 @@ async def get_memory_graph(
             "by_type": type_counts,
             "categories": list(category_index.keys()),
         },
+    }
+
+
+# ===========================================================================
+# Unified Memory Search — S-37
+# ===========================================================================
+
+
+@router.get("/memory-search")
+async def unified_memory_search(
+    query: str = Query(..., min_length=1, max_length=500),
+    limit: int = Query(10, ge=1, le=50),
+    types: str = Query("all", description="Comma-separated: semantic,kv,working,thought,lesson"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Unified search across all memory types."""
+    search_types = (
+        ["semantic", "kv", "working", "thought", "lesson"]
+        if types == "all"
+        else [t.strip() for t in types.split(",")]
+    )
+    results: list[dict] = []
+
+    # 1. Semantic search (vector)
+    if "semantic" in search_types:
+        try:
+            embedding = await generate_embedding(query)
+            if embedding:
+                from pgvector.sqlalchemy import Vector
+                stmt = (
+                    select(
+                        SemanticMemory,
+                        SemanticMemory.embedding.cosine_distance(embedding).label("distance"),
+                    )
+                    .where(SemanticMemory.embedding.isnot(None))
+                    .order_by("distance")
+                    .limit(limit)
+                )
+                result = await db.execute(stmt)
+                for row in result.all():
+                    mem = row[0]
+                    similarity = max(0.0, 1 - float(row[1]))
+                    results.append({
+                        "type": "semantic_memory",
+                        "id": str(mem.id),
+                        "title": mem.summary or (mem.content or "")[:80],
+                        "content": (mem.content or "")[:300],
+                        "category": mem.category,
+                        "relevance": round(similarity, 4),
+                        "importance": mem.importance,
+                        "source": mem.source,
+                        "created_at": mem.created_at.isoformat() if mem.created_at else None,
+                    })
+        except Exception:
+            pass
+
+    # 2. KV Memory text search
+    if "kv" in search_types:
+        pattern = f"%{query}%"
+        stmt = (
+            select(Memory)
+            .where(or_(Memory.key.ilike(pattern), cast(Memory.value, String).ilike(pattern)))
+            .order_by(Memory.updated_at.desc())
+            .limit(limit)
+        )
+        result = await db.execute(stmt)
+        for m in result.scalars().all():
+            results.append({
+                "type": "kv_memory",
+                "id": str(m.id),
+                "title": m.key,
+                "content": str(m.value)[:300] if m.value else "",
+                "category": m.category,
+                "relevance": 0.5,
+                "created_at": m.created_at.isoformat() if m.created_at else None,
+            })
+
+    # 3. Working Memory text search
+    if "working" in search_types:
+        pattern = f"%{query}%"
+        stmt = (
+            select(WorkingMemory)
+            .where(or_(
+                WorkingMemory.key.ilike(pattern),
+                cast(WorkingMemory.value, String).ilike(pattern),
+            ))
+            .order_by(WorkingMemory.importance.desc())
+            .limit(limit)
+        )
+        result = await db.execute(stmt)
+        for wm in result.scalars().all():
+            results.append({
+                "type": "working_memory",
+                "id": str(wm.id),
+                "title": f"{wm.category}/{wm.key}",
+                "content": str(wm.value)[:300] if wm.value else "",
+                "category": wm.category,
+                "relevance": 0.45,
+                "importance": wm.importance,
+                "created_at": wm.created_at.isoformat() if wm.created_at else None,
+            })
+
+    # 4. Thoughts text search
+    if "thought" in search_types:
+        stmt = (
+            select(Thought)
+            .where(Thought.content.ilike(f"%{query}%"))
+            .order_by(Thought.created_at.desc())
+            .limit(limit)
+        )
+        result = await db.execute(stmt)
+        for t in result.scalars().all():
+            results.append({
+                "type": "thought",
+                "id": str(t.id),
+                "title": (t.content or "")[:80],
+                "content": (t.content or "")[:300],
+                "category": t.category,
+                "relevance": 0.4,
+                "created_at": t.created_at.isoformat() if t.created_at else None,
+            })
+
+    # 5. Lessons text search
+    if "lesson" in search_types:
+        stmt = (
+            select(LessonLearned)
+            .where(or_(
+                LessonLearned.error_pattern.ilike(f"%{query}%"),
+                LessonLearned.resolution.ilike(f"%{query}%"),
+            ))
+            .order_by(LessonLearned.occurrences.desc())
+            .limit(limit)
+        )
+        result = await db.execute(stmt)
+        for ll in result.scalars().all():
+            results.append({
+                "type": "lesson",
+                "id": str(ll.id),
+                "title": (ll.error_pattern or "")[:80],
+                "content": (ll.resolution or "")[:300],
+                "category": ll.skill_name or "general",
+                "relevance": 0.35,
+                "occurrences": ll.occurrences,
+                "created_at": ll.created_at.isoformat() if ll.created_at else None,
+            })
+
+    results.sort(key=lambda r: r.get("relevance", 0), reverse=True)
+    type_counts: dict[str, int] = {}
+    for r in results:
+        type_counts[r["type"]] = type_counts.get(r["type"], 0) + 1
+
+    return {
+        "query": query,
+        "results": results[:limit * 2],
+        "total": len(results),
+        "by_type": type_counts,
+    }
+
+
+# ===========================================================================
+# Memory Timeline — S-32
+# ===========================================================================
+
+
+@router.get("/memory-timeline")
+async def get_memory_timeline(
+    hours: int = Query(168, ge=1, le=720, description="Hours lookback (default 7 days)"),
+    bucket_hours: int = Query(1, ge=1, le=24),
+    db: AsyncSession = Depends(get_db),
+):
+    """Time-bucketed memory creation data for Chart.js timeline charts."""
+    cutoff = datetime.utcnow() - timedelta(hours=hours)
+
+    sem_stmt = (
+        select(
+            func.date_trunc("hour", SemanticMemory.created_at).label("bucket"),
+            func.count().label("count"),
+            func.avg(SemanticMemory.importance).label("avg_importance"),
+        )
+        .where(SemanticMemory.created_at >= cutoff)
+        .group_by("bucket")
+        .order_by("bucket")
+    )
+    sem_result = await db.execute(sem_stmt)
+    sem_buckets = [
+        {"t": r.bucket.isoformat(), "count": r.count, "avg_imp": round(float(r.avg_importance or 0), 3)}
+        for r in sem_result.all()
+    ]
+
+    wm_stmt = (
+        select(
+            func.date_trunc("hour", WorkingMemory.created_at).label("bucket"),
+            func.count().label("count"),
+        )
+        .where(WorkingMemory.created_at >= cutoff)
+        .group_by("bucket")
+        .order_by("bucket")
+    )
+    wm_result = await db.execute(wm_stmt)
+    wm_buckets = [{"t": r.bucket.isoformat(), "count": r.count} for r in wm_result.all()]
+
+    th_stmt = (
+        select(
+            func.date_trunc("hour", Thought.created_at).label("bucket"),
+            func.count().label("count"),
+        )
+        .where(Thought.created_at >= cutoff)
+        .group_by("bucket")
+        .order_by("bucket")
+    )
+    th_result = await db.execute(th_stmt)
+    th_buckets = [{"t": r.bucket.isoformat(), "count": r.count} for r in th_result.all()]
+
+    ttl_stmt = (
+        select(WorkingMemory)
+        .where(WorkingMemory.ttl_hours.isnot(None))
+        .order_by(WorkingMemory.importance.desc())
+        .limit(50)
+    )
+    ttl_result = await db.execute(ttl_stmt)
+    ttl_items = []
+    now = datetime.utcnow()
+    for wm in ttl_result.scalars().all():
+        expires_at = (
+            wm.created_at + timedelta(hours=wm.ttl_hours)
+            if wm.created_at and wm.ttl_hours
+            else None
+        )
+        remaining_hours = (
+            (expires_at - now).total_seconds() / 3600
+            if expires_at and expires_at > now
+            else 0
+        )
+        ttl_items.append({
+            "id": str(wm.id),
+            "key": f"{wm.category}/{wm.key}",
+            "importance": wm.importance,
+            "ttl_hours": wm.ttl_hours,
+            "remaining_hours": round(remaining_hours, 1),
+            "expired": remaining_hours <= 0,
+            "created_at": wm.created_at.isoformat() if wm.created_at else None,
+        })
+
+    heatmap_stmt = (
+        select(
+            func.extract("dow", SemanticMemory.created_at).label("dow"),
+            func.extract("hour", SemanticMemory.created_at).label("hour"),
+            func.count().label("count"),
+        )
+        .where(SemanticMemory.created_at >= cutoff)
+        .group_by("dow", "hour")
+    )
+    heatmap_result = await db.execute(heatmap_stmt)
+    heatmap = [
+        {"dow": int(r.dow), "hour": int(r.hour), "count": r.count}
+        for r in heatmap_result.all()
+    ]
+
+    return {
+        "semantic_timeline": sem_buckets,
+        "working_memory_timeline": wm_buckets,
+        "thoughts_timeline": th_buckets,
+        "ttl_countdowns": ttl_items,
+        "creation_heatmap": heatmap,
+        "period_hours": hours,
+        "bucket_hours": bucket_hours,
+    }
+
+
+# ===========================================================================
+# Memory Consolidation Dashboard — S-35
+# ===========================================================================
+
+
+@router.get("/memory-consolidation")
+async def get_memory_consolidation_dashboard(
+    db: AsyncSession = Depends(get_db),
+):
+    """Memory consolidation dashboard: file tier counts, source distribution, promo candidates."""
+    from pathlib import Path
+
+    def _scan_tier(tier_path: Path) -> dict:
+        if not tier_path.exists():
+            return {"count": 0, "total_bytes": 0, "newest": 0, "oldest": 0}
+        files = [f for f in tier_path.glob("*") if f.is_file()]
+        file_stats = [f.stat() for f in files]
+        return {
+            "count": len(file_stats),
+            "total_bytes": sum(s.st_size for s in file_stats),
+            "newest": max((s.st_mtime for s in file_stats), default=0),
+            "oldest": min((s.st_mtime for s in file_stats), default=0),
+        }
+
+    base = Path(os.environ.get("ARIA_MEMORIES_PATH", "/aria_memories"))
+    tiers = {}
+    for tier in ["surface", "medium", "deep"]:
+        tiers[tier] = await asyncio.to_thread(_scan_tier, base / "memory" / tier)
+
+    source_stmt = select(
+        SemanticMemory.source,
+        func.count().label("count"),
+        func.avg(SemanticMemory.importance).label("avg_importance"),
+    ).group_by(SemanticMemory.source)
+    source_result = await db.execute(source_stmt)
+    sources = {
+        (r.source or "unknown"): {
+            "count": r.count,
+            "avg_importance": round(float(r.avg_importance or 0), 3),
+        }
+        for r in source_result.all()
+    }
+
+    cutoff_24h = datetime.utcnow() - timedelta(hours=24)
+    recent_stmt = (
+        select(SemanticMemory)
+        .where(SemanticMemory.created_at >= cutoff_24h)
+        .order_by(SemanticMemory.created_at.desc())
+        .limit(20)
+    )
+    recent_result = await db.execute(recent_stmt)
+    recent_memories = [
+        {
+            "id": str(m.id),
+            "summary": (m.summary or m.content or "")[:120],
+            "category": m.category,
+            "source": m.source,
+            "importance": m.importance,
+            "created_at": m.created_at.isoformat() if m.created_at else None,
+        }
+        for m in recent_result.scalars().all()
+    ]
+
+    promo_stmt = (
+        select(WorkingMemory)
+        .where(WorkingMemory.importance >= 0.7)
+        .order_by(WorkingMemory.importance.desc())
+        .limit(15)
+    )
+    promo_result = await db.execute(promo_stmt)
+    promotion_candidates = [
+        {
+            "id": str(wm.id),
+            "key": f"{wm.category}/{wm.key}",
+            "importance": wm.importance,
+            "access_count": wm.access_count,
+            "created_at": wm.created_at.isoformat() if wm.created_at else None,
+        }
+        for wm in promo_result.scalars().all()
+    ]
+
+    category_stmt = select(
+        SemanticMemory.category,
+        func.count().label("count"),
+        func.avg(func.length(SemanticMemory.content)).label("avg_content_len"),
+        func.avg(func.length(SemanticMemory.summary)).label("avg_summary_len"),
+    ).group_by(SemanticMemory.category)
+    cat_result = await db.execute(category_stmt)
+    compression_stats: dict = {}
+    for r in cat_result.all():
+        content_len = float(r.avg_content_len or 0)
+        summary_len = float(r.avg_summary_len or 0)
+        ratio = round(summary_len / content_len, 2) if content_len > 0 else 0
+        compression_stats[r.category] = {
+            "count": r.count,
+            "avg_content_len": round(content_len),
+            "avg_summary_len": round(summary_len),
+            "compression_ratio": ratio,
+        }
+
+    return {
+        "file_tiers": tiers,
+        "source_distribution": sources,
+        "recent_consolidations": recent_memories,
+        "promotion_candidates": promotion_candidates,
+        "compression_stats": compression_stats,
     }

@@ -287,6 +287,12 @@ class StreamManager:
             max_per_tool_failures = 3
             tool_failure_counts: dict[str, int] = {}
             for iteration in range(max_tool_iterations):
+                # Notify frontend: iteration starting
+                await self._send_json(websocket, {
+                    "type": "iteration_start",
+                    "iteration": iteration + 1,
+                    "tool_calls_so_far": len(accumulator.tool_calls),
+                })
                 try:
                     async for chunk in self.gateway.stream(
                         messages=messages,
@@ -326,6 +332,14 @@ class StreamManager:
                         "message": f"LLM error: {e}",
                     })
                     break
+
+                # Notify frontend: iteration result
+                await self._send_json(websocket, {
+                    "type": "iteration_end",
+                    "iteration": iteration + 1,
+                    "has_tool_calls": accumulator.finish_reason == "tool_calls",
+                    "tool_count": 0,  # updated below after resolving tool_calls
+                })
 
                 # Check for tool calls in accumulated content
                 # If the model requested tool calls, we re-call non-streaming

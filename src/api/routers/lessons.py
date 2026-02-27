@@ -117,6 +117,87 @@ async def seed_lessons(db: AsyncSession = Depends(get_db)):
     return {"seeded": created, "total": len(_KNOWN_PATTERNS)}
 
 
+@router.get("/lessons/dashboard")
+async def get_lessons_dashboard(db: AsyncSession = Depends(get_db)):
+    """Dashboard data: vis-network graph + stats + effectiveness distribution."""
+    stmt = select(LessonLearned).order_by(LessonLearned.occurrences.desc()).limit(500)
+    result = await db.execute(stmt)
+    lessons = result.scalars().all()
+
+    nodes: list[dict] = []
+    edges: list[dict] = []
+    skill_set: set = set()
+    error_type_set: set = set()
+
+    for ll in lessons:
+        lesson_id = f"lesson_{ll.id}"
+        nodes.append({
+            "id": lesson_id,
+            "label": (ll.error_pattern or "")[:40],
+            "type": "lesson",
+            "occurrences": ll.occurrences,
+            "effectiveness": float(ll.effectiveness or 0),
+            "resolution": ll.resolution,
+        })
+        skill = ll.skill_name or "unknown"
+        if skill not in skill_set:
+            nodes.append({"id": f"skill_{skill}", "label": skill, "type": "skill"})
+            skill_set.add(skill)
+        edges.append({"from": f"skill_{skill}", "to": lesson_id, "type": "produces"})
+
+        etype = ll.error_type or "generic"
+        if etype not in error_type_set:
+            nodes.append({"id": f"etype_{etype}", "label": etype, "type": "error_type"})
+            error_type_set.add(etype)
+        edges.append({"from": lesson_id, "to": f"etype_{etype}", "type": "classified_as"})
+
+    total = len(lessons)
+    avg_eff = sum(float(ll.effectiveness or 0) for ll in lessons) / total if total else 0
+    total_occ = sum(ll.occurrences for ll in lessons)
+
+    top_patterns = [
+        {
+            "pattern": ll.error_pattern,
+            "skill": ll.skill_name,
+            "occurrences": ll.occurrences,
+            "effectiveness": float(ll.effectiveness or 0),
+        }
+        for ll in lessons[:15]
+    ]
+
+    eff_buckets = {"0.0-0.2": 0, "0.2-0.4": 0, "0.4-0.6": 0, "0.6-0.8": 0, "0.8-1.0": 0}
+    for ll in lessons:
+        e = float(ll.effectiveness or 0)
+        if e < 0.2: eff_buckets["0.0-0.2"] += 1
+        elif e < 0.4: eff_buckets["0.2-0.4"] += 1
+        elif e < 0.6: eff_buckets["0.4-0.6"] += 1
+        elif e < 0.8: eff_buckets["0.6-0.8"] += 1
+        else: eff_buckets["0.8-1.0"] += 1
+
+    skill_stats: dict = {}
+    for ll in lessons:
+        s = ll.skill_name or "unknown"
+        skill_stats.setdefault(s, {"count": 0, "total_occ": 0, "avg_eff": 0.0})
+        skill_stats[s]["count"] += 1
+        skill_stats[s]["total_occ"] += ll.occurrences
+        skill_stats[s]["avg_eff"] += float(ll.effectiveness or 0)
+    for s in skill_stats:
+        n = skill_stats[s]["count"]
+        skill_stats[s]["avg_eff"] = round(skill_stats[s]["avg_eff"] / n, 3) if n else 0
+
+    return {
+        "graph": {"nodes": nodes, "edges": edges},
+        "stats": {
+            "total_lessons": total,
+            "avg_effectiveness": round(avg_eff, 3),
+            "total_occurrences": total_occ,
+        },
+        "top_patterns": top_patterns,
+        "effectiveness_distribution": eff_buckets,
+        "skill_breakdown": skill_stats,
+    }
+
+
 @router.delete("/lessons/{lesson_id}")
 async def delete_lesson(lesson_id: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(LessonLearned).where(LessonLearned.id == lesson_id))
