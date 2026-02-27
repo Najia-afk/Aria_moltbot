@@ -1,0 +1,70 @@
+{
+  "name": "aria-llm",
+  "version": "1.0.0",
+  "layer": 2,
+  "category": "llm",
+  "description": "Resilient LLM completion skill with circuit-breaker-aware fallback chain. Routes requests through the model priority chain defined in aria_models/models.yaml (local → free → paid), skipping models with open circuit breakers and retrying automatically.",
+  "author": "Aria Blue",
+  "dependencies": ["litellm"],
+  "focus_affinity": ["reasoning", "writing", "code", "analysis"],
+  "tools": [
+    {
+      "name": "complete",
+      "description": "Get an LLM completion using the resilient fallback chain. Automatically selects the best available model based on tier priority and circuit breaker state.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": { "type": "string", "enum": ["system", "user", "assistant"] },
+                "content": { "type": "string" }
+              },
+              "required": ["role", "content"]
+            },
+            "description": "Chat messages in OpenAI format"
+          },
+          "model": {
+            "type": "string",
+            "description": "Override model (e.g. litellm/kimi). If not set, uses the fallback chain."
+          },
+          "temperature": {
+            "type": "number",
+            "description": "Sampling temperature (default: 0.7)"
+          },
+          "max_tokens": {
+            "type": "integer",
+            "description": "Max tokens to generate"
+          }
+        },
+        "required": ["messages"]
+      }
+    },
+    {
+      "name": "complete_with_model",
+      "description": "Get a completion from a specific model, bypassing the fallback chain.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "model": { "type": "string", "description": "Model ID (e.g. litellm/kimi)" },
+          "messages": { "type": "array", "items": { "type": "object" } },
+          "temperature": { "type": "number" },
+          "max_tokens": { "type": "integer" }
+        },
+        "required": ["model", "messages"]
+      }
+    },
+    {
+      "name": "get_fallback_chain",
+      "description": "Get the current fallback chain (model list with tier and priority, loaded from models.yaml).",
+      "input_schema": { "type": "object", "properties": {} }
+    },
+    {
+      "name": "reset_circuit_breakers",
+      "description": "Reset all circuit breakers to closed state. Use when models have recovered.",
+      "input_schema": { "type": "object", "properties": {} }
+    }
+  ]
+}

@@ -274,6 +274,77 @@ SKILL_REGISTRY = {
             "api_url": os.environ.get("ARIA_API_URL", "http://aria-api:8000/api"),
         },
     ),
+    # === Agent & Session Management ===
+    "agent_manager": (
+        "aria_skills.agent_manager",
+        "AgentManagerSkill",
+        lambda: {
+            "api_url": os.environ.get("ARIA_API_URL", "http://aria-api:8000/api"),
+        },
+    ),
+    "working_memory": (
+        "aria_skills.working_memory",
+        "WorkingMemorySkill",
+        lambda: {
+            "api_url": os.environ.get("ARIA_API_URL", "http://aria-api:8000/api"),
+        },
+    ),
+    "sprint_manager": (
+        "aria_skills.sprint_manager",
+        "SprintManagerSkill",
+        lambda: {
+            "api_url": os.environ.get("ARIA_API_URL", "http://aria-api:8000/api"),
+        },
+    ),
+    "conversation_summary": (
+        "aria_skills.conversation_summary",
+        "ConversationSummarySkill",
+        lambda: {
+            "api_url": os.environ.get("ARIA_API_URL", "http://aria-api:8000/api"),
+            "litellm_url": os.environ.get("LITELLM_URL", "http://litellm:4000"),
+        },
+    ),
+    # === Browser & Sandbox ===
+    "browser": (
+        "aria_skills.browser",
+        "BrowserSkill",
+        lambda: {
+            "browser_url": os.environ.get("BROWSERLESS_URL", ""),
+        },
+    ),
+    "sandbox": (
+        "aria_skills.sandbox",
+        "SandboxSkill",
+        lambda: {
+            "sandbox_url": os.environ.get("SANDBOX_URL", "http://aria-sandbox:9999"),
+        },
+    ),
+    # === Pipeline ===
+    "pipeline_skill": (
+        "aria_skills.pipeline_skill",
+        "PipelineSkill",
+        lambda: {},
+    ),
+    # === RPG Skills ===
+    "rpg_campaign": (
+        "aria_skills.rpg_campaign",
+        "RPGCampaignSkill",
+        lambda: {},
+    ),
+    "rpg_pathfinder": (
+        "aria_skills.rpg_pathfinder",
+        "RPGPathfinderSkill",
+        lambda: {},
+    ),
+    # === Telegram (S-46) ===
+    "telegram": (
+        "aria_skills.telegram",
+        "TelegramSkill",
+        lambda: {
+            "bot_token": os.environ.get("TELEGRAM_BOT_TOKEN", ""),
+            "default_chat_id": os.environ.get("TELEGRAM_CHAT_ID", ""),
+        },
+    ),
     # === Raw Database — LAST on purpose: prefer api_client for data ops ===
     "database": ("aria_skills.database", "DatabaseSkill", lambda: {"dsn": os.environ.get("DATABASE_URL")}),
 }

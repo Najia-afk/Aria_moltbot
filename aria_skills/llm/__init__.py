@@ -23,16 +23,65 @@ from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
 from aria_skills.registry import SkillRegistry
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Fallback chain — priority order: local → free-cloud → paid-cloud
-# Model IDs must match aria_models/models.yaml entries under routing.fallbacks
+# Fallback chain — loaded dynamically from aria_models/models.yaml at runtime.
+# Static list is a safe fallback when models.yaml is unavailable.
 # ─────────────────────────────────────────────────────────────────────────────
-LLM_FALLBACK_CHAIN: list[dict[str, Any]] = [
+_STATIC_FALLBACK_CHAIN: list[dict] = [
     {"model": "litellm/qwen3-mlx",       "tier": "local",  "priority": 1},
     {"model": "litellm/trinity-free",    "tier": "free",   "priority": 2},
     {"model": "litellm/qwen3-next-free", "tier": "free",   "priority": 3},
     {"model": "litellm/deepseek-free",   "tier": "free",   "priority": 4},
     {"model": "litellm/kimi",            "tier": "paid",   "priority": 5},
 ]
+
+
+def _build_fallback_chain() -> list[dict]:
+    """Load fallback chain from aria_models/models.yaml routing.fallbacks.
+
+    Falls back to _STATIC_FALLBACK_CHAIN on any loading error.
+    """
+    try:
+        from aria_models.loader import load_catalog as _load_catalog
+
+        catalog = _load_catalog()
+        routing = catalog.get("routing", {})
+        fallbacks: list[str] = routing.get("fallbacks", [])
+        tier_order = routing.get("tier_order", ["local", "free", "paid"])
+
+        # Build tier map from model definitions
+        models_map: dict[str, str] = {}
+        for _mkey, mval in catalog.get("models", {}).items():
+            provider_model = mval.get("litellm", {}).get("model") or mval.get("provider_model", "")
+            tier = mval.get("tier", "paid")
+            if provider_model:
+                models_map[provider_model] = tier
+
+        chain = []
+        for i, model_id in enumerate(fallbacks):
+            # Infer tier: check models_map, then fallback name heuristics
+            tier = models_map.get(model_id, "")
+            if not tier:
+                if "local" in model_id or "mlx" in model_id or "ollama" in model_id:
+                    tier = "local"
+                elif "free" in model_id:
+                    tier = "free"
+                else:
+                    tier = "paid"
+            chain.append({"model": model_id, "tier": tier, "priority": i + 1})
+
+        # Ensure local models from models.yaml are prepended if not in fallbacks
+        for _mkey, mval in catalog.get("models", {}).items():
+            if mval.get("tier") == "local":
+                local_id = mval.get("litellm", {}).get("model", "")
+                if local_id and not any(e["model"] == local_id for e in chain):
+                    chain.insert(0, {"model": local_id, "tier": "local", "priority": 0})
+
+        return chain if chain else _STATIC_FALLBACK_CHAIN
+    except Exception:
+        return _STATIC_FALLBACK_CHAIN
+
+
+LLM_FALLBACK_CHAIN: list[dict] = _build_fallback_chain()
 
 
 @SkillRegistry.register
