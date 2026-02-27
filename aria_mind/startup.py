@@ -15,6 +15,11 @@ import os
 from pathlib import Path
 from datetime import datetime, timezone
 
+try:
+    import httpx as _httpx
+except ImportError:  # pragma: no cover
+    _httpx = None  # type: ignore
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -399,8 +404,151 @@ Time to get to work. 💜
     return mind, registry, coordinator
 
 
+# ---------------------------------------------------------------------------
+# Telegram long-poll loop
+# ---------------------------------------------------------------------------
+
+_TG_API = "https://api.telegram.org/bot"
+_TG_SESSIONS_FILE = Path("/aria_memories/memory/telegram_sessions.json")
+
+
+def _tg_load_sessions() -> dict:
+    try:
+        if _TG_SESSIONS_FILE.exists():
+            return json.loads(_TG_SESSIONS_FILE.read_text())
+    except Exception:
+        pass
+    return {}
+
+
+def _tg_save_sessions(sessions: dict) -> None:
+    try:
+        _TG_SESSIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _TG_SESSIONS_FILE.write_text(json.dumps(sessions, indent=2))
+    except Exception as exc:
+        logger.warning(f"[telegram] could not save sessions: {exc}")
+
+
+async def _tg_get_or_create_session(
+    chat_id: str, session_map: dict, engine_base: str, client: "_httpx.AsyncClient"
+) -> str:
+    """Return existing Aria session_id for chat_id or create a new one."""
+    if chat_id in session_map:
+        return session_map[chat_id]
+    try:
+        r = await client.post(
+            f"{engine_base}/api/engine/chat/sessions",
+            json={"persona": "aria"},
+            timeout=15,
+        )
+        r.raise_for_status()
+        sid = r.json().get("session_id") or r.json().get("id")
+    except Exception as exc:
+        logger.error(f"[telegram] could not create session: {exc}")
+        raise
+    session_map[chat_id] = sid
+    _tg_save_sessions(session_map)
+    logger.info(f"[telegram] new session {sid} for chat {chat_id}")
+    return sid
+
+
+async def telegram_poll_loop() -> None:
+    """Long-poll Telegram and forward messages to Aria chat engine."""
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+    if not token:
+        logger.info("[telegram] TELEGRAM_BOT_TOKEN not set — polling disabled")
+        return
+    if _httpx is None:
+        logger.warning("[telegram] httpx not installed — polling disabled")
+        return
+
+    allowed_id = str(os.environ.get("TELEGRAM_ALLOWED_USER_ID", "") or
+                     os.environ.get("TELEGRAM_CHAT_ID", ""))
+    engine_base = os.environ.get("ENGINE_API_BASE_URL", "http://aria-api:8000")
+    tg_base = f"{_TG_API}{token}"
+
+    session_map: dict = _tg_load_sessions()
+    offset: int | None = None
+
+    logger.info("[telegram] long-poll started")
+
+    async with _httpx.AsyncClient(timeout=40) as client:
+        while True:
+            try:
+                params: dict = {"timeout": 30, "allowed_updates": ["message"]}
+                if offset is not None:
+                    params["offset"] = offset
+
+                resp = await client.get(f"{tg_base}/getUpdates", params=params)
+                resp.raise_for_status()
+                updates = resp.json().get("result", [])
+
+                for update in updates:
+                    offset = update["update_id"] + 1
+                    message = update.get("message") or update.get("edited_message")
+                    if not message:
+                        continue
+
+                    chat_id = str(message["chat"]["id"])
+                    text = (message.get("text") or "").strip()
+
+                    if not text:
+                        continue
+                    if allowed_id and chat_id != allowed_id:
+                        logger.warning(f"[telegram] blocked message from {chat_id}")
+                        continue
+
+                    logger.info(f"[telegram] message from {chat_id}: {text[:80]}")
+
+                    try:
+                        # Send typing indicator
+                        await client.post(
+                            f"{tg_base}/sendChatAction",
+                            json={"chat_id": chat_id, "action": "typing"},
+                            timeout=5,
+                        )
+
+                        sid = await _tg_get_or_create_session(
+                            chat_id, session_map, engine_base, client
+                        )
+
+                        chat_resp = await client.post(
+                            f"{engine_base}/api/engine/chat/sessions/{sid}/messages",
+                            json={"content": text, "enable_tools": True, "enable_thinking": False},
+                            timeout=120,
+                        )
+                        chat_resp.raise_for_status()
+                        reply = chat_resp.json().get("content", "")
+                    except Exception as exc:
+                        logger.error(f"[telegram] chat error: {exc}")
+                        reply = "Sorry, I hit an error — try again in a moment."
+
+                    # Split reply into ≤4096-char chunks (Telegram limit)
+                    for chunk in [
+                        reply[i: i + 4096] for i in range(0, max(len(reply), 1), 4096)
+                    ]:
+                        try:
+                            await client.post(
+                                f"{tg_base}/sendMessage",
+                                json={"chat_id": chat_id, "text": chunk},
+                                timeout=15,
+                            )
+                        except Exception as exc:
+                            logger.error(f"[telegram] sendMessage error: {exc}")
+
+            except asyncio.CancelledError:
+                logger.info("[telegram] poll loop cancelled")
+                return
+            except Exception as exc:
+                logger.error(f"[telegram] poll error: {exc} — retrying in 5s")
+                await asyncio.sleep(5)
+
+
+# ---------------------------------------------------------------------------
+
+
 async def run_forever():
-    """Run startup then keep alive with heartbeat."""
+    """Run startup then keep alive with heartbeat and Telegram polling."""
     mind, registry, coordinator = await run_startup()
     
     print()
@@ -408,22 +556,27 @@ async def run_forever():
     print("   Press Ctrl+C to shutdown")
     print()
     
-    db = registry.get("database")
     heartbeat_count = 0
+
+    async def _heartbeat():
+        nonlocal heartbeat_count
+        try:
+            while True:
+                heartbeat_count += 1
+                if heartbeat_count % 60 == 0:  # Every hour (60 * 60s)
+                    logger.info(f"💓 Heartbeat #{heartbeat_count} - Aria is alive")
+                await asyncio.sleep(60)  # Beat every 60 seconds
+        except asyncio.CancelledError:
+            pass
     
     try:
-        while True:
-            heartbeat_count += 1
-            
-            # Heartbeat DB logging now handled by heartbeat.py via api_client
-            
-            if heartbeat_count % 60 == 0:  # Every hour (60 * 60s)
-                logger.info(f"💓 Heartbeat #{heartbeat_count} - Aria is alive")
-            
-            await asyncio.sleep(60)  # Beat every 60 seconds
+        tg_task = asyncio.create_task(telegram_poll_loop())
+        await _heartbeat()
             
     except asyncio.CancelledError:
         print("\n⚠️ Shutdown signal received...")
+        tg_task.cancel()
+        await asyncio.gather(tg_task, return_exceptions=True)
     finally:
         print("💔 Aria shutting down...")
         # Checkpoint working memory before shutdown
