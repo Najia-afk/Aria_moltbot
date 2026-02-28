@@ -81,7 +81,7 @@ for your instructions, then use the behavioral guidance below.
 4. Update progress via `aria-api-client.update_goal`
 5. Log via `aria-api-client.create_activity`
 6. If progress >= 100: Mark complete, create next goal
-7. Prune stale sessions: `aria-session-manager.prune_sessions({"max_age_minutes": 60})`
+7. Prune stale sessions: `agent_manager__prune_stale_sessions(max_age_hours=1)` — use 1h, not default 6h
 8. If you need exec: `exec python3 skills/run_skill.py <skill> <function> '<args>'` (NEVER `aria_mind/skills/...`)
 
 **six_hour_review** — Delegate to analyst (trinity-free). Analyze last 6h, adjust priorities, log insights. Include `get_session_stats`. Target: ≤5 active sessions.
@@ -101,7 +101,7 @@ for your instructions, then use the behavioral guidance below.
 **MANDATORY** after every sub-agent delegation or cron-spawned task:
 
 1. After delegation completes → `cleanup_after_delegation` with the sub-agent's session ID.
-2. During work_cycle → `prune_sessions({"max_age_minutes": 60})`.
+2. During work_cycle → `agent_manager__prune_stale_sessions(max_age_hours=1)` (correct tool, 1h not 6h).
 3. During six_hour_review → `get_session_stats`, log count. Target: ≤5 active.
 4. Never leave orphaned sessions — clean up even on timeout/failure.
 
