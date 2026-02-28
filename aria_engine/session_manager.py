@@ -572,14 +572,41 @@ class NativeSessionManager:
         """
         Archive + delete sessions older than N days.
 
+        Also auto-closes any scoped/cron sessions that are still marked
+        'active' but have not been updated in the last 2 hours (zombie sessions
+        that never got end_session() called on them).
+
         Args:
             days: Sessions inactive for this many days are pruned.
             dry_run: If True, only count without deleting.
 
         Returns:
-            Dict with 'pruned_count', 'archived_count', and 'message_count'.
+            Dict with 'pruned_count', 'archived_count', 'message_count', and
+            'zombies_closed'.
         """
         await self._ensure_archive_tables()
+
+        # ── Step 0: auto-close zombie scoped/cron sessions ──────────────────
+        zombie_cutoff = func.now() - func.make_interval(0, 0, 0, 0, 2)  # 2h
+        zombie_stmt = (
+            update(EngineChatSession)
+            .where(
+                EngineChatSession.status == "active",
+                EngineChatSession.session_type.in_(["scoped", "cron"]),
+                EngineChatSession.updated_at < zombie_cutoff,
+            )
+            .values(status="ended", ended_at=func.now(), updated_at=func.now())
+            .returning(EngineChatSession.id)
+        )
+
+        zombies_closed = 0
+        if not dry_run:
+            async with self._async_session() as session:
+                async with session.begin():
+                    result = await session.execute(zombie_stmt)
+                    zombies_closed = len(result.all())
+            if zombies_closed:
+                logger.info("prune_old_sessions: closed %d zombie sessions", zombies_closed)
 
         cutoff = func.now() - func.make_interval(0, 0, 0, days)
 
@@ -607,6 +634,7 @@ class NativeSessionManager:
                         "pruned_count": len(stale),
                         "archived_count": len(stale),
                         "message_count": sum(r.msg_count for r in stale),
+                        "zombies_closed": zombies_closed,
                         "dry_run": dry_run,
                     }
 
@@ -708,6 +736,7 @@ class NativeSessionManager:
             "pruned_count": len(stale_ids),
             "archived_count": len(stale_ids),
             "message_count": msg_count,
+            "zombies_closed": zombies_closed,
             "dry_run": False,
         }
 
