@@ -174,8 +174,8 @@ class TelegramPlatform:
     # ── SkillResult compatibility ──────────────────────────────────────────────
 
     async def post(self, content: str, tags: list[str] | None = None) -> SkillResult:
-        """Social interface — send to admin chat (TELEGRAM_ADMIN_CHAT_ID)."""
-        raw_id = os.environ.get("TELEGRAM_ADMIN_CHAT_ID", "0")
+        """Social interface — send to admin chat (TELEGRAM_ADMIN_CHAT_ID or TELEGRAM_CHAT_ID fallback)."""
+        raw_id = os.environ.get("TELEGRAM_ADMIN_CHAT_ID") or os.environ.get("TELEGRAM_CHAT_ID", "0")
         try:
             chat_id = int(raw_id)
         except ValueError:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 # ── activities.py ──────────────────────────────────────────────────────────
@@ -12,6 +12,14 @@ class CreateActivity(BaseModel):
     details: dict = Field(default_factory=dict)
     success: bool = True
     error_message: str | None = None
+
+    @field_validator("details", mode="before")
+    @classmethod
+    def coerce_details(cls, v: object) -> dict:
+        """Accept a plain string and wrap it so agents don't get a 422."""
+        if isinstance(v, str):
+            return {"message": v}
+        return v if isinstance(v, dict) else {"value": str(v)}
 
 
 # ── goals.py ───────────────────────────────────────────────────────────────
