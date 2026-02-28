@@ -387,6 +387,8 @@ class NativeSessionManager:
             update(EngineChatSession)
             .where(EngineChatSession.id == session_id)
             .values(
+                status="ended",
+                ended_at=func.now(),
                 updated_at=func.now(),
                 metadata_json=func.coalesce(
                     EngineChatSession.metadata_json,
