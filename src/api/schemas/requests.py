@@ -8,10 +8,18 @@ from pydantic import BaseModel, Field, field_validator
 class CreateActivity(BaseModel):
     """Request body for POST /activities."""
     action: str = ""
-    skill: str = ""
+    skill: str | None = None
     details: dict = Field(default_factory=dict)
     success: bool = True
     error_message: str | None = None
+
+    @field_validator("skill", mode="before")
+    @classmethod
+    def coerce_skill(cls, v: object) -> str | None:
+        """Accept null/None without raising."""
+        if v is None:
+            return None
+        return str(v)
 
     @field_validator("details", mode="before")
     @classmethod

@@ -100,12 +100,21 @@ async def write_artifact(body: ArtifactWriteRequest):
 
 @router.get("/artifacts/{category}/{filename:path}")
 async def read_artifact(category: str, filename: str):
-    """Read a file artifact from aria_memories/<category>/<filename>."""
+    """Read a file artifact from aria_memories/<category>/<filename>.
+
+    Falls back to aria_memories/<filename> (root level) so that root files
+    like HEARTBEAT.md are reachable via any category prefix.
+    """
     _validate_path_segment(category)
 
     filepath = ARIA_MEMORIES_PATH / category / filename
     if not filepath.exists():
-        raise HTTPException(status_code=404, detail=f"Artifact not found: {category}/{filename}")
+        # Root-level fallback — e.g. /aria_memories/HEARTBEAT.md
+        root_filepath = ARIA_MEMORIES_PATH / filename
+        if root_filepath.exists() and root_filepath.is_file():
+            filepath = root_filepath
+        else:
+            raise HTTPException(status_code=404, detail=f"Artifact not found: {category}/{filename}")
     if not filepath.is_file():
         raise HTTPException(status_code=400, detail="Not a file")
 
