@@ -68,6 +68,9 @@ async def list_goals(
 ):
     base = select(Goal).order_by(Goal.priority.desc(), Goal.created_at.desc())
     if status:
+        # 'active' is a legacy alias — DB stores 'in_progress'
+        if status == "active":
+            status = "in_progress"
         base = base.where(Goal.status == status)
 
     count_stmt = select(func.count()).select_from(base.subquery())
@@ -133,7 +136,8 @@ async def goal_board(
     # ── Auto-reconcile status → board_column ─────────────────────────
     # Goals created by cron/agents set status but never update board_column.
     status_to_column = {
-        "active": "doing",
+        # NOTE: 'in_progress' is intentionally NOT here — users/agents place
+        # in_progress goals across columns manually (backlog/todo/doing).
         "completed": "done",
         "paused": "on_hold",
         "cancelled": "done",

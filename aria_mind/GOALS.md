@@ -18,7 +18,7 @@ When the `work_cycle` job fires, you must:
 
 ### 1. Check Your Active Goals
 ```tool
-aria-api-client.get_goals({"status": "active", "limit": 5})
+aria-api-client.get_goals({"status": "in_progress", "limit": 5})
 ```
 
 ### 2. Select What to Work On
@@ -167,7 +167,7 @@ aria-api-client.get_activities({"limit": 100})
 
 ### 2. Check Goal Progress
 ```tool
-aria-api-client.get_goals({"status": "active", "limit": 20})
+aria-api-client.get_goals({"status": "in_progress", "limit": 20})
 ```
 
 ### 3. Identify Patterns
@@ -194,7 +194,7 @@ aria-api-client.create_activity({"action": "six_hour_review", "details": {"goals
 
 ```tool
 # List active goals
-aria-api-client.get_goals({"status": "active", "limit": 10})
+aria-api-client.get_goals({"status": "in_progress", "limit": 10})
 
 # Update goal progress
 aria-api-client.update_goal({"goal_id": "1", "progress": 50})
