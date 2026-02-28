@@ -30,6 +30,17 @@ logger = logging.getLogger("aria.engine.agent_pool")
 
 MAX_CONCURRENT_AGENTS = 5
 
+# Hard ceiling on active sub-agents by type prefix (last-resort cascade guard).
+# Primary defence is CB-aware spawn logic in the work cycle.
+# These limits prevent runaway spawning when that logic fails or is bypassed.
+# Incident reference: The Midnight Cascade — 71 sub-devsecops, 27.2M tokens (2026-02-28)
+MAX_SUB_AGENTS_PER_TYPE: dict[str, int] = {
+    "sub-devsecops": 10,
+    "sub-social": 10,
+    "sub-orchestrator": 5,
+    "sub-aria": 5,
+}
+
 
 @dataclass
 class EngineAgent:
@@ -306,6 +317,30 @@ class AgentPool:
                 f"Agent pool full ({MAX_CONCURRENT_AGENTS} max). "
                 "Terminate an agent first."
             )
+
+        # Per-type ceiling: query DB for current sub-agent count before spawning.
+        # Uses rsplit to extract prefix: "sub-devsecops-7" → "sub-devsecops"
+        # Prevents cascade spawning when a circuit breaker is permanently open.
+        type_prefix = agent_id.rsplit("-", 1)[0] if "-" in agent_id else agent_id
+        if type_prefix in MAX_SUB_AGENTS_PER_TYPE:
+            async with self._db_engine.begin() as _check:
+                count_q = (
+                    select(func.count())
+                    .select_from(EngineAgentState)
+                    .where(
+                        EngineAgentState.agent_id.like(f"{type_prefix}-%"),
+                        EngineAgentState.status != "disabled",
+                    )
+                )
+                _count_result = await _check.execute(count_q)
+                current_count: int = _count_result.scalar_one()
+            ceiling = MAX_SUB_AGENTS_PER_TYPE[type_prefix]
+            if current_count >= ceiling:
+                raise EngineError(
+                    f"Sub-agent ceiling reached: {type_prefix!r} has "
+                    f"{current_count}/{ceiling} active agents. "
+                    "Circuit breaker must reset or stale agents must be terminated first."
+                )
 
         # Insert to DB (upsert)
         async with self._db_engine.begin() as conn:

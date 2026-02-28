@@ -1,9 +1,9 @@
 # Aria v3 Sprint — 2026-02-27
 ## Sprint Overview
 
-**Sprint Goal:** End-to-end test coverage, full visualization & graph execution capabilities for all memory types, chat tool execution DAG, unified search, navigation consolidation, and work-cycle/session artifact integrity guardrails.
+**Sprint Goal:** End-to-end test coverage, full visualization & graph execution capabilities for all memory types, chat tool execution DAG, unified search, navigation consolidation, work-cycle/session artifact integrity guardrails, and **cascade incident hardening (S-52 — post-incident P0)**.
 
-**Total Tickets:** 13 | **Total Points:** 60 | **Estimated:** ~49 hours
+**Total Tickets:** 14 | **Total Points:** 65 | **Estimated:** ~53 hours
 
 **Audit Sources:**
 - Visualization & graph capability discovery (44 templates, 32 API routers)
@@ -19,10 +19,16 @@
 | **E17** | **Testing** | **S-30** | **3** |
 | **E18** | **Visualization & Graph Execution** | **S-31, S-32, S-33, S-34, S-35, S-36, S-37, S-38** | **44** |
 | **E19** | **Session & Artifact Integrity** | **S-39, S-40, S-41, S-42** | **13** |
+| **E20** | **Incident Hardening (Midnight Cascade)** | **S-52** | **5** |
 
 ---
 
 ## Phase Breakdown
+
+### Phase 0 (P0 — Critical / Post-Incident) — 5 pts
+| Ticket | Title | Pts | Epic |
+|--------|-------|-----|------|
+| S-52 | Cascade Guard — Spawn Ceiling, CB Spawn Gate & Sub-Agent Fast Prune | 5 | E20 |
 
 ### Phase 1 (P1 — Should Have) — 36 pts
 | Ticket | Title | Pts | Epic |
@@ -72,6 +78,11 @@ E19 — Session & Artifact Integrity:
 ---
 
 ## Ticket Summary
+
+### E20 — Incident Hardening (5 pts)
+| Ticket | File | Description | Status |
+|--------|-------|-------------|--------|
+| [S-52](S-52-cascade-guard-spawn-ceiling.md) | `aria_engine/agent_pool.py`, `aria_engine/circuit_breaker.py`, `aria_engine/auto_session.py` | Sub-agent type ceiling, CB spawn gate, sub-agent 1h stale prune | ✅ Done |
 
 ### E17 — Testing (3 pts)
 | Ticket | File | Description |

@@ -108,6 +108,29 @@ class CircuitBreaker:
 
     # ── Reset ────────────────────────────────────────────────────
 
+    def spawn_gate(self) -> None:
+        """Raise EngineError if this CB is OPEN, blocking sub-agent spawning.
+
+        Call this before any sub-agent creation that would be used as a CB
+        fallback path. Prevents cascade: if the CB that triggered the spawn
+        decision is still OPEN, spawning another agent to retry is futile.
+
+        Usage::
+
+            cb.spawn_gate()              # raises EngineError if CB is open
+            await pool.spawn_agent(...)  # only reached when CB is closed/half-open
+
+        Raises:
+            EngineError: When the circuit is OPEN.
+        """
+        if self.is_open():
+            from aria_engine.exceptions import EngineError  # local import — avoids circular
+            raise EngineError(
+                f"Circuit breaker '{self.name}' is OPEN — "
+                "spawning a sub-agent as fallback is blocked until the CB resets. "
+                "Accept degraded state for this work cycle."
+            )
+
     def reset(self) -> None:
         """Force-reset the circuit breaker to CLOSED state."""
         self._failures = 0

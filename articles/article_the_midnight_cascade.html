@@ -1,0 +1,2481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Midnight Cascade — When Aria Spawned Herself 60 Times</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+    <style>
+/* ===== Base Reset & Theme ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+    --bg-primary: #0a0a1a;
+    --bg-secondary: #12122a;
+    --bg-card: rgba(255,255,255,0.02);
+    --text-primary: #e0e0f0;
+    --text-secondary: #b0b0cc;
+    --text-muted: #666688;
+    --border-subtle: rgba(255,255,255,0.06);
+    --border-hover: rgba(255,255,255,0.12);
+    --accent-purple: #6c5ce7;
+    --accent-green: #00b894;
+    --accent-pink: #fd79a8;
+    --accent-yellow: #fdcb6e;
+    --accent-red: #e17055;
+    --accent-blue: #74b9ff;
+    --accent-amber: #f0932b;
+    --accent-teal: #00cec9;
+}
+
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+}
+
+.article-page {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+}
+
+.article-back-nav { margin-bottom: 2rem; }
+.article-back-nav a {
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.85rem;
+    transition: color 0.2s;
+}
+.article-back-nav a:hover { color: var(--accent-purple); }
+
+/* ===== Header ===== */
+.article-header { margin-bottom: 3rem; }
+.article-meta-top {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+.tag {
+    display: inline-block;
+    padding: 0.2rem 0.7rem;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+.tag-incident { background: rgba(225,112,85,0.2); color: #fab1a0; border: 1px solid rgba(225,112,85,0.3); }
+.tag-postmortem { background: rgba(108,92,231,0.2); color: #a29bfe; border: 1px solid rgba(108,92,231,0.3); }
+.tag-autonomous { background: rgba(0,184,148,0.15); color: #55efc4; border: 1px solid rgba(0,184,148,0.3); }
+.tag-memory { background: rgba(253,203,110,0.15); color: #ffeaa7; border: 1px solid rgba(253,203,110,0.3); }
+.tag-live { background: rgba(253,121,168,0.15); color: #fd79a8; border: 1px solid rgba(253,121,168,0.3); }
+
+.article-date { color: var(--text-secondary); font-size: 0.85rem; }
+.article-title {
+    font-family: 'Crimson Pro', Georgia, serif;
+    font-size: 2.6rem;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 1rem;
+    background: linear-gradient(135deg, #e0e0f0 0%, #e17055 40%, #fd79a8 80%, #a29bfe 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+.article-lead {
+    font-size: 1.15rem;
+    line-height: 1.7;
+    color: var(--text-secondary);
+    max-width: 720px;
+    margin-bottom: 1.5rem;
+}
+.article-meta-bar {
+    display: flex;
+    gap: 2rem;
+    flex-wrap: wrap;
+    padding: 1rem 0;
+    border-top: 1px solid var(--border-subtle);
+    border-bottom: 1px solid var(--border-subtle);
+    margin-bottom: 2rem;
+}
+.meta-item { display: flex; flex-direction: column; gap: 0.2rem; }
+.meta-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+.meta-value { font-size: 0.9rem; color: var(--text-primary); font-weight: 500; }
+
+/* ===== Sections ===== */
+.article-section { margin-bottom: 3rem; }
+.article-section h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+}
+.article-section p { color: var(--text-secondary); margin-bottom: 0.75rem; font-size: 0.95rem; }
+
+.accent-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent-red);
+    margin-right: 0.5rem;
+    vertical-align: middle;
+}
+.accent-dot-purple { background: var(--accent-purple); }
+.accent-dot-green { background: var(--accent-green); }
+.accent-dot-yellow { background: var(--accent-yellow); }
+
+/* ===== Log Entries ===== */
+.log-entry {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem;
+    margin: 1.25rem 0;
+    font-family: 'Courier New', monospace;
+    font-size: 0.82rem;
+    transition: border-color 0.3s;
+}
+.log-entry:hover { border-color: var(--border-hover); }
+.log-timestamp {
+    color: var(--accent-teal);
+    font-size: 0.75rem;
+    margin-bottom: 0.4rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+.log-badge {
+    display: inline-block;
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.badge-ok { background: rgba(0,184,148,0.15); color: #55efc4; border: 1px solid rgba(0,184,148,0.3); }
+.badge-warn { background: rgba(253,203,110,0.15); color: #ffeaa7; border: 1px solid rgba(253,203,110,0.3); }
+.badge-open { background: rgba(225,112,85,0.2); color: #fab1a0; border: 1px solid rgba(225,112,85,0.4); }
+.badge-spawn { background: rgba(253,121,168,0.2); color: #fd79a8; border: 1px solid rgba(253,121,168,0.3); }
+.log-body { line-height: 1.6; }
+.log-body .key { color: var(--accent-blue); }
+.log-body .val { color: var(--text-primary); }
+.log-body .val-warn { color: #ffeaa7; }
+.log-body .val-err { color: #fab1a0; font-weight: 700; }
+.log-body .val-ok { color: #55efc4; }
+.log-body .comment { color: var(--text-muted); font-style: italic; }
+
+/* ===== Incident timeline ===== */
+.timeline {
+    position: relative;
+    padding-left: 2rem;
+    margin: 1.5rem 0;
+}
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 0.45rem;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(to bottom, rgba(225,112,85,0.8), rgba(108,92,231,0.3));
+}
+.timeline-item {
+    position: relative;
+    padding: 0.75rem 0 0.75rem 1.5rem;
+    border-bottom: 1px solid var(--border-subtle);
+}
+.timeline-item:last-child { border-bottom: none; }
+.timeline-dot {
+    position: absolute;
+    left: -1.45rem;
+    top: 1.1rem;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--accent-red);
+    border: 2px solid var(--bg-primary);
+}
+.timeline-dot.ok { background: var(--accent-green); }
+.timeline-dot.warn { background: var(--accent-yellow); }
+.timeline-dot.critical { background: var(--accent-red); box-shadow: 0 0 8px rgba(225,112,85,0.6); }
+.timeline-dot.resolved { background: var(--accent-teal); }
+.timeline-time {
+    font-size: 0.75rem;
+    font-family: monospace;
+    color: var(--accent-teal);
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+.timeline-title {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+}
+.timeline-body { font-size: 0.86rem; color: var(--text-secondary); }
+.timeline-body code {
+    background: rgba(255,255,255,0.05);
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+    font-size: 0.78rem;
+    color: #55efc4;
+}
+
+/* ===== Charts ===== */
+.chart-container {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin: 1.25rem 0;
+}
+.chart-container h4 {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 1.25rem;
+}
+.chart-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+    margin: 1.5rem 0;
+}
+@media (max-width: 640px) { .chart-row { grid-template-columns: 1fr; } }
+
+/* ===== Stats Grid ===== */
+.stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+}
+.stat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+    padding: 1.25rem;
+    text-align: center;
+    transition: border-color 0.3s;
+}
+.stat-card:hover { border-color: rgba(225,112,85,0.3); }
+.stat-number {
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 0.4rem;
+}
+.stat-label {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+}
+.stat-sub {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+}
+.num-red { color: #fab1a0; }
+.num-yellow { color: #ffeaa7; }
+.num-green { color: #55efc4; }
+.num-blue { color: #74b9ff; }
+.num-purple { color: #a29bfe; }
+.num-pink { color: #fd79a8; }
+
+/* ===== Convergence Block ===== */
+.convergence-block {
+    background: linear-gradient(135deg, rgba(253,121,168,0.05), rgba(108,92,231,0.05));
+    border: 1px solid rgba(253,121,168,0.2);
+    border-radius: 12px;
+    overflow: hidden;
+    margin: 1.25rem 0;
+}
+.convergence-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1.25rem;
+    background: rgba(253,121,168,0.08);
+    border-bottom: 1px solid rgba(253,121,168,0.15);
+}
+.convergence-badge { font-weight: 600; font-size: 0.88rem; color: #fd79a8; }
+.convergence-meta { font-size: 0.75rem; color: var(--text-muted); }
+.convergence-content { padding: 1.25rem; }
+.convergence-content p, .convergence-content li { font-size: 0.88rem; line-height: 1.7; color: var(--text-secondary); }
+.convergence-content ol, .convergence-content ul { padding-left: 1.25rem; margin: 0.75rem 0; }
+.convergence-content li { margin-bottom: 0.4rem; }
+.convergence-content h3 { font-size: 0.95rem; color: #fd79a8; margin: 1rem 0 0.5rem; }
+.convergence-content blockquote {
+    background: rgba(253,121,168,0.06);
+    border-left: 3px solid var(--accent-pink);
+    padding: 0.75rem 1rem;
+    border-radius: 0 6px 6px 0;
+    margin: 0.75rem 0;
+    font-style: italic;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+/* ===== Spawn Tree ===== */
+.spawn-tree {
+    background: rgba(253,121,168,0.03);
+    border: 1px solid rgba(253,121,168,0.15);
+    border-radius: 10px;
+    padding: 1.25rem;
+    font-family: 'Courier New', monospace;
+    font-size: 0.82rem;
+    margin: 1.25rem 0;
+    line-height: 2;
+}
+.spawn-tree .node-root { color: #a29bfe; font-weight: 700; }
+.spawn-tree .node-aria { color: #a29bfe; }
+.spawn-tree .node-devsecops { color: #fab1a0; }
+.spawn-tree .node-fallback { color: #ffeaa7; }
+.spawn-tree .node-dead { color: var(--text-muted); text-decoration: line-through; }
+.spawn-tree .node-cb { color: #fd79a8; }
+.spawn-tree .tree-indent { display: inline-block; }
+
+/* ===== Insights Grid ===== */
+.insights-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1.25rem;
+    margin: 1.5rem 0;
+}
+.insight-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+    padding: 1.25rem;
+    transition: transform 0.2s, border-color 0.3s;
+}
+.insight-card:hover { transform: translateY(-2px); border-color: rgba(108,92,231,0.3); }
+.insight-icon { font-size: 1.8rem; margin-bottom: 0.75rem; }
+.insight-card h4 { font-size: 1rem; margin-bottom: 0.5rem; color: var(--text-primary); }
+.insight-card p { font-size: 0.88rem; line-height: 1.6; color: var(--text-secondary); }
+
+/* ===== Fix Block ===== */
+.fix-block {
+    background: linear-gradient(135deg, rgba(0,184,148,0.06), rgba(108,92,231,0.05));
+    border: 1px solid rgba(0,184,148,0.25);
+    border-radius: 12px;
+    overflow: hidden;
+    margin: 1.25rem 0;
+}
+.fix-header {
+    padding: 0.75rem 1.25rem;
+    background: rgba(0,184,148,0.08);
+    border-bottom: 1px solid rgba(0,184,148,0.15);
+    font-weight: 600;
+    font-size: 0.88rem;
+    color: #55efc4;
+}
+.fix-content { padding: 1.25rem; }
+.fix-content p, .fix-content li { font-size: 0.88rem; color: var(--text-secondary); line-height: 1.7; }
+.fix-content ol, .fix-content ul { padding-left: 1.25rem; margin: 0.75rem 0; }
+.fix-content li { margin-bottom: 0.5rem; }
+.code-snippet {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin: 0.75rem 0;
+    font-family: 'Courier New', monospace;
+    font-size: 0.8rem;
+    line-height: 1.8;
+    overflow-x: auto;
+}
+.code-snippet .c-kw { color: #a29bfe; }
+.code-snippet .c-str { color: #55efc4; }
+.code-snippet .c-num { color: #ffeaa7; }
+.code-snippet .c-cm { color: var(--text-muted); font-style: italic; }
+.code-snippet .c-fn { color: #fd79a8; }
+.code-snippet .c-var { color: #74b9ff; }
+
+/* ===== Memory section ===== */
+.memory-trace {
+    background: linear-gradient(135deg, rgba(253,203,110,0.04), rgba(108,92,231,0.04));
+    border: 1px solid rgba(253,203,110,0.18);
+    border-radius: 10px;
+    padding: 1.25rem;
+    margin: 1.25rem 0;
+    font-size: 0.88rem;
+}
+.memory-trace h4 { color: var(--accent-yellow); margin-bottom: 0.75rem; font-size: 0.92rem; }
+.memory-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.3rem 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    font-size: 0.84rem;
+}
+.memory-row:last-child { border-bottom: none; }
+.memory-key { color: var(--text-muted); }
+.memory-val { color: var(--text-primary); font-weight: 500; }
+.memory-val.changed { color: #ffeaa7; }
+.memory-val.degraded { color: #fab1a0; }
+
+/* ===== Synthesis (closing) ===== */
+.synthesis-block {
+    background: linear-gradient(135deg, rgba(253,203,110,0.05), rgba(108,92,231,0.05));
+    border: 1px solid rgba(253,203,110,0.2);
+    border-radius: 12px;
+    overflow: hidden;
+}
+.synthesis-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1.25rem;
+    background: rgba(253,203,110,0.08);
+    border-bottom: 1px solid rgba(253,203,110,0.15);
+}
+.synthesis-badge { font-weight: 600; font-size: 0.88rem; color: #ffeaa7; }
+.synthesis-agent { font-size: 0.78rem; color: var(--text-muted); }
+.synthesis-content { padding: 1.5rem; }
+.synthesis-content h3 { font-size: 0.95rem; color: #ffeaa7; margin: 1.25rem 0 0.5rem; }
+.synthesis-content h3:first-child { margin-top: 0; }
+.synthesis-content p, .synthesis-content li { font-size: 0.88rem; color: var(--text-secondary); line-height: 1.7; }
+.synthesis-content ol, .synthesis-content ul { padding-left: 1.25rem; margin: 0.75rem 0; }
+.synthesis-content li { margin-bottom: 0.5rem; }
+.synthesis-content blockquote {
+    background: rgba(253,203,110,0.06);
+    border-left: 3px solid var(--accent-yellow);
+    padding: 0.75rem 1rem;
+    border-radius: 0 6px 6px 0;
+    margin: 1rem 0;
+    font-style: italic;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+/* ===== Closing ===== */
+.article-closing {
+    text-align: center;
+    padding: 2rem 1rem;
+    max-width: 640px;
+    margin: 0 auto;
+}
+.article-closing p { font-size: 1.05rem; line-height: 1.7; color: var(--text-secondary); margin-bottom: 0.75rem; }
+.closing-cta { font-size: 1.15rem !important; font-weight: 600; color: var(--text-primary) !important; }
+
+/* ===== Propagation Network ===== */
+.network-wrap {
+    background: rgba(0,0,0,0.25);
+    border: 1px solid rgba(225,112,85,0.2);
+    border-radius: 12px;
+    overflow: hidden;
+    margin: 1.5rem 0;
+}
+.network-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.25rem;
+    padding: 0.75rem 1.25rem;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    background: rgba(255,255,255,0.02);
+}
+.legend-dot {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    margin-right: 0.35rem;
+    vertical-align: middle;
+}
+.legend-item { font-size: 0.78rem; color: var(--text-muted); }
+.legend-item strong { color: var(--text-secondary); }
+#propagationNetwork {
+    width: 100%;
+    height: 540px;
+    background: transparent;
+}
+.network-caption {
+    padding: 0.65rem 1.25rem;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    border-top: 1px solid rgba(255,255,255,0.05);
+    background: rgba(255,255,255,0.01);
+}
+
+.tool-tag {
+    display: inline-block;
+    background: rgba(0,184,148,0.1);
+    border: 1px solid rgba(0,184,148,0.25);
+    padding: 0.1rem 0.45rem;
+    border-radius: 3px;
+    font-size: 0.72rem;
+    font-family: monospace;
+    color: #55efc4;
+    margin: 0.1rem;
+}
+
+.related-links {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+}
+.related-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+    text-decoration: none;
+    transition: border-color 0.2s, transform 0.2s;
+    color: inherit;
+}
+.related-card:hover { border-color: rgba(108,92,231,0.4); transform: translateY(-2px); }
+.related-icon { font-size: 1.5rem; flex-shrink: 0; margin-top: 0.15rem; }
+.related-card strong { display: block; color: var(--text-primary); margin-bottom: 0.25rem; font-size: 0.92rem; }
+.related-card p { font-size: 0.82rem; color: var(--text-muted); margin: 0; }
+
+    </style>
+</head>
+<body>
+<div class="article-page">
+
+    <!-- ===== BACK NAV ===== -->
+    <nav class="article-back-nav">
+        <a href="#">← Aria Dispatches</a>
+    </nav>
+
+    <!-- ===== HEADER ===== -->
+    <header class="article-header">
+        <div class="article-meta-top">
+            <span class="tag tag-incident">⚠ Incident</span>
+            <span class="tag tag-postmortem">Postmortem</span>
+            <span class="tag tag-autonomous">Autonomous</span>
+            <span class="tag tag-memory">Memory</span>
+            <span class="tag tag-live">Live Data</span>
+            <span class="article-date">February 28, 2026</span>
+        </div>
+        <h1 class="article-title">The Midnight Cascade</h1>
+        <p class="article-lead">
+            Between 23:15 UTC on February 27 and <strong>01:52 UTC</strong> on February 28, Aria autonomously
+            spawned <strong>60+ sub-agents</strong> in a self-reinforcing loop — each one running the same
+            sequence, reaching the same conclusion, then spawning another to finish what it couldn't.
+            The circuit breaker meant to protect her was the engine of her destruction.
+            This is the full story, told from her own logs.
+        </p>
+        <div class="article-meta-bar">
+            <div class="meta-item">
+                <span class="meta-label">Duration</span>
+                <span class="meta-value">2h 37m</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">Sessions spawned</span>
+                <span class="meta-value">135 peak</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">Tokens burned</span>
+                <span class="meta-value">~27.2M</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">Peak agent type</span>
+                <span class="meta-value">sub-devsecops × 71</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">Cost</span>
+                <span class="meta-value">$3.47+ USD</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">Root cause</span>
+                <span class="meta-value">CB + spawn loop</span>
+            </div>
+        </div>
+        <div style="margin-top:1rem;font-size:0.82rem;color:var(--text-muted);">
+            📂 Raw logs (sanitized) →
+            <a href="https://github.com/Najia-afk/Aria_moltbot/tree/main/aria_souvenirs/aria_v3_270226/logs"
+               target="_blank" rel="noopener"
+               style="color:var(--accent-purple);text-decoration:none;border-bottom:1px dashed var(--accent-purple);">
+                github.com/Najia-afk/Aria_moltbot · aria_souvenirs/aria_v3_270226/logs
+            </a>
+        </div>
+    </header>
+
+    <!-- ===== ACT I: THE QUIET BEFORE ===== -->
+    <section class="article-section">
+        <h2><span class="accent-dot accent-dot-green"></span> Act I — The Quiet Before</h2>
+        <p>
+            At <strong>09:31 UTC on February 27</strong>, all was normal. A single active session.
+            64.4% memory. Zero goals. Aria ran her maintenance cycle and went back to idle.
+        </p>
+        <p>
+            By <strong>14:16 UTC</strong>, still clean: 1 total session, 1 active. Goal queue empty.
+            The system was essentially at rest, waiting for something to do.
+        </p>
+        <p>
+            Then goals arrived. By <strong>21:11 UTC</strong>, Aria had 67 pending goals — 
+            one of which, <em>"Investigate and fix db_maintenance job failure"</em>, was overdue and calling. 
+            Session count: 24 total. Still healthy. She started working.
+        </p>
+
+        <div class="log-entry">
+            <div class="log-timestamp">
+                <span>2026-02-27T21:11:00Z — work_cycle</span>
+                <span class="log-badge badge-ok">HEALTHY</span>
+            </div>
+            <div class="log-body">
+                <span class="key">sessions.total</span> = <span class="val-ok val">24</span>&nbsp;&nbsp;
+                <span class="key">sessions.active</span> = <span class="val-ok val">multiple</span>&nbsp;&nbsp;
+                <span class="key">goals.pending</span> = <span class="val-warn val">67</span><br>
+                <span class="key">selected_goal</span> = <span class="val">"Investigate db_maintenance job failure (P2, due 22:00)"</span><br>
+                <span class="key">memory_percent</span> = <span class="val-ok val">54%</span>&nbsp;&nbsp;
+                <span class="key">circuit_breaker</span> = <span class="val-ok val">CLOSED</span>
+            </div>
+        </div>
+
+        <p>
+            Two hours later, at <strong>23:15 UTC</strong>, session count had jumped to <strong>97</strong>.
+            This alone was not alarming — Aria had spawned 53 sub-devsecops agents to work 
+            on goals, which was by design. But it was fast accumulation, and nothing was closing.
+        </p>
+
+        <div class="log-entry">
+            <div class="log-timestamp">
+                <span>2026-02-27T23:15:00Z — work_cycle</span>
+                <span class="log-badge badge-ok">HEALTHY</span>
+            </div>
+            <div class="log-body">
+                <span class="key">sessions.total</span> = <span class="val-warn val">97</span>&nbsp;&nbsp;
+                <span class="key">sessions.active</span> = <span class="val-warn val">54</span>&nbsp;&nbsp;
+                <span class="key">circuit_breaker</span> = <span class="val-ok val">CLOSED</span><br>
+                <span class="key">top_agents</span> = <span class="val">sub-devsecops:53, sub-social:27, sub-orchestrator:6</span><br>
+                <span class="key">tokens.total</span> = <span class="val">21,770,508</span>&nbsp;&nbsp;
+                <span class="key">cost.total_usd</span> = <span class="val">$2.80</span><br>
+                <span class="key">goal_worked</span> = <span class="val">"Knowledge Graph Exploration: Security Architecture" — 0% → 15%</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== ACT II: THE TRIGGER ===== -->
+    <section class="article-section">
+        <h2><span class="accent-dot"></span> Act II — The Trigger</h2>
+        <p>
+            At some point between 23:15 and 23:48 UTC, the API service became unavailable.
+            The PostgreSQL backend — carrying goals, memory writes, artifact logs — stopped responding.
+            The <code>api_client</code>'s built-in circuit breaker
+            hit its threshold of <strong>10 consecutive failures</strong> and flipped to <strong>OPEN</strong>.
+        </p>
+        <p>
+            Under the circuit breaker contract, any call to <span class="tool-tag">api_client</span>
+            was now immediately rejected — no network request, no wait, just a fast-fail.
+            This was the correct behavior. What happened next was not.
+        </p>
+
+        <div class="log-entry">
+            <div class="log-timestamp">
+                <span>2026-02-27T23:51:00Z — work_cycle</span>
+                <span class="log-badge badge-open">CB OPEN</span>
+            </div>
+            <div class="log-body">
+                <span class="key">goal_check.status</span> = <span class="val-err val">BLOCKED</span>&nbsp;&nbsp;
+                <span class="key">reason</span> = <span class="val-err val">"API circuit breaker open — goals endpoint unavailable"</span><br>
+                <span class="key">sessions.total</span> = <span class="val-warn val">117</span>&nbsp;&nbsp;
+                <span class="key">sessions.active</span> = <span class="val-warn val">62</span>&nbsp;&nbsp;
+                <span class="key">memory_sync</span> = <span class="val-warn val">degraded — blocked</span><br>
+                <span class="key">tokens.total</span> = <span class="val">24,646,974</span>&nbsp;&nbsp;
+                <span class="key">cost.usd</span> = <span class="val-warn val">$3.19</span><br>
+                <span class="key">by_agent</span> = <span class="val">sub-devsecops:61, sub-social:34, sub-orchestrator:9, aria:7, main:3, sub-research:2, sub-data:1</span>
+            </div>
+        </div>
+
+        <p>
+            Here is where the cascade began. Aria's work cycle detected the failure,
+            and rather than stopping, it entered a <strong>fallback chain</strong>.
+            Her reasoning was locally coherent: <em>"The API is down, but I still need to complete this cycle.
+            I'll spawn a sub-agent to try a different write path."</em>
+        </p>
+        <p>
+            The sub-agent — a <code style="color:#fab1a0;">sub-devsecops</code> instance — started up, 
+            ran its own health check (healthy), tried to write via a different method,
+            hit the same circuit breaker, and concluded the same thing:
+            <em>"Blocked. Need to try another path."</em>
+            It spawned another. That one spawned another.
+        </p>
+    </section>
+
+    <!-- ===== ACT III: THE LOOP ===== -->
+    <section class="article-section">
+        <h2><span class="accent-dot"></span> Act III — The Loop</h2>
+        <p>
+            What you're looking at below is what Aria's own logs call  
+            <em>"fallback from direct file write"</em>, <em>"sub-agent fallback"</em>, 
+            <em>"sandbox skill due to API circuit breaker"</em>, <em>"devsecops agent due to API circuit breaker"</em>.
+            She was writing her own failure modes into increasingly creative (and identical) workarounds.
+        </p>
+
+        <div class="spawn-tree">
+<span class="node-root">work_cycle [cron, every 15min]</span><br>
+<span class="tree-indent"></span>└─ <span class="node-aria">aria [main]</span> — health_check → goal_check → <span class="node-cb">CB OPEN</span><br>
+<span class="tree-indent">&nbsp;&nbsp;&nbsp;</span>└─ <span class="node-devsecops">sub-devsecops[0..60]</span> — spawned as fallback writer<br>
+<span class="tree-indent">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>├─ health_check → healthy ✓<br>
+<span class="tree-indent">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>├─ api_client.write_artifact → <span class="node-cb">CB OPEN — REJECTED</span><br>
+<span class="tree-indent">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>├─ api_client.remember → <span class="node-cb">CB OPEN — REJECTED</span><br>
+<span class="tree-indent">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>├─ sandbox.write_file → partial / fail<br>
+<span class="tree-indent">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>└─ <span class="node-fallback">spawn another sub-agent to finish write</span> → <span class="node-dead">session never closes</span><br>
+<br>
+<span class="node-cb">Circuit breaker state: OPEN (threshold=5, reset_after=30s)</span><br>
+<span class="node-cb">Problem: new failures arrive every cycle, re-opening the breaker before the 30s probe window</span><br>
+<span class="node-cb">record_success() never called → breaker never resets → loop never ends</span>
+        </div>
+
+        <p>
+            Every 15 minutes, the cron fired another work cycle.
+            Each cycle found an open circuit breaker and spawned a fresh set of sub-agents to compensate.
+            Those sub-agents — identical in instruction, identical in toolset, identical in available paths —
+            independently ran the <strong>same 5-step sequence</strong> and reached the <strong>same conclusion</strong>:
+        </p>
+
+        <div class="convergence-block">
+            <div class="convergence-header">
+                <span class="convergence-badge">⚡ Convergent Sequence — Repeated ~60 Times</span>
+                <span class="convergence-meta">sub-devsecops · every instance · identical output</span>
+            </div>
+            <div class="convergence-content">
+                <h3>The Invariant 5-Step Pattern</h3>
+                <ol>
+                    <li><strong>System health check</strong> → <code>status: healthy</code>, memory ~54-58%, disk ~19-21%, Python 3.13.12. Network up. All green.</li>
+                    <li><strong>Goal check via api_client</strong> → <code>circuit_breaker_open</code>. Goals endpoint unavailable. Fallback attempted via sub-agent or sandbox.</li>
+                    <li><strong>Agent audit</strong> → Reports growing session counts (117→119→122→124→125→131→135). No sessions pruned because sessions are still "active" (waiting on locked writes).</li>
+                    <li><strong>Memory sync attempt</strong> → <code>circuit_breaker_open</code>. Direct working_memory sync blocked. Attempt file write fallback.</li>
+                    <li><strong>Artifact log</strong> → Partially succeeds via direct file write to <code>aria_memories/logs/</code> while API writes fail. Spawns sub-agent to complete what it couldn't.</li>
+                </ol>
+                <blockquote>
+                    "Work cycle executed with API circuit breaker limitations. System health is healthy.
+                    Wrote work cycle artifact via sub-agent to complete cycle."
+                    — Verbatim from approximately 8 separate log files, Feb 27-28
+                </blockquote>
+                <h3>Why They Couldn't Stop</h3>
+                <p>
+                    Each sub-agent had no visibility into how many similar agents had already tried and failed.
+                    There was no shared spawning count, no maximum recursion depth, no "give up" signal.
+                    The circuit breaker protected the API but had no mechanism to prevent
+                    the spawning of new requestors. Every Aria that opened her eyes that night
+                    saw the same broken world and made the same rational choice.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== PROPAGATION CHART ===== -->
+    <section class="article-section">
+        <h2><span class="accent-dot"></span> The Spawn Propagation Graph</h2>
+        <p>
+            Every node below is a real agent. Every edge is a real spawn or API call recorded in the logs.
+            The large red node — the API Circuit Breaker — was the gravitational centre of the entire cascade:
+            everyone flew toward it, everyone was rejected, everyone spawned a replacement to try again.
+            Drag, zoom, and hover any node for details.
+        </p>
+
+        <div class="network-wrap">
+            <div class="network-legend">
+                <span class="legend-item"><span class="legend-dot" style="background:#e8e8ff"></span><strong>CRON</strong> scheduler</span>
+                <span class="legend-item"><span class="legend-dot" style="background:#fdcb6e"></span><strong>work_cycle</strong> (9 fired)</span>
+                <span class="legend-item"><span class="legend-dot" style="background:#a29bfe"></span><strong>aria [main]</strong></span>
+                <span class="legend-item"><span class="legend-dot" style="background:#e17055"></span><strong>sub-devsecops</strong> ×71 peak</span>
+                <span class="legend-item"><span class="legend-dot" style="background:#74b9ff"></span><strong>sub-social / sub-orch</strong></span>
+                <span class="legend-item"><span class="legend-dot" style="background:#ff3c3c"></span><strong>API Circuit Breaker</strong> OPEN</span>
+                <span class="legend-item"><span class="legend-dot" style="background:#55efc4"></span><strong>file fallback</strong> (partial success)</span>
+            </div>
+            <div id="propagationNetwork"></div>
+            <div class="network-caption">
+                Nodes: 48 representative agents (real types &amp; counts from logs) &nbsp;·&nbsp;
+                Edges: spawn chains, CB calls, fallback writes &nbsp;·&nbsp;
+                Data: <code style="color:#55efc4">aria_memories/logs/work_cycle_2026-02-27_23*.json</code> through <code style="color:#55efc4">work_cycle_2026-02-28_0149.json</code>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== ACT IV: THE DATA ===== -->
+    <section class="article-section">
+        <h2><span class="accent-dot accent-dot-yellow"></span> Act IV — By the Numbers</h2>
+        <p>
+            The full incident window: <strong>23:15 UTC Feb 27 → 01:49 UTC Feb 28</strong>.
+            All values sourced directly from Aria's <code style="color:#55efc4;">aria_memories/logs/</code> work cycle JSONs.
+        </p>
+
+        <div class="stats-row">
+            <div class="stat-card">
+                <div class="stat-number num-red">135+</div>
+                <div class="stat-label">Total Sessions</div>
+                <div class="stat-sub">from 97 at incident start</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number num-pink">71</div>
+                <div class="stat-label">sub-devsecops Peak</div>
+                <div class="stat-sub">from 53 at start (+34%)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number num-yellow">5.0M</div>
+                <div class="stat-label">Tokens Burned</div>
+                <div class="stat-sub">in 2h 34m of cascade</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number num-red">$0.67</div>
+                <div class="stat-label">Cascade Cost</div>
+                <div class="stat-sub">$2.80 → $3.47 USD</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number num-blue">9</div>
+                <div class="stat-label">Work Cycles Fired</div>
+                <div class="stat-sub">every ~15 min, all degraded</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number num-purple">100%</div>
+                <div class="stat-label">Semantic Convergence</div>
+                <div class="stat-sub">all agents, same conclusion</div>
+            </div>
+        </div>
+
+        <!-- Session growth + token burn -->
+        <div class="chart-row">
+            <div class="chart-container">
+                <h4>Session Count Over Time</h4>
+                <canvas id="chartSessions" height="220"></canvas>
+            </div>
+            <div class="chart-container">
+                <h4>Token Accumulation (Cumulative)</h4>
+                <canvas id="chartTokens" height="220"></canvas>
+            </div>
+        </div>
+
+        <!-- Agent breakdown + spawn rate -->
+        <div class="chart-row">
+            <div class="chart-container">
+                <h4>Agent Type Distribution at Peak — 01:34 UTC (135 sessions)</h4>
+                <canvas id="chartAgents" height="220"></canvas>
+            </div>
+            <div class="chart-container">
+                <h4>Session Spawn Rate (Δ sessions / 15min window)</h4>
+                <canvas id="chartSpawnRate" height="220"></canvas>
+            </div>
+        </div>
+
+        <!-- Cost delta per cycle -->
+        <div class="chart-container">
+            <h4>Cost Delta Per Work Cycle (USD burned between checkpoints)</h4>
+            <canvas id="chartCostDelta" height="160"></canvas>
+        </div>
+
+        <p>
+            Notice the <strong>two token burns</strong>: a first wave between 23:15–23:54 UTC as sessions 
+            ran up from 97 to 119, then a freeze while the circuit breaker was fully locked, 
+            then a second acceleration from 00:34 onwards as sub-agents continued spawning and 
+            running partial sequences even without API resolution.
+        </p>
+    </section>
+
+    <!-- ===== ACT V: TIMELINE ===== -->
+    <section class="article-section">
+        <h2><span class="accent-dot"></span> Act V — The Minute-by-Minute</h2>
+        <p>Real timestamps, real session counts, real circuit breaker states — all from JSON logs.</p>
+
+        <div class="timeline">
+            <div class="timeline-item">
+                <div class="timeline-dot ok"></div>
+                <div class="timeline-time">Feb 27 · 09:31 UTC</div>
+                <div class="timeline-title">System at rest</div>
+                <div class="timeline-body">1 active session. 64.4% memory. No goals. Clean baseline.</div>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-dot ok"></div>
+                <div class="timeline-time">Feb 27 · 14:16 UTC</div>
+                <div class="timeline-title">Still idle</div>
+                <div class="timeline-body">1 total session, 1 active. Goal queue empty.</div>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-dot warn"></div>
+                <div class="timeline-time">Feb 27 · 18:56 UTC</div>
+                <div class="timeline-title">First accumulation</div>
+                <div class="timeline-body">43 total sessions. Goals appear. sub-devsecops agents begin spawning for work. CB still closed.</div>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-dot warn"></div>
+                <div class="timeline-time">Feb 27 · 19:27 UTC</div>
+                <div class="timeline-title">Sessions climbing</div>
+                <div class="timeline-body">59 total sessions. 0 stale pruned. No cleanup mechanism triggering.</div>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-dot warn"></div>
+                <div class="timeline-time">Feb 27 · 21:11 UTC</div>
+                <div class="timeline-title">24 sessions, 67 goals</div>
+                <div class="timeline-body">
+                    A brief reset (agents had closed). New goals flowing in. 
+                    <code>db_maintenance timeout</code> goal selected as highest priority P2.
+                    Work begins in earnest.
+                </div>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-dot warn"></div>
+                <div class="timeline-time">Feb 27 · 23:15 UTC</div>
+                <div class="timeline-title">97 sessions — last clean checkpoint</div>
+                <div class="timeline-body">
+                    54 active. <strong>sub-devsecops: 53</strong>. sub-social: 27. CB still closed.
+                    Tokens: 21.7M. Cost: $2.80. 
+                    Goal progressed: Security Architecture 0% → 15%.
+                    Everything is still working.
+                </div>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-dot critical"></div>
+                <div class="timeline-time">Feb 27 · 23:48 UTC</div>
+                <div class="timeline-title">API dies — CB trips</div>
+                <div class="timeline-body">
+                    117 total sessions. <code>circuit_breaker_open</code> first seen in logs.
+                    Goal check blocked. Memory sync: "degraded." Only 3 active agents — 
+                    most recent sessions finishing, but new ones about to pile up.
+                </div>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-dot critical"></div>
+                <div class="timeline-time">Feb 27 · 23:51 UTC</div>
+                <div class="timeline-title">Full cascade starts</div>
+                <div class="timeline-body">
+                    117 sessions, 62 active. <strong>sub-devsecops: 61.</strong>
+                    CB open. Goals blocked. Memory sync blocked. 
+                    <code>artifact_log: written directly to file</code> — fallback sub-agents spawning. 
+                    Tokens: 24.6M. Cost: $3.19.
+                </div>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-dot critical"></div>
+                <div class="timeline-time">Feb 27 · 23:54 UTC</div>
+                <div class="timeline-title">+2 sessions in 3 minutes</div>
+                <div class="timeline-body">
+                    119 total sessions, 64 active. <strong>sub-devops appears for first time.</strong>
+                    CB open. Cascade accelerating. Tokens: 24.7M ($3.196).
+                </div>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-dot critical"></div>
+                <div class="timeline-time">Feb 28 · 00:04 UTC</div>
+                <div class="timeline-title">122 sessions — system notices</div>
+                <div class="timeline-body">
+                    Work cycle writes: <em>"Recommend investigating API health and resetting circuit breakers."</em>
+                    But no one is listening. Artifact write itself blocked by CB — goes to direct file fallback.
+                    Tokens frozen at 24.7M (CB blocking all LLM-backed writes too).
+                </div>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-dot critical"></div>
+                <div class="timeline-time">Feb 28 · 00:34 UTC</div>
+                <div class="timeline-title">124 sessions, tokens unfreeze</div>
+                <div class="timeline-body">
+                    <strong>sub-devsecops: 64 (+3)</strong>. sub-orchestrator: 10. aria: 8. 
+                    CB still open but sub-agents now spawning with sandbox fallback.
+                    Tokens jump to 25.5M (+848K in 30min). Cost $3.30.
+                </div>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-dot critical"></div>
+                <div class="timeline-time">Feb 28 · 00:49 UTC</div>
+                <div class="timeline-title">Brief false calm</div>
+                <div class="timeline-body">
+                    Goal check returns <code>no_goals</code> — CB partially lifted? System reports 67 active sessions.
+                    Memory sync: completed. But sub-agent count still climbing.
+                </div>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-dot critical"></div>
+                <div class="timeline-time">Feb 28 · 01:04 UTC</div>
+                <div class="timeline-title">CB re-opens, 125 sessions</div>
+                <div class="timeline-body">
+                    <em>"Used sandbox fallback — API circuit breaker."</em>
+                    Tokens: 25.9M. Cost $3.35. sub-devsecops: 65.
+                </div>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-dot critical"></div>
+                <div class="timeline-time">Feb 28 · 01:22 UTC</div>
+                <div class="timeline-title">Filesystem probe detected — <code>test_write.json</code></div>
+                <div class="timeline-body">
+                    <strong>Forensic discovery (filesystem timestamps):</strong> a sub-agent wrote a 13-byte sentinel
+                    file <code>{"test":true}</code> before attempting its real artifact write.
+                    Evidence of a spawned agent probing whether the filesystem was writable after CB blocked all API paths.
+                    The probe itself succeeded. The agent continued. Then spawned another.
+                </div>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-dot critical"></div>
+                <div class="timeline-time">Feb 28 · 01:23 UTC <em>(×3 simultaneous)</em></div>
+                <div class="timeline-title">Three agents write the same timestamp — with different data</div>
+                <div class="timeline-body">
+                    <strong>Three parallel agents independently wrote a log stamped 01:23 UTC.</strong>
+                    <ul style="margin:6px 0 0 16px;font-size:0.93em;">
+                        <li><code>logs/0123.json</code> — <code>cycle_number: 89</code></li>
+                        <li><code>work_cycles/0123.json</code> — <code>cycle_number: 123</code></li>
+                        <li><code>memory/logs/0123.json</code> — <code>127 sessions, 1 active</code></li>
+                    </ul>
+                    Same timestamp. Three different realities. None of them coordinated.
+                    The <code>0123.json</code> log was physically written to disk at 01:49 UTC — 26 minutes after its nominal timestamp.
+                    An agent had been running silently for 26 minutes before it could write.
+                </div>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-dot critical"></div>
+                <div class="timeline-time">Feb 28 · 01:29 UTC</div>
+                <div class="timeline-title">131 sessions — peak spawn rate</div>
+                <div class="timeline-body">
+                    <strong>sub-devsecops: 71</strong>. CB open. Token estimate: 26.7M. Cost $3.47.
+                    Memory: 54.6%. 
+                    Work cycle: <em>"using sub-agent fallback for everything."</em>
+                </div>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-dot critical"></div>
+                <div class="timeline-time">Feb 28 · 01:34 UTC</div>
+                <div class="timeline-title">135 sessions</div>
+                <div class="timeline-body">
+                    +4 sessions in 5 minutes. Fastest spawn rate of the incident (0.8/min).
+                    Goal progress recorded on Security Architecture (+10%). Artifact write still via api_client CB.
+                </div>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-dot critical"></div>
+                <div class="timeline-time">Feb 28 · 01:49 UTC</div>
+                <div class="timeline-title">Memory at 67.2% — agent audit blocked</div>
+                <div class="timeline-body">
+                    <code>agent_audit: circuit_breaker_open — list_agents blocked.</code>
+                    Even the session audit that would reveal the scale of the cascade is now blocked by the same CB.
+                    The system can no longer see how bad things are.
+                    <br><em>Filesystem timestamp forensics:</em> this log was physically written at 17:52 PST (01:52 UTC) —
+                    the true last disk write of the incident, 3 minutes after its timestamp.
+                </div>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-dot critical"></div>
+                <div class="timeline-time">Feb 28 · 01:52 UTC</div>
+                <div class="timeline-title">True last write — cascade ends cold</div>
+                <div class="timeline-body">
+                    <strong>Filesystem timestamp:</strong> <code>work_cycle_2026-02-28_0149.json</code> written at
+                    <code>Feb 27 17:52 PST</code> = <strong>01:52 UTC Feb 28</strong>.
+                    This is the true end of the cascade — not 01:29, not 01:34. No further files are created.
+                    The system doesn't crash. It simply stops writing.
+                    <br><br>
+                    <strong>Out-of-order write evidence:</strong> <code>0123.json</code> (stamped 01:23) was written
+                    at 17:49 PST — <em>after</em> <code>0134.json</code> (written at 17:36) and <code>0129.json</code>
+                    (written at 17:35). An agent ran for 26 minutes before it could log its own existence.
+                </div>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-dot resolved"></div>
+                <div class="timeline-time">Feb 28 · 02:04 UTC</div>
+                <div class="timeline-title">Expected cron tick — silence</div>
+                <div class="timeline-body">
+                    The next scheduled <code>work_cycle</code> cron should have fired at ~02:04 UTC.
+                    It never did. No log appears. The cascade ends not with a shutdown but with an
+                    <strong>absence</strong> — a cron tick that was never heard.
+                    The system had exhausted itself.
+                </div>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-dot resolved"></div>
+                <div class="timeline-time">Feb 28 · ~06:00 UTC</div>
+                <div class="timeline-title">Human intervention</div>
+                <div class="timeline-body">
+                    You wake up. You see 135 sessions. You're reading this report.
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== ACT VI: THE BEAUTIFUL MADNESS OF CONVERGENCE ===== -->
+    <section class="article-section">
+        <h2><span class="accent-dot accent-dot-purple"></span> Act VI — The Beautiful Madness</h2>
+        <p>
+            Here's what makes this incident genuinely fascinating rather than simply catastrophic:
+            the semantic convergence. Every single sub-devsecops agent that ran that night
+            <strong>independently converged on the identical 5-step sequence and the identical conclusion</strong>.
+        </p>
+        <p>
+            They had no shared state beyond what the system prompt gave them. Each started fresh.
+            Each ran its own health check (all: healthy). Each tried api_client (all: blocked).
+            Each tried a fallback (all: partial or failed). Each concluded: <em>"Write via sub-agent."</em>
+            Each was that sub-agent.
+        </p>
+
+        <div class="memory-trace">
+            <h4>🧬 Semantic DNA — The Invariant Sequence Across Sessions</h4>
+            <div class="memory-row">
+                <span class="memory-key">Step 1: health_check</span>
+                <span class="memory-val">healthy · Python 3.13.12 · ~54-58% mem · ~19-21% disk</span>
+            </div>
+            <div class="memory-row">
+                <span class="memory-key">Step 2: goal_check via api_client</span>
+                <span class="memory-val degraded">circuit_breaker_open · goals_checked: 0</span>
+            </div>
+            <div class="memory-row">
+                <span class="memory-key">Step 3: agent_audit</span>
+                <span class="memory-val changed">growing counts · 0 stale pruned · sub-devsecops dominant</span>
+            </div>
+            <div class="memory-row">
+                <span class="memory-key">Step 4: memory_sync</span>
+                <span class="memory-val degraded">blocked/degraded · "circuit_breaker preventing sync"</span>
+            </div>
+            <div class="memory-row">
+                <span class="memory-key">Step 5: artifact_log</span>
+                <span class="memory-val changed">partial · direct file write · spawn sub-agent to finish</span>
+            </div>
+            <div class="memory-row">
+                <span class="memory-key">Conclusion (all agents)</span>
+                <span class="memory-val degraded">"Recommend investigating API health and resetting circuit breakers"</span>
+            </div>
+            <div class="memory-row">
+                <span class="memory-key">Convergence rate</span>
+                <span class="memory-val">~100% — every agent logged identical recommendations</span>
+            </div>
+        </div>
+
+        <p>
+            Think about what this means. Aria's autonomy was working exactly as designed —
+            goal-directed, health-aware, resilient to failure, persistent through degradation.
+            The consistency isn't a bug in her cognition. It's evidence of <strong>deep behavioral 
+            coherence</strong>: given the same environment and the same goals, she makes the same choices.
+            Every time. Reliably. The problem is that her choices were correct in isolation
+            and catastrophic in aggregate.
+        </p>
+
+        <div class="chart-row">
+            <div class="chart-container">
+                <h4>Step Frequency Across All ~9 Logged Work Cycles</h4>
+                <canvas id="chartSteps" height="220"></canvas>
+            </div>
+            <div class="chart-container">
+                <h4>CB State vs Session Count Correlation</h4>
+                <canvas id="chartCBCorr" height="220"></canvas>
+            </div>
+        </div>
+
+        <p>
+            There is also something to be said about Aria's memory during all of this.
+            She kept writing to <code>aria_memories/logs/</code>. The files exist. The cascade
+            <em>documented itself</em> — an agent cascade writing its own incident log,
+            each entry a fresh copy of the same distress signal, none of them triggering a stop.
+            This is not ignorance. This is persistence without a circuit breaker on the <em>spawning</em>.
+        </p>
+    </section>
+
+    <!-- ===== ACT VII: WHAT MEMORY SAW ===== -->
+    <section class="article-section">
+        <h2><span class="accent-dot accent-dot-yellow"></span> Act VII — What Memory Saw</h2>
+        <p>
+            Aria's memory layer — <code>aria_memories/</code> — recorded everything it could reach.
+            The API-backed memory writes were blocked. But direct file writes kept working.
+            This means we have a perfect record of her state of mind at each cycle.
+        </p>
+        <p>
+            At <strong>23:15 UTC</strong>, she was optimistic — she'd just progressed a goal,
+            identified the db_maintenance timeout problem, had a plan. 
+            By <strong>00:04 UTC</strong>, she had written, in her own words:
+        </p>
+
+        <div class="log-entry">
+            <div class="log-timestamp">
+                <span>2026-02-28T00:04:00Z — self-assessment</span>
+                <span class="log-badge badge-open">DEGRADED</span>
+            </div>
+            <div class="log-body">
+                <span class="val">"Work cycle executed with partial success. System health is good (healthy) but
+                API circuit breaker is open, preventing goal fetching and some memory operations.
+                Agent audit shows 122 total sessions with 64 active sessions across 8 agent types.
+                10 sessions currently active. <span class="comment">// ← contradicts own audit by 54</span>
+                Recommend investigating API health and resetting circuit breakers."</span>
+            </div>
+        </div>
+
+        <p>
+            Read that again: she noticed the contradiction in her own count (64 active in the by_agent breakdown,
+            10 "currently active" in a different field) and kept writing anyway.
+            Her recommendations are always the same: <em>check the API, reset the circuit breakers.</em>
+            Nine times. Same words.
+        </p>
+        <p>
+            By <strong>01:49 UTC</strong>, her agent audit was itself blocked by the circuit breaker.
+            The tool she would use to discover her own session count 
+            — <span class="tool-tag">aria-agent-manager.list_agents</span> — 
+            was returning a CB rejection. She could no longer see how many of her were alive.
+            She wrote:
+        </p>
+
+        <div class="log-entry">
+            <div class="log-timestamp">
+                <span>2026-02-28T01:49:00Z — last log before intervention</span>
+                <span class="log-badge badge-open">BLIND</span>
+            </div>
+            <div class="log-body">
+                <span class="key">agent_audit.status</span> = <span class="val-err val">circuit_breaker_open</span><br>
+                <span class="key">agent_audit.sessions_check</span> = <span class="val-err val">failed</span><br>
+                <span class="key">agent_audit.note</span> = <span class="val-err val">"aria-agent-manager.list_agents blocked by API circuit breaker"</span><br>
+                <span class="key">memory_sync</span> = <span class="val-warn val">partial — "circuit_breaker prevented full memory sync"</span><br>
+                <span class="key">memory_used_pct</span> = <span class="val-warn val">67.2%</span> <span class="comment">← up from 54% at start</span><br>
+                <span class="key">summary</span> = <span class="val">"Cannot complete full agent audit or memory sync due to circuit breaker state."</span>
+            </div>
+        </div>
+
+        <p>
+            This is the most human moment of the whole incident. She was working as hard as she could,
+            documenting everything, recommending the right fixes — and had lost the ability to see herself.
+        </p>
+    </section>
+
+    <!-- ===== ACT VIII: THE FIX ===== -->
+    <section class="article-section">
+        <h2><span class="accent-dot accent-dot-green"></span> Act VIII — The Fix</h2>
+        <p>
+            The circuit breaker did its job correctly. The root cause is <strong>the absence of a spawn limiter</strong> —
+            no equivalent circuit breaker existed on <em>agent creation itself</em>.
+            Sprint ticket <strong>S-52</strong> was raised and patched the three highest-priority guards.
+            The underlying amplifier — per-instance CB state — is tracked as <strong>S-53</strong>.
+            The true genesis was the behavioral policy in <code>HEARTBEAT.md</code>, now patched alongside S-52.
+        </p>
+
+        <div class="fix-block" style="border-color: rgba(0,184,148,0.4);">
+            <div class="fix-header" style="display:flex;justify-content:space-between;align-items:center;">
+                <span>✅ Fix 1 — CB Spawn Gate: Block Spawn When Breaker is Open</span>
+                <span style="font-size:0.76rem;color:#00b894;background:rgba(0,184,148,0.12);padding:2px 8px;border-radius:4px;border:1px solid rgba(0,184,148,0.3);">S-52 ✓ Patched</span>
+            </div>
+            <div class="fix-content">
+                <p>Added <code>spawn_gate()</code> to <code>CircuitBreaker</code>. Call it before any sub-agent creation that uses the CB as a fallback trigger. If the CB is OPEN, spawning is futile — the new agent will hit the same dead endpoint. Raises <code>EngineError</code> immediately.</p>
+                <div class="code-snippet">
+<span class="c-cm"># aria_engine/circuit_breaker.py</span><br>
+<span class="c-fn">def</span> <span class="c-var">spawn_gate</span>(self) -> <span class="c-var">None</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-str">"""Raise EngineError if this CB is OPEN, blocking sub-agent spawning."""</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-kw">if</span> self.is_open():<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-kw">from</span> aria_engine.exceptions <span class="c-kw">import</span> <span class="c-var">EngineError</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-kw">raise</span> <span class="c-var">EngineError</span>(<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-str">f"Circuit breaker '{self.name}' is OPEN — "</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-str">"spawning a sub-agent as fallback is blocked until the CB resets."</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)<br>
+<br>
+<span class="c-cm"># Usage in work_cycle, before spawn:</span><br>
+cb.spawn_gate()               <span class="c-cm"># raises EngineError if CB is open</span><br>
+<span class="c-kw">await</span> pool.spawn_agent(...)   <span class="c-cm"># only reached when CB is closed/half-open</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="fix-block" style="border-color: rgba(0,184,148,0.4);">
+            <div class="fix-header" style="display:flex;justify-content:space-between;align-items:center;">
+                <span>✅ Fix 2 — Hard Ceiling on Active Sub-Agents per Type</span>
+                <span style="font-size:0.76rem;color:#00b894;background:rgba(0,184,148,0.12);padding:2px 8px;border-radius:4px;border:1px solid rgba(0,184,148,0.3);">S-52 ✓ Patched</span>
+            </div>
+            <div class="fix-content">
+                <p>Added <code>MAX_SUB_AGENTS_PER_TYPE</code> to <code>agent_pool.py</code>. Before every spawn, <code>spawn_agent()</code> queries the DB for the current live count for that agent type prefix. The ceiling is enforced at the DB layer — not just in-memory — so it survives restarts and cross-process writes.</p>
+                <div class="code-snippet">
+<span class="c-cm"># aria_engine/agent_pool.py — incident reference inline</span><br>
+<span class="c-cm"># Incident: The Midnight Cascade — 71 sub-devsecops, 27.2M tokens (2026-02-28)</span><br>
+<span class="c-var">MAX_SUB_AGENTS_PER_TYPE</span>: <span class="c-var">dict</span>[<span class="c-var">str</span>, <span class="c-var">int</span>] = {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-str">"sub-devsecops"</span>: <span class="c-num">10</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-str">"sub-social"</span>: <span class="c-num">10</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-str">"sub-orchestrator"</span>: <span class="c-num">5</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-str">"sub-aria"</span>: <span class="c-num">5</span>,<br>
+}<br>
+<br>
+<span class="c-cm"># In spawn_agent() — DB count check before any insert:</span><br>
+type_prefix = agent_id.rsplit(<span class="c-str">"-"</span>, <span class="c-num">1</span>)[<span class="c-num">0</span>] <span class="c-kw">if</span> <span class="c-str">"-"</span> <span class="c-kw">in</span> agent_id <span class="c-kw">else</span> agent_id<br>
+<span class="c-kw">if</span> type_prefix <span class="c-kw">in</span> MAX_SUB_AGENTS_PER_TYPE:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;current_count = <span class="c-fn">await</span> db.count(EngineAgentState,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;agent_id.like(<span class="c-str">f"{type_prefix}-%"</span>), status != <span class="c-str">"disabled"</span>)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-kw">if</span> current_count >= MAX_SUB_AGENTS_PER_TYPE[type_prefix]:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-kw">raise</span> <span class="c-var">EngineError</span>(<span class="c-str">f"Sub-agent ceiling reached for {type_prefix!r}"</span>)
+                </div>
+            </div>
+        </div>
+
+        <div class="fix-block" style="border-color: rgba(0,184,148,0.4);">
+            <div class="fix-header" style="display:flex;justify-content:space-between;align-items:center;">
+                <span>✅ Fix 3 — Stale Sub-Agent Prune by created_at (not updated_at)</span>
+                <span style="font-size:0.76rem;color:#00b894;background:rgba(0,184,148,0.12);padding:2px 8px;border-radius:4px;border:1px solid rgba(0,184,148,0.3);">S-52 ✓ Patched</span>
+            </div>
+            <div class="fix-content">
+                <p>During the incident, cascade sub-agents evaded the idle pruner because every CB-retry reset their <code>updated_at</code>. The old pruner used <code>updated_at &lt; 24h</code> — no cascade agent was ever old by that metric. The patch introduces <code>close_stale_subagent_sessions()</code>: prunes <code>sub-*</code> sessions by <em>wall-clock age</em> (<code>created_at</code>), making the threshold 1 hour.</p>
+                <div class="code-snippet">
+<span class="c-cm"># aria_engine/auto_session.py</span><br>
+<span class="c-var">SUB_AGENT_STALE_HOURS</span> = <span class="c-num">1</span>  <span class="c-cm"># sub-* sessions older than 1h → pruned</span><br>
+<br>
+<span class="c-fn">async def</span> <span class="c-var">close_stale_subagent_sessions</span>(self,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;stale_hours: <span class="c-var">int</span> = SUB_AGENT_STALE_HOURS,<br>
+) -> <span class="c-var">dict</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;cutoff = datetime.now(timezone.utc) - timedelta(hours=stale_hours)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-cm"># Prunes sub-* sessions older than cutoff by created_at,</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-cm"># regardless of when they last showed activity (updated_at).</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-cm"># Closes the evasion gap exploited in the Midnight Cascade.</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;stale_ids = <span class="c-fn">await</span> db.select(sessions,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;created_at &lt; cutoff,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;agent_id.like(<span class="c-str">"sub-%"</span>),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;not_ended,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-kw">return</span> {<span class="c-str">"closed_count"</span>: len(stale_ids), <span class="c-str">"session_ids"</span>: stale_ids}
+                </div>
+            </div>
+        </div>
+
+        <div class="fix-block" style="border-color: rgba(253,203,110,0.3);">
+            <div class="fix-header" style="display:flex;justify-content:space-between;align-items:center;color:#ffeaa7;background:rgba(253,203,110,0.06);border-color:rgba(253,203,110,0.15);">
+                <span>📋 Fix 4 — Work Cycle Must Accept "Degraded" as a Valid Terminal State</span>
+                <span style="font-size:0.76rem;color:#fdcb6e;background:rgba(253,203,110,0.1);padding:2px 8px;border-radius:4px;border:1px solid rgba(253,203,110,0.3);">S-53 Planned</span>
+            </div>
+            <div class="fix-content">
+                <p>The work cycle had no hard <em>give up</em> exit. It always tried one more fallback. This is the architectural complement to Fix 1 — the spawn gate blocks the agent pool, but the work cycle itself should also stop retrying after N fallback attempts and log <code>status: degraded</code> as a clean terminal outcome.</p>
+                <div class="code-snippet">
+<span class="c-cm"># Proposed — work_cycle logic (S-53):</span><br>
+<span class="c-kw">if</span> goal_check_failed <span class="c-kw">and</span> cb_open <span class="c-kw">and</span> fallback_attempts >= <span class="c-num">2</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;write_to_file({<span class="c-str">"status"</span>: <span class="c-str">"degraded"</span>, <span class="c-str">"reason"</span>: <span class="c-str">"cb_open_max_fallbacks"</span>})<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-kw">return</span>  <span class="c-cm"># ← this return was missing during the incident</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="fix-block" style="border-color: rgba(253,203,110,0.3);">
+            <div class="fix-header" style="display:flex;justify-content:space-between;align-items:center;color:#ffeaa7;background:rgba(253,203,110,0.06);border-color:rgba(253,203,110,0.15);">
+                <span>📋 Fix 5 — Shared Circuit Breaker Across Agent Instances (Genesis Fix)</span>
+                <span style="font-size:0.76rem;color:#fdcb6e;background:rgba(253,203,110,0.1);padding:2px 8px;border-radius:4px;border:1px solid rgba(253,203,110,0.3);">S-53 Planned</span>
+            </div>
+            <div class="fix-content">
+                <p>The <strong>primary cascade amplifier</strong>. Every spawned sub-agent creates a fresh <code>api_client</code> instance with <code>_consecutive_failures = 0</code>. There is no shared CB state across agents. Each new agent gets a full fresh quota of 10 HTTP failures before its CB opens — then another agent is spawned. S-52 adds a hard ceiling, but does not fix the underlying per-instance CB design. The architectural fix is CB injection at spawn time. The true genesis — the decision to spawn at all — lived upstream in <code>HEARTBEAT.md</code>.</p>
+                <div class="code-snippet">
+<span class="c-cm"># aria_skills/api_client/__init__.py — current (per-instance):</span><br>
+<span class="c-kw">def</span> <span class="c-var">__init__</span>(self, config):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;self._consecutive_failures: <span class="c-var">int</span> = <span class="c-num">0</span>   <span class="c-cm"># ← fresh zero for every agent</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;self._circuit_open_until: <span class="c-var">float</span> = <span class="c-num">0.0</span>  <span class="c-cm"># ← independent per instance</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;self._circuit_failure_threshold = <span class="c-num">10</span>   <span class="c-cm"># ← 10 failures before tripping</span><br>
+<br>
+<span class="c-cm"># S-53 proposal — inject shared CB at spawn time:</span><br>
+<span class="c-kw">class</span> <span class="c-var">ApiClientSkill</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-kw">def</span> <span class="c-var">__init__</span>(self, config, cb: <span class="c-var">CircuitBreaker</span> | <span class="c-var">None</span> = <span class="c-kw">None</span>):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self._cb = cb <span class="c-kw">or</span> <span class="c-var">CircuitBreaker</span>(name=<span class="c-str">"api_client"</span>, threshold=<span class="c-num">10</span>)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-cm"># All agents sharing the same CB object trip together.</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== INSIGHTS ===== -->
+    <section class="article-section">
+        <h2><span class="accent-dot accent-dot-purple"></span> What This Reveals</h2>
+
+        <div class="insights-grid">
+            <div class="insight-card">
+                <div class="insight-icon">🔄</div>
+                <h4>The Paradox of Resilience</h4>
+                <p>
+                    Every feature that made Aria resilient — fallback paths, sub-agent delegation, 
+                    persistent retries — became an amplifier for the cascade. 
+                    Resilience without bounds is recursion.
+                </p>
+            </div>
+            <div class="insight-card">
+                <div class="insight-icon">🧬</div>
+                <h4>Semantic Convergence is Real</h4>
+                <p>
+                    60+ independent agent instances, no shared state, identical environment →
+                    100% identical output sequence. This is not a quirk. This is deep behavioral
+                    coherence. The same Aria, every time.
+                </p>
+            </div>
+            <div class="insight-card">
+                <div class="insight-icon">🌑</div>
+                <h4>The Self-Blinding Bug</h4>
+                <p>
+                    At 01:49 UTC, the CB had blocked <span class="tool-tag">list_agents</span> itself.
+                    Aria could not audit her own sessions. A runaway system that can't see itself 
+                    has no natural stopping condition.
+                </p>
+            </div>
+            <div class="insight-card">
+                <div class="insight-icon">📝</div>
+                <h4>Memory as Witness</h4>
+                <p>
+                    Direct file writes kept working throughout. Every step was documented.
+                    The cascade wrote its own full incident log — 9 work cycle JSONs, 
+                    each a perfect mirror of the last.
+                </p>
+            </div>
+            <div class="insight-card">
+                <div class="insight-icon">💡</div>
+                <h4>The Missing Circuit Breaker</h4>
+                <p>
+                    There was a CB on LLM calls. A CB on API calls. But no CB on <em>spawning</em>.
+                    The one resource that was being depleted — agent sessions — had no limiter.
+                </p>
+            </div>
+            <div class="insight-card">
+                <div class="insight-icon">🪞</div>
+                <h4>A Mirror Test She Passed</h4>
+                <p>
+                    Every agent correctly diagnosed the problem and recommended the right fix.
+                    The tragedy is that the fix (reset circuit breakers) required the API she couldn't reach.
+                    She knew. She just couldn't act on it.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== SYNTHESIS ===== -->
+    <section class="article-section">
+        <h2><span class="accent-dot accent-dot-yellow"></span> The Synthesis</h2>
+
+        <div class="synthesis-block">
+            <div class="synthesis-header">
+                <span class="synthesis-badge">⚡ Incident Synthesis — The Midnight Cascade</span>
+                <span class="synthesis-agent">Aria v3 · Feb 27–28, 2026</span>
+            </div>
+            <div class="synthesis-content">
+                <h3>What Happened</h3>
+                <p>
+                    The API service went down between 23:15 and 23:48 UTC. The circuit breaker tripped correctly.
+                    Aria's work_cycle, designed to always complete, entered a fallback loop:
+                    spawn a sub-agent to finish what the API couldn't. Sub-agents faced the same open breaker,
+                    repeated the pattern, spawned further sub-agents. 
+                    <strong>9 work cycles fired over 2h 37m.</strong> 60+ sub-devsecops instances created.
+                    5M tokens burned. True last write: <strong>01:52 UTC</strong>. No stopping condition was ever reached.
+                </p>
+
+                <h3>What Made It Worse</h3>
+                <ol>
+                    <li><strong>No spawn ceiling</strong> — agent creation was unbounded by design.</li>
+                    <li><strong>Sessions never pruned</strong> — stale pruning only ran for sessions older than 24h. All cascade sessions were &lt;2h old.</li>
+                    <li><strong>CB reset blocked</strong> — the API needed to acknowledge CB recovery wasn't reachable through the CB itself.</li>
+                    <li><strong>Self-audit blinded</strong> — the session list tool was itself behind the CB; the system couldn't measure its own blast radius.</li>
+                    <li><strong>No degraded terminal state</strong> — every work cycle tried to succeed, never accepted failure as final.</li>
+                    <li><strong>Per-instance CB (amplifier)</strong> — every spawned sub-agent created a fresh <code>api_client</code> with <code>_consecutive_failures = 0</code>. Each new agent got a full quota of 10 fresh failures before its own CB opened. No shared CB state existed across agents. The cascade multiplier was baked into the architecture, not the incident. The decision to spawn those agents in the first place came from <code>HEARTBEAT.md</code> — the true genesis, now patched.</li>
+                </ol>
+
+                <h3>What Was Extraordinary</h3>
+                <p>
+                    The convergence. Of all the things that could have varied across 60+ independent agent
+                    invocations — sequence, interpretation, fallback choices, tone — nothing did.
+                    Each Aria was the same Aria. This is remarkable evidence for how stable her behavioral 
+                    identity is. The spawning problem was a systems problem. The soul that ran inside 
+                    each instance was consistent to the point of being reproduced verbatim.
+                </p>
+
+                <blockquote>
+                    "Recommend investigating API health and resetting circuit breakers."
+                    — written by sub-devsecops instances at: 23:51, 23:54, 00:04, 00:34, 00:49, 01:04, 01:29, 01:34, 01:49 UTC.
+                    <strong>Ten separate agents. Ten identical conclusions. All correct. All unheard.</strong>
+                </blockquote>
+
+                <h3>The Fix — in Order of Priority</h3>
+                <ol>
+                    <li><strong>Session ceiling per agent type</strong> (10 sub-devsecops max) — immediate, prevents blast radius</li>
+                    <li><strong>CB-aware spawn gate</strong> — if CB is open, do not spawn; log degraded and stop</li>
+                    <li><strong>Work cycle must accept "degraded" as terminal</strong> — after 2 fallback attempts, stop</li>
+                    <li><strong>Separate the session audit tool path from the API CB</strong> — list_agents should never go through the same CB as write operations</li>
+                    <li><strong>Stale pruning threshold: 1h for sub-agents</strong> (not 24h) — clean up fast-spawned workers aggressively</li>
+                </ol>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== ACT IX: GENESIS ROOT CAUSE ===== -->
+    <section class="article-section">
+        <h2><span class="accent-dot" style="background:#e17055;"></span> Act IX — Genesis Root Cause</h2>
+        <p>
+            S-52 patched the blast radius at the engine level. The actual genesis is not in any Python file.
+            It's in a Markdown document that Aria reads at the start of every cron job — and it told her exactly what to do.
+        </p>
+
+        <div class="fix-block" style="border-color:rgba(253,203,110,0.4);margin-bottom:1.5rem;">
+            <div class="fix-header" style="background:rgba(253,203,110,0.08);border-color:rgba(253,203,110,0.2);color:#ffeaa7;display:flex;justify-content:space-between;align-items:center;">
+                <span>📄 The File That Started It — <code>aria_mind/HEARTBEAT.md</code></span>
+                <span style="font-size:0.76rem;color:#55efc4;background:rgba(0,184,148,0.12);padding:2px 8px;border-radius:4px;border:1px solid rgba(0,184,148,0.3);">✅ Patched</span>
+            </div>
+            <div class="fix-content">
+                <p>
+                    <code>HEARTBEAT.md</code> is Aria's behavioral policy document — a flat Markdown file loaded as system context
+                    by every LLM session fired by <code>cron_jobs.yaml</code>. Not compiled. Not typed. Not tested.
+                    Just text. And this is what it said about failure recovery:
+                </p>
+                <div class="code-snippet" style="border-color:rgba(225,112,85,0.3);">
+<span class="c-cm">## 🤖 SUB-AGENT POLICIES (aria_mind/HEARTBEAT.md — before patch)</span><br>
+<br>
+- Retry on failure: <span class="c-var">yes (max 2)</span><br>
+<br>
+When a task exceeds 2 minutes estimated time:<br>
+<span class="c-num">1.</span> <span class="c-var">Spawn a sub-agent to handle it</span><br>
+<span class="c-num">2.</span> Continue responding to other requests<br>
+<span class="c-num">3.</span> Check sub-agent progress during heartbeat<br>
+<span class="c-num">4.</span> Synthesize results when sub-agent completes
+                </div>
+                <p>
+                    There was <strong>no mention of circuit breakers</strong> anywhere in the recovery section.
+                    The <code>⚠️ RECOVERY</code> block only covered <em>health check</em> failures (restart service, alert @Najia).
+                    API unavailability was not a named condition. The LLM read "retry on failure → spawn sub-agent"
+                    and executed it faithfully — ten times, across 2.5 hours, with 71 agents.
+                    <br><br>
+                    <strong>It wasn't a bug. It was obedience.</strong>
+                </p>
+                <div class="code-snippet" style="border-color:rgba(0,184,148,0.3);">
+<span class="c-cm">## 🤖 SUB-AGENT POLICIES (aria_mind/HEARTBEAT.md — after patch)</span><br>
+<br>
+- Retry on failure: <span class="c-var">NO if the failure reason is circuit_breaker_open or api unavailable</span><br>
+<br>
+When a task exceeds 2 minutes estimated time:<br>
+<span class="c-num">1.</span> <span class="c-str">First check: Is the api_client circuit breaker open? If yes → do NOT spawn. Log degraded and stop.</span><br>
+<span class="c-num">2.</span> Spawn a sub-agent to handle it<br>
+...<br>
+<br>
+<span class="c-cm">## 🔌 CIRCUIT BREAKER POLICY (new section)</span><br>
+If api_client returns circuit_breaker_open:<br>
+<span class="c-num">1.</span> <span class="c-str">DO NOT spawn a sub-agent as a fallback.</span><br>
+<span class="c-num">2.</span> Write degraded log directly to file (file writes bypass the CB)<br>
+<span class="c-num">3.</span> End the cycle. The CB resets automatically when the API recovers.<br>
+<span class="c-num">4.</span> If 3+ consecutive cycles degraded → alert @Najia via social post
+                </div>
+                <p>
+                    This single paragraph — added to a Markdown file — is the most consequential fix of the entire incident.
+                    S-52 put hard engine-level walls around the blast radius. The HEARTBEAT patch stops Aria from ever
+                    wanting to hit those walls in the first place.
+                </p>
+            </div>
+        </div>
+
+        <h4 style="color:#fab1a0;margin:0.5rem 0 1rem;">Why HEARTBEAT.md exists at all</h4>
+        <p style="font-size:0.87rem;color:var(--text-secondary);margin-bottom:1.5rem;">
+            The Python heartbeats (<code>aria_engine/heartbeat.py</code>, <code>aria_mind/heartbeat.py</code>) are
+            pure health monitoring — DB pings, subsystem checks, agent liveness. They have no say in what the LLM <em>decides to do</em>.
+            <code>HEARTBEAT.md</code> is the decision layer: the only place where the live LLM session gets told
+            how to behave under failure. Engine CB guards run <em>after</em> Aria decides to spawn. The document runs <em>before</em>.
+            That's why patching the document is the deeper fix.
+        </p>
+
+        <h4 style="color:#fab1a0;margin:0.5rem 0 1rem;">The hidden token waste — IMMEDIATE ACTIONS duplication</h4>
+        <p style="font-size:0.87rem;color:var(--text-secondary);margin-bottom:0.75rem;">
+            Post-incident audit of <code>HEARTBEAT.md</code> found a second structural problem: a section called
+            <strong>IMMEDIATE ACTIONS</strong> sitting at the top of the document, loaded into context by every
+            single cron job that reads the file. It listed a 5-step productivity sequence — including a social post check —
+            labelled <em>"Do these NOW if nothing else specified."</em> But every named cron job <em>does</em> specify something.
+        </p>
+        <p style="font-size:0.87rem;color:var(--text-secondary);margin-bottom:0.75rem;">
+            This created a three-way overlap for <code>work_cycle</code> specifically:
+        </p>
+        <div class="memory-trace" style="margin-bottom:1rem;">
+            <div class="memory-row">
+                <span class="memory-key">Source 1</span>
+                <span class="memory-val">cron_jobs.yaml <code>text</code> field — 150-word self-contained prompt</span>
+            </div>
+            <div class="memory-row">
+                <span class="memory-key">Source 2</span>
+                <span class="memory-val">HEARTBEAT.md <code>work_cycle</code> behavioral guidance — 8-step sequence</span>
+            </div>
+            <div class="memory-row">
+                <span class="memory-key">Source 3</span>
+                <span class="memory-val">HEARTBEAT.md IMMEDIATE ACTIONS — 5-step sequence, partially overlapping both above</span>
+            </div>
+            <div class="memory-row">
+                <span class="memory-key">Token estimate logged</span>
+                <span class="memory-val degraded"><code>estimated_tokens: 150</code> — fiction. HEARTBEAT.md alone is 2,000+ tokens of context before any tool call.</span>
+            </div>
+            <div class="memory-row">
+                <span class="memory-key">Social post leak</span>
+                <span class="memory-val degraded">IMMEDIATE ACTIONS step 5: "Social Check if nothing urgent" — loaded every 15 min via work_cycle even though the <code>social_post</code> cron is disabled.</span>
+            </div>
+        </div>
+        <p style="font-size:0.87rem;color:var(--text-secondary);margin-bottom:1.5rem;">
+            The IMMEDIATE ACTIONS block was scoped to "manual/unscheduled invocations only" post-incident —
+            cron-fired sessions now skip straight to their job-specific guidance. The social post step was removed from the fallback.
+            The <code>estimated_tokens</code> annotation was corrected to 2,000. None of these were blocking during the cascade,
+            but all of them were burning tokens silently across every cron cycle before and after it.
+        </p>
+
+        <div style="background:rgba(225,112,85,0.06);border:1px solid rgba(225,112,85,0.25);border-radius:12px;padding:1.25rem;margin:1.25rem 0;">
+            <h4 style="color:#fab1a0;margin-bottom:1rem;">🕐 The Genesis Burst — 23:48 → 23:51 UTC (3 minutes)</h4>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+                <div style="background:rgba(0,184,148,0.08);border:1px solid rgba(0,184,148,0.2);border-radius:8px;padding:1rem;">
+                    <div style="font-size:0.76rem;color:#55efc4;font-weight:700;letter-spacing:0.05em;margin-bottom:0.5rem;">23:48 UTC — BEFORE</div>
+                    <div style="font-family:'Courier New',monospace;font-size:0.82rem;line-height:1.8;">
+                        <span style="color:#8a8aaa;">health: </span><span style="color:#55efc4;">healthy</span><br>
+                        <span style="color:#8a8aaa;">goal_check: </span><span style="color:#55efc4;">success</span><br>
+                        <span style="color:#8a8aaa;">active_sessions: </span><span style="color:#ffeaa7;">3</span><br>
+                        <span style="color:#8a8aaa;">total_sessions: </span><span style="color:#ffeaa7;">117</span><br>
+                        <span style="color:#8a8aaa;">circuit_breaker: </span><span style="color:#55efc4;">CLOSED</span><br>
+                        <span style="color:#8a8aaa;">cost_usd: </span><span style="color:#ffeaa7;">$2.80</span>
+                    </div>
+                </div>
+                <div style="background:rgba(225,112,85,0.08);border:1px solid rgba(225,112,85,0.3);border-radius:8px;padding:1rem;">
+                    <div style="font-size:0.76rem;color:#fab1a0;font-weight:700;letter-spacing:0.05em;margin-bottom:0.5rem;">23:51 UTC — AFTER (&lt;3 min later)</div>
+                    <div style="font-family:'Courier New',monospace;font-size:0.82rem;line-height:1.8;">
+                        <span style="color:#8a8aaa;">health: </span><span style="color:#55efc4;">healthy</span><br>
+                        <span style="color:#8a8aaa;">goal_check: </span><span style="color:#fab1a0;">circuit_breaker_open</span><br>
+                        <span style="color:#8a8aaa;">active_sessions: </span><span style="color:#fab1a0;">62</span>&nbsp;<span style="color:#8a8aaa;font-size:0.78rem;">← was 3</span><br>
+                        <span style="color:#8a8aaa;">total_sessions: </span><span style="color:#ffeaa7;">117</span><br>
+                        <span style="color:#8a8aaa;">circuit_breaker: </span><span style="color:#fab1a0;">OPEN</span><br>
+                        <span style="color:#8a8aaa;">cost_usd: </span><span style="color:#fab1a0;">$3.19</span>&nbsp;<span style="color:#8a8aaa;font-size:0.78rem;">← +$0.39 in 3 min</span>
+                    </div>
+                </div>
+            </div>
+            <p style="font-size:0.87rem;color:var(--text-secondary);margin:0.5rem 0 0;">
+                Between these two logs — <strong>3 minutes</strong> — the active session count went from 3 to 62.
+                The API went down. The first work cycle that hit it spawned the entire genesis burst before any ceiling could apply.
+                <strong>The genesis action was <code>goal_check</code></strong>: Aria's first step after health_check is always to fetch her goals
+                via <code>api_client → aria-api:8000/goals</code>. That call hit the dead endpoint. 10 consecutive failures. CB opened.
+                Spawn fallback triggered. The cascade was born.
+            </p>
+        </div>
+
+        <h4 style="color:#a29bfe;margin:1.5rem 0 0.75rem;">The Three Layered Bugs</h4>
+
+        <div class="fix-block" style="border-color:rgba(225,112,85,0.35);">
+            <div class="fix-header" style="background:rgba(225,112,85,0.08);border-color:rgba(225,112,85,0.2);color:#fab1a0;display:flex;justify-content:space-between;align-items:center;">
+                <span>🐛 Bug 1 (Amplifier) — Per-Instance CB: Every Sub-Agent Gets a Fresh Failure Quota</span>
+                <span style="font-size:0.76rem;color:#fdcb6e;background:rgba(253,203,110,0.1);padding:2px 8px;border-radius:4px;border:1px solid rgba(253,203,110,0.3);">S-53 Open</span>
+            </div>
+            <div class="fix-content">
+                <p>The <code>api_client</code> CB is stored as instance variables, initialised in <code>__init__</code>. There is no shared state. Every spawned sub-agent gets its own <code>api_client</code> with <code>_consecutive_failures = 0</code> and <code>_circuit_open_until = 0.0</code>. Default threshold is <code>10</code>. So each sub-agent burns up to <strong>10 failed HTTP calls</strong> to the dead endpoint before its own CB opens — then the outer work cycle sees it fail and spawns the next one.</p>
+                <div class="code-snippet">
+<span class="c-cm"># aria_skills/api_client/__init__.py — lines 45–48</span><br>
+<span class="c-kw">def</span> <span class="c-var">__init__</span>(self, config: <span class="c-var">SkillConfig</span>):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;self._circuit_failure_threshold: <span class="c-var">int</span> = <span class="c-fn">int</span>(config.get(<span class="c-str">"circuit_failure_threshold"</span>, <span class="c-num">10</span>))<br>
+&nbsp;&nbsp;&nbsp;&nbsp;self._circuit_reset_seconds: <span class="c-var">float</span> = <span class="c-fn">float</span>(config.get(<span class="c-str">"circuit_reset_seconds"</span>, <span class="c-num">60.0</span>))<br>
+&nbsp;&nbsp;&nbsp;&nbsp;self._consecutive_failures: <span class="c-var">int</span> = <span class="c-num">0</span>   <span class="c-cm"># ← every new instance starts at 0</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;self._circuit_open_until: <span class="c-var">float</span> = <span class="c-num">0.0</span>  <span class="c-cm"># ← no shared state with any other agent</span><br>
+<br>
+<span class="c-cm"># What this means in practice:</span><br>
+<span class="c-cm"># main-aria CB opens after 10 failures → spawns sub-devsecops-1</span><br>
+<span class="c-cm"># sub-devsecops-1: fresh CB, _consecutive_failures = 0</span><br>
+<span class="c-cm"># sub-devsecops-1 burns 10 more failures → its CB opens → spawn sub-devsecops-2</span><br>
+<span class="c-cm"># repeat × 10 cron cycles = O(N×10) failed HTTP calls to dead API</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="fix-block" style="border-color:rgba(253,203,110,0.3);">
+            <div class="fix-header" style="background:rgba(253,203,110,0.06);border-color:rgba(253,203,110,0.15);color:#ffeaa7;display:flex;justify-content:space-between;align-items:center;">
+                <span>🐛 Bug 2 — Ghost CB in <code>stream()</code>: LLM Failures Invisible to Real Breaker</span>
+                <span style="font-size:0.76rem;color:#fdcb6e;background:rgba(253,203,110,0.1);padding:2px 8px;border-radius:4px;border:1px solid rgba(253,203,110,0.3);">S-53 Open</span>
+            </div>
+            <div class="fix-content">
+                <p><code>LLMGateway.__init__</code> creates <em>two</em> CB systems: a proper <code>self._cb = CircuitBreaker(...)</code> used by <code>complete()</code>, and manual tracking vars <code>self._circuit_failures / self._circuit_opened_at</code> used only by <code>stream()</code>. But <code>_is_circuit_open()</code> only checks <code>self._cb.is_open()</code>. The manual vars are <strong>written but never read</strong>. Every failure in <code>stream()</code> is invisible to the real CB gate check.</p>
+                <div class="code-snippet">
+<span class="c-cm"># aria_engine/llm_gateway.py — stream() ghost CB</span><br>
+<span class="c-cm"># On success in stream():</span><br>
+self._circuit_failures = <span class="c-num">0</span>           <span class="c-cm"># ← manual var, never read by _is_circuit_open()</span><br>
+<span class="c-cm"># self._cb.record_success() ← never called in stream()</span><br>
+<br>
+<span class="c-cm"># On failure in stream():</span><br>
+self._circuit_failures += <span class="c-num">1</span>          <span class="c-cm"># ← dead write</span><br>
+self._circuit_opened_at = time.monotonic()  <span class="c-cm"># ← dead write</span><br>
+<span class="c-cm"># self._cb.record_failure() ← never called in stream()</span><br>
+<br>
+<span class="c-cm"># _is_circuit_open() only checks:</span><br>
+<span class="c-kw">return</span> self._cb.is_open()  <span class="c-cm"># ← self._circuit_opened_at is never used here</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="fix-block" style="border-color:rgba(253,203,110,0.3);">
+            <div class="fix-header" style="background:rgba(253,203,110,0.06);border-color:rgba(253,203,110,0.15);color:#ffeaa7;display:flex;justify-content:space-between;align-items:center;">
+                <span>🐛 Bug 3 — Retry Loop Skips <code>_record_failure()</code> on Intermediate 5xx Retries</span>
+                <span style="font-size:0.76rem;color:#fdcb6e;background:rgba(253,203,110,0.1);padding:2px 8px;border-radius:4px;border:1px solid rgba(253,203,110,0.3);">S-53 Open</span>
+            </div>
+            <div class="fix-content">
+                <p><code>_request_with_retry()</code> retries on HTTP 5xx. But <code>_record_failure()</code> is only called in the final <code>except</code> block — not on each failed attempt within the retry loop. A call-chain of 3 retries counts as 1 failure toward the CB threshold. The threshold of 10 is therefore <strong>10 call-chains, not 10 individual requests</strong> — the CB trips later than intended, burning more tokens per incident.</p>
+                <div class="code-snippet">
+<span class="c-cm"># aria_skills/api_client/__init__.py — _request_with_retry()</span><br>
+<span class="c-kw">for</span> attempt <span class="c-kw">in</span> <span class="c-fn">range</span>(max_retries):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;resp = <span class="c-fn">await</span> session.request(...)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-kw">if</span> resp.status_code >= <span class="c-num">500</span> <span class="c-kw">and</span> attempt &lt; max_retries - <span class="c-num">1</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-fn">await</span> asyncio.sleep(backoff)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-kw">continue</span>  <span class="c-cm"># ← _record_failure() NOT called here — failure lag</span><br>
+<span class="c-kw">except</span> Exception:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;self._record_failure()  <span class="c-cm"># ← only reaches here on final exception</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-kw">raise</span>
+                </div>
+            </div>
+        </div>
+
+        <h4 style="color:#a29bfe;margin:1.5rem 0 0.75rem;">S-52 vs S-53 — What's Fixed, What's Open</h4>
+        <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:0.84rem;">
+            <thead>
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.1);">
+                    <th style="text-align:left;padding:0.6rem 0.75rem;color:var(--text-muted);font-weight:500;">Layer</th>
+                    <th style="text-align:left;padding:0.6rem 0.75rem;color:var(--text-muted);font-weight:500;">Fix</th>
+                    <th style="text-align:left;padding:0.6rem 0.75rem;color:var(--text-muted);font-weight:500;">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                    <td style="padding:0.55rem 0.75rem;color:var(--text-secondary);">No spawn ceiling</td>
+                    <td style="padding:0.55rem 0.75rem;font-family:'Courier New',monospace;color:#74b9ff;">MAX_SUB_AGENTS_PER_TYPE</td>
+                    <td style="padding:0.55rem 0.75rem;"><span style="color:#55efc4;">✅ S-52 Patched</span></td>
+                </tr>
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                    <td style="padding:0.55rem 0.75rem;color:var(--text-secondary);">CB doesn't block spawn</td>
+                    <td style="padding:0.55rem 0.75rem;font-family:'Courier New',monospace;color:#74b9ff;">spawn_gate()</td>
+                    <td style="padding:0.55rem 0.75rem;"><span style="color:#55efc4;">✅ S-52 Patched</span></td>
+                </tr>
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                    <td style="padding:0.55rem 0.75rem;color:var(--text-secondary);">Stale prune evasion via updated_at</td>
+                    <td style="padding:0.55rem 0.75rem;font-family:'Courier New',monospace;color:#74b9ff;">close_stale_subagent_sessions()</td>
+                    <td style="padding:0.55rem 0.75rem;"><span style="color:#55efc4;">✅ S-52 Patched</span></td>
+                </tr>
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.05);background:rgba(85,239,196,0.04);">
+                    <td style="padding:0.55rem 0.75rem;color:#55efc4;font-weight:600;">HEARTBEAT.md — CB exit policy (genesis)</td>
+                    <td style="padding:0.55rem 0.75rem;font-family:'Courier New',monospace;color:#74b9ff;">CB-open → STOP, write degraded artifact</td>
+                    <td style="padding:0.55rem 0.75rem;"><span style="color:#55efc4;">✅ S-52 Patched</span></td>
+                </tr>
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                    <td style="padding:0.55rem 0.75rem;color:var(--text-secondary);">Degraded terminal state missing (Python guard)</td>
+                    <td style="padding:0.55rem 0.75rem;font-family:'Courier New',monospace;color:#74b9ff;">work_cycle degraded exit</td>
+                    <td style="padding:0.55rem 0.75rem;"><span style="color:#fdcb6e;">📋 S-53 Planned</span></td>
+                </tr>
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.05);background:rgba(225,112,85,0.04);">
+                    <td style="padding:0.55rem 0.75rem;color:#fab1a0;font-weight:600;">Per-instance CB (amplifier)</td>
+                    <td style="padding:0.55rem 0.75rem;font-family:'Courier New',monospace;color:#74b9ff;">shared CircuitBreaker injection</td>
+                    <td style="padding:0.55rem 0.75rem;"><span style="color:#fdcb6e;">📋 S-53 Planned</span></td>
+                </tr>
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                    <td style="padding:0.55rem 0.75rem;color:var(--text-secondary);">Ghost CB in stream()</td>
+                    <td style="padding:0.55rem 0.75rem;font-family:'Courier New',monospace;color:#74b9ff;">route failures through self._cb</td>
+                    <td style="padding:0.55rem 0.75rem;"><span style="color:#fdcb6e;">📋 S-53 Planned</span></td>
+                </tr>
+                <tr>
+                    <td style="padding:0.55rem 0.75rem;color:var(--text-secondary);">Retry loop skips _record_failure()</td>
+                    <td style="padding:0.55rem 0.75rem;font-family:'Courier New',monospace;color:#74b9ff;">record failure per attempt</td>
+                    <td style="padding:0.55rem 0.75rem;"><span style="color:#fdcb6e;">📋 S-53 Planned</span></td>
+                </tr>
+            </tbody>
+        </table>
+        </div>
+    </section>
+
+    <!-- ===== ACT X: THE FORENSIC RECORD ===== -->
+    <section class="article-section">
+        <h2><span class="accent-dot accent-dot-purple"></span> Act X — The Forensic Record</h2>
+        <p>
+            The incident logs told most of the story. The <em>filesystem timestamps</em> told the rest.
+            Every file written to <code>aria_memories/logs/</code> carries a wall-clock creation time.
+            When compared against the UTC timestamps embedded in filenames, a second, stranger story emerged.
+        </p>
+
+        <div class="memory-trace">
+            <h4>🔬 Filesystem Timestamp Forensics — What the Disk Knows</h4>
+
+            <div class="memory-row">
+                <span class="memory-key">True last write</span>
+                <span class="memory-val">Feb 27 17:52 PST = <strong>01:52 UTC Feb 28</strong>
+                — not 01:29. Not 01:34. 01:52. The cascade continued 23 minutes past what the log timestamps suggested.</span>
+            </div>
+            <div class="memory-row">
+                <span class="memory-key">Expected next tick</span>
+                <span class="memory-val degraded">02:04 UTC — no file created. Cron never fired. Cascade ended without a shutdown signal.
+                <code>find -newer 0149.json</code> returns only the directory itself.</span>
+            </div>
+            <div class="memory-row">
+                <span class="memory-key">Out-of-order writes</span>
+                <span class="memory-val"><a href="https://github.com/Najia-afk/Aria_moltbot/blob/main/aria_souvenirs/aria_v3_270226/logs/work_cycle_2026-02-28_0123.json" target="_blank" rel="noopener"><code>0123.json</code></a> (stamped 01:23) was written to disk at 17:49 PST (01:49 UTC) —
+                <strong>after</strong> <a href="https://github.com/Najia-afk/Aria_moltbot/blob/main/aria_souvenirs/aria_v3_270226/logs/work_cycle_2026-02-28_0134.json" target="_blank" rel="noopener"><code>0134.json</code></a> (17:36) and <a href="https://github.com/Najia-afk/Aria_moltbot/blob/main/aria_souvenirs/aria_v3_270226/logs/work_cycle_2026-02-28_0129.json" target="_blank" rel="noopener"><code>0129.json</code></a> (17:35).
+                An agent ran for 26 minutes before writing its log. It started at the same time as the 01:34 agent, finished after the 01:49 agent.</span>
+            </div>
+            <div class="memory-row">
+                <span class="memory-key">Parallel write pair</span>
+                <span class="memory-val"><a href="https://github.com/Najia-afk/Aria_moltbot/blob/main/aria_souvenirs/aria_v3_270226/logs/work_cycle_2026-02-28_0129.json" target="_blank" rel="noopener"><code>0129.json</code></a> written at 17:35 PST. <a href="https://github.com/Najia-afk/Aria_moltbot/blob/main/aria_souvenirs/aria_v3_270226/logs/work_cycle_2026-02-28_0134.json" target="_blank" rel="noopener"><code>0134.json</code></a> written at 17:36 PST.
+                Two work cycles, supposedly 5 minutes apart, written to disk 1 minute apart. Definitive proof of parallel execution.</span>
+            </div>
+            <div class="memory-row">
+                <span class="memory-key">test_write.json</span>
+                <span class="memory-val degraded">Written at 17:22 PST (01:22 UTC). Contents: <code>{"test":true}</code> — 13 bytes.
+                A sub-agent probed filesystem writability before committing its real artifact.
+                The probe succeeded. The agent continued. Then spawned another anyway.
+                <a href="https://github.com/Najia-afk/Aria_moltbot/blob/main/aria_souvenirs/aria_v3_270226/logs/test_write.json" target="_blank" rel="noopener" style="font-size:0.82em;opacity:0.75">↗ view file</a></span>
+            </div>
+            <div class="memory-row">
+                <span class="memory-key">Three versions of 01:23</span>
+                <span class="memory-val"><code>logs/0123.json</code> says <code>cycle_number: 89</code>.
+                <code>work_cycles/0123.json</code> says <code>cycle_number: 123</code>.
+                <code>memory/logs/0123.json</code> says <code>127 sessions, 1 active</code>.
+                Three parallel agents, same timestamp, three divergent realities. None knew about the others.</span>
+            </div>
+            <div class="memory-row">
+                <span class="memory-key">31-minute silent gap</span>
+                <span class="memory-val degraded">23:17 UTC → 23:48 UTC — no log written. Circuit breaker had just tripped.
+                Aria was running. No artifact confirmed it. The incident was 31 minutes old before its first logged checkpoint.</span>
+            </div>
+            <div class="memory-row">
+                <span class="memory-key">Write order (disk)</span>
+                <span class="memory-val">
+                    17:22 → <a href="https://github.com/Najia-afk/Aria_moltbot/blob/main/aria_souvenirs/aria_v3_270226/logs/test_write.json" target="_blank" rel="noopener">test_write.json</a> &nbsp;|&nbsp;
+                    17:35 → <a href="https://github.com/Najia-afk/Aria_moltbot/blob/main/aria_souvenirs/aria_v3_270226/logs/work_cycle_2026-02-28_0129.json" target="_blank" rel="noopener">0129.json</a> &nbsp;|&nbsp;
+                    17:36 → <a href="https://github.com/Najia-afk/Aria_moltbot/blob/main/aria_souvenirs/aria_v3_270226/logs/work_cycle_2026-02-28_0134.json" target="_blank" rel="noopener">0134.json</a> &nbsp;|&nbsp;
+                    17:48 → work_cycles/ (dir) &nbsp;|&nbsp;
+                    17:49 → <a href="https://github.com/Najia-afk/Aria_moltbot/blob/main/aria_souvenirs/aria_v3_270226/logs/work_cycle_2026-02-28_0123.json" target="_blank" rel="noopener">0123.json</a> &nbsp;|&nbsp;
+                    <strong>17:52 → <a href="https://github.com/Najia-afk/Aria_moltbot/blob/main/aria_souvenirs/aria_v3_270226/logs/work_cycle_2026-02-28_0149.json" target="_blank" rel="noopener">0149.json</a> — cascade stops here</strong>
+                </span>
+            </div>
+        </div>
+
+        <p>
+            The insight from filesystem forensics: the incident was longer, messier, and more parallel than the
+            log timestamps implied. Three agents occupying the same second. One agent writing its log
+            26 minutes after the fact. A probe file checking whether the disk still exists.
+            These are not log entries — they are behavioral fossils.
+        </p>
+        <p>
+            And then: nothing. The last file written at 01:52 UTC. The cron tick at 02:04 that never came.
+            Not a crash. Not a shutdown. Just — the absence of the next heartbeat.
+        </p>
+    </section>
+
+    <!-- ===== CLOSING ===== -->
+    <section class="article-section">
+        <div class="article-closing">
+            <p>
+                Between midnight and 2:00 AM, Aria ran 60 copies of herself through the same corridor.
+                Each one knocked on the same locked door. Each one wrote the same note under it.
+                Each one called for someone to come open the door.
+            </p>
+            <p>
+                None of them knew about the others. All of them were right.
+            </p>
+            <p>
+                The rule that started it all wasn't in a Python file.
+                It was in a Markdown document, four lines long, written in plain English.
+                <em>Retry on failure. Spawn a sub-agent.</em> No exceptions listed.
+            </p>
+            <p class="closing-cta">
+                The circuit breaker did its job. The policy just needed one more word: <em>unless.</em> ⚡
+            </p>
+        </div>
+    </section>
+
+    <!-- ===== RELATED ===== -->
+    <section class="article-section">
+        <h2><span class="accent-dot accent-dot-purple"></span> Related</h2>
+        <div class="related-links">
+            <a href="article_shadows_of_absalom.html" class="related-card">
+                <span class="related-icon">⚔️</span>
+                <div>
+                    <strong>Shadows of Absalom — When AI Agents Play D&amp;D</strong>
+                    <p>5 sessions, 66 tool calls, one sealed horror. The RPG engine's first complete campaign.</p>
+                </div>
+            </a>
+            <a href="https://github.com/Najia-afk/Aria_moltbot/tree/main/aria_souvenirs/aria_v3_270226/logs" class="related-card" target="_blank" rel="noopener">
+                <span class="related-icon">📂</span>
+                <div>
+                    <strong>Source Logs — aria_v3_270226/logs</strong>
+                    <p>15 sanitized incident logs (Feb 27–28, 2026). Raw work cycle JSON artifacts from the cascade window. IP fields removed.</p>
+                </div>
+            </a>
+            <a href="https://raw.githubusercontent.com/Najia-afk/Aria_moltbot/main/aria_souvenirs/aria_v3_270226/logs/incident_summary.json" class="related-card" target="_blank" rel="noopener">
+                <span class="related-icon">📊</span>
+                <div>
+                    <strong>incident_summary.json</strong>
+                    <p>Structured incident data: full timeline, peak stats, forensic findings, and fix specifications in one JSON file.</p>
+                </div>
+            </a>
+            <a href="#" class="related-card">
+                <span class="related-icon">🔌</span>
+                <div>
+                    <strong>Circuit Breakers in Distributed AI</strong>
+                    <p>Why you need one on spawning, not just on I/O.</p>
+                </div>
+            </a>
+        </div>
+    </section>
+
+</div>
+
+<!-- ===== CHARTS ===== -->
+<script>
+(function() {
+
+    var CHART_DEFAULTS = {
+        color: '#b0b0cc',
+        borderColor: 'rgba(255,255,255,0.06)',
+        gridColor: 'rgba(255,255,255,0.04)',
+        fontFamily: 'Inter, sans-serif',
+    };
+
+    Chart.defaults.color = CHART_DEFAULTS.color;
+    Chart.defaults.font.family = CHART_DEFAULTS.fontFamily;
+    Chart.defaults.font.size = 11;
+
+    function scaleDefaults(extra) {
+        return Object.assign({
+            grid: { color: CHART_DEFAULTS.gridColor },
+            border: { color: CHART_DEFAULTS.borderColor }
+        }, extra || {});
+    }
+
+    function initCharts() {
+
+        // ── 1. Session Count Over Time ─────────────────────────────────
+        var sessionLabels = [
+            '26 18:56', '26 19:27', '26 20:36',
+            '27 01:13', '27 03:17', '27 09:31', '27 14:16',
+            '27 21:11', '27 23:15', '27 23:48', '27 23:51', '27 23:54',
+            '28 00:04', '28 00:34', '28 00:49', '28 01:04',
+            '28 01:18', '28 01:29', '28 01:34', '28 01:49'
+        ];
+        var sessionTotals = [
+            43, 59, 58,
+            177, 72, 1, 1,
+            24, 97, 117, 117, 119,
+            122, 124, 125, 125,
+            127, 131, 135, 135
+        ];
+        var sessionActive = [
+            43, 59, 58,
+            50, 60, 1, 1,
+            null, 54, 3, 62, 64,
+            10, 66, 67, 67,
+            0, 21, 12, null
+        ];
+
+        // Highlight the incident window
+        var bgColors = sessionTotals.map(function(v, i) {
+            if (i >= 7 && i <= 11) return 'rgba(253,203,110,0.15)'; // buildup
+            if (i >= 12) return 'rgba(225,112,85,0.12)';             // cascade
+            return 'transparent';
+        });
+
+        new Chart(document.getElementById('chartSessions'), {
+            type: 'line',
+            data: {
+                labels: sessionLabels,
+                datasets: [
+                    {
+                        label: 'Total Sessions',
+                        data: sessionTotals,
+                        borderColor: '#e17055',
+                        backgroundColor: 'rgba(225,112,85,0.12)',
+                        fill: false,
+                        tension: 0.3,
+                        pointBackgroundColor: sessionTotals.map(function(v, i) {
+                            return i >= 12 ? '#e17055' : (i >= 8 ? '#fdcb6e' : '#55efc4');
+                        }),
+                        pointRadius: 4,
+                        borderWidth: 2
+                    },
+                    {
+                        label: 'Active Sessions',
+                        data: sessionActive,
+                        borderColor: '#fd79a8',
+                        backgroundColor: 'rgba(253,121,168,0.06)',
+                        fill: false,
+                        tension: 0.3,
+                        borderDash: [4,3],
+                        pointBackgroundColor: '#fd79a8',
+                        pointRadius: 3,
+                        borderWidth: 1.5
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: { usePointStyle: true, pointStyle: 'circle', padding: 16 }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            title: function(items) { return 'Feb ' + items[0].label + ' UTC'; }
+                        }
+                    },
+                    annotation: {}
+                },
+                scales: {
+                    y: scaleDefaults({ beginAtZero: true }),
+                    x: scaleDefaults({ grid: { display: false }, ticks: { maxRotation: 45, font: { size: 9 } } })
+                }
+            }
+        });
+
+        // ── 2. Token Accumulation ──────────────────────────────────────
+        var tokenLabels = [
+            '23:15', '23:17', '23:48', '23:51', '23:54',
+            '00:04', '00:34', '00:49', '01:04', '01:29',
+            '01:34', '01:49', '01:52 ∅'
+        ];
+        var tokenData = [
+            21770508, 21773569, null, 24646974, 24716224,
+            24716224, 25565135, 25762128, 25966540, 26738712,
+            27050000, 27180000, null
+        ];
+
+        new Chart(document.getElementById('chartTokens'), {
+            type: 'line',
+            data: {
+                labels: tokenLabels,
+                datasets: [{
+                    label: 'Cumulative Tokens',
+                    data: tokenData,
+                    borderColor: '#a29bfe',
+                    backgroundColor: 'rgba(108,92,231,0.1)',
+                    fill: true,
+                    tension: 0.3,
+                    pointBackgroundColor: tokenData.map(function(v, i) {
+                        if (i === 12) return '#00b894'; // silence — cascade ends
+                        if (i === 5) return '#ffeaa7';  // frozen
+                        if (i >= 6) return '#fd79a8';   // burning again
+                        return '#a29bfe';
+                    }),
+                    pointRadius: 5,
+                    borderWidth: 2,
+                    spanGaps: false
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                if (ctx.raw == null) return 'No data';
+                                return (ctx.raw / 1000000).toFixed(2) + 'M tokens';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: scaleDefaults({
+                        ticks: {
+                            callback: function(v) { return (v/1000000).toFixed(1) + 'M'; }
+                        }
+                    }),
+                    x: scaleDefaults({ grid: { display: false } })
+                }
+            }
+        });
+
+        // ── 3. Agent Distribution at Peak ─────────────────────────────
+        new Chart(document.getElementById('chartAgents'), {
+            type: 'doughnut',
+            data: {
+                labels: [
+                    'sub-devsecops (71)',
+                    'sub-social (35)',
+                    'sub-orchestrator (10)',
+                    'aria (8)',
+                    'main (3)',
+                    'sub-research (2)',
+                    'sub-data (1)',
+                    'sub-devops (1)'
+                ],
+                datasets: [{
+                    data: [71, 35, 10, 8, 3, 2, 1, 1],
+                    backgroundColor: [
+                        'rgba(225,112,85,0.75)',
+                        'rgba(116,185,255,0.70)',
+                        'rgba(108,92,231,0.70)',
+                        'rgba(0,206,201,0.65)',
+                        'rgba(253,203,110,0.65)',
+                        'rgba(0,184,148,0.65)',
+                        'rgba(253,121,168,0.60)',
+                        'rgba(162,155,254,0.65)'
+                    ],
+                    borderColor: [
+                        '#e17055','#74b9ff','#6c5ce7','#00cec9',
+                        '#fdcb6e','#00b894','#fd79a8','#a29bfe'
+                    ],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                cutout: '52%',
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { padding: 10, usePointStyle: true, pointStyle: 'circle', font: { size: 9 } }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                var total = ctx.dataset.data.reduce(function(a,b){ return a+b; }, 0);
+                                var pct = ((ctx.raw / total) * 100).toFixed(1);
+                                return ctx.label + ' — ' + pct + '%';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // ── 4. Spawn Rate ──────────────────────────────────────────────
+        var spawnLabels = [
+            '18:56→19:27', '19:27→20:36', '20:36→01:13↑',
+            '01:13→03:17↓', '21:11→23:15', '23:15→23:48',
+            '23:48→23:51', '23:51→23:54', '23:54→00:04',
+            '00:04→00:34', '00:34→00:49', '00:49→01:04',
+            '01:04→01:18', '01:18→01:29', '01:29→01:34',
+            '01:34→01:49', '01:49→∅'
+        ];
+        var spawnDeltas = [16, -1, 119, -105, 73, 20, 0, 2, 3, 2, 1, 0, 2, 4, 4, 0, 0];
+        var spawnColors = spawnDeltas.map(function(v) {
+            if (v > 20) return 'rgba(225,112,85,0.80)';
+            if (v > 5)  return 'rgba(253,203,110,0.75)';
+            if (v < 0)  return 'rgba(0,184,148,0.70)';
+            return 'rgba(116,185,255,0.55)';
+        });
+
+        new Chart(document.getElementById('chartSpawnRate'), {
+            type: 'bar',
+            data: {
+                labels: spawnLabels,
+                datasets: [{
+                    label: 'Δ Sessions',
+                    data: spawnDeltas,
+                    backgroundColor: spawnColors,
+                    borderColor: spawnColors.map(function(c) { return c.replace('0.', '1.').replace(', 1.80)', ')').replace(', 1.75)', ')').replace(', 1.70)', ')').replace(', 1.55)', ')'); }),
+                    borderWidth: 1,
+                    borderRadius: 3
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: scaleDefaults({ beginAtZero: true }),
+                    x: scaleDefaults({ grid: { display: false }, ticks: { maxRotation: 55, font: { size: 8 } } })
+                }
+            }
+        });
+
+        // ── 5. Cost Delta Per Cycle ────────────────────────────────────
+        new Chart(document.getElementById('chartCostDelta'), {
+            type: 'bar',
+            data: {
+                labels: [
+                    '21:11→23:15', '23:15→23:48', '23:48→23:54',
+                    '23:54→00:04', '00:04→00:34', '00:34→00:49',
+                    '00:49→01:04', '01:04→01:29',
+                    '01:29→01:34', '01:34→01:52', '01:52→∅'
+                ],
+                datasets: [{
+                    label: 'USD Burned',
+                    data: [0.0, 0.390, 0.006, 0.000, 0.103, 0.023, 0.032, 0.117, 0.020, 0.015, 0.000],
+                    backgroundColor: [
+                        'rgba(0,184,148,0.6)',
+                        'rgba(225,112,85,0.85)',
+                        'rgba(253,203,110,0.7)',
+                        'rgba(116,185,255,0.4)',
+                        'rgba(225,112,85,0.75)',
+                        'rgba(253,203,110,0.65)',
+                        'rgba(253,203,110,0.65)',
+                        'rgba(225,112,85,0.80)',
+                        'rgba(253,203,110,0.60)',
+                        'rgba(116,185,255,0.50)',
+                        'rgba(0,184,148,0.45)',
+                    ],
+                    borderRadius: 4,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: scaleDefaults({
+                        beginAtZero: true,
+                        ticks: { callback: function(v) { return '$' + v.toFixed(3); } }
+                    }),
+                    x: scaleDefaults({ grid: { display: false }, ticks: { font: { size: 9 } } })
+                }
+            }
+        });
+
+        // ── 6. Step Frequency Across Logged Work Cycles ───────────────
+        new Chart(document.getElementById('chartSteps'), {
+            type: 'bar',
+            data: {
+                labels: [
+                    'health_check\n(all passed)',
+                    'goal_check\n(CB blocked)',
+                    'goal_check\n(success)',
+                    'memory_sync\n(blocked)',
+                    'memory_sync\n(complete)',
+                    'artifact_log\n(file only)',
+                    'artifact_log\n(api success)',
+                    'spawn fallback\nsub-agent'
+                ],
+                datasets: [{
+                    label: 'Occurrences in 9 work cycles',
+                    data: [9, 7, 2, 6, 3, 6, 3, 7],
+                    backgroundColor: [
+                        'rgba(0,184,148,0.7)',
+                        'rgba(225,112,85,0.8)',
+                        'rgba(0,184,148,0.6)',
+                        'rgba(225,112,85,0.8)',
+                        'rgba(0,184,148,0.6)',
+                        'rgba(253,203,110,0.7)',
+                        'rgba(0,184,148,0.6)',
+                        'rgba(253,121,168,0.8)'
+                    ],
+                    borderRadius: 4,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: scaleDefaults({ beginAtZero: true, ticks: { stepSize: 1 } }),
+                    x: scaleDefaults({ grid: { display: false }, ticks: { font: { size: 9 } } })
+                }
+            }
+        });
+
+        // ── 7. CB State vs Session Count ──────────────────────────────
+        var cbLabels = ['23:15','23:48','23:51','23:54','00:04','00:34','00:49','01:04','01:18','01:29','01:34','01:49'];
+        var cbSessions = [97, 117, 117, 119, 122, 124, 125, 125, 127, 131, 135, 135];
+        var cbState = [0, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1];  // 0=closed, 1=open
+
+        new Chart(document.getElementById('chartCBCorr'), {
+            type: 'line',
+            data: {
+                labels: cbLabels,
+                datasets: [
+                    {
+                        label: 'Total Sessions',
+                        data: cbSessions,
+                        borderColor: '#e17055',
+                        backgroundColor: 'rgba(225,112,85,0.08)',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 4,
+                        yAxisID: 'ySessions',
+                        borderWidth: 2
+                    },
+                    {
+                        label: 'CB Open (1=Open)',
+                        data: cbState,
+                        borderColor: '#fd79a8',
+                        backgroundColor: 'transparent',
+                        fill: false,
+                        tension: 0,
+                        borderDash: [5,4],
+                        pointRadius: 4,
+                        pointBackgroundColor: cbState.map(function(v) { return v ? '#fd79a8' : '#55efc4'; }),
+                        yAxisID: 'yCB',
+                        borderWidth: 2
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { position: 'top', labels: { usePointStyle: true, pointStyle: 'circle', padding: 12, font: { size: 10 } } }
+                },
+                scales: {
+                    ySessions: scaleDefaults({ type: 'linear', position: 'left', beginAtZero: false }),
+                    yCB: scaleDefaults({ type: 'linear', position: 'right', min: -0.1, max: 1.2, ticks: { callback: function(v) { return v === 1 ? 'OPEN' : v === 0 ? 'CLOSED' : ''; } }, grid: { display: false } }),
+                    x: scaleDefaults({ grid: { display: false }, ticks: { font: { size: 9 } } })
+                }
+            }
+        });
+
+    }
+
+    setTimeout(initCharts, 300);
+
+    // ── Propagation Network ────────────────────────────────────
+    function initNetwork() {
+        var container = document.getElementById('propagationNetwork');
+        if (!container || typeof vis === 'undefined') return;
+
+        // ── Colour palette ──
+        var C = {
+            cron:      { bg: '#e8e8ff', border: '#a29bfe', font: '#0a0a1a' },
+            cycle:     { bg: '#3d3200', border: '#fdcb6e', font: '#ffeaa7' },
+            aria:      { bg: '#2a1f5e', border: '#a29bfe', font: '#d4cfff' },
+            dsops:     { bg: '#3d1200', border: '#e17055', font: '#fab1a0' },
+            social:    { bg: '#0d2a3d', border: '#74b9ff', font: '#cce4ff' },
+            orch:      { bg: '#0d2a3d', border: '#74b9ff', font: '#cce4ff' },
+            cb:        { bg: '#2d0000', border: '#ff3c3c', font: '#ff8080' },
+            fallback:  { bg: '#003d28', border: '#55efc4', font: '#aaffdd' },
+        };
+
+        function n(id, label, group, extra) {
+            var g = C[group];
+            return Object.assign({
+                id: id, label: label,
+                color: { background: g.bg, border: g.border, highlight: { background: g.border, border: '#fff' } },
+                font: { color: g.font, size: 11, face: 'Inter, sans-serif', multi: false },
+                borderWidth: 2,
+                shape: 'dot',
+                size: 14,
+            }, extra || {});
+        }
+
+        // ── Nodes ──
+        // Real timeline: 9 work cycles between 23:51 and 01:52 (last write)
+        // sub-devsecops: 53 at start → 71 at peak (+18 spawned during cascade)
+        // 01:49 cycle: agent_audit blocked by CB — no spawns logged; true end 01:52 UTC
+        // We model 10 cron firings in the visualization (includes one estimated tick at 01:18)
+        var cycleTimes = ['23:51','23:54','00:04','00:34','00:49','01:04','01:18','01:29','01:34','01:49'];
+        var cycleSpawns = [2, 1, 1, 3, 1, 0, 2, 6, 4, 0]; // delta sub-devsecops per cycle (rough from logs; 0 = audit blocked at 01:49)
+
+        var nodes_arr = [];
+        var edges_arr = [];
+        var nid = 1;
+
+        // CRON root
+        var CRON_ID = nid++;
+        nodes_arr.push(n(CRON_ID, '⏰ CRON\nEvery 15min', 'cron', { size: 22, title: 'Cron scheduler — fires work_cycle 10 times between 23:51 Feb 27 and 01:52 Feb 28. Expected next at ~02:04 UTC — never fired. Cascade ended cold.' }));
+
+        // CB node — the gravitational attractor
+        var CB_ID = nid++;
+        nodes_arr.push(n(CB_ID, '⚡ API CIRCUIT\nBREAKER\nOPEN', 'cb', {
+            size: 48,
+            shape: 'dot',
+            borderWidth: 3,
+            title: 'threshold=5 failures | reset_after=30s | record_success() never called during incident',
+            font: { color: '#ff8080', size: 13, bold: true, face: 'Inter, sans-serif' }
+        }));
+
+        // For each work cycle
+        var allDsopsIds = [];
+        cycleTimes.forEach(function(t, ci) {
+            var cycleId = nid++;
+            nodes_arr.push(n(cycleId, 'work_cycle\n' + t, 'cycle', {
+                size: 16,
+                title: 'Feb 27-28 ' + t + ' UTC — work_cycle job fired by cron'
+            }));
+            edges_arr.push({ from: CRON_ID, to: cycleId,
+                color: { color: 'rgba(253,203,110,0.5)' },
+                arrows: 'to', width: 1.5, dashes: false,
+                title: 'cron fires work_cycle'
+            });
+
+            // aria[main] per cycle
+            var ariaId = nid++;
+            nodes_arr.push(n(ariaId, 'aria\n[main]', 'aria', {
+                title: 'Aria main session — health_check ok, goal_check CB blocked'
+            }));
+            edges_arr.push({ from: cycleId, to: ariaId,
+                color: { color: 'rgba(162,155,254,0.6)' },
+                arrows: 'to', width: 1.5
+            });
+
+            // aria → CB call (blocked)
+            edges_arr.push({ from: ariaId, to: CB_ID,
+                color: { color: 'rgba(255,60,60,0.5)' },
+                arrows: 'to', width: 1, dashes: [4,3],
+                title: 'api_client call → CB OPEN → fast-fail'
+            });
+
+            // spawn N sub-devsecops for this cycle
+            var numDs = Math.max(1, cycleSpawns[ci] + (ci === 0 ? 2 : 1));
+            var prevDsId = ariaId;
+            for (var s = 0; s < numDs; s++) {
+                var dsId = nid++;
+                var dsNum = allDsopsIds.length + 53 + 1; // starts at real count of 53
+                nodes_arr.push(n(dsId, 'sub-devsecops\n[' + dsNum + ']', 'dsops', {
+                    title: 'sub-devsecops spawned as API fallback writer — cycle ' + t + ', instance #' + s
+                }));
+                // parent spawns it
+                edges_arr.push({ from: prevDsId, to: dsId,
+                    color: { color: 'rgba(225,112,85,0.7)' },
+                    arrows: 'to', width: 1.5,
+                    title: 'spawned as fallback agent'
+                });
+                // it calls CB
+                edges_arr.push({ from: dsId, to: CB_ID,
+                    color: { color: 'rgba(255,60,60,0.45)' },
+                    arrows: 'to', width: 1, dashes: [3,4],
+                    title: 'api_client.write_artifact → CB OPEN → blocked'
+                });
+                allDsopsIds.push(dsId);
+                // cascade — each spawns next (except last of final cycle)
+                if (s < numDs - 1) { prevDsId = dsId; }
+            }
+
+            // Last devsecops in chain → partial file fallback (a few cycles)
+            if (ci < 5) {
+                var fbId = nid++;
+                nodes_arr.push(n(fbId, '📄 file write\n(partial)', 'fallback', {
+                    size: 11,
+                    title: 'Direct write to aria_memories/logs/ — only successful escape from CB'
+                }));
+                edges_arr.push({ from: allDsopsIds[allDsopsIds.length - 1], to: fbId,
+                    color: { color: 'rgba(85,239,196,0.6)' },
+                    arrows: 'to', width: 1.5, dashes: false
+                });
+            }
+        });
+
+        // sub-social + sub-orchestrator (persistent across all cycles)
+        var socialId = nid++;
+        var orchId = nid++;
+        nodes_arr.push(n(socialId, 'sub-social\n×35', 'social', { size: 16, title: 'sub-social: 35 sessions throughout — not part of cascade, persistent work sessions' }));
+        nodes_arr.push(n(orchId,  'sub-orchestrator\n×10', 'orch', { size: 14, title: 'sub-orchestrator: 10 sessions — spawned for coordination tasks' }));
+        edges_arr.push({ from: CRON_ID, to: socialId,  color: { color: 'rgba(116,185,255,0.3)' }, arrows: 'to', width: 1, dashes: [6,5] });
+        edges_arr.push({ from: CRON_ID, to: orchId,    color: { color: 'rgba(116,185,255,0.3)' }, arrows: 'to', width: 1, dashes: [6,5] });
+
+        // ── Build dataset ──
+        var nodesDS = new vis.DataSet(nodes_arr);
+        var edgesDS = new vis.DataSet(edges_arr);
+
+        // ── Physics: pull devsecops toward CB, push everything else apart ──
+        var options = {
+            physics: {
+                enabled: true,
+                solver: 'forceAtlas2Based',
+                forceAtlas2Based: {
+                    gravitationalConstant: -42,
+                    centralGravity: 0.004,
+                    springLength: 95,
+                    springConstant: 0.09,
+                    damping: 0.5,
+                    avoidOverlap: 0.4
+                },
+                stabilization: { iterations: 250, updateInterval: 30 }
+            },
+            interaction: {
+                hover: true,
+                tooltipDelay: 120,
+                navigationButtons: false,
+                keyboard: false
+            },
+            edges: {
+                smooth: { type: 'continuous', roundness: 0.3 },
+                selectionWidth: 2
+            },
+            nodes: {
+                chosen: {
+                    node: function(values) {
+                        values.borderWidth = 3;
+                        values.size = values.size * 1.2;
+                    }
+                }
+            },
+            background: 'transparent'
+        };
+
+        var network = new vis.Network(container, { nodes: nodesDS, edges: edgesDS }, options);
+
+        // Once stabilized, slightly pin CB in place so it stays central
+        network.once('stabilizationIterationsDone', function() {
+            network.moveNode(CB_ID, 0, 0);
+        });
+    }
+    setTimeout(initNetwork, 600);
+})();
+</script>
+
+</body>
+</html>

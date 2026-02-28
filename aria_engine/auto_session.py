@@ -30,6 +30,12 @@ MAX_MESSAGES_PER_SESSION = 200
 MAX_SESSION_DURATION_HOURS = 8
 AUTO_TITLE_MAX_LENGTH = 100
 IDLE_SCAN_INTERVAL_MINUTES = 5
+# Sub-agent sessions are pruned after this many hours regardless of activity.
+# Unlike the idle prune (which resets on any update), this uses created_at —
+# a sub-* session alive for >1h survived at least 4 cron cycles and is stale.
+# Incident: Midnight Cascade — sub-agents updated updated_at on every CB-retry,
+# resetting the idle clock and evading standard prune for the full 2.5h window.
+SUB_AGENT_STALE_HOURS = 1
 
 
 def generate_auto_title(first_message: str) -> str:
@@ -319,6 +325,80 @@ class AutoSessionManager:
             "closed_count": len(idle_ids),
             "session_ids": idle_ids,
         }
+
+    async def close_stale_subagent_sessions(
+        self,
+        stale_hours: int = SUB_AGENT_STALE_HOURS,
+    ) -> dict[str, Any]:
+        """Close sub-agent sessions older than stale_hours (default 1h).
+
+        Unlike close_idle_sessions() which prunes by updated_at (reset on any
+        activity), this method prunes by created_at — the wall-clock age of
+        the session. A sub-* session that has been running for >1h survived
+        at least 4 cron cycles and should be considered stale regardless of
+        whether it was "active" recently.
+
+        This closes the gap exploited in the Midnight Cascade incident, where
+        sub-agents evaded idle-prune by updating updated_at on every CB-retry.
+
+        Args:
+            stale_hours: Sessions older than this are closed.
+                         Default: SUB_AGENT_STALE_HOURS (1).
+
+        Returns:
+            Dict with 'closed_count' and 'session_ids'.
+        """
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=stale_hours)
+        async with self._db.begin() as conn:
+            stmt = (
+                select(EngineChatSession.id)
+                .where(
+                    and_(
+                        EngineChatSession.created_at < cutoff,
+                        EngineChatSession.agent_id.like("sub-%"),
+                        or_(
+                            EngineChatSession.metadata_json.is_(None),
+                            not_(
+                                EngineChatSession.metadata_json.has_key("ended")
+                            ),
+                            EngineChatSession.metadata_json["ended"].astext
+                            == "false",
+                        ),
+                    )
+                )
+            )
+            result = await conn.execute(stmt)
+            stale_ids = [row[0] for row in result.fetchall()]
+
+            if stale_ids:
+                await conn.execute(
+                    update(EngineChatSession)
+                    .where(EngineChatSession.id.in_(stale_ids))
+                    .values(
+                        metadata_json=func.coalesce(
+                            EngineChatSession.metadata_json,
+                            cast("{}", PG_JSONB),
+                        ).op("||")(  # type: ignore[operator]
+                            cast(
+                                {
+                                    "ended": True,
+                                    "end_reason": "sub_agent_stale_prune",
+                                },
+                                PG_JSONB,
+                            )
+                        ),
+                        updated_at=func.now(),
+                    )
+                )
+
+        if stale_ids:
+            logger.info(
+                "Stale-pruned %d sub-agent sessions (created >%dh ago)",
+                len(stale_ids),
+                stale_hours,
+            )
+
+        return {"closed_count": len(stale_ids), "session_ids": stale_ids}
 
     async def get_or_create_session(
         self,
