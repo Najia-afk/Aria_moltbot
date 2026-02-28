@@ -17,7 +17,8 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks, WebSocket
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select, update, and_, or_
+from sqlalchemy import func, select, delete, and_, or_
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession, AsyncEngine, async_sessionmaker
 from starlette.websockets import WebSocketDisconnect, WebSocketState
 
@@ -679,37 +680,104 @@ async def get_roundtable_turns(session_id: str):
 
 @router.delete("/{session_id}")
 async def delete_roundtable(session_id: str):
-    """End/archive a roundtable session."""
+    """Immediately archive and delete a roundtable or swarm session."""
     if _db_session is None:
         raise HTTPException(status_code=503, detail="Database not available")
 
     try:
         async with _db_session() as session:
             async with session.begin():
-                stmt = (
-                    update(EngineChatSession)
-                    .where(
+                # Works for both roundtable and swarm
+                row_result = await session.execute(
+                    select(EngineChatSession).where(
                         and_(
                             EngineChatSession.id == session_id,
-                            EngineChatSession.session_type == "roundtable",
+                            EngineChatSession.session_type.in_(("roundtable", "swarm")),
                         )
                     )
-                    .values(status="ended", updated_at=func.now())
-                    .returning(EngineChatSession.id)
                 )
-                result = await session.execute(stmt)
-                row = result.first()
+                row = row_result.scalar_one_or_none()
                 if row is None:
-                    raise HTTPException(status_code=404, detail=f"Roundtable {session_id} not found")
+                    raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
 
-        # Clean up in-memory cache
+                # Archive session immediately (idempotent)
+                await session.execute(
+                    pg_insert(EngineChatSessionArchive)
+                    .values(
+                        id=row.id,
+                        agent_id=row.agent_id,
+                        session_type=row.session_type,
+                        title=row.title,
+                        system_prompt=row.system_prompt,
+                        model=row.model,
+                        temperature=row.temperature,
+                        max_tokens=row.max_tokens,
+                        context_window=row.context_window,
+                        status="ended",
+                        message_count=row.message_count,
+                        total_tokens=row.total_tokens,
+                        total_cost=row.total_cost,
+                        metadata_json=row.metadata_json,
+                        created_at=row.created_at,
+                        updated_at=func.now(),
+                        ended_at=func.now(),
+                        archived_at=func.now(),
+                    )
+                    .on_conflict_do_nothing(index_elements=["id"])
+                )
+
+                # Archive messages (idempotent)
+                msg_rows = (await session.execute(
+                    select(EngineChatMessage).where(
+                        EngineChatMessage.session_id == session_id
+                    )
+                )).scalars().all()
+                for msg in msg_rows:
+                    await session.execute(
+                        pg_insert(EngineChatMessageArchive)
+                        .values(
+                            id=msg.id,
+                            session_id=msg.session_id,
+                            agent_id=msg.agent_id,
+                            role=msg.role,
+                            content=msg.content,
+                            thinking=msg.thinking,
+                            tool_calls=msg.tool_calls,
+                            tool_results=msg.tool_results,
+                            model=msg.model,
+                            tokens_input=msg.tokens_input,
+                            tokens_output=msg.tokens_output,
+                            cost=msg.cost,
+                            latency_ms=msg.latency_ms,
+                            embedding=msg.embedding,
+                            metadata_json=msg.metadata_json,
+                            created_at=msg.created_at,
+                            archived_at=func.now(),
+                        )
+                        .on_conflict_do_nothing(index_elements=["id"])
+                    )
+
+                # Delete messages then session from working table
+                await session.execute(
+                    delete(EngineChatMessage).where(
+                        EngineChatMessage.session_id == session_id
+                    )
+                )
+                await session.execute(
+                    delete(EngineChatSession).where(
+                        EngineChatSession.id == session_id
+                    )
+                )
+
+        # Clean up in-memory caches
         _completed.pop(session_id, None)
+        _swarm_completed.pop(session_id, None)
 
-        return {"status": "ended", "session_id": session_id}
+        return {"status": "archived", "session_id": session_id}
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Delete roundtable failed: %s", e)
+        logger.error("Delete roundtable/swarm failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
