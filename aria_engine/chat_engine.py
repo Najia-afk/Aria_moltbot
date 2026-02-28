@@ -94,7 +94,7 @@ class ChatEngine:
     """
 
     # Maximum tool call iterations to prevent infinite loops
-    MAX_TOOL_ITERATIONS = 20
+    MAX_TOOL_ITERATIONS = 50
 
     # Per-tool consecutive failure cap — after this many failures of the
     # *same* tool in one turn, we inject a rejection so the LLM stops retrying.
@@ -567,6 +567,33 @@ class ChatEngine:
                         created_at=datetime.now(timezone.utc),
                     )
                     db.add(tool_msg)
+
+            # ── 4b. If loop exhausted (hit MAX_TOOL_ITERATIONS) or final
+            #        content is empty, force one plain summary call ─────────
+            if not final_content or (final_content.rstrip().endswith(":") and accumulated_tool_calls):
+                logger.warning(
+                    "Session %s: forcing summary call (content=%r, iterations=%d)",
+                    sid, final_content[:60] if final_content else "", iteration + 1,
+                )
+                try:
+                    summary_response: LLMResponse = await self.gateway.complete(
+                        messages=messages,
+                        model=session.model,
+                        temperature=session.temperature,
+                        max_tokens=session.max_tokens,
+                        tools=None,  # No tools — force a plain text answer
+                        enable_thinking=False,
+                    )
+                    total_input_tokens += summary_response.input_tokens
+                    total_output_tokens += summary_response.output_tokens
+                    total_cost += summary_response.cost_usd
+                    if summary_response.content:
+                        final_content = summary_response.content
+                        final_finish_reason = summary_response.finish_reason
+                except Exception as e:
+                    logger.error("Summary call failed in session %s: %s", sid, e)
+                    if not final_content:
+                        final_content = "I completed the requested actions. Let me know if you need anything else."
 
             # ── 5. Persist assistant message ──────────────────────────────
             elapsed_ms = int((time.monotonic() - overall_start) * 1000)
