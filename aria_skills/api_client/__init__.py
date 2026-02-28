@@ -40,8 +40,10 @@ class AriaAPIClient(BaseSkill):
         self._api_url: str = ""
         self._max_retries: int = int(self.config.config.get("max_retries", 3))
         self._base_backoff_seconds: float = float(self.config.config.get("base_backoff_seconds", 0.5))
-        self._circuit_failure_threshold: int = int(self.config.config.get("circuit_failure_threshold", 5))
-        self._circuit_reset_seconds: float = float(self.config.config.get("circuit_reset_seconds", 30.0))
+        # Trip only after 10 consecutive hard failures (not 5) to avoid false-open
+        # on brief error bursts during cron work cycles.
+        self._circuit_failure_threshold: int = int(self.config.config.get("circuit_failure_threshold", 10))
+        self._circuit_reset_seconds: float = float(self.config.config.get("circuit_reset_seconds", 60.0))
         self._consecutive_failures: int = 0
         self._circuit_open_until: float = 0.0
     
