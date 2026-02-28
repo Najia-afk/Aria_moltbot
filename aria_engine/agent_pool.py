@@ -538,6 +538,52 @@ class AgentPool:
                 )
             )
 
+    async def update_agent_config(
+        self,
+        agent_id: str,
+        *,
+        model: str | None = None,
+        system_prompt: str | None = None,
+        focus_type: str | None = None,
+        temperature: float | None = None,
+        skills: list[str] | None = None,
+    ) -> "EngineAgent":
+        """Update config fields for an existing agent (in-memory + DB)."""
+        agent = self._agents.get(agent_id)
+        if agent is None:
+            raise EngineError(f"Agent {agent_id!r} not found in pool")
+
+        if model is not None:
+            agent.model = model
+        if system_prompt is not None:
+            agent.system_prompt = system_prompt
+        if focus_type is not None:
+            agent.focus_type = focus_type
+        if temperature is not None:
+            agent.temperature = temperature
+        if skills is not None:
+            agent.skills = skills
+
+        update_vals: dict[str, Any] = {"updated_at": func.now()}
+        if model is not None:
+            update_vals["model"] = model
+        if system_prompt is not None:
+            update_vals["system_prompt"] = system_prompt
+        if focus_type is not None:
+            update_vals["focus_type"] = focus_type
+        if temperature is not None:
+            update_vals["temperature"] = temperature
+        if skills is not None:
+            update_vals["skills"] = skills
+
+        async with self._db_engine.begin() as conn:
+            await conn.execute(
+                update(EngineAgentState)
+                .where(EngineAgentState.agent_id == agent_id)
+                .values(**update_vals)
+            )
+        return agent
+
     def get_status(self) -> dict[str, Any]:
         """Get pool status summary."""
         statuses: dict[str, int] = {}

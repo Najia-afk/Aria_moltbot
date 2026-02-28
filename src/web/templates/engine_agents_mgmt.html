@@ -345,12 +345,30 @@
             </div>
         </div>
         <div class="form-group">
-            <label>System Prompt (preview)</label>
-            <textarea id="panelPrompt" readonly placeholder="System prompt will appear here…"></textarea>
+            <label>Focus Type</label>
+            <select id="panelFocusType">
+                <option value="">general</option>
+                <option value="research">research</option>
+                <option value="devops">devops</option>
+                <option value="creative">creative</option>
+                <option value="security">security</option>
+                <option value="social">social</option>
+                <option value="analysis">analysis</option>
+                <option value="sprint">sprint</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>System Prompt</label>
+            <textarea id="panelPrompt" rows="6" placeholder="System prompt…"></textarea>
+        </div>
+        <div class="form-group">
+            <label>Skills</label>
+            <div id="panelSkillsList" style="max-height:160px;overflow-y:auto;display:flex;flex-wrap:wrap;gap:6px;padding:8px;background:var(--bg-primary,#0d0d1a);border:1px solid var(--border-color,#3a3a5e);border-radius:6px;">
+                <span style="color:var(--text-muted);font-size:0.8rem;">Loading skills…</span>
+            </div>
         </div>
         <div style="display:flex;gap:8px;margin-top:16px;">
-            <button class="btn-primary" onclick="saveAgentConfig()" style="flex:1;justify-content:center;">Save Changes</button>
-            <a id="panelPromptLink" href="#" class="btn-secondary" style="text-align:center;text-decoration:none;padding:10px 18px;border-radius:8px;font-size:0.85rem;">Edit Prompt</a>
+            <button class="btn-primary" onclick="saveAgentConfig()" style="flex:1;justify-content:center;">💾 Save Changes</button>
         </div>
     </div>
 </div>
@@ -492,8 +510,8 @@
         document.getElementById('panelAgentName').textContent = agent.display_name || agentId;
         document.getElementById('panelTemp').value = agent.temperature || 0.7;
         document.getElementById('panelTempVal').textContent = agent.temperature || 0.7;
-        document.getElementById('panelPrompt').value = agent.system_prompt || '(not loaded)';
-        document.getElementById('panelPromptLink').href = `/operations/agents/${agentId}/prompt`;
+        document.getElementById('panelPrompt').value = agent.system_prompt || '';
+        document.getElementById('panelFocusType').value = agent.focus_type || '';
 
         // Load models into selector
         try {
@@ -508,6 +526,22 @@
             }).join('');
         } catch(e) { /* ignore */ }
 
+        // Load skills as checkboxes
+        const agentSkills = agent.skills || [];
+        try {
+            const sresp = await fetch('/api/skills');
+            const sdata = await sresp.json();
+            const skillNames = (sdata.skills || sdata || []).map(s => s.skill_name || s.canonical_name || s);
+            document.getElementById('panelSkillsList').innerHTML = skillNames.map(sk => {
+                const checked = agentSkills.includes(sk) ? 'checked' : '';
+                return `<label style="display:flex;align-items:center;gap:4px;font-size:0.78rem;white-space:nowrap;cursor:pointer;"><input type="checkbox" class="panel-skill-cb" value="${esc(sk)}" ${checked}> ${esc(sk)}</label>`;
+            }).join('');
+        } catch(e) {
+            document.getElementById('panelSkillsList').innerHTML = agentSkills.map(sk =>
+                `<label style="display:flex;align-items:center;gap:4px;font-size:0.78rem;cursor:pointer;"><input type="checkbox" class="panel-skill-cb" value="${esc(sk)}" checked> ${esc(sk)}</label>`
+            ).join('') || '<span style="color:var(--text-muted);font-size:0.8rem;">Could not load skills</span>';
+        }
+
         document.getElementById('agentDetailPanel').classList.add('open');
     }
 
@@ -517,17 +551,24 @@
 
     async function saveAgentConfig() {
         const agentId = document.getElementById('panelAgentId').value;
+        const checkedSkills = [...document.querySelectorAll('.panel-skill-cb:checked')].map(cb => cb.value);
         const config = {
-            model: document.getElementById('panelModel').value,
+            model: document.getElementById('panelModel').value || undefined,
             temperature: parseFloat(document.getElementById('panelTemp').value),
+            system_prompt: document.getElementById('panelPrompt').value || undefined,
+            focus_type: document.getElementById('panelFocusType').value || undefined,
+            skills: checkedSkills,
         };
+        // Strip undefined keys
+        Object.keys(config).forEach(k => config[k] === undefined && delete config[k]);
 
         try {
-            await fetch(`${API}/agents/${agentId}`, {
+            const resp = await fetch(`${API}/agents/${agentId}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(config),
             });
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
             closePanel();
             loadAgents();
         } catch(e) {

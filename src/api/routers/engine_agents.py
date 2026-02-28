@@ -36,6 +36,17 @@ class AgentSummary(BaseModel):
     last_active_at: str | None = None
     context_length: int = 0
     system_prompt: str = ""
+    skills: list[str] = []
+    enabled: bool = True
+
+
+class AgentUpdate(BaseModel):
+    """Fields that can be patched on a live agent."""
+    model: str | None = None
+    system_prompt: str | None = None
+    focus_type: str | None = None
+    temperature: float | None = None
+    skills: list[str] | None = None
 
 
 class AgentPoolStatus(BaseModel):
@@ -119,6 +130,27 @@ async def get_agent(
     if agent is None:
         raise HTTPException(404, f"Agent {agent_id!r} not found")
     return AgentSummary(**agent.get_summary())
+
+
+@router.patch("/{agent_id}", response_model=AgentSummary)
+async def update_agent(
+    agent_id: str,
+    body: AgentUpdate,
+    pool: AgentPool = Depends(get_pool),
+) -> AgentSummary:
+    """Patch config fields on a live agent (model, prompt, focus, temperature, skills)."""
+    try:
+        agent = await pool.update_agent_config(
+            agent_id,
+            model=body.model,
+            system_prompt=body.system_prompt,
+            focus_type=body.focus_type,
+            temperature=body.temperature,
+            skills=body.skills,
+        )
+        return AgentSummary(**agent.get_summary())
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.post("/delegate", response_model=DelegateResponse)

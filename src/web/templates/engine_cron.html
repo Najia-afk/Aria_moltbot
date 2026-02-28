@@ -101,12 +101,7 @@
                 <div>
                     <label>Agent</label>
                     <select id="jobAgent">
-                        <option value="main" selected>main</option>
-                        <option value="aria-talk">aria-talk</option>
-                        <option value="aria-analyst">aria-analyst</option>
-                        <option value="aria-devops">aria-devops</option>
-                        <option value="aria-creator">aria-creator</option>
-                        <option value="aria-memeothy">aria-memeothy</option>
+                        <option value="main">main</option>
                     </select>
                 </div>
             </div>
@@ -293,11 +288,29 @@ async function deleteJob(jobId) {
     refreshJobs();
 }
 
+async function loadAgentOptions(selected) {
+    const sel = document.getElementById('jobAgent');
+    try {
+        const resp = await fetch('/api/engine/agents');
+        const data = await resp.json();
+        const agentList = data.agents || [];
+        sel.innerHTML = agentList.map(a =>
+            `<option value="${a.agent_id}" ${a.agent_id === selected ? 'selected' : ''}>${a.display_name || a.agent_id}</option>`
+        ).join('');
+        if (selected && !agentList.find(a => a.agent_id === selected)) {
+            sel.insertAdjacentHTML('afterbegin', `<option value="${selected}" selected>${selected}</option>`);
+        }
+    } catch(e) {
+        // keep whatever is already in the select
+    }
+}
+
 function openCreateModal() {
     document.getElementById('jobModalTitle').textContent = 'New Cron Job';
     document.getElementById('jobForm').reset();
     document.getElementById('jobId').value = '';
     document.getElementById('jobEnabled').checked = true;
+    loadAgentOptions('main');
     document.getElementById('jobModal').classList.add('active');
 }
 
@@ -308,13 +321,13 @@ async function openEditModal(jobId) {
     document.getElementById('jobId').value = j.id;
     document.getElementById('jobName').value = j.name;
     document.getElementById('jobSchedule').value = j.schedule;
-    document.getElementById('jobAgent').value = j.agent_id;
     document.getElementById('jobSessionMode').value = j.session_mode;
     document.getElementById('jobMaxDuration').value = j.max_duration_seconds || 300;
     document.getElementById('jobPayloadType').value = j.payload_type;
     document.getElementById('jobRetryCount').value = j.retry_count || 0;
     document.getElementById('jobPayload').value = j.payload || '';
     document.getElementById('jobEnabled').checked = j.enabled;
+    await loadAgentOptions(j.agent_id);
     document.getElementById('jobModal').classList.add('active');
 }
 
