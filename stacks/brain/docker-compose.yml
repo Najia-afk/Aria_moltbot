@@ -142,9 +142,7 @@ services:
     volumes:
       - ./certs:/certs
     command: >
-      sh -c "if [ -f /certs/cert.pem ] && [ -f /certs/key.pem ]; then
-      echo 'Cert already exists, skipping generation.'; exit 0; fi; \
-      apk add --no-cache openssl; \
+      sh -c "apk add --no-cache openssl; \
       SAN=\"DNS:localhost,DNS:aria.local,DNS:${SERVICE_HOST},IP:127.0.0.1\"; \
       if [ -n \"${MAC_LAN_IP}\" ]; then SAN=\"$$SAN,IP:${MAC_LAN_IP}\"; fi; \
       if [ -n \"${MAC_TAILSCALE_IP}\" ]; then SAN=\"$$SAN,IP:${MAC_TAILSCALE_IP}\"; fi; \
