@@ -35,6 +35,7 @@ class AgentSummary(BaseModel):
     consecutive_failures: int = 0
     last_active_at: str | None = None
     context_length: int = 0
+    system_prompt: str = ""
 
 
 class AgentPoolStatus(BaseModel):

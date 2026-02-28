@@ -191,6 +191,13 @@ function renderDetail(agentId) {
             </div>
         </div>
 
+        <!-- System Prompt -->
+        ${agent.system_prompt ? `
+        <div class="mb-3">
+            <h6>🧠 System Prompt</h6>
+            <pre style="background:var(--bs-dark,#1e1e1e);color:var(--bs-light,#f8f9fa);padding:0.75rem;border-radius:6px;font-size:0.78rem;max-height:220px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;">${agent.system_prompt.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre>
+        </div>` : ''}
+
         <!-- Sessions for this agent -->
         <h6>📂 Sessions</h6>
         <div class="session-list mb-3" id="agentSessions-${agentId}">

@@ -177,6 +177,7 @@ class EngineAgent:
                 self.last_active_at.isoformat() if self.last_active_at else None
             ),
             "context_length": len(self._context),
+            "system_prompt": self.system_prompt,
         }
 
 
