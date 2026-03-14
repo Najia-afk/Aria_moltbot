@@ -210,6 +210,20 @@ async def ensure_schema() -> None:
             "WITH (m = 16, ef_construction = 64) "
             "WHERE embedding IS NOT NULL",
         )
+        # HNSW vector index on archived messages (P1-4)
+        await _run_isolated(
+            conn, "hnsw_archive_messages_embedding",
+            "CREATE INDEX IF NOT EXISTS idx_archive_messages_embedding_hnsw "
+            "ON aria_engine.chat_messages_archive USING hnsw (embedding vector_cosine_ops) "
+            "WITH (m = 16, ef_construction = 64) "
+            "WHERE embedding IS NOT NULL",
+        )
+        # GIN trigram index for archive content text search (P0-1)
+        await _run_isolated(
+            conn, "gin_archive_content_trgm",
+            "CREATE INDEX IF NOT EXISTS idx_ecma_content_trgm "
+            "ON aria_engine.chat_messages_archive USING gin (content gin_trgm_ops)",
+        )
 
         if failed:
             logger.warning("Schema bootstrap: %d tables created, %d failed: %s",

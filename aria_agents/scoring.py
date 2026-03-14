@@ -220,6 +220,26 @@ class PerformanceTracker:
         all_agents = set(list(self._records.keys()) + list(self._scores.keys()))
         stats = [self.get_agent_stats(aid) for aid in all_agents]
         return sorted(stats, key=lambda x: x["score"], reverse=True)
+
+    def merge_external_scores(self, db_scores: dict[str, float]) -> int:
+        """Merge DB-backed pheromone scores into in-memory tracker.
+
+        For agents that have no local records yet, the DB score is adopted.
+        For agents with local records, the local computed score takes precedence
+        (it has fresher data).  Returns the number of agents updated from DB.
+        """
+        updated = 0
+        for agent_id, db_score in db_scores.items():
+            if agent_id not in self._scores:
+                self._scores[agent_id] = db_score
+                updated += 1
+        if updated:
+            logger.info("Merged %d agent scores from DB into in-memory tracker", updated)
+        return updated
+
+    def export_scores(self) -> dict[str, float]:
+        """Export all current scores for persisting to an external store (DB)."""
+        return dict(self._scores)
     
     def save(self) -> bool:
         """Persist scores and recent records to disk."""

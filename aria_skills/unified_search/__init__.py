@@ -247,6 +247,46 @@ class MemoryBackend:
         except Exception:
             return []
 
+class ArchiveBackend:
+    """Search archived conversation messages via text match."""
+
+    def __init__(self, api_client):
+        self._api = api_client
+
+    async def search(self, query: str, limit: int = 10,
+                     role: str | None = None) -> list[SearchResult]:
+        try:
+            result = await self._api.search_archived_conversations(
+                query=query, limit=limit, role=role)
+            if not result.success:
+                return []
+
+            items = result.data if isinstance(result.data, list) else (
+                result.data.get("results", result.data.get("messages", []))
+                if isinstance(result.data, dict) else [])
+
+            results: list[SearchResult] = []
+            for item in items:
+                role_prefix = item.get("role", "")
+                session_title = item.get("session_title", "")
+                content = item.get("content", "")
+                display = f"[{role_prefix}] {session_title}: {content}" if session_title else content
+                results.append(SearchResult(
+                    content=display,
+                    score=0.6,
+                    source="archive",
+                    category=item.get("session_type", "chat"),
+                    importance=0.7 if role_prefix == "user" else 0.5,
+                    metadata={
+                        "session_id": item.get("session_id", ""),
+                        "session_title": session_title,
+                        "role": role_prefix,
+                    },
+                    original_id=str(item.get("id", "")),
+                ))
+            return results
+        except Exception:
+            return []
 
 # ═══════════════════════════════════════════════════════════════════
 # Skill Class
@@ -255,13 +295,14 @@ class MemoryBackend:
 @SkillRegistry.register
 class UnifiedSearchSkill(BaseSkill):
     """
-    Unified search across semantic, graph, and memory backends with RRF.
+    Unified search across semantic, graph, memory, and archive backends with RRF.
 
     Tools:
       search           — Full unified search with RRF merge
       semantic_search  — Search semantic memories only
       graph_search     — Search knowledge graph only
       memory_search    — Search traditional memories only
+      archive_search   — Search archived conversations
     """
 
     def __init__(self, config: SkillConfig | None = None):
@@ -270,6 +311,7 @@ class UnifiedSearchSkill(BaseSkill):
         self._semantic: SemanticBackend | None = None
         self._graph: GraphBackend | None = None
         self._memory: MemoryBackend | None = None
+        self._archive: ArchiveBackend | None = None
         self._merger: RRFMerger | None = None
         self._search_count = 0
 
@@ -289,11 +331,13 @@ class UnifiedSearchSkill(BaseSkill):
         self._semantic = SemanticBackend(self._api)
         self._graph = GraphBackend(self._api)
         self._memory = MemoryBackend(self._api)
+        self._archive = ArchiveBackend(self._api)
 
         weights = {
             "semantic": float(self.config.config.get("weight_semantic", 1.0)),
             "graph": float(self.config.config.get("weight_graph", 0.8)),
             "memory": float(self.config.config.get("weight_memory", 0.6)),
+            "archive": float(self.config.config.get("weight_archive", 0.7)),
         }
         k = int(self.config.config.get("rrf_k", 60))
         self._merger = RRFMerger(k=k, weights=weights)
@@ -335,7 +379,7 @@ class UnifiedSearchSkill(BaseSkill):
         if not query:
             return SkillResult.fail("No query provided")
 
-        backends = backends or kwargs.get("backends", ["semantic", "graph", "memory"])
+        backends = backends or kwargs.get("backends", ["semantic", "graph", "memory", "archive"])
         start = time.monotonic()
 
         ranked_lists: dict[str, list[SearchResult]] = {}
@@ -357,6 +401,11 @@ class UnifiedSearchSkill(BaseSkill):
             results = await self._memory.search(query, limit=limit, category=category)
             ranked_lists["memory"] = results
             backend_counts["memory"] = len(results)
+
+        if "archive" in backends and self._archive:
+            results = await self._archive.search(query, limit=limit)
+            ranked_lists["archive"] = results
+            backend_counts["archive"] = len(results)
 
         # RRF merge
         merged = self._merger.merge(ranked_lists, limit=limit)
@@ -427,9 +476,28 @@ class UnifiedSearchSkill(BaseSkill):
             "backend": "memory",
         })
 
+    @logged_method()
+    async def archive_search(self, query: str = "", limit: int = 10,
+                              role: str | None = None, **kwargs) -> SkillResult:
+        """Search archived conversations by text content."""
+        if self._archive is None:
+            return SkillResult.fail("unified_search not initialized — archive backend unavailable")
+        query = query or kwargs.get("query", "")
+        if not query:
+            return SkillResult.fail("No query provided")
+
+        results = await self._archive.search(query, limit=limit, role=role)
+        return SkillResult.ok({
+            "query": query,
+            "results": [r.to_dict() for r in results],
+            "total_results": len(results),
+            "backend": "archive",
+        })
+
     async def close(self) -> None:
         self._api = None
         self._semantic = None
         self._graph = None
         self._memory = None
+        self._archive = None
         self._status = SkillStatus.UNAVAILABLE

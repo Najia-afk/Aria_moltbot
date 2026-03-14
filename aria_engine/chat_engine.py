@@ -342,6 +342,12 @@ class ChatEngine:
                     role="user",
                     content=content,
                 )
+            elif self._protector is None:
+                logger.critical(
+                    "SessionProtection is NOT configured — injection checks "
+                    "and rate limiting are DISABLED for session %s",
+                    sid,
+                )
 
             # ── 2. Persist user message (with dedup) ─────────────────
             now = datetime.now(timezone.utc)
@@ -936,6 +942,17 @@ class ChatEngine:
             memory_block = await retrieve_semantic_memories(db, current_content)
             if memory_block:
                 messages.append({"role": "system", "content": memory_block})
+        except Exception:
+            pass
+
+        # ── Archive conversation recall ───────────────────────────────────
+        # Search past archived conversations for content relevant to the
+        # current user message, so Aria can recall prior exchanges.
+        try:
+            from aria_engine.memory_cache import retrieve_archived_conversations
+            archive_block = await retrieve_archived_conversations(db, current_content)
+            if archive_block:
+                messages.append({"role": "system", "content": archive_block})
         except Exception:
             pass
 

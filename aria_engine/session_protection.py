@@ -13,6 +13,7 @@ import asyncio
 import logging
 import re
 import time
+import unicodedata
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -428,10 +429,14 @@ class SessionProtection:
         """
         Sanitize message content.
 
+        - Normalize Unicode to NFKC (collapse confusables before pattern matching)
         - Strip control characters (except \\n, \\t, \\r)
         - Normalize whitespace
         - Ensure valid UTF-8
         """
+        # NFKC normalization — collapse Unicode confusables (P1-2)
+        content = unicodedata.normalize("NFKC", content)
+
         # Remove control characters
         content = CONTROL_CHAR_RE.sub("", content)
 

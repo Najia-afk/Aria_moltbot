@@ -486,3 +486,63 @@ def _format_memory_block(memories: list[dict]) -> str:
         truncated = text[:500] + "..." if len(text) > 500 else text
         lines.append(f"- [{mem['category']}] {truncated}")
     return "\n".join(lines)
+
+
+async def retrieve_archived_conversations(db, user_message: str) -> Optional[str]:
+    """Search archived conversations for messages matching *user_message*.
+
+    Returns a formatted system-message string with matching archived
+    conversation excerpts, or ``None`` if nothing relevant is found.
+    """
+    if not user_message or len(user_message.strip()) < 10:
+        return None
+
+    try:
+        from db.models import EngineChatMessageArchive, EngineChatSessionArchive
+        from sqlalchemy import select
+
+        # Extract meaningful keywords from the user message for search.
+        # Use the first 200 chars as a search heuristic.
+        search_text = user_message.strip()[:200]
+
+        stmt = (
+            select(
+                EngineChatMessageArchive.role,
+                EngineChatMessageArchive.content,
+                EngineChatMessageArchive.created_at,
+                EngineChatSessionArchive.title,
+            )
+            .join(
+                EngineChatSessionArchive,
+                EngineChatMessageArchive.session_id == EngineChatSessionArchive.id,
+            )
+            .where(
+                EngineChatMessageArchive.content.ilike(f"%{search_text[:80]}%"),
+                EngineChatMessageArchive.role.in_(["user", "assistant"]),
+            )
+            .order_by(EngineChatMessageArchive.created_at.desc())
+            .limit(5)
+        )
+        rows = (await db.execute(stmt)).all()
+
+        if not rows:
+            return None
+
+        lines = ["[Recalled Past Conversations — excerpts from archived sessions]"]
+        for role, content, created_at, title in rows:
+            ts = created_at.strftime("%Y-%m-%d") if created_at else "unknown"
+            session_label = title or "untitled session"
+            truncated = (content or "")[:400]
+            if len(content or "") > 400:
+                truncated += "..."
+            lines.append(f"- [{ts} / {session_label}] {role}: {truncated}")
+
+        logger.info(
+            "Archive conversation injection: %d messages retrieved",
+            len(rows),
+        )
+        return "\n".join(lines)
+
+    except Exception as exc:
+        logger.debug("Archive conversation retrieval failed (non-fatal): %s", exc)
+        return None

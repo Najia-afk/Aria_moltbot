@@ -374,6 +374,20 @@ class AgentPool:
             self._agents[row.agent_id] = agent
 
         logger.info("Loaded %d agents from database", len(self._agents))
+
+        # P1-3: Bridge DB-backed pheromone scores into the in-memory tracker
+        # so file-backed coordinator scoring starts from the DB baseline.
+        try:
+            from aria_agents.scoring import get_performance_tracker
+            db_scores = {
+                aid: agent.pheromone_score
+                for aid, agent in self._agents.items()
+            }
+            tracker = get_performance_tracker()
+            tracker.merge_external_scores(db_scores)
+        except Exception as e:
+            logger.debug("Pheromone score bridge skipped: %s", e)
+
         return len(self._agents)
 
     async def spawn_agent(

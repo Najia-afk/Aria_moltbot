@@ -213,18 +213,24 @@ class Roundtable:
 
         turns: list[RoundtableTurn] = []
 
+        # Reserve 20% of total budget for synthesis (P1-6)
+        synthesis_budget = total_timeout * 0.20
+        round_budget = total_timeout - synthesis_budget
+
         for round_num in range(1, rounds + 1):
-            # Check total timeout
+            # Check total timeout (minus synthesis reserve)
             elapsed = time.monotonic() - start
-            if elapsed > total_timeout:
+            if elapsed > round_budget:
                 logger.warning(
-                    "Roundtable total timeout after round %d (%.0fs)",
+                    "Roundtable round budget exhausted after round %d (%.0fs), "
+                    "reserving %.0fs for synthesis",
                     round_num - 1,
                     elapsed,
+                    synthesis_budget,
                 )
                 break
 
-            remaining = total_timeout - elapsed
+            remaining = round_budget - elapsed
             round_timeout = min(
                 agent_timeout * len(agent_ids),
                 remaining,

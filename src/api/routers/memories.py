@@ -18,7 +18,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import cast, func, or_, select, delete, String
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.models import Memory, SemanticMemory, WorkingMemory, Thought, LessonLearned, CacheMetricSnapshot
+from db.models import Memory, SemanticMemory, WorkingMemory, Thought, LessonLearned, CacheMetricSnapshot, EngineChatMessageArchive, EngineChatSessionArchive
 from deps import get_db
 from pagination import paginate_query, build_paginated_response
 from schemas.requests import CreateMemory, CreateSemanticMemory, SearchByVector, SummarizeSession, UpdateMemory
@@ -509,11 +509,18 @@ async def search_memories(
 
     result = await db.execute(stmt)
     memories = []
+    now = datetime.now(timezone.utc)
     for mem, dist in result.all():
-        mem.accessed_at = datetime.now(timezone.utc)
+        mem.accessed_at = now
         mem.access_count = int(mem.access_count or 0) + 1
         d = mem.to_dict()
         d["similarity"] = round(1 - dist, 4)
+        # P2-1: Time-decayed effective importance (0.95^days since last access)
+        last_access = mem.accessed_at or mem.created_at or now
+        age_days = max((now - last_access).total_seconds() / 86400, 0)
+        d["effective_importance"] = round(
+            float(mem.importance or 0.5) * (0.95 ** age_days), 4
+        )
         memories.append(d)
     await db.commit()
     return {"memories": memories, "query": query}
@@ -1094,12 +1101,12 @@ async def get_memory_graph(
 async def unified_memory_search(
     query: str = Query(..., min_length=1, max_length=500),
     limit: int = Query(10, ge=1, le=50),
-    types: str = Query("all", description="Comma-separated: semantic,kv,working,thought,lesson"),
+    types: str = Query("all", description="Comma-separated: semantic,kv,working,thought,lesson,archive"),
     db: AsyncSession = Depends(get_db),
 ):
-    """Unified search across all memory types."""
+    """Unified search across all memory types including conversation archives."""
     search_types = (
-        ["semantic", "kv", "working", "thought", "lesson"]
+        ["semantic", "kv", "working", "thought", "lesson", "archive"]
         if types == "all"
         else [t.strip() for t in types.split(",")]
     )
@@ -1228,6 +1235,43 @@ async def unified_memory_search(
                 "created_at": _dt_iso_utc(ll.created_at),
             })
 
+    # 6. Archive search (conversation history)
+    if "archive" in search_types:
+        pattern = f"%{query}%"
+        stmt = (
+            select(
+                EngineChatMessageArchive,
+                EngineChatSessionArchive.title.label("session_title"),
+                EngineChatSessionArchive.session_type.label("session_type"),
+            )
+            .join(
+                EngineChatSessionArchive,
+                EngineChatMessageArchive.session_id == EngineChatSessionArchive.id,
+            )
+            .where(
+                EngineChatMessageArchive.content.ilike(pattern),
+                EngineChatMessageArchive.role.in_(["user", "assistant"]),
+            )
+            .order_by(EngineChatMessageArchive.created_at.desc())
+            .limit(limit)
+        )
+        result = await db.execute(stmt)
+        for row in result.all():
+            msg = row[0]
+            session_title = row[1] or "Untitled session"
+            session_type = row[2] or "chat"
+            results.append({
+                "type": "archived_conversation",
+                "id": str(msg.id),
+                "title": f"[{msg.role}] {session_title}",
+                "content": (msg.content or "")[:500],
+                "category": session_type,
+                "relevance": 0.65,
+                "session_id": str(msg.session_id),
+                "role": msg.role,
+                "created_at": _dt_iso_utc(msg.created_at),
+            })
+
     results.sort(key=lambda r: r.get("relevance", 0), reverse=True)
     type_counts: dict[str, int] = {}
     for r in results:
@@ -1238,6 +1282,66 @@ async def unified_memory_search(
         "results": results[:limit * 2],
         "total": len(results),
         "by_type": type_counts,
+    }
+
+
+# ===========================================================================
+# Archive Conversation Search — dedicated endpoint
+# ===========================================================================
+
+
+@router.get("/archive-search")
+async def search_archived_conversations(
+    query: str = Query(..., min_length=1, max_length=500),
+    limit: int = Query(20, ge=1, le=100),
+    role: str | None = Query(None, description="Filter by role: user, assistant"),
+    session_type: str | None = Query(None, description="Filter by session type"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Search archived conversation messages by text content."""
+    pattern = f"%{query}%"
+    stmt = (
+        select(
+            EngineChatMessageArchive,
+            EngineChatSessionArchive.title.label("session_title"),
+            EngineChatSessionArchive.session_type.label("s_type"),
+            EngineChatSessionArchive.agent_id.label("agent"),
+        )
+        .join(
+            EngineChatSessionArchive,
+            EngineChatMessageArchive.session_id == EngineChatSessionArchive.id,
+        )
+        .where(
+            EngineChatMessageArchive.content.ilike(pattern),
+            EngineChatMessageArchive.role.in_(["user", "assistant"]),
+        )
+    )
+    if role:
+        stmt = stmt.where(EngineChatMessageArchive.role == role)
+    if session_type:
+        stmt = stmt.where(EngineChatSessionArchive.session_type == session_type)
+
+    stmt = stmt.order_by(EngineChatMessageArchive.created_at.desc()).limit(limit)
+    result = await db.execute(stmt)
+
+    messages = []
+    for row in result.all():
+        msg = row[0]
+        messages.append({
+            "id": str(msg.id),
+            "session_id": str(msg.session_id),
+            "session_title": row[1] or "Untitled",
+            "session_type": row[2] or "chat",
+            "agent": row[3],
+            "role": msg.role,
+            "content": (msg.content or "")[:1000],
+            "created_at": _dt_iso_utc(msg.created_at),
+        })
+
+    return {
+        "query": query,
+        "results": messages,
+        "total": len(messages),
     }
 
 

@@ -283,7 +283,30 @@ class Cognition:
                             )
                 except Exception as e:
                     self.logger.debug(f"Semantic memory recall skipped: {e}")
-        
+
+        # Step 2.8: Archive conversation recall
+        # Search archived conversations for past exchanges — fills the gap
+        # where semantic_memories might not contain detailed conversation text.
+        if self._skills:
+            api = self._skills.get("api_client")
+            if api and api.is_available:
+                try:
+                    archive_result = await api.search_archived_conversations(
+                        query=prompt[:300],
+                        limit=5,
+                    )
+                    if archive_result.success and archive_result.data:
+                        archive_items = archive_result.data
+                        if isinstance(archive_items, dict):
+                            archive_items = archive_items.get("results", [])
+                        if isinstance(archive_items, list) and archive_items:
+                            context["archived_conversations"] = archive_items[:5]
+                            self.logger.debug(
+                                f"📂 Archive recall: {len(archive_items)} messages for prompt"
+                            )
+                except Exception as e:
+                    self.logger.debug(f"Archive conversation recall skipped: {e}")
+
         # Step 3: Build context with recent memory + confidence awareness
         recent = self.memory.recall_short(limit=5)
         context["recent_memory"] = recent

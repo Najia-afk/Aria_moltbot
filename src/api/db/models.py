@@ -1008,6 +1008,12 @@ Index("idx_ecma_role", EngineChatMessageArchive.role)
 Index("idx_ecma_created", EngineChatMessageArchive.created_at)
 Index("idx_ecma_archived", EngineChatMessageArchive.archived_at.desc())
 Index("idx_ecma_session_created", EngineChatMessageArchive.session_id, EngineChatMessageArchive.created_at)
+# GIN trigram index for ILIKE text search on archived message content (P0-1)
+Index("idx_ecma_content_trgm", EngineChatMessageArchive.content, postgresql_using="gin", postgresql_ops={"content": "gin_trgm_ops"})
+# HNSW vector indexes for embedding similarity search (P1-4)
+if HAS_PGVECTOR:
+    Index("idx_ecm_embedding_hnsw", EngineChatMessage.embedding, postgresql_using="hnsw", postgresql_with={"m": 16, "ef_construction": 64}, postgresql_ops={"embedding": "vector_cosine_ops"})
+    Index("idx_ecma_embedding_hnsw", EngineChatMessageArchive.embedding, postgresql_using="hnsw", postgresql_with={"m": 16, "ef_construction": 64}, postgresql_ops={"embedding": "vector_cosine_ops"})
 
 
 class EngineCronJob(Base):

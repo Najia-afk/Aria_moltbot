@@ -1512,6 +1512,28 @@ class AriaAPIClient(BaseSkill):
         except Exception as e:
             return SkillResult.fail(f"Failed to search semantic memories: {e}")
 
+    async def search_archived_conversations(
+        self, query: str, limit: int = 10,
+        role: str | None = None,
+        session_type: str | None = None,
+    ) -> SkillResult:
+        """Search archived conversation messages by text content.
+
+        Queries chat_messages_archive for past conversations that match
+        the query string.  Returns matching messages with session context.
+        """
+        try:
+            params: dict[str, Any] = {"query": query, "limit": limit}
+            if role:
+                params["role"] = role
+            if session_type:
+                params["session_type"] = session_type
+            resp = await self._request_with_retry(
+                "GET", "/memories/archive-search", params=params)
+            return SkillResult.ok(resp.json())
+        except Exception as e:
+            return SkillResult.fail(f"Failed to search archived conversations: {e}")
+
     async def list_semantic_memories(
         self, category: str = None, source: str = None,
         limit: int = 50, page: int = 1,

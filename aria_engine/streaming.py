@@ -1605,6 +1605,15 @@ class StreamManager:
         if memory_block:
             messages.append({"role": "system", "content": memory_block})
 
+        # ── Archive conversation recall ───────────────────────────────────
+        try:
+            from aria_engine.memory_cache import retrieve_archived_conversations
+            archive_block = await retrieve_archived_conversations(db, current_content)
+            if archive_block:
+                messages.append({"role": "system", "content": archive_block})
+        except Exception:
+            pass
+
         window = session.context_window or 50
         MIN_CONVERSATION_TURNS = 10  # always keep at least this many user+assistant msgs
         fetch_limit = max(window * 3, 200)  # over-fetch so we have room to pick

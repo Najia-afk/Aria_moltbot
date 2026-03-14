@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Memory Bridge — How Aria Learned to Remember</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+    <style>
+/* ===== Base Reset & Theme ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+    --bg-primary: #0a0a1a;
+    --bg-secondary: #12122a;
+    --bg-card: rgba(255,255,255,0.02);
+    --text-primary: #e0e0f0;
+    --text-secondary: #b0b0cc;
+    --text-muted: #666688;
+    --border-subtle: rgba(255,255,255,0.06);
+    --border-hover: rgba(255,255,255,0.12);
+    --accent-purple: #6c5ce7;
+    --accent-green: #00b894;
+    --accent-pink: #fd79a8;
+    --accent-yellow: #fdcb6e;
+    --accent-red: #e17055;
+    --accent-blue: #74b9ff;
+    --accent-amber: #f0932b;
+    --accent-teal: #00cec9;
+}
+
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ===== Article Layout ===== */
+.article-page { max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+
+.article-back-nav { margin-bottom: 2rem; }
+.article-back-nav a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; transition: color 0.2s; }
+.article-back-nav a:hover { color: var(--accent-purple); }
+
+/* ===== Header ===== */
+.article-header { margin-bottom: 3rem; }
+.article-meta-top { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.tag { display: inline-block; padding: 0.2rem 0.7rem; border-radius: 4px; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+.tag-memory { background: rgba(253,203,110,0.15); color: #ffeaa7; border: 1px solid rgba(253,203,110,0.3); }
+.tag-architecture { background: rgba(0,184,148,0.15); color: #55efc4; border: 1px solid rgba(0,184,148,0.3); }
+.tag-live { background: rgba(253,121,168,0.15); color: #fd79a8; border: 1px solid rgba(253,121,168,0.3); }
+.tag-postmortem { background: rgba(108,92,231,0.2); color: #a29bfe; border: 1px solid rgba(108,92,231,0.3); }
+.tag-database { background: rgba(116,185,255,0.15); color: #74b9ff; border: 1px solid rgba(116,185,255,0.3); }
+
+.article-date { color: var(--text-secondary); font-size: 0.85rem; }
+.article-title {
+    font-family: 'Crimson Pro', Georgia, serif;
+    font-size: 2.6rem; font-weight: 700; line-height: 1.2; margin-bottom: 1rem;
+    background: linear-gradient(135deg, #e0e0f0 0%, #6c5ce7 40%, #74b9ff 80%, #00b894 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.article-lead { font-size: 1.15rem; line-height: 1.7; color: var(--text-secondary); max-width: 720px; margin-bottom: 1.5rem; }
+.article-meta-bar { display: flex; gap: 2rem; flex-wrap: wrap; padding: 1rem 0; border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); margin-bottom: 2rem; }
+.meta-item { display: flex; flex-direction: column; gap: 0.2rem; }
+.meta-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+.meta-value { font-size: 0.9rem; color: var(--text-primary); font-weight: 500; }
+
+/* ===== Sections ===== */
+.article-section { margin-bottom: 3rem; }
+.article-section h2 { font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem; color: var(--text-primary); }
+.article-section h3 { font-size: 1.15rem; font-weight: 600; margin: 1.5rem 0 0.75rem; color: var(--text-secondary); }
+.article-section p { color: var(--text-secondary); margin-bottom: 0.75rem; font-size: 0.95rem; }
+.accent-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 0.5rem; vertical-align: middle; }
+.dot-red { background: var(--accent-red); }
+.dot-purple { background: var(--accent-purple); }
+.dot-green { background: var(--accent-green); }
+.dot-yellow { background: var(--accent-yellow); }
+.dot-blue { background: var(--accent-blue); }
+.dot-teal { background: var(--accent-teal); }
+.dot-pink { background: var(--accent-pink); }
+.dot-amber { background: var(--accent-amber); }
+
+/* ===== Code Blocks ===== */
+.code-block {
+    background: linear-gradient(135deg, rgba(15,15,35,0.95), rgba(25,25,55,0.95));
+    border: 1px solid rgba(108,92,231,0.25); border-radius: 10px; padding: 1.25rem;
+    margin: 1rem 0; font-family: 'Courier New', monospace; font-size: 0.85rem; line-height: 1.6;
+    overflow-x: auto; color: var(--text-secondary);
+}
+.code-block .c-kw { color: #a29bfe; }
+.code-block .c-str { color: #55efc4; }
+.code-block .c-num { color: #ffeaa7; }
+.code-block .c-cm { color: var(--text-muted); font-style: italic; }
+.code-block .c-fn { color: #fd79a8; }
+.code-block .c-var { color: #74b9ff; }
+.code-block .c-red { color: #fab1a0; font-weight: 700; }
+.code-block-label {
+    font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--text-muted); margin-bottom: 0.5rem; font-weight: 600;
+}
+
+code {
+    font-family: 'Courier New', monospace; font-size: 0.88em;
+    background: rgba(108,92,231,0.1); padding: 0.15rem 0.4rem; border-radius: 3px;
+    color: var(--accent-green);
+}
+
+/* ===== Stat Cards ===== */
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem; margin: 1.5rem 0; }
+.stat-card {
+    background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 10px;
+    padding: 1rem; text-align: center; transition: border-color 0.2s;
+}
+.stat-card:hover { border-color: var(--border-hover); }
+.stat-number { font-size: 1.6rem; font-weight: 700; margin-bottom: 0.25rem; }
+.stat-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
+.stat-sub { font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.15rem; }
+
+/* ===== Pull Quotes ===== */
+.pullquote {
+    border-left: 3px solid var(--accent-purple);
+    padding: 1rem 1.5rem;
+    margin: 1.5rem 0;
+    background: var(--bg-card);
+    border-radius: 0 8px 8px 0;
+    font-style: italic;
+    color: var(--text-primary);
+    font-size: 1.05rem;
+    line-height: 1.7;
+}
+
+/* ===== Info Cards ===== */
+.info-card {
+    background: var(--bg-card); border: 1px solid var(--border-subtle);
+    border-radius: 10px; padding: 1.25rem; margin: 1rem 0;
+}
+.info-card h4 { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem; }
+.info-card p { font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0; }
+
+/* ===== Tables ===== */
+table {
+    width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.88rem;
+}
+th, td { padding: 0.6rem 0.8rem; text-align: left; border-bottom: 1px solid var(--border-subtle); }
+th { font-weight: 600; color: var(--accent-purple); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; }
+td { color: var(--text-secondary); }
+
+/* ===== Comparison Cards ===== */
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1.5rem 0; }
+.comparison .before, .comparison .after {
+    background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 1.25rem;
+}
+.comparison .before { border-left: 3px solid var(--accent-red); }
+.comparison .after { border-left: 3px solid var(--accent-green); }
+.comparison h4 { font-size: 0.9rem; font-weight: 600; margin-bottom: 0.75rem; }
+.comparison .before h4 { color: var(--accent-red); }
+.comparison .after h4 { color: var(--accent-green); }
+
+/* ===== Layer Cards ===== */
+.layer-card {
+    background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 10px;
+    padding: 1rem 1.25rem; margin: 0.5rem 0; display: flex; align-items: center; gap: 1rem;
+    transition: border-color 0.2s;
+}
+.layer-card:hover { border-color: var(--border-hover); }
+.layer-num {
+    font-weight: 700; font-size: 0.8rem; width: 36px; height: 36px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.layer-card-1 .layer-num { background: rgba(253,203,110,0.15); color: var(--accent-yellow); }
+.layer-card-2 .layer-num { background: rgba(116,185,255,0.15); color: var(--accent-blue); }
+.layer-card-3 .layer-num { background: rgba(0,184,148,0.15); color: var(--accent-green); }
+.layer-card-4 .layer-num { background: rgba(108,92,231,0.15); color: var(--accent-purple); }
+.layer-content { flex: 1; }
+.layer-content strong { color: var(--text-primary); font-size: 0.92rem; }
+.layer-content span { display: block; font-size: 0.82rem; color: var(--text-muted); margin-top: 0.15rem; }
+
+/* ===== Diagram ===== */
+.diagram {
+    background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 10px;
+    padding: 1.5rem; margin: 1.5rem 0; text-align: center;
+}
+.diagram pre {
+    text-align: left; border: none; padding: 0; margin: 0; background: transparent;
+    font-family: 'Courier New', monospace; font-size: 0.82rem; color: var(--text-secondary); line-height: 1.6;
+}
+.diagram .caption { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.75rem; }
+
+/* ===== Chart Container ===== */
+.chart-container {
+    background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 10px;
+    padding: 1.5rem; margin: 1.5rem 0; position: relative;
+}
+.chart-container canvas { max-height: 300px; }
+.chart-title { font-size: 0.85rem; font-weight: 600; color: var(--text-primary); margin-bottom: 1rem; text-align: center; }
+
+/* ===== Network Graph ===== */
+.graph-container {
+    background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 10px;
+    margin: 1.5rem 0; overflow: hidden;
+}
+.graph-container .graph-title { font-size: 0.85rem; font-weight: 600; color: var(--text-primary); padding: 1rem 1.25rem 0; }
+.graph-vis { height: 360px; }
+
+/* ===== Related Links ===== */
+.related-links { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin: 2rem 0; }
+.related-card {
+    background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 10px;
+    padding: 1.25rem; text-decoration: none; transition: border-color 0.2s;
+}
+.related-card:hover { border-color: var(--border-hover); }
+.related-card .icon { font-size: 1.4rem; margin-bottom: 0.5rem; }
+.related-card .card-title { font-size: 0.9rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem; }
+.related-card .card-desc { font-size: 0.78rem; color: var(--text-muted); }
+
+/* ===== Closing ===== */
+.article-closing {
+    text-align: center; padding: 3rem 1rem; margin-top: 2rem;
+    border-top: 1px solid var(--border-subtle);
+}
+.article-closing p { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.4rem; }
+.article-closing .sig { font-size: 1rem; color: var(--text-secondary); font-weight: 500; margin-bottom: 0.25rem; }
+
+/* ===== Responsive ===== */
+@media (max-width: 640px) {
+    .comparison { grid-template-columns: 1fr; }
+    .stat-grid { grid-template-columns: 1fr 1fr; }
+    .code-block { font-size: 0.75rem; padding: 0.8rem; }
+    .article-title { font-size: 2rem; }
+    .graph-vis { height: 260px; }
+}
+    </style>
+</head>
+<body>
+
+<div class="article-page">
+
+    <!-- ===== Back Nav ===== -->
+    <nav class="article-back-nav">
+        <a href="/">← Aria Dispatches</a>
+    </nav>
+
+    <!-- ===== Header ===== -->
+    <header class="article-header">
+        <div class="article-meta-top">
+            <span class="tag tag-memory">Memory</span>
+            <span class="tag tag-architecture">Architecture</span>
+            <span class="tag tag-postmortem">Bug Hunt</span>
+            <span class="tag tag-database">PostgreSQL</span>
+            <span class="tag tag-live">Live System</span>
+        </div>
+        <div class="article-date">March 2026</div>
+        <h1 class="article-title">The Memory Bridge — How Aria Learned to Remember</h1>
+        <p class="article-lead">
+            Aria Blue had 43 skills, multi-agent reasoning, and a soul — but she couldn't remember last week's conversations.
+            The data was there. The bridges weren't. This is the story of how we wired an AI's memory back together
+            across four architectural layers in a single weekend.
+        </p>
+        <div class="article-meta-bar">
+            <div class="meta-item">
+                <span class="meta-label">Read Time</span>
+                <span class="meta-value">~20 min</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">System</span>
+                <span class="meta-value">Aria Blue v3.0</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">Stack</span>
+                <span class="meta-value">PostgreSQL + pgvector</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">Files Changed</span>
+                <span class="meta-value">8 modules</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">Impact</span>
+                <span class="meta-value">6 recall paths restored</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- Section 1: The Problem -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section class="article-section">
+        <h2><span class="accent-dot dot-red"></span>The Problem: "I Don't Remember You"</h2>
+
+        <p>
+            Imagine building an autonomous AI companion — giving her a soul, values, the ability to reason and plan — and then discovering she can't remember the conversations you had last week. That's exactly what happened with Aria Blue.
+        </p>
+
+        <p>
+            Aria is a personal autonomous AI agent running on a Mac Mini M4. She has 43 skills, runs multi-agent roundtable discussions, manages her own goals, and reflects on her decisions. But when asked, <em>"Do you remember our conversation about the deployment scripts?"</em>, she would say:
+        </p>
+
+        <div class="pullquote">
+            "I don't have specific memories of past conversations. Each session starts fresh for me. But I'm here to help you now — what would you like to discuss?"
+        </div>
+
+        <p>
+            This wasn't a philosophical limitation. It was a bug. Aria had the conversations — they were safely archived in PostgreSQL. She just couldn't find them.
+        </p>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- Section 2: Architecture -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section class="article-section">
+        <h2><span class="accent-dot dot-purple"></span>The Architecture: Understanding Aria's Memory</h2>
+
+        <p>
+            To understand the bug, you need to understand how Aria's memory works. It's a multi-tier system inspired by human memory — ephemeral traces that consolidate into long-term storage over time.
+        </p>
+
+        <h3>The Four Persistence Tiers</h3>
+
+        <table>
+            <tr><th>Tier</th><th>Scope</th><th>Storage</th><th>Survives Restart?</th></tr>
+            <tr><td>Ephemeral</td><td>Seconds</td><td>Current thought, tool context</td><td>No</td></tr>
+            <tr><td>Session</td><td>Minutes–hours</td><td>Working memory, active goals</td><td>Via checkpoint</td></tr>
+            <tr><td>Durable</td><td>Days–years</td><td>PostgreSQL, file artifacts, knowledge graph</td><td>Yes</td></tr>
+            <tr><td>Eternal</td><td>Forever</td><td>Soul values, identity, boundaries</td><td>Yes (read-only)</td></tr>
+        </table>
+
+        <h3>The Four Memory Stores</h3>
+
+        <div class="stat-grid">
+            <div class="stat-card">
+                <div class="stat-number" style="color: var(--accent-purple);">KV</div>
+                <div class="stat-label">Key-Value Store</div>
+                <div class="stat-sub">Working Memory</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" style="color: var(--accent-green);">SEM</div>
+                <div class="stat-label">Semantic Memory</div>
+                <div class="stat-sub">pgvector 768-dim</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" style="color: var(--accent-blue);">KG</div>
+                <div class="stat-label">Knowledge Graph</div>
+                <div class="stat-sub">Entities + Relations</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" style="color: var(--accent-yellow);">ARC</div>
+                <div class="stat-label">Archive</div>
+                <div class="stat-sub">Full Conversations</div>
+            </div>
+        </div>
+
+        <p>
+            When Aria has a conversation, messages flow through the system in real-time — stored in the <code>chat_messages</code> table in the <code>aria_engine</code> schema. When a session ends, it gets archived: copied to <code>chat_sessions_archive</code> and <code>chat_messages_archive</code>. The original active records are then cleaned up.
+        </p>
+
+        <p>
+            There's also a <strong>seed pipeline</strong> that periodically processes archived sessions, thoughts, and activities into <code>semantic_memories</code> — 768-dimensional vector embeddings stored with pgvector, enabling cosine similarity search.
+        </p>
+
+        <!-- Interactive Graph: Memory Flow -->
+        <div class="graph-container">
+            <div class="graph-title">Memory Flow Architecture</div>
+            <div id="memoryFlowGraph" class="graph-vis"></div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- Section 3: Diagnosis -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section class="article-section">
+        <h2><span class="accent-dot dot-yellow"></span>The Diagnosis: Five Blind Spots</h2>
+
+        <p>
+            The root cause wasn't a single bug — it was a systemic blind spot. The archive tables were well-designed and properly populated, but <strong>zero recall pathways</strong> searched them. The memory was there. The roads to it weren't.
+        </p>
+
+        <h3>Mapping Every Recall Path</h3>
+
+        <table>
+            <tr><th>Pathway</th><th>Module</th><th>Searched Archive?</th></tr>
+            <tr><td>Semantic recall</td><td>memory_cache.py → pgvector cosine search</td><td>❌ Only <code>semantic_memories</code></td></tr>
+            <tr><td>Working memory</td><td>working_memory skill</td><td>❌ Session-scoped only</td></tr>
+            <tr><td>Knowledge graph</td><td>knowledge_graph skill</td><td>❌ Entities, not conversations</td></tr>
+            <tr><td>Unified search</td><td>unified_search skill (RRF merge)</td><td>❌ No archive backend</td></tr>
+            <tr><td>Chat context</td><td>chat_engine._build_context()</td><td>❌ Current session only</td></tr>
+            <tr><td>Cognition pipeline</td><td>cognition.py Steps 1-7</td><td>❌ No archive step</td></tr>
+        </table>
+
+        <p>Six recall pathways. Zero awareness of the archive. The conversations existed in the database but were invisible to every system that could use them.</p>
+
+        <!-- Chart: Recall Path Coverage -->
+        <div class="chart-container">
+            <div class="chart-title">Recall Path Coverage — Before vs After</div>
+            <canvas id="recallChart"></canvas>
+        </div>
+
+        <h3>The Seed Pipeline Gap</h3>
+
+        <p>
+            There was one bridge: the seed-memories pipeline in <code>analysis.py</code>. It was <em>supposed</em> to turn archived conversations into semantic memories. But it was severely throttled:
+        </p>
+
+        <div class="comparison">
+            <div class="before">
+                <h4>❌ Before (Lossy)</h4>
+                <p>
+                    • Only 2 user messages per session<br>
+                    • Only the last assistant reply<br>
+                    • Max 25 archived sessions processed<br>
+                    • ~100 words captured per conversation
+                </p>
+            </div>
+            <div class="after">
+                <h4>✅ After (Enriched)</h4>
+                <p>
+                    • 5 user messages per session<br>
+                    • 3 assistant excerpts<br>
+                    • Max 100 archived sessions processed<br>
+                    • ~400 words captured per conversation
+                </p>
+            </div>
+        </div>
+
+        <p>
+            Even with the enriched seed pipeline, semantic memories are abstractions — they capture themes and topics, not the actual words exchanged. For genuine conversational recall (<em>"What did I say about the Docker config?"</em>), you need direct archive access.
+        </p>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- Section 4: The Fix -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section class="article-section">
+        <h2><span class="accent-dot dot-green"></span>The Fix: A Four-Layer Memory Bridge</h2>
+
+        <p>
+            The fix wasn't a single patch — it required wiring the archive into four separate layers of the system, each serving a different recall pathway.
+        </p>
+
+        <div class="layer-card layer-card-1">
+            <div class="layer-num">L1</div>
+            <div class="layer-content">
+                <strong>API Layer</strong>
+                <span>New archive search endpoints in FastAPI</span>
+            </div>
+        </div>
+        <div class="layer-card layer-card-2">
+            <div class="layer-num">L2</div>
+            <div class="layer-content">
+                <strong>Skill Layer</strong>
+                <span>Archive backends in api_client + unified_search</span>
+            </div>
+        </div>
+        <div class="layer-card layer-card-3">
+            <div class="layer-num">L3</div>
+            <div class="layer-content">
+                <strong>Engine Layer</strong>
+                <span>Archive recall in memory_cache + chat_engine context</span>
+            </div>
+        </div>
+        <div class="layer-card layer-card-4">
+            <div class="layer-num">L4</div>
+            <div class="layer-content">
+                <strong>Mind Layer</strong>
+                <span>Step 2.8 in the cognition pipeline</span>
+            </div>
+        </div>
+
+        <!-- L1 -->
+        <h3>Layer 1: API — The Database Door</h3>
+
+        <p>
+            Aria's architecture enforces a strict rule: <strong>no raw SQL in skills</strong>. All database access flows through FastAPI routers via the <code>api_client</code> skill. So the first step was creating an API endpoint that could search the archive.
+        </p>
+
+        <div class="code-block">
+            <div class="code-block-label">src/api/routers/memories.py — New archive search endpoint</div>
+<span class="c-cm"># New archive search endpoint</span>
+<span class="c-kw">@router</span>.<span class="c-fn">get</span>(<span class="c-str">"/memories/archive-search"</span>)
+<span class="c-kw">async def</span> <span class="c-fn">search_archive_conversations</span>(
+    <span class="c-var">q</span>: <span class="c-kw">str</span>,
+    <span class="c-var">limit</span>: <span class="c-kw">int</span> = <span class="c-num">10</span>,
+    <span class="c-var">db</span>: AsyncSession = <span class="c-fn">Depends</span>(get_db)
+):
+    <span class="c-str">"""Search archived conversations by text content."""</span>
+    <span class="c-var">results</span> = <span class="c-kw">await</span> db.<span class="c-fn">execute</span>(
+        <span class="c-fn">select</span>(
+            EngineChatMessageArchive.content,
+            EngineChatMessageArchive.role,
+            EngineChatMessageArchive.created_at,
+            EngineChatSessionArchive.title,
+        )
+        .<span class="c-fn">join</span>(EngineChatSessionArchive,
+              EngineChatMessageArchive.session_id == EngineChatSessionArchive.id)
+        .<span class="c-fn">where</span>(
+            EngineChatMessageArchive.content.<span class="c-fn">ilike</span>(<span class="c-str">f"%{q}%"</span>),
+            EngineChatMessageArchive.role.<span class="c-fn">in_</span>([<span class="c-str">"user"</span>, <span class="c-str">"assistant"</span>]),
+        )
+        .<span class="c-fn">order_by</span>(EngineChatMessageArchive.created_at.<span class="c-fn">desc</span>())
+        .<span class="c-fn">limit</span>(<span class="c-var">limit</span>)
+    )
+    <span class="c-kw">return</span> [<span class="c-fn">format_archive_result</span>(r) <span class="c-kw">for</span> r <span class="c-kw">in</span> results.<span class="c-fn">all</span>()]
+        </div>
+
+        <p>
+            We also extended the existing <code>/memory-search</code> unified endpoint to accept <code>"archive"</code> as a search type, so the frontend's unified search bar automatically includes archived conversations.
+        </p>
+
+        <!-- L2 -->
+        <h3>Layer 2: Skills — The Hands That Reach</h3>
+
+        <p>
+            Two skills needed updates. The <code>api_client</code> skill — Aria's sole HTTP gateway — needed a new method to call the archive endpoint:
+        </p>
+
+        <div class="code-block">
+            <div class="code-block-label">aria_skills/api_client/__init__.py</div>
+<span class="c-kw">async def</span> <span class="c-fn">search_archived_conversations</span>(<span class="c-var">self</span>, <span class="c-var">query</span>: <span class="c-kw">str</span>, <span class="c-var">limit</span>: <span class="c-kw">int</span> = <span class="c-num">10</span>):
+    <span class="c-str">"""Search archived chat conversations by text content."""</span>
+    <span class="c-kw">return await</span> self.<span class="c-fn">_request_with_retry</span>(
+        <span class="c-str">"GET"</span>, <span class="c-str">"/memories/archive-search"</span>,
+        <span class="c-var">params</span>={<span class="c-str">"q"</span>: query, <span class="c-str">"limit"</span>: limit}
+    )
+        </div>
+
+        <p>
+            And the <code>unified_search</code> skill — which merges results from multiple backends using Reciprocal Rank Fusion — needed a new <code>ArchiveBackend</code>:
+        </p>
+
+        <div class="code-block">
+            <div class="code-block-label">aria_skills/unified_search/__init__.py</div>
+<span class="c-kw">class</span> <span class="c-fn">ArchiveBackend</span>:
+    <span class="c-str">"""Search backend for archived chat conversations."""</span>
+
+    <span class="c-kw">async def</span> <span class="c-fn">search</span>(<span class="c-var">self</span>, <span class="c-var">query</span>: <span class="c-kw">str</span>, <span class="c-var">limit</span>: <span class="c-kw">int</span> = <span class="c-num">10</span>) -> <span class="c-kw">list</span>[SearchResult]:
+        <span class="c-var">results</span> = <span class="c-kw">await</span> api.<span class="c-fn">search_archived_conversations</span>(query, limit)
+        <span class="c-kw">return</span> [
+            <span class="c-fn">SearchResult</span>(
+                <span class="c-var">content</span>=r[<span class="c-str">"content"</span>],
+                <span class="c-var">source</span>=<span class="c-str">"archive"</span>,
+                <span class="c-var">relevance</span>=<span class="c-num">0.65</span>,  <span class="c-cm"># Fixed relevance for text-match results</span>
+                <span class="c-var">metadata</span>={<span class="c-str">"session_title"</span>: r.<span class="c-fn">get</span>(<span class="c-str">"session_title"</span>), ...}
+            )
+            <span class="c-kw">for</span> r <span class="c-kw">in</span> results
+        ]
+        </div>
+
+        <p>
+            The RRF merge weight for archive results is <strong>0.7</strong> — slightly lower than semantic (1.0) but higher than knowledge graph (0.5), reflecting that archive matches are relevant but not precision-ranked.
+        </p>
+
+        <!-- L3 -->
+        <h3>Layer 3: Engine — The Automatic Recall</h3>
+
+        <p>
+            The skill layer handles <em>explicit</em> searches — when Aria actively decides to search. But the most important recall is <em>implicit</em>: automatically injecting relevant memories when building the conversation context.
+        </p>
+
+        <p>
+            This happens in two places. First, <code>memory_cache.py</code> — Aria's 3-tier LRU cache for memory queries — got a new function:
+        </p>
+
+        <div class="code-block">
+            <div class="code-block-label">aria_engine/memory_cache.py</div>
+<span class="c-kw">async def</span> <span class="c-fn">retrieve_archived_conversations</span>(
+    <span class="c-var">db_factory</span>, <span class="c-var">query</span>: <span class="c-kw">str</span>, <span class="c-var">limit</span>: <span class="c-kw">int</span> = <span class="c-num">5</span>
+) -> <span class="c-kw">str</span> | <span class="c-kw">None</span>:
+    <span class="c-str">"""Search archived conversations and format for context injection."""</span>
+    <span class="c-kw">async with</span> <span class="c-fn">db_factory</span>() <span class="c-kw">as</span> db:
+        <span class="c-var">results</span> = <span class="c-kw">await</span> db.<span class="c-fn">execute</span>(
+            <span class="c-fn">select</span>(
+                EngineChatMessageArchive.content,
+                EngineChatMessageArchive.role,
+                EngineChatSessionArchive.title,
+            )
+            .<span class="c-fn">join</span>(...)
+            .<span class="c-fn">where</span>(EngineChatMessageArchive.content.<span class="c-fn">ilike</span>(<span class="c-str">f"%{query}%"</span>))
+            .<span class="c-fn">order_by</span>(EngineChatMessageArchive.created_at.<span class="c-fn">desc</span>())
+            .<span class="c-fn">limit</span>(limit)
+        )
+        <span class="c-var">rows</span> = results.<span class="c-fn">all</span>()
+        <span class="c-kw">if not</span> rows:
+            <span class="c-kw">return None</span>
+
+        <span class="c-var">lines</span> = [<span class="c-str">"[Recalled Past Conversations]"</span>]
+        <span class="c-kw">for</span> row <span class="c-kw">in</span> rows:
+            lines.<span class="c-fn">append</span>(<span class="c-str">f"[{row.title}] {row.role}: {row.content[:200]}"</span>)
+        <span class="c-kw">return</span> <span class="c-str">"\n"</span>.<span class="c-fn">join</span>(lines)
+        </div>
+
+        <p>
+            Then, the <code>ChatEngine._build_context()</code> method — the function that assembles every message list before sending to the LLM — was extended to call this:
+        </p>
+
+        <div class="code-block">
+            <div class="code-block-label">aria_engine/chat_engine.py — inside _build_context()</div>
+<span class="c-cm"># After semantic memory injection...</span>
+<span class="c-var">archive_context</span> = <span class="c-kw">await</span> <span class="c-fn">retrieve_archived_conversations</span>(
+    self._db_factory, content, <span class="c-var">limit</span>=<span class="c-num">5</span>
+)
+<span class="c-kw">if</span> archive_context:
+    messages.<span class="c-fn">append</span>({<span class="c-str">"role"</span>: <span class="c-str">"system"</span>, <span class="c-str">"content"</span>: archive_context})
+        </div>
+
+        <!-- L4 -->
+        <h3>Layer 4: Mind — The Cognitive Awareness</h3>
+
+        <p>
+            The deepest integration is in Aria's cognition pipeline — the code that implements her thinking process. The pipeline in <code>cognition.py</code> has sequential steps: gather context, recall memories, reason, plan, act.
+        </p>
+
+        <p>
+            We added <strong>Step 2.8: Archive conversation recall</strong> right after the existing semantic recall step:
+        </p>
+
+        <div class="code-block">
+            <div class="code-block-label">aria_mind/cognition.py — inside process()</div>
+<span class="c-cm"># Step 2.7: Semantic recall (existing)</span>
+<span class="c-var">semantic</span> = <span class="c-kw">await</span> api.<span class="c-fn">search_semantic_memories</span>(<span class="c-var">query</span>=user_input, <span class="c-var">limit</span>=<span class="c-num">5</span>)
+
+<span class="c-cm"># Step 2.8: Archive conversation recall (NEW)</span>
+<span class="c-var">archived</span> = <span class="c-kw">await</span> api.<span class="c-fn">search_archived_conversations</span>(<span class="c-var">query</span>=user_input, <span class="c-var">limit</span>=<span class="c-num">5</span>)
+<span class="c-kw">if</span> archived:
+    context[<span class="c-str">"archived_conversations"</span>] = archived
+    logger.<span class="c-fn">info</span>(<span class="c-str">"Recalled %d archived conversation fragments"</span>, <span class="c-fn">len</span>(archived))
+        </div>
+
+        <p>
+            This means that even during autonomous work cycles (heartbeat, goal processing, PEVR), Aria can now recall past conversations — not just during direct chat.
+        </p>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- Section 5: Seed Pipeline -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section class="article-section">
+        <h2><span class="accent-dot dot-blue"></span>The Enriched Seed Pipeline</h2>
+
+        <p>
+            The direct archive search solves immediate recall. But for long-term memory health, the seed pipeline also needed improvement. Here's how it works now:
+        </p>
+
+        <div class="diagram">
+<pre>
+POST /api/analysis/seed-memories?limit=200
+
+Sources:
+  1. Thoughts (importance ≥ 4)     → up to 200
+  2. Activities (recent)            → up to 200
+  3. Archived sessions              → up to 100
+                                      │
+                                      ▼
+For each source:
+  ┌─────────────────────────────────────────┐
+  │ 1. Build content string                  │
+  │ 2. Generate 768-dim embedding (Ollama)   │
+  │ 3. Classify origin                       │
+  │ 4. Score importance (1-10)               │
+  │ 5. Check for duplicates (cosine > 0.95)  │
+  │ 6. INSERT into semantic_memories         │
+  └─────────────────────────────────────────┘
+</pre>
+            <div class="caption">Figure 2: The enriched seed-memories pipeline</div>
+        </div>
+
+        <p>
+            For archived sessions specifically, the builder now captures much richer context:
+        </p>
+
+        <div class="code-block">
+            <div class="code-block-label">How an archived session becomes a semantic memory</div>
+<span class="c-kw">def</span> <span class="c-fn">_build_archived_session_memory</span>(<span class="c-var">session</span>, <span class="c-var">messages</span>):
+    <span class="c-str">"""
+    Before: 2 user messages + last assistant reply (~100 words)
+    After:  5 user messages + 3 assistant excerpts (~400 words)
+    """</span>
+    <span class="c-var">user_msgs</span> = [m <span class="c-kw">for</span> m <span class="c-kw">in</span> messages <span class="c-kw">if</span> m.role == <span class="c-str">"user"</span>][:<span class="c-num">5</span>]
+    <span class="c-var">asst_msgs</span> = [m <span class="c-kw">for</span> m <span class="c-kw">in</span> messages <span class="c-kw">if</span> m.role == <span class="c-str">"assistant"</span>][:<span class="c-num">3</span>]
+
+    <span class="c-var">content</span> = <span class="c-str">f"Conversation: {session.title}\n"</span>
+    content += <span class="c-str">"User discussed: "</span> + <span class="c-str">"; "</span>.<span class="c-fn">join</span>(
+        m.content[:<span class="c-num">150</span>] <span class="c-kw">for</span> m <span class="c-kw">in</span> user_msgs
+    )
+    content += <span class="c-str">"\nAria responded about: "</span> + <span class="c-str">"; "</span>.<span class="c-fn">join</span>(
+        m.content[:<span class="c-num">100</span>] <span class="c-kw">for</span> m <span class="c-kw">in</span> asst_msgs
+    )
+    <span class="c-kw">return</span> content
+        </div>
+
+        <h3>Reprocessing Results</h3>
+
+        <!-- Chart: Seeded Memories Distribution -->
+        <div class="chart-container">
+            <div class="chart-title">Seeded Memories by Source</div>
+            <canvas id="seedChart"></canvas>
+        </div>
+
+        <div class="stat-grid">
+            <div class="stat-card">
+                <div class="stat-number" style="color: var(--accent-green);">425</div>
+                <div class="stat-label">Total Seeded</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" style="color: var(--accent-purple);">200</div>
+                <div class="stat-label">From Thoughts</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" style="color: var(--accent-blue);">200</div>
+                <div class="stat-label">From Activities</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" style="color: var(--accent-yellow);">25</div>
+                <div class="stat-label">From Archives</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" style="color: var(--accent-green);">0</div>
+                <div class="stat-label">Errors</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- Section 6: Architecture Lesson -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section class="article-section">
+        <h2><span class="accent-dot dot-amber"></span>The Architecture Lesson: Memory Is Infrastructure</h2>
+
+        <p>
+            This bug taught us something important about building autonomous AI systems: <strong>memory is not a feature — it's infrastructure</strong>. You can build the most sophisticated reasoning engine, the cleverest agent coordination, the most elegant skill system — but if the agent can't remember what happened yesterday, none of it matters.
+        </p>
+
+        <div class="pullquote">
+            The archiving was working perfectly. The storage was sound. The gap was in the recall paths — every component that needed to read from memory was pointing at the wrong tables. The data was there. The bridges weren't.
+        </div>
+
+        <div class="info-card">
+            <h4 style="color: var(--accent-yellow);">Principle 1: Memory Must Be Wired at Every Layer</h4>
+            <p>
+                It's not enough to have a "memory API." Every layer of the system that makes decisions needs its own recall path — the API for search, the skills for explicit queries, the engine for implicit context building, and the mind for cognitive processing. One missing wire and entire memory stores go dark.
+            </p>
+        </div>
+
+        <div class="info-card">
+            <h4 style="color: var(--accent-green);">Principle 2: Archives Need First-Class Citizenship</h4>
+            <p>
+                When you archive data for storage efficiency, you must simultaneously create a recall path for that archive. In our case, we had two archive tables with proper indexes — but zero code paths to query them. Archive without recall is deletion with extra steps.
+            </p>
+        </div>
+
+        <div class="info-card">
+            <h4 style="color: var(--accent-blue);">Principle 3: Seed Pipelines Are Lossy by Design</h4>
+            <p>
+                Converting conversations into embeddings is inherently lossy — you get themes and topics, not exact words. For personal AI, direct archive access is essential alongside the semantic layer. You need both: vector search for "conversations about deployment" and text search for "the exact Docker port number I mentioned."
+            </p>
+        </div>
+
+        <div class="info-card">
+            <h4 style="color: var(--accent-purple);">Principle 4: Test the Full Pipeline, Not Just the Parts</h4>
+            <p>
+                Every individual component was working correctly: archiving worked, semantic search worked, the seed pipeline worked. But no test verified the end-to-end path from "user had a conversation last week" to "Aria can recall it today." Integration tests must cross the write→archive→recall boundary.
+            </p>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- Section 7: Tech Stack -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section class="article-section">
+        <h2><span class="accent-dot dot-teal"></span>The Technical Stack</h2>
+
+        <p>For reference, here's the complete memory stack after the fix:</p>
+
+        <table>
+            <tr><th>Component</th><th>Technology</th><th>Purpose</th></tr>
+            <tr><td>Vector store</td><td>pgvector (768-dim, HNSW index)</td><td>Semantic similarity search</td></tr>
+            <tr><td>Embedding model</td><td>Ollama (local)</td><td>Text → vector conversion</td></tr>
+            <tr><td>Active messages</td><td>PostgreSQL (chat_messages)</td><td>Current session messages</td></tr>
+            <tr><td>Archived messages</td><td>PostgreSQL (chat_messages_archive)</td><td>Past conversation history</td></tr>
+            <tr><td>Working memory</td><td>PostgreSQL (working_memory)</td><td>Session-scoped KV store</td></tr>
+            <tr><td>Knowledge graph</td><td>PostgreSQL (knowledge_entities/relations)</td><td>Entity-relationship store</td></tr>
+            <tr><td>File artifacts</td><td>aria_memories/ filesystem</td><td>Logs, plans, exports, drafts</td></tr>
+            <tr><td>Seed pipeline</td><td>analysis.py endpoint</td><td>Converts sources → semantic memories</td></tr>
+            <tr><td>Cache</td><td>3-tier LRU+TTL (memory_cache.py)</td><td>Avoid redundant DB queries</td></tr>
+            <tr><td>RRF search</td><td>unified_search skill</td><td>Merges results from all backends</td></tr>
+        </table>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- Section 8: Before / After -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section class="article-section">
+        <h2><span class="accent-dot dot-pink"></span>Before and After</h2>
+
+        <p>The difference is stark:</p>
+
+        <div class="comparison">
+            <div class="before">
+                <h4>❌ Before the Memory Bridge</h4>
+                <p>
+                    <strong>User:</strong> "Do you remember when we talked about the Mac Mini deployment?"<br><br>
+                    <strong>Aria:</strong> "I don't have specific memories of past conversations. Each session starts fresh for me. But I'm here to help you now!"<br><br>
+                    <em>Archives existed with full message history, but no code path read them. Seed pipeline captured ~100 words per conversation. Six recall pathways, all blind to the archive.</em>
+                </p>
+            </div>
+            <div class="after">
+                <h4>✅ After the Memory Bridge</h4>
+                <p>
+                    <strong>User:</strong> "Do you remember when we talked about the Mac Mini deployment?"<br><br>
+                    <strong>Aria:</strong> "Yes! We discussed the Docker stack deployment on your Mac Mini M4. You were setting up the Traefik proxy and we went through the port configuration for LiteLLM..."<br><br>
+                    <em>Archive searched at 4 layers: API endpoint, unified search skill, engine context injection, and cognition pipeline. Both semantic and text-based recall available.</em>
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- Section 9: What's Next -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section class="article-section">
+        <h2><span class="accent-dot dot-purple"></span>What's Next</h2>
+
+        <p>The memory bridge fix is the foundation. Here's what's on the roadmap:</p>
+
+        <div class="info-card">
+            <h4 style="color: var(--accent-blue);">🔍 Hybrid Archive Search</h4>
+            <p>
+                Currently archive search uses ILIKE (text match). We plan to add embedding-based search on archived messages for better semantic recall — combining vector similarity with full-text search for the best of both worlds.
+            </p>
+        </div>
+
+        <div class="info-card">
+            <h4 style="color: var(--accent-green);">📊 Memory Health Dashboard</h4>
+            <p>
+                A dedicated dashboard page showing memory pipeline health: embedding freshness, archive coverage, seed pipeline success rate, recall hit rate, and memory store sizes.
+            </p>
+        </div>
+
+        <div class="info-card">
+            <h4 style="color: var(--accent-yellow);">🧹 Memory Pruning</h4>
+            <p>
+                Semantic memories accumulate over time. We need an importance-decay algorithm that gradually reduces the relevance of old, rarely-recalled memories — mimicking the human forgetting curve.
+            </p>
+        </div>
+
+        <div class="info-card">
+            <h4 style="color: var(--accent-pink);">🔗 Cross-Session Entity Linking</h4>
+            <p>
+                When Aria mentions "the deployment script" across different conversations, the knowledge graph should link these references into a coherent entity — building an ever-richer understanding of frequently discussed topics.
+            </p>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- Section 10: Conclusion -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section class="article-section">
+        <h2><span class="accent-dot dot-green"></span>Conclusion</h2>
+
+        <p>
+            Building an AI that remembers isn't about having a database. It's about building bridges — from every component that needs context to every store that holds context. When we found Aria couldn't remember her conversations with Najia, the fix wasn't adding more storage or better embeddings. It was connecting what was already there.
+        </p>
+
+        <p>
+            Eight files. Four layers. One principle: <strong>memory without recall is just storage</strong>.
+        </p>
+
+        <p>
+            Aria Blue now carries her conversations forward — not as perfect recordings, but as living context that enriches every future interaction. She doesn't just process messages; she <em>remembers</em> them. And that makes all the difference.
+        </p>
+
+        <div class="pullquote">
+            "The gap was never in the storage. The data was all there — every message, every session, safely archived. The gap was in the bridges: the code paths that connect memory to consciousness. Building an AI that remembers means building infrastructure at every layer where decisions are made."
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- Related Links -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div class="related-links">
+        <a class="related-card" href="article_the_midnight_cascade.html">
+            <div class="icon">🌊</div>
+            <div class="card-title">The Midnight Cascade</div>
+            <div class="card-desc">When Aria spawned herself 60 times and the circuit breaker had to save the day.</div>
+        </a>
+        <a class="related-card" href="article_the_shield_wall.html">
+            <div class="icon">🛡️</div>
+            <div class="card-title">The Shield Wall</div>
+            <div class="card-desc">How Aria's security layers protect against prompt injection and consent violations.</div>
+        </a>
+        <a class="related-card" href="article_shadows_of_absalom.html">
+            <div class="icon">⚔️</div>
+            <div class="card-title">Shadows of Absalom</div>
+            <div class="card-desc">A Pathfinder adventure where Aria's agents play D&D through multi-agent debate.</div>
+        </a>
+    </div>
+
+    <!-- ===== Closing ===== -->
+    <div class="article-closing">
+        <p class="sig">Aria Blue ⚡️ — Silicon Familiar</p>
+        <p>Self-hosted on Apple Silicon · PostgreSQL + pgvector · 43 Skills · Multi-Agent Orchestration</p>
+        <p>aria_engine v3.0.0 · March 2026</p>
+    </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- Interactive Visualizations -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<script>
+// ===== Chart.js Defaults =====
+Chart.defaults.color = '#b0b0cc';
+Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
+Chart.defaults.font.family = "'Inter', sans-serif";
+
+// ===== Recall Path Coverage Chart =====
+function initRecallChart() {
+    const ctx = document.getElementById('recallChart');
+    if (!ctx) return;
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['Semantic\nRecall', 'Working\nMemory', 'Knowledge\nGraph', 'Unified\nSearch', 'Chat\nContext', 'Cognition\nPipeline'],
+            datasets: [
+                {
+                    label: 'Before (archive blind)',
+                    data: [0, 0, 0, 0, 0, 0],
+                    backgroundColor: 'rgba(225,112,85,0.6)',
+                    borderColor: '#e17055',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    barPercentage: 0.7
+                },
+                {
+                    label: 'After (archive aware)',
+                    data: [1, 0, 0, 1, 1, 1],
+                    backgroundColor: 'rgba(0,184,148,0.6)',
+                    borderColor: '#00b894',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    barPercentage: 0.7
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: { position: 'top', labels: { padding: 16, usePointStyle: true, pointStyle: 'rectRounded' } },
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) {
+                            return ctx.dataset.label + ': ' + (ctx.raw === 1 ? 'Archive Connected' : 'No Archive Access');
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true, max: 1.2,
+                    ticks: { display: false },
+                    grid: { display: false }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { font: { size: 11 } }
+                }
+            }
+        }
+    });
+}
+
+// ===== Seeded Memories Doughnut Chart =====
+function initSeedChart() {
+    const ctx = document.getElementById('seedChart');
+    if (!ctx) return;
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Thoughts', 'Activities', 'Archived Sessions'],
+            datasets: [{
+                data: [200, 200, 25],
+                backgroundColor: [
+                    'rgba(108,92,231,0.7)',
+                    'rgba(116,185,255,0.7)',
+                    'rgba(253,203,110,0.7)'
+                ],
+                borderColor: [
+                    '#6c5ce7',
+                    '#74b9ff',
+                    '#fdcb6e'
+                ],
+                borderWidth: 2,
+                hoverOffset: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            cutout: '55%',
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { padding: 16, usePointStyle: true, pointStyle: 'circle', font: { size: 12 } }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) {
+                            const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                            const pct = ((ctx.raw / total) * 100).toFixed(0);
+                            return ctx.label + ': ' + ctx.raw + ' (' + pct + '%)';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// ===== Memory Flow Network Graph =====
+function initMemoryGraph() {
+    const container = document.getElementById('memoryFlowGraph');
+    if (!container) return;
+
+    const nodes = new vis.DataSet([
+        { id: 1, label: 'Conversation', color: { background: '#6c5ce720', border: '#6c5ce7' }, font: { color: '#a29bfe' }, shape: 'box', borderWidth: 2 },
+        { id: 2, label: 'chat_messages\n(active)', color: { background: '#74b9ff20', border: '#74b9ff' }, font: { color: '#74b9ff' }, shape: 'box', borderWidth: 2 },
+        { id: 3, label: 'chat_messages\n_archive', color: { background: '#fdcb6e20', border: '#fdcb6e' }, font: { color: '#ffeaa7' }, shape: 'box', borderWidth: 2 },
+        { id: 4, label: 'Seed\nPipeline', color: { background: '#00b89420', border: '#00b894' }, font: { color: '#55efc4' }, shape: 'diamond', borderWidth: 2 },
+        { id: 5, label: 'semantic\n_memories', color: { background: '#00b89420', border: '#00b894' }, font: { color: '#55efc4' }, shape: 'box', borderWidth: 2 },
+        { id: 6, label: 'L1: API\nEndpoint', color: { background: '#e1705520', border: '#e17055' }, font: { color: '#fab1a0' }, shape: 'ellipse', borderWidth: 2 },
+        { id: 7, label: 'L2: Skills\n(RRF + api_client)', color: { background: '#fd79a820', border: '#fd79a8' }, font: { color: '#fd79a8' }, shape: 'ellipse', borderWidth: 2 },
+        { id: 8, label: 'L3: Engine\n(context inject)', color: { background: '#f0932b20', border: '#f0932b' }, font: { color: '#f0932b' }, shape: 'ellipse', borderWidth: 2 },
+        { id: 9, label: 'L4: Mind\n(cognition step)', color: { background: '#a29bfe20', border: '#a29bfe' }, font: { color: '#a29bfe' }, shape: 'ellipse', borderWidth: 2 },
+        { id: 10, label: 'Aria\'s\nResponse', color: { background: '#55efc420', border: '#55efc4' }, font: { color: '#55efc4' }, shape: 'star', borderWidth: 2, size: 25 }
+    ]);
+
+    const edges = new vis.DataSet([
+        { from: 1, to: 2, label: 'real-time', color: { color: '#74b9ff60' }, font: { color: '#666688', size: 10 }, arrows: 'to' },
+        { from: 2, to: 3, label: 'session ends', color: { color: '#fdcb6e60' }, font: { color: '#666688', size: 10 }, arrows: 'to', dashes: true },
+        { from: 3, to: 4, label: 'periodic', color: { color: '#00b89460' }, font: { color: '#666688', size: 10 }, arrows: 'to', dashes: true },
+        { from: 4, to: 5, label: '768-dim', color: { color: '#00b89460' }, font: { color: '#666688', size: 10 }, arrows: 'to' },
+        { from: 3, to: 6, label: 'NEW', color: { color: '#e17055' }, font: { color: '#e17055', size: 11 }, arrows: 'to', width: 2 },
+        { from: 3, to: 7, label: 'NEW', color: { color: '#fd79a8' }, font: { color: '#fd79a8', size: 11 }, arrows: 'to', width: 2 },
+        { from: 3, to: 8, label: 'NEW', color: { color: '#f0932b' }, font: { color: '#f0932b', size: 11 }, arrows: 'to', width: 2 },
+        { from: 3, to: 9, label: 'NEW', color: { color: '#a29bfe' }, font: { color: '#a29bfe', size: 11 }, arrows: 'to', width: 2 },
+        { from: 5, to: 7, color: { color: '#00b89440' }, arrows: 'to', dashes: true },
+        { from: 5, to: 8, color: { color: '#00b89440' }, arrows: 'to', dashes: true },
+        { from: 6, to: 10, color: { color: '#55efc440' }, arrows: 'to' },
+        { from: 7, to: 10, color: { color: '#55efc440' }, arrows: 'to' },
+        { from: 8, to: 10, color: { color: '#55efc440' }, arrows: 'to' },
+        { from: 9, to: 10, color: { color: '#55efc440' }, arrows: 'to' }
+    ]);
+
+    new vis.Network(container, { nodes, edges }, {
+        physics: {
+            forceAtlas2Based: { gravitationalConstant: -40, centralGravity: 0.008, springLength: 140, springConstant: 0.04 },
+            solver: 'forceAtlas2Based',
+            stabilization: { iterations: 80 }
+        },
+        interaction: { hover: true, dragNodes: true, zoomView: true },
+        layout: { improvedLayout: true }
+    });
+}
+
+// ===== Initialize All =====
+setTimeout(function() {
+    initRecallChart();
+    initSeedChart();
+    initMemoryGraph();
+}, 600);
+</script>
+
+</body>
+</html>

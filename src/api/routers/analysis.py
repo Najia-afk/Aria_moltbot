@@ -67,18 +67,22 @@ def _compact_text(text: str | None, limit: int = 280) -> str:
 
 
 def _build_archived_session_memory(session, messages: list[Any]) -> tuple[str, str]:
-    """Build a concise semantic-memory payload for an archived session."""
+    """Build a concise semantic-memory payload for an archived session.
+
+    Captures a richer conversation excerpt so participant names and key
+    exchanges survive into semantic memory (enables recall by name).
+    """
     title = (session.title or "").strip()
     user_topics: list[str] = []
-    last_assistant = ""
+    assistant_excerpts: list[str] = []
     tool_names: list[str] = []
     seen_tools: set[str] = set()
 
     for msg in messages:
-        if msg.role == "user" and msg.content and len(user_topics) < 2:
-            user_topics.append(_compact_text(msg.content, 220))
-        elif msg.role == "assistant" and msg.content:
-            last_assistant = _compact_text(msg.content, 360)
+        if msg.role == "user" and msg.content and len(user_topics) < 5:
+            user_topics.append(_compact_text(msg.content, 300))
+        elif msg.role == "assistant" and msg.content and len(assistant_excerpts) < 3:
+            assistant_excerpts.append(_compact_text(msg.content, 300))
 
         if isinstance(msg.tool_calls, list):
             for call in msg.tool_calls:
@@ -93,7 +97,7 @@ def _build_archived_session_memory(session, messages: list[Any]) -> tuple[str, s
                 if len(tool_names) >= 5:
                     break
 
-    if not title and not user_topics and not last_assistant:
+    if not title and not user_topics and not assistant_excerpts:
         return "", ""
 
     label = title or f"{session.agent_id} {session.session_type} session"
@@ -108,11 +112,11 @@ def _build_archived_session_memory(session, messages: list[Any]) -> tuple[str, s
     if session.model:
         parts.append(f"Model: {session.model}")
     if user_topics:
-        parts.append("User topics:")
+        parts.append("User messages:")
         parts.extend(f"- {topic}" for topic in user_topics)
-    if last_assistant:
-        parts.append("Outcome:")
-        parts.append(last_assistant)
+    if assistant_excerpts:
+        parts.append("Assistant responses:")
+        parts.extend(f"- {excerpt}" for excerpt in assistant_excerpts)
     if tool_names:
         parts.append("Tools used: " + ", ".join(tool_names))
 
@@ -192,9 +196,9 @@ async def detect_patterns(req: PatternDetectionRequest, db: AsyncSession = Depen
             }
             try:
                 embedding = await _generate_embedding(content_text)
-            except Exception as e:
-                logger.warning("Embedding generation failed: %s", e)
-                embedding = [0.0] * 768
+            except Exception:
+                logger.warning("Embedding generation failed for pattern %s — skipping", p.subject)
+                continue
 
             # Check for existing pattern with same type+subject
             existing_stmt = (
@@ -279,9 +283,9 @@ async def run_compression(req: CompressionRequest, db: AsyncSession = Depends(ge
         for cm in manager.compressed_store:
             try:
                 embedding = await _generate_embedding(cm.summary)
-            except Exception as e:
-                logger.warning("Embedding generation failed: %s", e)
-                embedding = [0.0] * 768
+            except Exception:
+                logger.warning("Embedding generation failed for compression — skipping")
+                continue
             mem = SemanticMemory(
                 content=cm.summary,
                 summary=cm.summary[:100],
@@ -393,9 +397,9 @@ async def run_auto_compression(
         for cm in manager.compressed_store:
             try:
                 embedding = await _generate_embedding(cm.summary)
-            except Exception as e:
-                logger.warning("Embedding generation failed: %s", e)
-                embedding = [0.0] * 768
+            except Exception:
+                logger.warning("Embedding generation failed for auto-compression — skipping")
+                continue
             db.add(SemanticMemory(
                 content=cm.summary,
                 summary=cm.summary[:100],
@@ -480,9 +484,9 @@ async def seed_semantic_memories(
             try:
                 embedding = await _generate_embedding(content[:2000])
             except Exception as e:
-                logger.warning("Embedding failed for thought %s: %s", t.id, e)
-                embedding = [0.0] * 768
+                logger.warning("Embedding failed for thought %s: %s — skipping", t.id, e)
                 errors += 1
+                continue
 
             cat = t.category or "general"
             # Derive origin: thoughts from user interactions vs autonomous cognition
@@ -554,9 +558,9 @@ async def seed_semantic_memories(
             try:
                 embedding = await _generate_embedding(content[:2000])
             except Exception as e:
-                logger.warning("Embedding failed for activity %s: %s", a.id, e)
-                embedding = [0.0] * 768
+                logger.warning("Embedding failed for activity %s: %s — skipping", a.id, e)
                 errors += 1
+                continue
 
             # Classify origin from action name
             _cron_actions = {"cron_execution", "heartbeat", "session_cleanup",
@@ -598,7 +602,7 @@ async def seed_semantic_memories(
         await db.commit()
 
     # ── 3. Archived sessions → semantic_memories ──
-    archived_limit = min(limit, 25)
+    archived_limit = min(limit, 100)
     archive_stmt = (
         select(EngineChatSessionArchive)
         .where(
@@ -652,9 +656,9 @@ async def seed_semantic_memories(
             try:
                 embedding = await _generate_embedding(content[:2000])
             except Exception as e:
-                logger.warning("Embedding failed for archived session %s: %s", s.id, e)
-                embedding = [0.0] * 768
+                logger.warning("Embedding failed for archived session %s: %s — skipping", s.id, e)
                 errors += 1
+                continue
 
             # Classify origin — prefer metadata tag, fall back to session_type
             meta_origin = (s.metadata_json or {}).get("origin", "")

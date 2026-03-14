@@ -92,8 +92,6 @@ EXEMPT_ENDPOINTS = {
 # the Docker network.  External input is validated by Pydantic schemas.
 EXEMPT_PREFIXES = (
     "/engine/cron",
-    "/engine/chat",
-    "/engine/sessions",
     "/graphql",
     "/memories",
     "/memory-cache",
