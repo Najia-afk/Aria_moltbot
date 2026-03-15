@@ -93,7 +93,7 @@ async function doSearch() {
         const data = await res.json();
         renderResults(data, q);
     } catch (e) {
-        container.innerHTML = `<div class="no-results">Search failed: ${e.message}</div>`;
+        container.innerHTML = `<div class="no-results">Search failed: ${escapeHtml(e.message)}</div>`;
     }
 }
 

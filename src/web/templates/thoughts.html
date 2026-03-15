@@ -163,12 +163,12 @@ function renderThoughts(thoughts) {
     }
     
     container.innerHTML = thoughts.map(t => `
-        <div class="thought-card" data-category="${t.category || 'general'}">
+        <div class="thought-card" data-category="${escapeHtml(t.category || 'general')}">
             <div class="thought-header">
-                <span class="thought-category">${t.category || 'General'}</span>
+                <span class="thought-category">${escapeHtml(t.category || 'General')}</span>
                 <span class="thought-time">${formatTime(t.timestamp)}</span>
             </div>
-            <div class="thought-content">${t.content}</div>
+            <div class="thought-content">${escapeHtml(t.content)}</div>
         </div>
     `).join('');
 }
