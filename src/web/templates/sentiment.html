@@ -358,7 +358,7 @@ async function loadSentiment() {
         const speakerSel = document.getElementById('filter-speaker');
         const curSpeaker = speakerSel.value;
         speakerSel.innerHTML = '<option value="">All Speakers</option>' +
-            speakers.map(s => `<option value="${escapeHtml(s)}"${s === curSpeaker ? ' selected' : ''}>${speakerIcons[s]||'❓'} ${escapeHtml(speakerLabels[s]||s)}</option>`).join('');
+            speakers.map(s => `<option value="${s}"${s === curSpeaker ? ' selected' : ''}>${speakerIcons[s]||'❓'} ${speakerLabels[s]||s}</option>`).join('');
 
         // Populate agent filter dynamically from data
         const agents = [...new Set(_allItems.map(i => i.agent_id).filter(Boolean))].sort();

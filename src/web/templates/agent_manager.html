@@ -357,22 +357,22 @@ function renderAgents() {
         return `
         <div class="agent-card ${disabledClass}">
             <div class="card-header">
-                <h4 title="${escapeHtml(a.display_name || a.agent_id)}">${escapeHtml(a.display_name || a.agent_id)}</h4>
+                <h4 title="${a.display_name || a.agent_id}">${a.display_name || a.agent_id}</h4>
                 <div class="badges">
-                    <span class="badge-type ${escapeHtml(typeClass)}">${typeEmoji} ${escapeHtml(typeLabel)}</span>
-                    <span class="badge-status ${escapeHtml(statusClass)}">${statusEmoji} ${escapeHtml(statusClass)}</span>
+                    <span class="badge-type ${typeClass}">${typeEmoji} ${typeLabel}</span>
+                    <span class="badge-status ${statusClass}">${statusEmoji} ${statusClass}</span>
                 </div>
             </div>
             <div class="card-meta">
-                <span>🆔 ${escapeHtml(a.agent_id)}</span>
-                <span>🤖 ${escapeHtml(a.model || '—')}</span>
-                ${a.focus_type ? `<span>${focusEmoji} ${escapeHtml(a.focus_type)}</span>` : ''}
-                <span>📎 ${escapeHtml(parentLabel)}</span>
+                <span>🆔 ${a.agent_id}</span>
+                <span>🤖 ${a.model || '—'}</span>
+                ${a.focus_type ? `<span>${focusEmoji} ${a.focus_type}</span>` : ''}
+                <span>📎 ${parentLabel}</span>
             </div>
-            ${a.fallback_model ? `<div class="card-detail">🔄 Fallback: ${escapeHtml(a.fallback_model)}</div>` : ''}
+            ${a.fallback_model ? `<div class="card-detail">🔄 Fallback: ${a.fallback_model}</div>` : ''}
             <div class="card-detail">🌡️ temp=${a.temperature} · tokens=${a.max_tokens} · timeout=${a.timeout_seconds}s</div>
-            ${skills.length ? `<div class="card-skills">${skills.map(s => `<span class="skill-tag">🔧 ${escapeHtml(s)}</span>`).join('')}</div>` : ''}
-            ${caps.length ? `<div class="card-detail">⚡ ${caps.map(c => escapeHtml(c)).join(', ')}</div>` : ''}
+            ${skills.length ? `<div class="card-skills">${skills.map(s => `<span class="skill-tag">🔧 ${s}</span>`).join('')}</div>` : ''}
+            ${caps.length ? `<div class="card-detail">⚡ ${caps.join(', ')}</div>` : ''}
             <div class="card-detail" style="display:flex;align-items:center;gap:8px;">
                 🏆 Score: ${scorePercent}%
                 <div class="score-bar" style="flex:1;">
@@ -380,13 +380,13 @@ function renderAgents() {
                 </div>
                 ${a.consecutive_failures > 0 ? `<span style="color:#ef4444;">⚠️ ${a.consecutive_failures} fails</span>` : ''}
             </div>
-            ${a.current_task ? `<div class="card-detail">📋 ${escapeHtml(a.current_task)}</div>` : ''}
+            ${a.current_task ? `<div class="card-detail">📋 ${a.current_task}</div>` : ''}
             <div class="card-actions">
-                <button class="btn btn-secondary btn-sm" onclick="openEditModal('${escapeHtml(a.agent_id)}')" style="font-size:12px;">✏️ Edit</button>
-                <button class="btn btn-secondary btn-sm" onclick="toggleEnabled('${escapeHtml(a.agent_id)}', ${!a.enabled})" style="font-size:12px;">
+                <button class="btn btn-secondary btn-sm" onclick="openEditModal('${a.agent_id}')" style="font-size:12px;">✏️ Edit</button>
+                <button class="btn btn-secondary btn-sm" onclick="toggleEnabled('${a.agent_id}', ${!a.enabled})" style="font-size:12px;">
                     ${a.enabled ? '🚫 Disable' : '✅ Enable'}
                 </button>
-                <button class="btn btn-secondary btn-sm" style="font-size:12px;color:#ef4444;" onclick="deleteAgent('${escapeHtml(a.agent_id)}')">🗑️ Delete</button>
+                <button class="btn btn-secondary btn-sm" style="font-size:12px;color:#ef4444;" onclick="deleteAgent('${a.agent_id}')">🗑️ Delete</button>
             </div>
         </div>`;
     }).join('');

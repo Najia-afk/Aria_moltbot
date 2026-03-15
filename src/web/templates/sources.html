@@ -318,7 +318,7 @@ async function loadSources() {
         renderSources(items);
         renderPagination(total, currentPage, 25);
     } catch (e) {
-        document.getElementById('sources-list').innerHTML = '<div class="empty-state"><h3>Error loading sources</h3><p>' + escapeHtml(e.message) + '</p></div>';
+        document.getElementById('sources-list').innerHTML = '<div class="empty-state"><h3>Error loading sources</h3><p>' + e.message + '</p></div>';
     }
 
     // Load stats

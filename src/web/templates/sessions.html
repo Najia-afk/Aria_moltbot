@@ -363,7 +363,7 @@ function populateAgentFilter() {
     const agents = (_stats.by_agent || []).map(a => a.agent_id).filter(Boolean);
 
     select.innerHTML = '<option value="">All Agents</option>' +
-        agents.map(agent => `<option value="${escapeHtml(agent)}">${escapeHtml(agent)}</option>`).join('');
+        agents.map(agent => `<option value="${agent}">${agent}</option>`).join('');
 
     if (current && agents.includes(current)) {
         select.value = current;
@@ -441,7 +441,7 @@ function renderSessionOverview() {
     if (agents.length > 0) {
         body.innerHTML = agents.map(a => `
             <tr>
-                <td><span class="agent-badge">🤖 ${escapeHtml(a.agent_id)}</span></td>
+                <td><span class="agent-badge">🤖 ${a.agent_id}</span></td>
                 <td>${formatNumber(a.sessions)}</td>
                 <td>${formatNumber(a.tokens)}</td>
                 <td>${formatCost(a.cost)}</td>
@@ -489,7 +489,7 @@ function renderAgentTab() {
             const share = (a.sessions / totalSessions * 100).toFixed(1);
             return `
             <tr>
-                <td><span class="agent-badge">🤖 ${escapeHtml(a.agent_id)}</span></td>
+                <td><span class="agent-badge">🤖 ${a.agent_id}</span></td>
                 <td>${formatNumber(a.sessions)}</td>
                 <td>${formatNumber(a.tokens)}</td>
                 <td>${formatCost(a.cost)}</td>

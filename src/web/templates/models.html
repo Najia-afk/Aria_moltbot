@@ -659,7 +659,7 @@ async function loadSpendLogs() {
             return `
                 <tr>
                     <td>${date.toLocaleString()}</td>
-                    <td><code>${escapeHtml(displayModel)}</code></td>
+                    <td><code>${displayModel}</code></td>
                     <td>${formatNumber(tokens)}</td>
                     <td class="money">${formatMoney(cost)}</td>
                     <td>${duration.toFixed(2)}s</td>

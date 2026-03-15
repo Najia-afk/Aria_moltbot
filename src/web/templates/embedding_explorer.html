@@ -232,7 +232,7 @@ async function loadData() {
         const cats = [...new Set(allPoints.map(p => p.category).filter(Boolean))].sort();
         const sel = document.getElementById('catFilter');
         const curVal = sel.value;
-        sel.innerHTML = '<option value="">All categories</option>' + cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+        sel.innerHTML = '<option value="">All categories</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
         sel.value = curVal;
 
         // Assign colors

@@ -60,7 +60,7 @@ INJECTION_PATTERNS = [
     # XSS patterns
     (re.compile(r"<script[^>]*>", re.I), "xss"),
     (re.compile(r"javascript:", re.I), "xss"),
-    (re.compile(r"\bon(click|dblclick|mouse(?:over|out|down|up|move|enter|leave)|key(?:down|up|press)|load|unload|error|focus|blur|submit|change|input|abort|drag(?:start|end|over|enter|leave|drop)?|drop|copy|cut|paste|scroll|wheel|touch(?:start|end|move|cancel)|pointer(?:down|up|move|over|out|enter|leave|cancel)|animation(?:start|end|iteration)|transition(?:start|end|run|cancel)|resize|select|reset|contextmenu|beforeunload)\s*=", re.I), "xss"),
+    (re.compile(r"on\w+\s*=", re.I), "xss"),
     
     # Path traversal
     (re.compile(r"\.\./|\.\.\\", re.I), "path_traversal"),
@@ -93,6 +93,7 @@ EXEMPT_ENDPOINTS = {
 EXEMPT_PREFIXES = (
     "/engine/cron",
     "/engine/chat",
+    "/engine/sessions",
     "/graphql",
     "/memories",
     "/memory-cache",
