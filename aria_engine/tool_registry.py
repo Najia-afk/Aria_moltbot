@@ -666,13 +666,22 @@ class ToolRegistry:
             _walk(skill, 0)
         return added
 
+    def _core_infra_skills(self) -> list[str]:
+        """Return L0 + L1 + L2 skills (core infrastructure fallback)."""
+        core = set(self.ALLOWED_L0_SKILLS)
+        for skill_name, manifest in self._manifests.items():
+            layer = manifest.get("layer", 3)
+            if isinstance(layer, int) and layer <= 2:
+                core.add(skill_name)
+        return sorted(core)
+
     async def get_allowed_skills(self, db: Any, agent_id: str) -> list[str] | None:
         """
         Read the per-agent skill filter from the DB.
 
         Shared by ChatEngine and StreamingEngine to avoid DRY violations.
         Returns the allowed skills list, or None if no filtering.
-        Falls closed: if skills column is NULL/empty, returns L0-only list.
+        Falls closed: if skills column is NULL/empty, returns core infra (L0-L2).
         """
         from sqlalchemy import select
 
@@ -699,10 +708,18 @@ class ToolRegistry:
                             skills_list.append(l0)
                     return skills_list
             except (json.JSONDecodeError, TypeError, KeyError):
-                pass
+                logger.error(
+                    "Failed to parse skills for agent %s — falling back to core infra",
+                    agent_id,
+                    exc_info=True,
+                )
 
-        # Fail-closed: NULL or empty skills → only L0 globals
-        return list(self.ALLOWED_L0_SKILLS)
+        # Fail-closed: NULL or empty skills → core infrastructure (L0+L1+L2)
+        logger.warning(
+            "Agent %s has no skills in DB — returning core infra (L0-L2)",
+            agent_id,
+        )
+        return self._core_infra_skills()
 
     async def execute(
         self,

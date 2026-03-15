@@ -177,7 +177,9 @@ async def lifespan(app: FastAPI):
             tool_count = tool_registry.discover_from_manifests()
             print(f"\u2705 Tool registry: {tool_count} tools discovered from skill manifests")
         except Exception as te:
+            import traceback
             print(f"\u26a0\ufe0f  Tool manifest discovery failed (non-fatal): {te}")
+            traceback.print_exc()
         # Auto-wire: compute agent → skills from manifest metadata and persist
         try:
             try:
@@ -212,7 +214,9 @@ async def lifespan(app: FastAPI):
                     await _wire_db.commit()
                 print(f"\u2705 Skill auto-wire: {wired} agents updated, {len(skill_map)} agents mapped")
         except Exception as _aw:
-            print(f"\u26a0\ufe0f  Skill auto-wire failed (non-fatal): {_aw}")
+            import traceback
+            print(f"🔴 Skill auto-wire FAILED — agents will only have input_guard tools: {_aw}")
+            traceback.print_exc()
         # Session protection: prompt-injection guard + persistent rate-limit windows
         try:
             from aria_engine.session_protection import SessionProtection
