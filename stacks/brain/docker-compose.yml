@@ -216,6 +216,7 @@ services:
   # LiteLLM Router for model management
   litellm:
     # Aria v3 freeze: pinned to stable release v1.81.12 (2026-02-21)
+    # SECURITY: DO NOT upgrade past v1.81.12 — PyPI litellm 1.82.7/1.82.8 compromised (2026-03-24)
     image: ghcr.io/berriai/litellm:main-v1.81.12-stable
     container_name: litellm
     restart: unless-stopped
