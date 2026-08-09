@@ -15,6 +15,8 @@ sed \
   -e "s|\${TRAEFIK_HTTPS_PORT}|${TRAEFIK_HTTPS_PORT}|g" \
   -e "s|\${TRAEFIK_DASHBOARD_USER}|${TRAEFIK_DASHBOARD_USER}|g" \
   -e "s|\${TRAEFIK_DASHBOARD_PASSWORD_HASH}|${TRAEFIK_DASHBOARD_PASSWORD_HASH}|g" \
+  -e "s|\${ARIA_LAN_USER}|${ARIA_LAN_USER}|g" \
+  -e "s|\${ARIA_LAN_PASSWORD_HASH}|${ARIA_LAN_PASSWORD_HASH}|g" \
   /etc/traefik/dynamic.template.yaml > /etc/traefik/dynamic.yaml
 
 echo "Dynamic config ready."

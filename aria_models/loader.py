@@ -14,13 +14,17 @@ _cache: dict[str, Any] = {}
 _cache_timestamp: float = 0.0
 
 
+def _is_enabled(entry: Any) -> bool:
+    return isinstance(entry, dict) and entry.get("enabled", True) is not False
+
+
 def _build_alias_index(catalog: dict[str, Any] | None) -> dict[str, str]:
     models = catalog.get("models", {}) if catalog else {}
     alias_index: dict[str, str] = {}
     for canonical_id, entry in models.items():
-        alias_index[canonical_id] = canonical_id
-        if not isinstance(entry, dict):
+        if not _is_enabled(entry):
             continue
+        alias_index[canonical_id] = canonical_id
         for alias in entry.get("aliases", []):
             alias_index.setdefault(alias, canonical_id)
     return alias_index
@@ -46,7 +50,12 @@ def _materialize_views(catalog: dict[str, Any]) -> dict[str, Any]:
     use_cases/focus_defaults), and profiles from inline model metadata so all
     downstream consumers see the same shape as schema v4.
     """
-    models = catalog.get("models", {})
+    all_models = catalog.get("models", {})
+    models = {
+        model_id: entry
+        for model_id, entry in all_models.items()
+        if _is_enabled(entry)
+    }
     if not models:
         return catalog
 
@@ -236,9 +245,11 @@ def validate_models(path: Path | None = None) -> list[str]:
             else:
                 api_base = litellm_block.get("api_base") or entry.get("api_base")
                 if api_base is not None:
-                    if not isinstance(api_base, str) or not api_base.startswith(("http://", "https://")):
+                    if not isinstance(api_base, str) or not api_base.startswith(
+                        ("http://", "https://", "os.environ/")
+                    ):
                         errors.append(
-                            f"Model '{model_id}': 'api_base' must be an http/https URL, got {api_base!r}"
+                            f"Model '{model_id}': 'api_base' must be an http/https URL or environment reference, got {api_base!r}"
                         )
 
     return errors
@@ -263,7 +274,8 @@ def get_model_entry(model_id: str, catalog: dict[str, Any] | None = None) -> dic
     catalog = catalog or load_catalog()
     models = catalog.get("models", {}) if catalog else {}
     normalized = normalize_model_id(model_id, catalog=catalog)
-    return models.get(normalized)
+    entry = models.get(normalized)
+    return entry if _is_enabled(entry) else None
 
 
 def get_route_skill(model_id: str, catalog: dict[str, Any] | None = None) -> str | None:

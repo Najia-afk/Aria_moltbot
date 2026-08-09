@@ -39,7 +39,9 @@ ARIA_DATA_SCHEMA_FILE="${RUN_DIR}/aria_data_schema.sql.gz"
 ARIA_ENGINE_SCHEMA_FILE="${RUN_DIR}/aria_engine_schema.sql.gz"
 LITELLM_SCHEMA_FILE="${RUN_DIR}/litellm_schema.sql.gz"
 JSON_EXPORT="${RUN_DIR}/aria_export.json"
-KEEP_DAYS=14
+MEMORIES_BACKUP_FILE="${RUN_DIR}/aria_memories.tar.gz"
+MANIFEST_FILE="${RUN_DIR}/SHA256SUMS"
+KEEP_DAYS="${KEEP_DAYS:-14}"
 
 # Ensure backup directory exists
 mkdir -p "${RUN_DIR}"
@@ -158,6 +160,15 @@ fi
 
 echo "[$(date -Iseconds)] JSON export: ${JSON_EXPORT}"
 
+# File memories are part of Aria's state and must be recoverable with the DB.
+tar -czf "${MEMORIES_BACKUP_FILE}" -C "${ARIA_DIR}" aria_memories
+echo "[$(date -Iseconds)] memories backup: ${MEMORIES_BACKUP_FILE}"
+
+(
+    cd "${RUN_DIR}"
+    shasum -a 256 ./* > "${MANIFEST_FILE}"
+)
+
 # Mark latest successful backup for quick restore automation
 ln -sfn "${RUN_DIR}" "${BACKUP_ROOT}/latest"
 
@@ -166,4 +177,28 @@ find "${BACKUP_ROOT}" -mindepth 1 -maxdepth 1 -type d -name "20*" -mtime +${KEEP
 
 REMAINING_RUNS=$(find "${BACKUP_ROOT}" -mindepth 1 -maxdepth 1 -type d -name "20*" | wc -l | tr -d ' ')
 echo "[$(date -Iseconds)] Backup complete. run=${RUN_DIR}, retained_runs=${REMAINING_RUNS} (${KEEP_DAYS}-day retention)."
+
+if [[ "${NAS_BACKUP_ENABLED:-false}" == "true" ]]; then
+    : "${NAS_BACKUP_HOST:?NAS_BACKUP_HOST is required}"
+    : "${NAS_BACKUP_USER:?NAS_BACKUP_USER is required}"
+    : "${NAS_BACKUP_DIR:?NAS_BACKUP_DIR is required}"
+    : "${NAS_BACKUP_SSH_KEY:?NAS_BACKUP_SSH_KEY is required}"
+    : "${NAS_BACKUP_KNOWN_HOSTS:?NAS_BACKUP_KNOWN_HOSTS is required}"
+    NAS_BACKUP_PORT="${NAS_BACKUP_PORT:-22}"
+
+    [[ "$NAS_BACKUP_HOST" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "Invalid NAS_BACKUP_HOST" >&2; exit 1; }
+    [[ "$NAS_BACKUP_USER" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "Invalid NAS_BACKUP_USER" >&2; exit 1; }
+    [[ "$NAS_BACKUP_DIR" =~ ^/[A-Za-z0-9._/-]+$ ]] || { echo "Invalid NAS_BACKUP_DIR" >&2; exit 1; }
+    [[ -f "$NAS_BACKUP_SSH_KEY" ]] || { echo "NAS SSH key not found" >&2; exit 1; }
+    [[ -s "$NAS_BACKUP_KNOWN_HOSTS" ]] || { echo "NAS known_hosts file missing or empty" >&2; exit 1; }
+
+    SSH_COMMAND="ssh -p ${NAS_BACKUP_PORT} -i ${NAS_BACKUP_SSH_KEY} -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=${NAS_BACKUP_KNOWN_HOSTS}"
+    destination="${NAS_BACKUP_DIR}/postgres_daily"
+    $SSH_COMMAND "${NAS_BACKUP_USER}@${NAS_BACKUP_HOST}" "umask 077; mkdir -p '${destination}'"
+    rsync -a --partial -e "$SSH_COMMAND" "${RUN_DIR}/" \
+        "${NAS_BACKUP_USER}@${NAS_BACKUP_HOST}:${destination}/${TIMESTAMP}/"
+    $SSH_COMMAND "${NAS_BACKUP_USER}@${NAS_BACKUP_HOST}" \
+        "cd '${destination}/${TIMESTAMP}' && shasum -a 256 -c SHA256SUMS"
+    echo "[$(date -Iseconds)] NAS replication verified: ${NAS_BACKUP_HOST}:${destination}/${TIMESTAMP}"
+fi
 echo "---"

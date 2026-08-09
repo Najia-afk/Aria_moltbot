@@ -199,25 +199,6 @@ set_port "SANDBOX_PORT" "$SANDBOX_PORT"
 
 info "Host ports randomized (no conflicts with existing services)"
 
-# ── Optional: prompt for API keys ─────────────────────────────
-
-echo ""
-echo -e "${CYAN}Optional API Keys${NC} (press Enter to skip)"
-echo "These can be added to .env later."
-echo ""
-
-read -rp "OpenRouter API Key (sk-or-v1-...): " OR_KEY
-if [ -n "$OR_KEY" ]; then
-    fill_env "OPEN_ROUTER_KEY" "$OR_KEY"
-    info "OpenRouter key saved"
-fi
-
-read -rp "Moonshot/Kimi API Key: " KIMI_KEY
-if [ -n "$KIMI_KEY" ]; then
-    fill_env "MOONSHOT_KIMI_KEY" "$KIMI_KEY"
-    info "Moonshot key saved"
-fi
-
 # ── Summary ───────────────────────────────────────────────────
 
 echo ""

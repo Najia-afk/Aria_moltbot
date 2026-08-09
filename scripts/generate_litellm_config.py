@@ -119,6 +119,8 @@ def generate_model_list(catalog: dict) -> list[dict]:
     entries = []
 
     for model_id, entry in models.items():
+        if not isinstance(entry, dict) or entry.get("enabled", True) is False:
+            continue
         litellm_params = entry.get("litellm")
         if not litellm_params:
             continue
