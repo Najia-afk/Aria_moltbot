@@ -41,6 +41,19 @@ LITELLM_SCHEMA_FILE="${RUN_DIR}/litellm_schema.sql.gz"
 JSON_EXPORT="${RUN_DIR}/aria_export.json"
 KEEP_DAYS=14
 
+# Wait for aria-db to actually be up (e.g. this fired right after boot/wake,
+# before Docker Desktop finished starting the stack). Without this, the
+# first docker exec below fails silently (stderr is discarded per-command)
+# and set -e kills the whole run with zero backup content.
+DB_WAIT_DEADLINE=$((SECONDS + 300))
+until docker exec "${DB_CONTAINER}" pg_isready -U "${DB_USER}" >/dev/null 2>&1; do
+    if [ "${SECONDS}" -ge "${DB_WAIT_DEADLINE}" ]; then
+        echo "[$(date -Iseconds)] ERROR: ${DB_CONTAINER} not ready after 5m; aborting backup." >&2
+        exit 1
+    fi
+    sleep 5
+done
+
 # Ensure backup directory exists
 mkdir -p "${RUN_DIR}"
 
