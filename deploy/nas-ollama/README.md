@@ -7,7 +7,8 @@ home directories, SSH configuration, or system services.
 
 - Port `11434` is published only on NAS loopback (`127.0.0.1`).
 - Ollama cloud features are disabled with `OLLAMA_NO_CLOUD=1`.
-- The reviewed Ollama `0.32.6` multi-platform image is pinned by immutable digest.
+- The image is the official, pinned Ollama `0.32.6` digest — no custom build,
+  no model weights baked into any image layer.
 - The root filesystem is read-only. Only the named model volume and `/tmp` are writable.
 - All Linux capabilities are dropped and privilege escalation is disabled.
 - Logs rotate instead of growing without a limit.
@@ -15,27 +16,28 @@ home directories, SSH configuration, or system services.
   Flash Attention, and Q8 KV cache preserve memory headroom on the 64 GB NAS.
 
 The container still has outbound network access so an operator can pull models.
-Do not publish port `11434` on a LAN address and do not use host networking.
+Port `11434` is published on all NAS interfaces (LAN-reachable, not internet-
+exposed) as a deliberate, reversible trade-off: NAS SSH on this appliance does
+not support key-based tunneling (no login home directory is provisioned for
+any account, and no account has sudo to create one). Revert to loopback-only
+plus an SSH tunnel once that platform limitation is resolved (see
+tests/unit/test_nas_ollama_compose.py for the enforced port contract). Do not
+use host networking.
 
-## UGREEN Deployment
+## Build and Deploy
 
-1. Open the UGREEN **Docker** application.
-2. Create a Compose project and upload `compose.yml`.
-3. Create/start the project and confirm the container becomes healthy.
-4. Use the UGREEN container terminal to pull and alias the selected models:
+1. Create the Compose project from `compose.yml` on the NAS and start it.
+2. The NAS pulls the pinned `ollama` image itself (digest-verified).
+3. A one-shot `model-init` service, running only on the NAS over its internal
+   compose network, calls the `ollama` service's own API to pull `qwen3:30b`,
+   alias it `aria-primary`, and pull `nomic-embed-text`. It exits once done.
+   Nothing is built, staged, or transferred from the Mac — the NAS does its
+   own pull with its own CPU/network/storage.
 
-```bash
-ollama pull <reviewed-chat-model>
-ollama cp <reviewed-chat-model> aria-primary
-ollama pull nomic-embed-text
-ollama list
-```
-
-Model selection must follow a NAS CPU/GPU benchmark. The 64 GB system-memory
-figure alone does not establish that a large model will run at useful speed.
-Qwen3.5 is natively 256K, but its own guidance recommends retaining at least
-128K for thinking quality. The initial release therefore uses 128K and promotes
-to 256K only after load, latency, and memory tests pass.
+Model: `qwen3:30b` (Qwen3-30B-A3B, MoE — ~3B active params, 19GB, native 256K
+context). This exceeds the 128K floor while staying light on NAS CPU/GPU
+compute. The operational window is set to 131072 pending the load/latency
+benchmark; promotion to the full 256K happens after that benchmark passes.
 
 ## Required Verification
 

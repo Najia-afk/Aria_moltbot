@@ -17,10 +17,9 @@ services:
       OLLAMA_MAX_QUEUE: "8"
       OLLAMA_NUM_PARALLEL: "1"
     ports:
-      - name: ollama-loopback
+      - name: ollama-lan
         target: 11434
         published: "11434"
-        host_ip: 127.0.0.1
         protocol: tcp
     volumes:
       - ollama-data:/root/.ollama
@@ -45,6 +44,34 @@ services:
       options:
         max-size: 10m
         max-file: "3"
+
+  # One-shot: runs on the NAS itself, pulls/aliases models over the internal
+  # network via Ollama's own checksummed pull, then exits. No Mac build,
+  # no baked model weights, no manual container-terminal typing.
+  model-init:
+    image: ollama/ollama:0.32.6@sha256:b88c73ace3e115f8ec53dc8761ae1c0aabfa675406e3681786b98757ce050f42
+    pull_policy: missing
+    restart: "no"
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        ollama pull qwen3:30b
+        ollama cp qwen3:30b aria-primary
+        ollama pull nomic-embed-text
+        ollama list
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=256m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges=true
 
 volumes:
   ollama-data:

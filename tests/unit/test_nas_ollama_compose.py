@@ -6,19 +6,20 @@ import yaml
 COMPOSE_FILE = Path(__file__).parents[2] / "deploy" / "nas-ollama" / "compose.yml"
 
 
-def test_nas_ollama_is_loopback_only_and_hardened():
-    service = yaml.safe_load(COMPOSE_FILE.read_text())["services"]["ollama"]
+def test_nas_ollama_is_lan_exposed_and_hardened():
+    compose = yaml.safe_load(COMPOSE_FILE.read_text())
+    service = compose["services"]["ollama"]
 
     assert service["image"] == (
         "ollama/ollama:0.32.6@"
         "sha256:b88c73ace3e115f8ec53dc8761ae1c0aabfa675406e3681786b98757ce050f42"
     )
+    assert service["pull_policy"] == "missing"
     assert service["ports"] == [
         {
-            "name": "ollama-loopback",
+            "name": "ollama-lan",
             "target": 11434,
             "published": "11434",
-            "host_ip": "127.0.0.1",
             "protocol": "tcp",
         }
     ]
@@ -33,3 +34,14 @@ def test_nas_ollama_is_loopback_only_and_hardened():
     assert service["cap_drop"] == ["ALL"]
     assert "no-new-privileges=true" in service["security_opt"]
     assert service["mem_limit"] == "56g"
+
+
+def test_model_init_pulls_on_nas_not_on_mac():
+    compose = yaml.safe_load(COMPOSE_FILE.read_text())
+    init = compose["services"]["model-init"]
+
+    assert init["image"] == compose["services"]["ollama"]["image"]
+    assert init["restart"] == "no"
+    assert init["environment"]["OLLAMA_HOST"] == "http://ollama:11434"
+    assert "ports" not in init
+    assert init["depends_on"]["ollama"]["condition"] == "service_healthy"
