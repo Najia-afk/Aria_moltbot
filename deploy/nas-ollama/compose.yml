@@ -2,13 +2,20 @@ name: aria-nas-ollama
 
 services:
   ollama:
-    image: ${OLLAMA_IMAGE:?Set OLLAMA_IMAGE to an immutable ollama/ollama@sha256 digest}
+    image: ollama/ollama:0.32.6@sha256:b88c73ace3e115f8ec53dc8761ae1c0aabfa675406e3681786b98757ce050f42
     pull_policy: missing
     restart: unless-stopped
     init: true
     environment:
       OLLAMA_HOST: 0.0.0.0:11434
       OLLAMA_NO_CLOUD: "1"
+      OLLAMA_CONTEXT_LENGTH: "131072"
+      OLLAMA_FLASH_ATTENTION: "1"
+      OLLAMA_KEEP_ALIVE: 10m
+      OLLAMA_KV_CACHE_TYPE: q8_0
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_MAX_QUEUE: "8"
+      OLLAMA_NUM_PARALLEL: "1"
     ports:
       - name: ollama-loopback
         target: 11434
@@ -25,6 +32,7 @@ services:
     security_opt:
       - no-new-privileges=true
     pids_limit: 512
+    mem_limit: 56g
     healthcheck:
       test: ["CMD", "ollama", "list"]
       interval: 30s

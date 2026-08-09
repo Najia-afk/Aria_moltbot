@@ -77,3 +77,14 @@ def test_disabled_models_are_excluded_from_litellm_generation():
     }
 
     assert [entry["model_name"] for entry in generate_model_list(catalog)] == ["nas"]
+
+
+def test_nas_model_preserves_aria_long_context_contract():
+    entry = get_model_entry("nas_ollama")
+
+    assert entry is not None
+    assert entry["contextWindow"] == 131072
+    assert entry["safe_prompt_tokens"] == 98304
+    assert entry["maxTokens"] == 32768
+    generated = generate_model_list({"models": {"nas_ollama": entry}})
+    assert generated[0]["model_info"]["max_tokens"] == 131072

@@ -1,6 +1,6 @@
 # AUTO-GENERATED from aria_models/models.yaml
-# Generated: 2026-08-09T12:24:10Z
-# Source SHA-256: e4a83e6c9717b69a5edda050cafd38141276184124e357466e3c20c61e188838
+# Generated: 2026-08-09T13:45:10Z
+# Source SHA-256: ecac9fe69a1bc91bd37914fdee4e2ce0f467d1c6c14661562621b9bb3098f2df
 # Do not hand-edit model_list — edit models.yaml and re-run:
 #   python scripts/generate_litellm_config.py
 
@@ -10,7 +10,7 @@ model_list:
       model: ollama_chat/aria-primary
       api_base: os.environ/NAS_OLLAMA_URL
     model_info:
-      max_tokens: 32768
+      max_tokens: 131072
       input_cost_per_token: 0
       output_cost_per_token: 0
 

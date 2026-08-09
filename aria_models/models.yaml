@@ -77,8 +77,9 @@ models:
     tool_calling: true
     input: [text]
     cost: {input: 0, output: 0, cacheRead: 0, cacheWrite: 0}
-    contextWindow: 32768
-    maxTokens: 8192
+    contextWindow: 131072
+    safe_prompt_tokens: 98304
+    maxTokens: 32768
     routeSkill: litellm
     litellm:
       model: ollama_chat/aria-primary
