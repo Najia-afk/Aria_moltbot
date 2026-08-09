@@ -13,7 +13,7 @@ providers:
 
 # Routing — fallbacks derived from per-model fallback_order
 routing:
-  primary: litellm/kimi
+  primary: litellm/qwen3.5_mlx
   bypass: false
   tier_order: [local, free, paid]
   timeout: 300
@@ -69,7 +69,7 @@ models:
     tier: local
     priority: 1
     fallback_order: 1
-    tasks: [sentiment, ollama_default, local_fast, focus_classify, reflection, planning, pevr]
+    tasks: [primary, sentiment, ollama_default, local_fast, focus_classify, reflection, planning, pevr]
     tags: {fast_simple: 1}
     focus_for: [devsecops]
     reasoning: true
@@ -159,7 +159,7 @@ models:
     alias: Kimi K2.5 (Moonshot Paid)
     tier: paid
     priority: 4
-    tasks: [primary, summarization, memory_compression, conversation_summary, token_counting, moonshot_default]
+    tasks: [summarization, memory_compression, conversation_summary, token_counting, moonshot_default]
     tags: {long_context: 1, complex_reasoning: 1}
     focus_for: [data, trader]
     reasoning: true

@@ -80,6 +80,8 @@ services:
       - ../../aria_memories:/app/aria_memories
       - ../../aria_mind:/aria_mind:ro
       - ../../aria_models:/aria_models:ro
+      # Shadow baked /app/aria_models with bind mount for live models.yaml updates
+      - ../../aria_models:/app/aria_models:ro
       - ../../aria_engine:/aria_engine:ro
       # Shadow baked /app/aria_engine with bind mount for live code updates
       - ../../aria_engine:/app/aria_engine:ro
