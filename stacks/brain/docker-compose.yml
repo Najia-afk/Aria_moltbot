@@ -6,7 +6,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USER:-admin}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-admin}
       POSTGRES_DB: ${DB_NAME:-aria_warehouse}
     volumes:
       - aria_pg_data:/var/lib/postgresql/data
@@ -52,17 +52,18 @@ services:
     restart: unless-stopped
     command: ["python", "-m", "aria_engine"]
     environment:
-      DATABASE_URL: postgresql+asyncpg://${DB_USER:-admin}:${DB_PASSWORD:?DB_PASSWORD is required}@aria-db:${DB_INTERNAL_PORT:-5432}/${DB_NAME:-aria_warehouse}
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-admin}:${DB_PASSWORD:-admin}@aria-db:${DB_INTERNAL_PORT:-5432}/${DB_NAME:-aria_warehouse}
       LITELLM_BASE_URL: http://litellm:${LITELLM_INTERNAL_PORT:-4000}/v1
-      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?LITELLM_MASTER_KEY is required}
-      NAS_OLLAMA_URL: ${NAS_OLLAMA_URL:?NAS_OLLAMA_URL must point to the private NAS Ollama endpoint}
-      ARIA_ENV: production
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-change-me}
+      MOONSHOT_KIMI_KEY: ${MOONSHOT_KIMI_KEY:-}
+      OPEN_ROUTER_KEY: ${OPEN_ROUTER_KEY:-${OPENROUTER_API_KEY:-}}
+      OPEN_ROUTER_KEY_DEEP: ${OPEN_ROUTER_KEY_DEEP:-${OPENROUTER_API_KEY_DEEP:-${OPEN_ROUTER_KEY:-${OPENROUTER_API_KEY:-}}}}
       ENGINE_DEBUG: ${ENGINE_DEBUG:-false}
       ENGINE_HEALTH_PORT: ${ENGINE_HEALTH_PORT:-8081}
       # Full URL for heartbeat API posts (not the routing prefix API_BASE_URL)
       ENGINE_API_BASE_URL: http://aria-api:${API_INTERNAL_PORT:-8000}
       # S-103: API key for engine→API authentication
-      ARIA_API_KEY: ${ARIA_API_KEY:?ARIA_API_KEY is required}
+      ARIA_API_KEY: ${ARIA_API_KEY:-}
       # Browserless (headless Chrome for browser skill)
       BROWSERLESS_TOKEN: ${BROWSERLESS_TOKEN:-}
       BROWSERLESS_INTERNAL_PORT: ${BROWSERLESS_INTERNAL_PORT:-3000}
@@ -164,10 +165,8 @@ services:
     environment:
       SERVICE_HOST: ${SERVICE_HOST:-aria.local}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
-      ARIA_API_KEY: ${ARIA_API_KEY:?ARIA_API_KEY is required}
-      ARIA_ADMIN_KEY: ${ARIA_ADMIN_KEY:?ARIA_ADMIN_KEY is required}
-      ARIA_LAN_USER: ${ARIA_LAN_USER:?ARIA_LAN_USER is required}
-      ARIA_LAN_PASSWORD_HASH: ${ARIA_LAN_PASSWORD_HASH:?ARIA_LAN_PASSWORD_HASH is required}
+      ARIA_API_KEY: ${ARIA_API_KEY:-}
+      ARIA_ADMIN_KEY: ${ARIA_ADMIN_KEY:-}
       TRAEFIK_HTTP_PORT: ${TRAEFIK_HTTP_PORT:-8080}
       TRAEFIK_HTTPS_PORT: ${TRAEFIK_HTTPS_PORT:-8443}
       TRAEFIK_DASHBOARD_USER: ${TRAEFIK_DASHBOARD_USER:-admin}
@@ -188,12 +187,12 @@ services:
       - "--entrypoints.websecure.transport.respondingTimeouts.idleTimeout=300s"
       - "--metrics.prometheus=true"
     ports:
-      - "${ARIA_LAN_BIND_ADDRESS:?ARIA_LAN_BIND_ADDRESS is required}:${TRAEFIK_HTTP_PORT:-8080}:${TRAEFIK_INTERNAL_HTTP_PORT:-80}"
-      - "${ARIA_LAN_BIND_ADDRESS:?ARIA_LAN_BIND_ADDRESS is required}:${TRAEFIK_HTTPS_PORT:-8443}:${TRAEFIK_INTERNAL_HTTPS_PORT:-443}"
-      - "127.0.0.1:${TRAEFIK_DASH_PORT:-8081}:${TRAEFIK_INTERNAL_DASH_PORT:-8080}"
+      - "${TRAEFIK_HTTP_PORT:-8080}:${TRAEFIK_INTERNAL_HTTP_PORT:-80}"
+      - "${TRAEFIK_HTTPS_PORT:-8443}:${TRAEFIK_INTERNAL_HTTPS_PORT:-443}"
+      - "${TRAEFIK_DASH_PORT:-8081}:${TRAEFIK_INTERNAL_DASH_PORT:-8080}"
     volumes:
       - ./traefik-entrypoint.sh:/traefik-entrypoint.sh:ro
-      - ./traefik-lan.template.yaml:/etc/traefik/dynamic.template.yaml:ro
+      - ./traefik-dynamic.template.yaml:/etc/traefik/dynamic.template.yaml:ro
       - ./certs:/certs:ro
     healthcheck:
       test: ["CMD", "traefik", "healthcheck", "--ping"]
@@ -222,10 +221,12 @@ services:
     container_name: litellm
     restart: unless-stopped
     environment:
-      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?LITELLM_MASTER_KEY is required}
-      DATABASE_URL: postgresql://${DB_USER:-admin}:${DB_PASSWORD:?DB_PASSWORD is required}@aria-db:${DB_INTERNAL_PORT:-5432}/${DB_NAME:-aria_warehouse}?schema=litellm
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-change-me}
+      DATABASE_URL: postgresql://${DB_USER:-admin}:${DB_PASSWORD:-admin}@aria-db:${DB_INTERNAL_PORT:-5432}/${DB_NAME:-aria_warehouse}?schema=litellm
+      MOONSHOT_KIMI_KEY: ${MOONSHOT_KIMI_KEY:-}
+      OPEN_ROUTER_KEY: ${OPEN_ROUTER_KEY:-${OPENROUTER_API_KEY:-}}
+      OPEN_ROUTER_KEY_DEEP: ${OPEN_ROUTER_KEY_DEEP:-${OPENROUTER_API_KEY_DEEP:-${OPEN_ROUTER_KEY:-${OPENROUTER_API_KEY:-}}}}
       STORE_MODEL_IN_DB: "True"
-      NAS_OLLAMA_URL: ${NAS_OLLAMA_URL:?NAS_OLLAMA_URL must point to the private NAS Ollama endpoint}
       OLLAMA_API_BASE: ${OLLAMA_URL:-http://host.docker.internal:11434}
       MLX_API_BASE: ${MLX_URL:-http://host.docker.internal:8080}/v1
       LITELLM_INTERNAL_PORT: ${LITELLM_INTERNAL_PORT:-4000}
@@ -272,7 +273,7 @@ services:
     environment:
       PROMETHEUS_INTERNAL_PORT: ${PROMETHEUS_INTERNAL_PORT:-9090}
     ports:
-      - "127.0.0.1:${PROMETHEUS_PORT:-9090}:${PROMETHEUS_INTERNAL_PORT:-9090}"
+      - "${PROMETHEUS_PORT:-9090}:${PROMETHEUS_INTERNAL_PORT:-9090}"
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:$${PROMETHEUS_INTERNAL_PORT}/-/ready || exit 1"]
       interval: 30s
@@ -300,7 +301,7 @@ services:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
     ports:
-      - "127.0.0.1:${GRAFANA_PORT:-3001}:${GRAFANA_INTERNAL_PORT:-3000}"
+      - "${GRAFANA_PORT:-3001}:${GRAFANA_INTERNAL_PORT:-3000}"
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:$${GRAFANA_INTERNAL_PORT}/api/health || exit 1"]
       interval: 30s
@@ -325,7 +326,7 @@ services:
       # Ensure bind-mounted /app/<pkg> always shadows pip-installed site-packages
       PYTHONPATH: /app
       # Database
-      DATABASE_URL: postgresql://${DB_USER:-admin}:${DB_PASSWORD:?DB_PASSWORD is required}@aria-db:${DB_INTERNAL_PORT:-5432}/${DB_NAME:-aria_warehouse}
+      DATABASE_URL: postgresql://${DB_USER:-admin}:${DB_PASSWORD:-admin}@aria-db:${DB_INTERNAL_PORT:-5432}/${DB_NAME:-aria_warehouse}
       # Local LLM (Ollama - native on host)
       OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-hf.co/unsloth/GLM-4.7-Flash-REAP-23B-A3B-GGUF:Q3_K_S}
@@ -352,8 +353,7 @@ services:
       BROWSERLESS_INTERNAL_PORT: ${BROWSERLESS_INTERNAL_PORT:-3000}
       # LiteLLM (internal)
       LITELLM_URL: ${LITELLM_URL:-http://litellm:4000}
-      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?LITELLM_MASTER_KEY is required}
-      NAS_OLLAMA_URL: ${NAS_OLLAMA_URL:?NAS_OLLAMA_URL must point to the private NAS Ollama endpoint}
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-change-me}
       # Aria Email
       ARIA_EMAIL: ${ARIA_EMAIL:-}
       ARIA_EMAIL_PASSWORD: ${ARIA_EMAIL_PASSWORD:-}
@@ -428,12 +428,11 @@ services:
     container_name: aria-web
     restart: unless-stopped
     environment:
-      SECRET_KEY: ${WEB_SECRET_KEY:?WEB_SECRET_KEY is required}
-      FLASK_ENV: production
+      SECRET_KEY: ${WEB_SECRET_KEY:-aria-dev-secret-key}
       SERVICE_HOST: ${SERVICE_HOST:-localhost}
       API_BASE_URL: ${API_BASE_URL:-/api}
-      ARIA_API_KEY: ${ARIA_API_KEY:?ARIA_API_KEY is required}
-      ARIA_ADMIN_KEY: ${ARIA_ADMIN_KEY:?ARIA_ADMIN_KEY is required}
+      ARIA_API_KEY: ${ARIA_API_KEY:-}
+      ARIA_ADMIN_KEY: ${ARIA_ADMIN_KEY:-}
       # WS_BASE_URL: browser-accessible host:port for WebSocket chat.
       # Leave empty to auto-detect (works via Traefik or direct API fallback).
       # Set explicitly if behind a custom reverse proxy, e.g. "myhost:8080"
@@ -455,7 +454,7 @@ services:
       - ../../src/web/static:/app/static:ro
       - ../../src/web/app.py:/app/app.py:ro
     ports:
-      - "127.0.0.1:${ARIA_WEB_PORT:-5050}:${WEB_INTERNAL_PORT:-5000}"
+      - "${ARIA_WEB_PORT:-5050}:${WEB_INTERNAL_PORT:-5000}"
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:'+str($${WEB_INTERNAL_PORT})+'/')\" || exit 1"]
       interval: 15s
@@ -487,21 +486,22 @@ services:
       PYTHONPATH: /
       API_INTERNAL_PORT: ${API_INTERNAL_PORT:-8000}
       API_WORKERS: ${API_WORKERS:-1}
-      DATABASE_URL: postgresql://${DB_USER:-admin}:${DB_PASSWORD:?DB_PASSWORD is required}@aria-db:${DB_INTERNAL_PORT:-5432}/${DB_NAME:-aria_warehouse}
+      DATABASE_URL: postgresql://${DB_USER:-admin}:${DB_PASSWORD:-admin}@aria-db:${DB_INTERNAL_PORT:-5432}/${DB_NAME:-aria_warehouse}
       # S-103: API authentication keys
-      ARIA_API_KEY: ${ARIA_API_KEY:?ARIA_API_KEY is required}
-      ARIA_ADMIN_KEY: ${ARIA_ADMIN_KEY:?ARIA_ADMIN_KEY is required}
-      ARIA_ENV: production
+      ARIA_API_KEY: ${ARIA_API_KEY:-}
+      ARIA_ADMIN_KEY: ${ARIA_ADMIN_KEY:-}
       GRAFANA_URL: ${GRAFANA_URL:-http://grafana:3000}
       PROMETHEUS_URL: ${PROMETHEUS_URL:-http://prometheus:9090}
       OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
-      NAS_OLLAMA_URL: ${NAS_OLLAMA_URL:?NAS_OLLAMA_URL must point to the private NAS Ollama endpoint}
       MLX_URL: ${MLX_URL:-http://host.docker.internal:8080}
       LITELLM_URL: ${LITELLM_URL:-http://litellm:4000}
       PGADMIN_URL: ${PGADMIN_URL:-http://aria-pgadmin:80}
       API_BASE_URL: ${API_BASE_URL:-/api}
       # API keys for provider balance checks
-      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?LITELLM_MASTER_KEY is required}
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-change-me}
+      MOONSHOT_KIMI_KEY: ${MOONSHOT_KIMI_KEY:-}
+      OPEN_ROUTER_KEY: ${OPEN_ROUTER_KEY:-${OPENROUTER_API_KEY:-}}
+      OPEN_ROUTER_KEY_DEEP: ${OPEN_ROUTER_KEY_DEEP:-${OPENROUTER_API_KEY_DEEP:-${OPEN_ROUTER_KEY:-${OPENROUTER_API_KEY:-}}}}
       # Moltbook (ToolRegistry + skill execution runs in aria-api)
       MOLTBOOK_API_KEY: ${MOLTBOOK_API_KEY:-}
       MOLTBOOK_TOKEN: ${MOLTBOOK_TOKEN:-}
@@ -565,7 +565,7 @@ services:
       # S-100: Docker socket removed — admin uses docker-socket-proxy
       # See docker-socket-proxy service below
     ports:
-      - "127.0.0.1:${ARIA_API_PORT:-8000}:${API_INTERNAL_PORT:-8000}"
+      - "${ARIA_API_PORT:-8000}:${API_INTERNAL_PORT:-8000}"
     depends_on:
       aria-db:
         condition: service_healthy

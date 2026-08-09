@@ -1,14 +1,16 @@
 # AUTO-GENERATED from aria_models/models.yaml
-# Generated: 2026-08-09T13:45:10Z
-# Source SHA-256: ecac9fe69a1bc91bd37914fdee4e2ce0f467d1c6c14661562621b9bb3098f2df
+# Generated: 2026-03-10T22:12:48Z
+# Source SHA-256: 708b06e6dd7b26b13cb272d466c47c6e1f345a72bc5845bfe9a91748f6a44146
 # Do not hand-edit model_list — edit models.yaml and re-run:
 #   python scripts/generate_litellm_config.py
 
 model_list:
-  - model_name: nas_ollama
+  - model_name: qwen3.5_mlx
     litellm_params:
-      model: ollama_chat/aria-primary
-      api_base: os.environ/NAS_OLLAMA_URL
+      # OLD 9B: openai/mlx-community/Qwen3.5-9B-MLX-4bit
+      model: openai/mlx-community/Qwen3.5-4B-MLX-4bit
+      api_base: "http://host.docker.internal:8080/v1"
+      api_key: not-needed
     model_info:
       max_tokens: 131072
       input_cost_per_token: 0
@@ -17,11 +19,30 @@ model_list:
   - model_name: embedding
     litellm_params:
       model: ollama/nomic-embed-text
-      api_base: os.environ/NAS_OLLAMA_URL
+      api_base: "http://host.docker.internal:11434"
     model_info:
       max_tokens: 8192
       input_cost_per_token: 0
       output_cost_per_token: 0
+
+  - model_name: trinity
+    litellm_params:
+      model: "openrouter/arcee-ai/trinity-large-preview:free"
+      api_key: os.environ/OPEN_ROUTER_KEY
+    model_info:
+      max_tokens: 131072
+      input_cost_per_token: 0
+      output_cost_per_token: 0
+
+  - model_name: kimi
+    litellm_params:
+      model: moonshot/kimi-k2.5
+      api_base: "https://api.moonshot.ai/v1"
+      api_key: os.environ/MOONSHOT_KIMI_KEY
+    model_info:
+      max_tokens: 256000
+      input_cost_per_token: 0.56
+      output_cost_per_token: 2.94
 
 general_settings:
   database_url: os.environ/DATABASE_URL
