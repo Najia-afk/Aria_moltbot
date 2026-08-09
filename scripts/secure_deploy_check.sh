@@ -18,7 +18,9 @@ while IFS='=' read -r key value; do
 done < "$ENV_FILE"
 
 for key in DB_PASSWORD WEB_SECRET_KEY LITELLM_MASTER_KEY ARIA_API_KEY ARIA_ADMIN_KEY \
-    ARIA_LAN_BIND_ADDRESS ARIA_LAN_USER ARIA_LAN_PASSWORD_HASH NAS_OLLAMA_URL; do
+    ARIA_LAN_BIND_ADDRESS ARIA_LAN_USER ARIA_LAN_PASSWORD_HASH NAS_OLLAMA_URL \
+    NAS_OLLAMA_HEALTH_URL NAS_LLM_SSH_HOST NAS_LLM_SSH_USER NAS_LLM_SSH_KEY \
+    NAS_LLM_SSH_KNOWN_HOSTS; do
     [[ -n "${!key:-}" ]] || fail "${key} is required"
 done
 [[ "${ARIA_ENV:-}" == "production" ]] || fail "ARIA_ENV must be production"
@@ -28,22 +30,22 @@ done
 [[ "$ARIA_LAN_PASSWORD_HASH" == '$$apr1$$'* || "$ARIA_LAN_PASSWORD_HASH" == '$$2'* ]] \
     || fail "LAN password must be an htpasswd hash"
 
-.venv/bin/python - "$NAS_OLLAMA_URL" <<'PY'
-import ipaddress
-import socket
+"${ARIA_DIR}/.venv/bin/python" - "$NAS_OLLAMA_URL" "$NAS_OLLAMA_HEALTH_URL" <<'PY'
 import sys
 from urllib.parse import urlparse
 
-url = urlparse(sys.argv[1])
-if url.scheme != "http" or not url.hostname or url.port != 11434:
-    raise SystemExit("FAIL: NAS_OLLAMA_URL must be http://<private-host>:11434")
-addresses = {item[4][0] for item in socket.getaddrinfo(url.hostname, url.port)}
-if not addresses or any(not ipaddress.ip_address(address).is_private for address in addresses):
-    raise SystemExit("FAIL: NAS_OLLAMA_URL must resolve only to private addresses")
+container_url = urlparse(sys.argv[1])
+health_url = urlparse(sys.argv[2])
+if (container_url.scheme, container_url.hostname, container_url.port) != (
+    "http", "host.docker.internal", 11435
+):
+    raise SystemExit("FAIL: NAS_OLLAMA_URL must use the Mini SSH tunnel via host.docker.internal:11435")
+if (health_url.scheme, health_url.hostname, health_url.port) != ("http", "127.0.0.1", 11435):
+    raise SystemExit("FAIL: NAS_OLLAMA_HEALTH_URL must use Mini loopback port 11435")
 PY
-pass "NAS endpoint resolves privately"
+pass "NAS endpoint is constrained to the Mini SSH tunnel"
 
-.venv/bin/python - <<'PY'
+"${ARIA_DIR}/.venv/bin/python" - <<'PY'
 from aria_models.loader import load_catalog, validate_models
 
 errors = validate_models()
@@ -65,10 +67,11 @@ cd "${ARIA_DIR}/stacks/brain"
 docker compose config --quiet
 pass "Compose configuration is valid"
 
+"${ARIA_DIR}/scripts/nas_llm_tunnel.sh" check
 tags_file="$(mktemp)"
 trap 'rm -f "$tags_file"' EXIT
-curl -fsS --connect-timeout 3 --max-time 10 "${NAS_OLLAMA_URL}/api/tags" > "$tags_file" \
-    || fail "NAS Ollama is not reachable at the configured private endpoint"
+curl -fsS --connect-timeout 3 --max-time 10 "${NAS_OLLAMA_HEALTH_URL}/api/tags" > "$tags_file" \
+    || fail "NAS Ollama is not reachable through the SSH tunnel"
 "${ARIA_DIR}/.venv/bin/python" -c 'import json,sys; names={m["name"].split(":")[0] for m in json.load(open(sys.argv[1])).get("models",[])}; required={"aria-primary","nomic-embed-text"}; missing=required-names; assert not missing, f"missing NAS models: {sorted(missing)}"' "$tags_file"
 pass "NAS Ollama is reachable with required aliases"
 

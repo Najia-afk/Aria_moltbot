@@ -14,14 +14,15 @@ Git.
   disabled and cloud keys are not passed to containers.
 - NAS backups use key-only SSH, strict host-key checking, checksums, and a
   private remote directory.
-- Ollama must be restricted by the NAS firewall to the Mini's source address.
-  Prefer a WireGuard/Tailscale address for `NAS_OLLAMA_URL` when available.
+- Ollama binds only to NAS loopback. LiteLLM reaches it through a dedicated SSH
+  key restricted to forwarding one destination; no Ollama LAN port is opened.
 
 ## 1. Configure The Mini
 
 ```bash
 ./scripts/configure_secure_lan.sh \
   --nas-host <private-nas-hostname-or-address> \
+  --nas-user <non-root-nas-username> \
   --lan-address <mini-lan-address>
 ```
 
@@ -38,11 +39,12 @@ Use the UGREEN administration interface to:
 
 1. Install a vendor-supported Ollama package/container and pin its image version.
 2. Store model data on a dedicated NAS volume.
-3. Expose Ollama only on the private interface.
-4. Add a firewall allow rule for the Mini source address, then deny other sources.
-5. Enable SSH for a non-root service account used only for backups.
+3. Bind Ollama only to NAS loopback (`127.0.0.1:11434`).
+4. Keep the Ollama port closed on every LAN interface.
+5. Enable SSH for non-root service accounts with separate tunnel and backup keys.
 6. Disable SSH password login only after key login has been tested in a second session.
-7. Enable encrypted storage/snapshots for the backup volume when supported.
+7. Allow NAS SSH only from the Mini source address.
+8. Enable encrypted storage/snapshots for the backup volume when supported.
 
 Select the chat model after checking the NAS CPU/GPU architecture and available
 memory. Give the chosen Ollama model the stable alias expected by Aria:
@@ -56,16 +58,36 @@ The alias keeps hardware-specific model choices out of the public repository.
 
 ## 3. Pin SSH Trust
 
-Create a dedicated Ed25519 key locally. Type its passphrase directly into the
-terminal; never place a passphrase in `.env` or chat.
+Create a dedicated Ed25519 backup key locally. Type its passphrase directly
+into the terminal; never place a passphrase in `.env` or chat.
 
 ```bash
 ssh-keygen -t ed25519 -f ~/.ssh/aria_nas_backup -C aria-nas-backup
 ```
 
-Install only the public key for the NAS backup account. Verify the host-key
+The Mini configurator uses `~/.ssh/aria_nas_llm` as a separate LLM tunnel key.
+Install its public key with restrictions equivalent to the following single
+`authorized_keys` entry (keep the public key itself on the same line):
+
+```text
+restrict,port-forwarding,permitopen="127.0.0.1:11434" <public-key>
+```
+
+This disables PTY, agent, X11, and arbitrary destinations. The account should
+also have no administrative group membership. Verify the host-key
 fingerprint through the UGREEN UI or physical console before writing it to a
 dedicated known-hosts file. Do not rely on `StrictHostKeyChecking=accept-new`.
+
+Set `NAS_LLM_SSH_HOST`, `NAS_LLM_SSH_USER`, `NAS_LLM_SSH_KEY`, and
+`NAS_LLM_SSH_KNOWN_HOSTS` in the private `.env`, then start and verify:
+
+```bash
+./scripts/nas_llm_tunnel.sh start
+./scripts/nas_llm_tunnel.sh check
+```
+
+Install only a separate backup public key for the NAS backup account. That key
+must not be reused for the model tunnel.
 
 Add these private values to `stacks/brain/.env`:
 

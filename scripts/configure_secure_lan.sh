@@ -9,15 +9,17 @@ VAULT_DIR="${VAULT_DIR:-${HOME}/aria_vault}"
 CREDENTIAL_DIR="${VAULT_DIR}/credentials"
 
 usage() {
-    echo "Usage: $0 --nas-host HOST [--lan-address ADDRESS] [--lan-user USER]"
+    echo "Usage: $0 --nas-host HOST [--nas-user USER] [--lan-address ADDRESS] [--lan-user USER]"
 }
 
 NAS_HOST=""
+NAS_USER=""
 LAN_ADDRESS=""
 LAN_USER="aria"
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --nas-host) NAS_HOST="${2:-}"; shift 2 ;;
+        --nas-user) NAS_USER="${2:-}"; shift 2 ;;
         --lan-address) LAN_ADDRESS="${2:-}"; shift 2 ;;
         --lan-user) LAN_USER="${2:-}"; shift 2 ;;
         -h|--help) usage; exit 0 ;;
@@ -86,7 +88,16 @@ set_env ARIA_LAN_USER "$LAN_USER"
 set_env ARIA_LAN_PASSWORD_HASH "$compose_lan_hash"
 set_env SERVICE_HOST "$LAN_ADDRESS"
 set_env MAC_LAN_IP "$LAN_ADDRESS"
-set_env NAS_OLLAMA_URL "http://${NAS_HOST}:11434"
+set_env NAS_OLLAMA_URL "http://host.docker.internal:11435"
+set_env NAS_OLLAMA_HEALTH_URL "http://127.0.0.1:11435"
+set_env NAS_LLM_SSH_HOST "$NAS_HOST"
+if [[ -n "$NAS_USER" ]]; then
+    set_env NAS_LLM_SSH_USER "$NAS_USER"
+fi
+set_env NAS_LLM_SSH_KEY "${HOME}/.ssh/aria_nas_llm"
+set_env NAS_LLM_SSH_KNOWN_HOSTS "${HOME}/.ssh/aria_nas_llm_known_hosts"
+set_env NAS_LLM_TUNNEL_PORT "11435"
+set_env NAS_LLM_REMOTE_PORT "11434"
 set_env CORS_ALLOWED_ORIGINS "https://${LAN_ADDRESS}:$(get_env TRAEFIK_HTTPS_PORT)"
 
 # The active privacy-first deployment must not retain usable cloud credentials.
@@ -101,4 +112,4 @@ fi
 
 echo "Secure LAN configuration written to ${ENV_FILE}"
 echo "LAN login stored with mode 0600 at ${CREDENTIAL_DIR}/aria_lan_login"
-echo "Run scripts/secure_deploy_check.sh after SSH and Ollama are enabled on the NAS."
+echo "Set NAS_LLM_SSH_USER/KEY/KNOWN_HOSTS, then start scripts/nas_llm_tunnel.sh."
