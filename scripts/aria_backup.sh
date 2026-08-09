@@ -166,4 +166,39 @@ find "${BACKUP_ROOT}" -mindepth 1 -maxdepth 1 -type d -name "20*" -mtime +${KEEP
 
 REMAINING_RUNS=$(find "${BACKUP_ROOT}" -mindepth 1 -maxdepth 1 -type d -name "20*" | wc -l | tr -d ' ')
 echo "[$(date -Iseconds)] Backup complete. run=${RUN_DIR}, retained_runs=${REMAINING_RUNS} (${KEEP_DAYS}-day retention)."
+
+# ── Push this run to the NAS (SMB, dedicated non-admin user) ──────────
+# Aria's own containers never have these credentials — this is a Mac-side
+# launchd job only. Failure here is non-fatal: the local backup above has
+# already succeeded regardless of NAS reachability.
+if [ "${NAS_BACKUP_ENABLED:-false}" = "true" ]; then
+    NAS_MOUNT_DIR=$(mktemp -d /tmp/aria_nas_backup.XXXXXX)
+    NAS_PASS=$(security find-generic-password \
+        -s "${NAS_BACKUP_KEYCHAIN_SERVICE:-aria-nas-archive}" \
+        -a "${NAS_BACKUP_KEYCHAIN_ACCOUNT:-aria-archive}" -w 2>/dev/null || true)
+
+    if [ -z "${NAS_PASS}" ]; then
+        echo "[$(date -Iseconds)] WARNING: NAS backup credentials not found in Keychain; skipping NAS push."
+    else
+        NAS_PASS_ENC=$(python3 -c "import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=''))" "${NAS_PASS}")
+        if mount_smbfs "//${NAS_BACKUP_USER}:${NAS_PASS_ENC}@${NAS_BACKUP_HOST}/${NAS_BACKUP_SHARE}" "${NAS_MOUNT_DIR}" 2>/dev/null; then
+            if rsync -a "${RUN_DIR}/" "${NAS_MOUNT_DIR}/${TIMESTAMP}/"; then
+                echo "[$(date -Iseconds)] NAS push complete: ${NAS_BACKUP_HOST}/${NAS_BACKUP_SHARE}/${TIMESTAMP}"
+                # Prune old runs on the NAS too (same retention as local).
+                find "${NAS_MOUNT_DIR}" -mindepth 1 -maxdepth 1 -type d -name "20*" -mtime +${KEEP_DAYS} -exec rm -rf {} + 2>/dev/null || true
+            else
+                echo "[$(date -Iseconds)] WARNING: NAS push (rsync) failed; local backup is still intact."
+            fi
+            umount "${NAS_MOUNT_DIR}" 2>/dev/null || true
+        else
+            echo "[$(date -Iseconds)] WARNING: NAS SMB mount failed; local backup is still intact."
+        fi
+        NAS_PASS=""
+        NAS_PASS_ENC=""
+    fi
+    rmdir "${NAS_MOUNT_DIR}" 2>/dev/null || true
+else
+    echo "[$(date -Iseconds)] NAS_BACKUP_ENABLED not true; skipping NAS push (local-only backup)."
+fi
+
 echo "---"
