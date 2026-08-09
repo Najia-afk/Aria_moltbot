@@ -13,6 +13,7 @@ Features:
 """
 import asyncio
 import logging
+import os
 import time
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, TYPE_CHECKING
@@ -143,10 +144,16 @@ class LLMGateway:
             else:
                 extra["api_key"] = raw_key
 
-        # Per-model api_base
+        # Per-model api_base (supports "os.environ/VAR" syntax)
         raw_base = litellm_block.get("api_base", "")
         if raw_base:
-            extra["api_base"] = raw_base
+            if raw_base.startswith("os.environ/"):
+                env_var = raw_base.split("/", 1)[1]
+                resolved_base = os.environ.get(env_var, "")
+                if resolved_base:
+                    extra["api_base"] = resolved_base
+            else:
+                extra["api_base"] = raw_base
 
         # Forward any other litellm params (temperature, max_tokens, etc.)
         _reserved = {"model", "api_key", "api_base"}
@@ -255,8 +262,10 @@ class LLMGateway:
         except Exception:
             return max(1, int(len(text.split()) * 1.35))
 
-    # Default timeout for LLM calls (seconds). Override via config.
-    LLM_TIMEOUT: float = 120.0
+    # Default timeout for LLM calls (seconds). CPU-bound local inference (e.g.
+    # NAS Ollama) can take well over 120s for longer/"thinking" responses.
+    # Override via LLM_TIMEOUT env var.
+    LLM_TIMEOUT: float = float(os.environ.get("LLM_TIMEOUT", "240"))
 
     async def complete(
         self,
