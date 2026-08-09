@@ -37,7 +37,8 @@ content to Git.
 
 Use the UGREEN administration interface to:
 
-1. Install a vendor-supported Ollama package/container and pin its image version.
+1. Install the isolated Compose project in `deploy/nas-ollama/` through the
+  UGREEN Docker application.
 2. Store model data on a dedicated NAS volume.
 3. Bind Ollama only to NAS loopback (`127.0.0.1:11434`).
 4. Keep the Ollama port closed on every LAN interface.

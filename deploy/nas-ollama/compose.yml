@@ -1,0 +1,43 @@
+name: aria-nas-ollama
+
+services:
+  ollama:
+    image: ${OLLAMA_IMAGE:?Set OLLAMA_IMAGE to an immutable ollama/ollama@sha256 digest}
+    pull_policy: missing
+    restart: unless-stopped
+    init: true
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
+      OLLAMA_NO_CLOUD: "1"
+    ports:
+      - name: ollama-loopback
+        target: 11434
+        published: "11434"
+        host_ip: 127.0.0.1
+        protocol: tcp
+    volumes:
+      - ollama-data:/root/.ollama
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=1g
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges=true
+    pids_limit: 512
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+volumes:
+  ollama-data:
+    name: aria-nas-ollama-data
