@@ -169,16 +169,16 @@ echo "[$(date -Iseconds)] Backup complete. run=${RUN_DIR}, retained_runs=${REMAI
 
 # ── Push this run to the NAS (SMB, dedicated non-admin user) ──────────
 # Aria's own containers never have these credentials — this is a Mac-side
-# launchd job only. Failure here is non-fatal: the local backup above has
-# already succeeded regardless of NAS reachability.
+# launchd job only. Password lives in stacks/brain/.env (gitignored, not
+# referenced by any docker-compose.yml service environment block, so it
+# never reaches an Aria container). Failure here is non-fatal: the local
+# backup above has already succeeded regardless of NAS reachability.
 if [ "${NAS_BACKUP_ENABLED:-false}" = "true" ]; then
     NAS_MOUNT_DIR=$(mktemp -d /tmp/aria_nas_backup.XXXXXX)
-    NAS_PASS=$(security find-generic-password \
-        -s "${NAS_BACKUP_KEYCHAIN_SERVICE:-aria-nas-archive}" \
-        -a "${NAS_BACKUP_KEYCHAIN_ACCOUNT:-aria-archive}" -w 2>/dev/null || true)
+    NAS_PASS="${NAS_BACKUP_PASSWORD:-}"
 
     if [ -z "${NAS_PASS}" ]; then
-        echo "[$(date -Iseconds)] WARNING: NAS backup credentials not found in Keychain; skipping NAS push."
+        echo "[$(date -Iseconds)] WARNING: NAS_BACKUP_PASSWORD not set in .env; skipping NAS push."
     else
         NAS_PASS_ENC=$(python3 -c "import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=''))" "${NAS_PASS}")
         if mount_smbfs "//${NAS_BACKUP_USER}:${NAS_PASS_ENC}@${NAS_BACKUP_HOST}/${NAS_BACKUP_SHARE}" "${NAS_MOUNT_DIR}" 2>/dev/null; then
