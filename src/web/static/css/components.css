@@ -553,6 +553,127 @@ tr:hover td {
     color: var(--info);
 }
 
+.badge-secondary {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+}
+
+/* ================================
+   GAP-FILL: classes referenced by templates but never defined.
+   Found via a full class-usage audit against base.css/components.css/
+   variables.css (2026-09-25). Centralized here instead of touching every
+   template, matching the variables.css "legacy token aliases" pattern.
+   ================================ */
+.page-header .subtitle {
+    font-size: 1rem;
+    color: var(--text-muted);
+}
+
+.hero-compact {
+    padding: var(--space-lg) var(--space-xl);
+}
+
+.hero-compact h1,
+.hero-title {
+    font-size: 2rem;
+}
+
+.section-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+    margin-bottom: var(--space-lg);
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-md);
+}
+
+.btn-sm {
+    padding: var(--space-xs) var(--space-md);
+    font-size: 0.8rem;
+}
+
+.table-sm th,
+.table-sm td {
+    padding: var(--space-sm) var(--space-md);
+    font-size: 0.8rem;
+}
+
+.card-body {
+    margin: var(--space-md) 0;
+}
+
+.card-footer {
+    margin-top: var(--space-md);
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--border-subtle);
+}
+
+.stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-lg);
+    margin-bottom: var(--space-xl);
+}
+@media (max-width: 1024px) {
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+    .stats-row { grid-template-columns: 1fr; }
+}
+
+.stat-content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.footer-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.footer-brand {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.footer-logo {
+    font-size: 1.5rem;
+}
+
+.footer-text {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+}
+
+.footer-text strong {
+    color: var(--text-primary);
+}
+
+.footer-divider {
+    width: 100%;
+    max-width: 200px;
+    height: 1px;
+    background: var(--border-subtle);
+    margin: var(--space-sm) 0;
+}
+
+.footer-bottom {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
 /* ================================
    ACTIVITY LIST
    ================================ */

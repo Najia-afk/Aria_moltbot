@@ -1,9 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Sprint Board - Aria Blue{% endblock %}
 
-{% block page_title %}📋 Sprint Board{% endblock %}
-{% block page_subtitle %}Kanban workflow for goal management{% endblock %}
-
 {% block extra_css %}
 <style>
     /* Board layout (no tabs) */
@@ -84,7 +81,10 @@
 </style>
 {% endblock %}
 
-{% block content %}
+{% block content %}<div class="page-header">
+    <h1>📋 Sprint Board</h1>
+    <p class="subtitle">Kanban workflow for goal management</p>
+</div>
 <!-- ── Controls ─────────────────────────────────────────────────────── -->
 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
     <div style="display:flex; gap:0.5rem; align-items:center;">
