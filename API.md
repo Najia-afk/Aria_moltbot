@@ -8,7 +8,7 @@ The API is the **sole database gateway** — all skills and agents access data t
 
 ### REST Routers
 
-All routers live in `src/api/routers/` — 34 router files containing 240+ REST endpoints, 2 WebSocket endpoints, and 1 GraphQL schema.
+All routers live in `src/api/routers/` — 36 router files containing 263 REST endpoints, 2 WebSocket endpoints, and 1 GraphQL schema.
 
 **→ [`src/api/routers/`](src/api/routers/)**
 

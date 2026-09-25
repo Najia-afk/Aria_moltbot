@@ -4,7 +4,7 @@
 {% block extra_css %}
 <style>
     .soul-layout { display: grid; grid-template-columns: 280px 1fr; gap: 25px; min-height: 70vh; }
-    .soul-sidebar { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px; height: fit-content; max-height: calc(100vh - 130px); overflow-y: auto; position: sticky; top: 100px; }
+    .soul-sidebar { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px; height: fit-content; max-height: calc(100vh - 130px); max-height: calc(100dvh - 130px); overflow-y: auto; position: sticky; top: 100px; }
     .soul-sidebar h3 { font-size: 13px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.02em; }
     .soul-nav-item { display: block; padding: 10px 14px; border-radius: 8px; color: var(--text-secondary); text-decoration: none; font-size: 13px; cursor: pointer; transition: all 0.15s; border: none; background: none; width: 100%; text-align: left; }
     .soul-nav-item:hover { background: var(--bg-tertiary); color: var(--text-primary); }

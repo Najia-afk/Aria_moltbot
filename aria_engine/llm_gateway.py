@@ -15,6 +15,7 @@ import asyncio
 import json
 import logging
 import time
+import warnings
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, TYPE_CHECKING
 
@@ -28,6 +29,15 @@ from aria_engine.config import EngineConfig
 from aria_engine.circuit_breaker import CircuitBreaker
 from aria_engine.exceptions import LLMError, safe_fire_and_forget
 from aria_models.loader import load_catalog, get_routing_config, normalize_model_id
+
+# litellm's streaming Message/StreamingChoices models emit a Pydantic
+# serializer warning on every tool-call chunk (known upstream quirk, not a
+# real data issue) — silence it instead of spamming this on every request.
+warnings.filterwarnings(
+    "ignore",
+    message=".*PydanticSerializationUnexpectedValue.*",
+    category=UserWarning,
+)
 
 logger = logging.getLogger("aria.engine.llm")
 

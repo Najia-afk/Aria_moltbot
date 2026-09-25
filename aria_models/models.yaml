@@ -100,10 +100,11 @@ models:
     provider: litellm
     name: Qwen2.5 0.5B Instruct (Ollama Local)
     alias: Qwen2.5 0.5B (Sentiment)
-    _note: 'Only resident local chat model. Keeps RAM low on the 16GB host.'
+    _note: 'Only resident local chat model. Keeps RAM low on the 16GB host. Not
+      in the general fallback chain — 0.5B/32K-context is unsafe as a blind
+      catch-all for failed agentic/tool-calling completions; reachable only via
+      the sentiment task route.'
     tier: local
-    priority: 1
-    fallback_order: 1
     tasks: [sentiment]
     tags: {fast_simple: 1}
     reasoning: false
@@ -161,6 +162,12 @@ models:
     input: [text]
     cost: {input: 0, output: 0, cacheRead: 0, cacheWrite: 0}
     contextWindow: 1000000
+    # aria_engine/chat_engine.py falls back to contextWindow for its hard
+    # token-budget limit when safe_prompt_tokens is unset. Without this,
+    # trinity's real 1M window let a cron session balloon to 395k input
+    # tokens / 175s latency before ever triggering compaction — set well
+    # below the raw window so budget enforcement actually engages.
+    safe_prompt_tokens: 120000
     maxTokens: 8192
     routeSkill: litellm
     litellm:
