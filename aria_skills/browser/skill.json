@@ -2,6 +2,7 @@
   "name": "aria-browser",
   "version": "1.0.0",
   "layer": 2,
+  "status": "active",
   "description": "Headless browser for web access — navigate, snapshot, screenshot, and scrape pages via the aria-browser (browserless/chrome) service.",
   "author": "Aria Blue",
   "dependencies": [],

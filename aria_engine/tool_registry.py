@@ -163,7 +163,7 @@ class ToolRegistry:
         """Invoke a skill handler with timeout support for async/sync handlers."""
         if asyncio.iscoroutinefunction(handler):
             return await asyncio.wait_for(handler(**kwargs), timeout=self._timeout)
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         return await asyncio.wait_for(
             loop.run_in_executor(None, lambda: handler(**kwargs)),
             timeout=self._timeout,
@@ -828,7 +828,7 @@ class ToolRegistry:
                     timeout=self._timeout,
                 )
             else:
-                loop = asyncio.get_event_loop()
+                loop = asyncio.get_running_loop()
                 result = await asyncio.wait_for(
                     loop.run_in_executor(None, lambda: tool._handler(**args)),
                     timeout=self._timeout,

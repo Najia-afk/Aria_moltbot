@@ -4,6 +4,7 @@
   "description": "Persistent working memory that survives restarts. Stores key/value items with importance scoring, weighted context retrieval, and checkpoint/restore for session continuity.",
   "author": "Aria Team",
   "layer": 3,
+  "status": "active",
   "dependencies": ["api_client"],
   "focus_affinity": ["orchestrator"],
   "tools": [

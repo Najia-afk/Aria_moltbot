@@ -4,6 +4,7 @@
   "description": "Switch between LLM models and toggle thinking/reasoning mode. Use no_think for faster simple queries.",
   "author": "Aria Team",
   "layer": 2,
+  "status": "active",
   "dependencies": ["litellm"],
   "support_level": "advanced_compatibility",
   "default_routing": false,

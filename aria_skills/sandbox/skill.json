@@ -2,6 +2,7 @@
   "name": "aria-sandbox",
   "version": "2.0.0",
   "layer": 3,
+  "status": "active",
   "description": "Sandboxed code execution environment — run code, read/write files, and run tests in an isolated Docker container.",
   "author": "Aria Blue",
   "dependencies": ["api_client"],

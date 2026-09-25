@@ -4,6 +4,7 @@
   "description": "Log and query Aria's performance reviews and self-assessments.",
   "author": "Aria Team",
   "layer": 4,
+  "status": "active",
   "dependencies": [
     "api_client"
   ],

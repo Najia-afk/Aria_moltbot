@@ -4,6 +4,7 @@
   "description": "System health checks, self-diagnostics, and auto-recovery for Aria services.",
   "author": "Aria Team",
   "layer": 2,
+  "status": "active",
   "dependencies": [
     "api_client"
   ],

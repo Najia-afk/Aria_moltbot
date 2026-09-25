@@ -4,6 +4,7 @@
   "description": "Manage Aria's scheduled jobs, tasks, and background operations.",
   "author": "Aria Team",
   "layer": 4,
+  "status": "active",
   "dependencies": [
     "api_client"
   ],

@@ -2,11 +2,12 @@
   "name": "aria-llm",
   "version": "1.0.0",
   "layer": 2,
+  "status": "active",
   "category": "llm",
   "description": "Resilient LLM completion skill with circuit-breaker-aware fallback chain. Routes requests through the model priority chain defined in aria_models/models.yaml (local → free → paid), skipping models with open circuit breakers and retrying automatically.",
   "author": "Aria Blue",
   "dependencies": ["litellm"],
-  "focus_affinity": ["reasoning", "writing", "code", "analysis"],
+  "focus_affinity": ["orchestrator"],
   "tools": [
     {
       "name": "complete",

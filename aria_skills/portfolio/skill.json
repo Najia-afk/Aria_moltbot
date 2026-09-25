@@ -4,6 +4,7 @@
   "description": "💼 Portfolio and position management for Crypto Trader",
   "author": "Aria Blue",
   "layer": 3,
+  "status": "active",
   "dependencies": [
     "api_client",
     "market_data"

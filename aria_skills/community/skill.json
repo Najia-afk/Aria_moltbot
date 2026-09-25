@@ -4,6 +4,7 @@
   "description": "🌐 Community management and growth for Social Architect",
   "author": "Aria Blue",
   "layer": 3,
+  "status": "active",
   "dependencies": ["api_client", "social"],
   "support_level": "advanced_compatibility",
   "default_routing": false,

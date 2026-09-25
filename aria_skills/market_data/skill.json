@@ -4,6 +4,7 @@
   "description": "📈 Cryptocurrency market data and analysis for Crypto Trader",
   "author": "Aria Blue",
   "layer": 3,
+  "status": "active",
   "dependencies": [
     "api_client"
   ],

@@ -4,6 +4,7 @@
   "description": "🔍 Fact-checking and claim verification for Journalist",
   "author": "Aria Blue",
   "layer": 3,
+  "status": "active",
   "dependencies": ["api_client", "research"],
   "support_level": "advanced_compatibility",
   "default_routing": false,

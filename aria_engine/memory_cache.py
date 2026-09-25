@@ -174,7 +174,8 @@ class MemoryCacheManager:
 
     def record_embedding_dims(self, dims: int) -> None:
         """Track vector dimensionality for health monitoring."""
-        self._embedding_dims_seen[dims] = self._embedding_dims_seen.get(dims, 0) + 1
+        with self._latency_lock:
+            self._embedding_dims_seen[dims] = self._embedding_dims_seen.get(dims, 0) + 1
 
     def record_semantic_latency(self, latency_ms: float, result_count: int, cached: bool = False) -> None:
         """Record a semantic search operation latency."""

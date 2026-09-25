@@ -351,10 +351,10 @@ SELECT COUNT(*) FROM activity_log;
 
 | Service | Image | Port (host) | Profile | Description |
 |---------|-------|-------------|---------|-------------|
-| **aria-db** | pgvector/pgvector:pg16 | — (internal) | default | PostgreSQL 16 + pgvector (dual database) |
-| **aria-browser** | browserless/chrome:2.18.0 | 3000 | default | Headless browser automation |
+| **aria-db** | pgvector/pgvector:0.8.2-pg17 | — (internal) | default | PostgreSQL 17 + pgvector (dual database) |
+| **aria-browser** | ghcr.io/browserless/chromium:v2.42.0 | 3000 | default | Headless browser automation |
 | **aria-engine** | Custom (Python) | — (internal) | default | Aria Engine AI gateway (health on :8081) |
-| **tor-proxy** | dperson/torproxy:latest | 9050, 9051 | default | Privacy proxy |
+| **tor-proxy** | dperson/torproxy:latest | 9050, 9051 | tor | Privacy proxy |
 | **certs-init** | alpine:3.20 | — | default | TLS certificate generation (oneshot) |
 | **traefik** | traefik:v3.1 | 8080, 8443, 8081 | default | HTTPS reverse proxy + dashboard |
 | **litellm** | ghcr.io/berriai/litellm:main-v1.81.12-stable | 18793 | default | LLM model router |
@@ -365,10 +365,10 @@ SELECT COUNT(*) FROM activity_log;
 | **prometheus** | prom/prometheus:v2.51.0 | 9090 | monitoring | Metrics collection |
 | **grafana** | grafana/grafana:11.4.0 | 3001 | monitoring | Monitoring dashboards |
 | **pgadmin** | dpage/pgadmin4:8.14 | 5051 | monitoring | Database admin UI |
-| **aria-sandbox** | Custom (Python) | — (internal) | sandbox | Isolated code execution (S-29) |
+| **aria-sandbox** | Custom (Python) | — (internal) | default | Isolated code execution (S-29) |
 | **jaeger** | jaegertracing/all-in-one:1.62 | 16686, 4317 | tracing | Distributed tracing |
 
-> **16 services total**: 11 default + 3 monitoring profile + 1 sandbox profile + 1 tracing profile.
+> **16 services total**: 11 default (incl. aria-sandbox) + 1 tor profile + 3 monitoring profile + 1 tracing profile.
 > Traefik ports use env vars: `TRAEFIK_HTTP_PORT` (default 8080), `TRAEFIK_HTTPS_PORT` (default 8443), `TRAEFIK_DASH_PORT` (default 8081).
 > aria-web port uses `ARIA_WEB_PORT` (default 5050; macOS reserves 5000).
 

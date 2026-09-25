@@ -4,6 +4,7 @@
   "description": "Session management via aria-api REST layer. All data in PostgreSQL (aria_engine.chat_sessions). List, prune stale, delete, stats.",
   "author": "Aria Team",
   "layer": 2,
+  "status": "active",
   "dependencies": [],
   "focus_affinity": ["orchestrator"],
   "tools": [

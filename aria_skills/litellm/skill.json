@@ -4,6 +4,7 @@
   "description": "Manage LiteLLM proxy, models, and API spend tracking.",
   "author": "Aria Team",
   "layer": 2,
+  "status": "active",
   "dependencies": [
     "api_client"
   ],

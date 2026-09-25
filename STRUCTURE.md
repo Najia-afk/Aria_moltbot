@@ -79,7 +79,7 @@ Aria_moltbot/
 │   ├── aria_memories/            # Memory mount
 │   └── articles/                 # Article content
 │
-├── aria_skills/                  # Skill modules (43 skills)
+├── aria_skills/                  # Skill modules (44 skills)
 │   ├── __init__.py               # Package exports
 │   ├── base.py                   # BaseSkill, SkillConfig, SkillResult
 │   ├── catalog.py                # Skill catalog generator (--list-skills CLI)

@@ -2,6 +2,7 @@
   "name": "aria-sprint-manager",
   "version": "1.0.0",
   "layer": 3,
+  "status": "active",
   "category": "orchestrator",
   "description": "Sprint planning and goal management as Product Owner",
   "focus_affinity": ["orchestrator"],

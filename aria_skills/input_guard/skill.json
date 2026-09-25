@@ -4,6 +4,7 @@
   "description": "🛡️ Runtime security for Aria - analyzes inputs for prompt injection, validates API params, and filters sensitive output",
   "author": "Aria Team",
   "layer": 0,
+  "status": "active",
   "dependencies": [],
   "focus_affinity": ["devsecops"],
   "tools": [

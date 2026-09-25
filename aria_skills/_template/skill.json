@@ -4,6 +4,7 @@
   "description": "TODO: Short human-readable description of the skill.",
   "author": "Aria Team",
   "layer": 3,
+  "status": "stub",
   "dependencies": ["api_client"],
   "focus_affinity": ["orchestrator"],
   "tools": [

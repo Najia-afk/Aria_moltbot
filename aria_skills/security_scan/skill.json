@@ -4,6 +4,7 @@
   "description": "🔒 Security scanning and vulnerability detection for DevSecOps",
   "author": "Aria Blue",
   "layer": 3,
+  "status": "active",
   "dependencies": [
     "api_client"
   ],

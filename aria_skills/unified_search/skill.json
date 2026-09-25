@@ -4,6 +4,7 @@
   "description": "Unified search across semantic memories, knowledge graph, and traditional memories with Reciprocal Rank Fusion (RRF)",
   "author": "Aria Team",
   "layer": 3,
+  "status": "active",
   "category": "cognitive",
   "dependencies": ["api_client"],
   "focus_affinity": ["data", "orchestrator", "memory"],

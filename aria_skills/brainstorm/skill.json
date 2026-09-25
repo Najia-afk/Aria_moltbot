@@ -4,6 +4,7 @@
   "description": "🎨 Creative brainstorming and ideation for Creative Adventurer",
   "author": "Aria Blue",
   "layer": 3,
+  "status": "active",
   "dependencies": ["api_client"],
   "support_level": "advanced_compatibility",
   "default_routing": false,

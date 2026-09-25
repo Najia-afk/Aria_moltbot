@@ -4,6 +4,7 @@
   "description": "Pathfinder 2e rules engine — dice rolls, combat resolution, character and condition management for Aria's tabletop RPG system.",
   "author": "Aria Team",
   "layer": 3,
+  "status": "active",
   "dependencies": ["api_client"],
   "focus_affinity": ["rpg_master", "orchestrator"],
   "tools": [

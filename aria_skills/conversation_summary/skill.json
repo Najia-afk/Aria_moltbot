@@ -4,6 +4,7 @@
   "description": "📝 Summarize conversations into durable semantic memories",
   "author": "Aria Blue",
   "layer": 3,
+  "status": "active",
   "dependencies": ["api_client"],
   "focus_affinity": ["memory", "cognitive"],
   "tools": [

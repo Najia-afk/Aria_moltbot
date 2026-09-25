@@ -4,6 +4,7 @@
   "description": "Build and query Aria's knowledge graph. Store entities (people, places, concepts) and their relationships.",
   "author": "Aria Team",
   "layer": 3,
+  "status": "active",
   "dependencies": [
     "api_client"
   ],

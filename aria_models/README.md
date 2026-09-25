@@ -32,7 +32,7 @@ models = catalog["models"].keys()
 ```yaml
 schema_version: 5
 routing:
-  primary: litellm/kimi
+  primary: litellm/trinity
 criteria:
   tiers:
     local: [qwen3.5_mlx, embedding]

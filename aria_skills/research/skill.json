@@ -4,6 +4,7 @@
   "description": "📰 Research and information gathering for Journalist",
   "author": "Aria Blue",
   "layer": 3,
+  "status": "active",
   "dependencies": [
     "api_client"
   ],

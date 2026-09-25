@@ -5,6 +5,7 @@ Admin endpoints — service control + soul file access + DB maintenance.
 import asyncio
 import logging
 import os
+import secrets
 from datetime import datetime, timezone
 
 import httpx
@@ -69,7 +70,7 @@ async def api_service_control(service_id: str, action: str, request: Request):
     if not ARIA_ADMIN_TOKEN:
         raise HTTPException(status_code=403, detail="Admin token not configured")
     token = request.headers.get("X-Admin-Token", "")
-    if token != ARIA_ADMIN_TOKEN:
+    if not secrets.compare_digest(token, ARIA_ADMIN_TOKEN):
         raise HTTPException(status_code=401, detail="Unauthorized")
     if action not in {"restart", "stop", "start"}:
         raise HTTPException(status_code=400, detail="Invalid action")
