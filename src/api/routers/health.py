@@ -167,11 +167,13 @@ async def api_status():
     """
     Check all registered services.
 
-    Uses synchronous httpx in a thread-pool with a hard 1-second
-    future timeout to cap DNS-resolution hangs for non-existent
-    Docker hostnames (which ignore httpx connect timeouts).
-    The pool is shut down with ``wait=False`` so we don't block on
-    threads still stuck in DNS lookups.
+    Uses synchronous httpx in a thread-pool with a hard 1-second future
+    timeout to cap DNS-resolution hangs for non-existent Docker hostnames
+    (which ignore httpx connect timeouts). The whole thread-pool orchestration
+    runs via ``asyncio.to_thread`` so it never blocks this process's own
+    event loop — a blocking call here would prevent the "aria-api" self-check
+    (http://localhost:8000/health) from ever being accepted, since this same
+    event loop is what would have to serve it.
     """
     import concurrent.futures
     import socket
@@ -179,6 +181,7 @@ async def api_status():
     _HARD_TIMEOUT = 0.8   # max wall-clock seconds per service
 
     def _check_sync(name: str, url: str) -> tuple[str, dict]:
+        optional = name in OPTIONAL_SERVICE_IDS
         try:
             prev = socket.getdefaulttimeout()
             socket.setdefaulttimeout(0.8)
@@ -189,59 +192,70 @@ async def api_status():
                     ),
                 ) as client:
                     resp = client.get(url)
-                    return name, {"status": "up", "code": resp.status_code}
+                    return name, {"status": "up", "code": resp.status_code, "optional": optional}
             finally:
                 socket.setdefaulttimeout(prev)
         except Exception as e:
-            if name not in OPTIONAL_SERVICE_IDS:
+            if not optional:
                 logger.warning("Service probe %s failed: %s", name, e)
-            return name, {"status": "down", "code": None, "error": str(e)[:50]}
+            return name, {"status": "down", "code": None, "error": str(e)[:50], "optional": optional}
 
     urls = {
         name: base_url.rstrip("/") + health_path
         for name, (base_url, health_path) in SERVICE_URLS.items()
     }
 
-    results: dict[str, dict] = {}
-    pool = concurrent.futures.ThreadPoolExecutor(max_workers=len(urls))
-    try:
-        future_map = {
-            pool.submit(_check_sync, name, url): name
-            for name, url in urls.items()
-        }
-        done, not_done = concurrent.futures.wait(
-            future_map, timeout=_HARD_TIMEOUT + 0.5,
-        )
-        for future in done:
-            try:
-                name, info = future.result(timeout=0)
-                results[name] = info
-            except Exception as e:
-                logger.warning("Service probe future error: %s", e)
+    def _run_checks() -> dict[str, dict]:
+        # Runs in a worker thread (via asyncio.to_thread below) so the
+        # blocking concurrent.futures.wait() below never freezes the event
+        # loop — otherwise the "aria-api" self-check (localhost:8000) can
+        # never be accepted by this same process and always times out.
+        results: dict[str, dict] = {}
+        pool = concurrent.futures.ThreadPoolExecutor(max_workers=len(urls))
+        try:
+            future_map = {
+                pool.submit(_check_sync, name, url): name
+                for name, url in urls.items()
+            }
+            done, not_done = concurrent.futures.wait(
+                future_map, timeout=_HARD_TIMEOUT + 0.5,
+            )
+            for future in done:
+                try:
+                    name, info = future.result(timeout=0)
+                    results[name] = info
+                except Exception as e:
+                    logger.warning("Service probe future error: %s", e)
+                    results[future_map[future]] = {
+                        "status": "down", "code": None, "error": "timeout",
+                    }
+            for future in not_done:
+                future.cancel()
                 results[future_map[future]] = {
                     "status": "down", "code": None, "error": "timeout",
                 }
-        for future in not_done:
-            future.cancel()
-            results[future_map[future]] = {
-                "status": "down", "code": None, "error": "timeout",
-            }
-    finally:
-        pool.shutdown(wait=False, cancel_futures=True)
+        finally:
+            pool.shutdown(wait=False, cancel_futures=True)
 
-    # Any services that didn't complete in time
-    for name in urls:
-        if name not in results:
-            results[name] = {"status": "down", "code": None, "error": "timeout"}
+        # Any services that didn't complete in time
+        for name in urls:
+            if name not in results:
+                results[name] = {
+                    "status": "down", "code": None, "error": "timeout",
+                    "optional": name in OPTIONAL_SERVICE_IDS,
+                }
+        return results
+
+    results = await asyncio.to_thread(_run_checks)
 
     # Check PostgreSQL via SQLAlchemy engine
     try:
         async with async_engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
-        results["postgres"] = {"status": "up", "code": 200}
+        results["postgres"] = {"status": "up", "code": 200, "optional": False}
     except Exception as e:
         logger.warning("Postgres check failed: %s", e)
-        results["postgres"] = {"status": "down", "code": None}
+        results["postgres"] = {"status": "down", "code": None, "optional": False}
     return results
 
 

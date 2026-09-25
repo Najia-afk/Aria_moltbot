@@ -641,7 +641,8 @@
             .then(r => r.json())
             .then(data => {
                 const el = document.getElementById('api-status');
-                const allUp = Object.values(data).every(s => s.status === 'up');
+                const critical = Object.values(data).filter(s => !s.optional);
+                const allUp = critical.every(s => s.status === 'up');
                 const statusClass = allUp ? 'up' : 'partial';
                 el.innerHTML = `<span class="status-dot ${statusClass}"></span><span>${escapeHtml(allUp ? 'All Systems Online' : 'Partial')}</span>`;
             })
