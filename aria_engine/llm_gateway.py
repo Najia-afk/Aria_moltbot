@@ -12,6 +12,7 @@ Features:
 - Circuit breaker for resilience
 """
 import asyncio
+import json
 import logging
 import time
 from dataclasses import dataclass, field
@@ -43,6 +44,28 @@ class LLMResponse:
     cost_usd: float = 0.0
     latency_ms: int = 0
     finish_reason: str = ""
+
+
+def unwrap_json_message_envelope(content: str) -> str:
+    """Strip an accidental {"message": "..."} JSON envelope from model output.
+
+    Some free-tier models (observed on nvidia/nemotron-3.5-lightning:free) wrap
+    their entire reply in a JSON object like {"message": "...", "user_name": "..."}
+    instead of a real tool call or plain text, when given a large tool-calling
+    context. Only unwraps when the WHOLE trimmed content is a single JSON object
+    with a string "message" field — never touches partial/embedded JSON.
+    """
+    stripped = content.strip()
+    if not (stripped.startswith("{") and stripped.endswith("}")):
+        return content
+    try:
+        parsed = json.loads(stripped)
+    except (json.JSONDecodeError, ValueError):
+        return content
+    if isinstance(parsed, dict) and isinstance(parsed.get("message"), str):
+        logger.warning("Unwrapped stray JSON message envelope from model output")
+        return parsed["message"]
+    return content
 
 
 @dataclass
@@ -354,6 +377,8 @@ class LLMGateway:
                         content = strip_thinking_from_content(content)
 
                 tool_calls_raw = getattr(choice.message, "tool_calls", None)
+                if not tool_calls_raw:
+                    content = unwrap_json_message_envelope(content)
                 tool_calls = None
                 if tool_calls_raw:
                     tool_calls = [
