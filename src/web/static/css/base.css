@@ -208,6 +208,8 @@ nav {
     font-size: 0.75rem;
     font-weight: 500;
     color: var(--text-secondary);
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 /* Menu Toggle (hamburger) - hidden on desktop */

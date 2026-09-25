@@ -42,7 +42,7 @@ from starlette.websockets import WebSocket, WebSocketDisconnect, WebSocketState
 
 from aria_engine.config import EngineConfig
 from aria_engine.exceptions import SessionError, LLMError, safe_fire_and_forget
-from aria_engine.llm_gateway import LLMGateway, StreamChunk
+from aria_engine.llm_gateway import LLMGateway, StreamChunk, unwrap_json_message_envelope
 from aria_engine.telemetry import log_model_usage, log_skill_invocation, _parse_skill_from_tool
 from aria_engine.tool_registry import ToolRegistry, ToolResult
 
@@ -1345,6 +1345,18 @@ class StreamManager:
             })
 
             assistant_msg_id = uuid.uuid4()
+            # Some free-tier models leak a stray {"message": "..."} JSON
+            # envelope instead of plain text under heavy tool-calling context
+            # (see llm_gateway.unwrap_json_message_envelope). The streaming
+            # path can't retroactively un-stream already-sent chunks, but we
+            # can at least store the clean version so history/reloads never
+            # show the raw JSON, and tell the frontend to self-correct below.
+            _clean_content = (
+                accumulator.content if accumulator.tool_calls
+                else unwrap_json_message_envelope(accumulator.content)
+            )
+            _content_was_corrected = _clean_content != accumulator.content
+            accumulator.content = _clean_content
             assistant_msg = EngineChatMessage(
                 id=assistant_msg_id,
                 session_id=uuid.UUID(session_id),
@@ -1430,6 +1442,10 @@ class StreamManager:
                 "cost": accumulator.cost_usd,
                 "repair_applied": promise_repair_triggered,
                 "usage_estimated": True,
+                # Only set when the streamed text needed the JSON-envelope fix
+                # (see unwrap_json_message_envelope) — tells the frontend to
+                # replace the just-streamed bubble text with the clean version.
+                "corrected_content": accumulator.content if _content_was_corrected else None,
                 "context_compacted": bool(context_compaction_meta),
                 "context_notice": (
                     context_compaction_meta.get("notice")

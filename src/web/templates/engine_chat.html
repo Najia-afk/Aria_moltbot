@@ -2746,6 +2746,13 @@
     function finalizeStreamingMessage(msg) {
         isStreaming = false;
 
+        // Backend detected the whole response was a stray JSON envelope
+        // (rare free-tier model quirk) — swap in the clean text before the
+        // final render instead of leaving the raw JSON on screen forever.
+        if (msg && msg.corrected_content) {
+            streamContent = msg.corrected_content;
+        }
+
         // Update graph path with conversation content
         if (streamContent) graphPath.addFromContent(streamContent);
 
