@@ -537,7 +537,12 @@ class OutputFilter:
     """
     
     SENSITIVE_PATTERNS = [
-        (re.compile(r'\b[A-Za-z0-9]{32,}\b'), '[REDACTED_KEY]'),  # Long alphanumeric strings
+        # Compound/specific patterns must run before the generic long-alnum-string
+        # catch-all below — otherwise it redacts one segment of a multi-part
+        # secret (e.g. a JWT's header) first, breaking the specific pattern's
+        # match on the original text and letting the remaining segment(s) —
+        # including the JWT payload, which can carry sensitive claims — leak
+        # through unredacted.
         (re.compile(r'(api[_-]?key|apikey)\s*[=:]\s*[^\s,}]+', re.IGNORECASE), 'api_key=[REDACTED]'),
         # Password pattern: matches "password": "value" or password=value or password: value
         (re.compile(r'"?(password|passwd|pwd)"?\s*[=:]\s*"?[^",}\s]+', re.IGNORECASE), '"password": "[REDACTED]"'),
@@ -547,6 +552,7 @@ class OutputFilter:
         (re.compile(r'postgres://[^\s]+'), 'postgres://[REDACTED]'),
         (re.compile(r'mongodb://[^\s]+'), 'mongodb://[REDACTED]'),
         (re.compile(r'redis://[^\s]+'), 'redis://[REDACTED]'),
+        (re.compile(r'\b[A-Za-z0-9]{32,}\b'), '[REDACTED_KEY]'),  # Long alphanumeric strings (fallback)
     ]
     
     # Paths that should not be revealed

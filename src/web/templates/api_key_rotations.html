@@ -3,6 +3,9 @@
 
 {% block extra_css %}
 <style>
+    @media (max-width: 768px) {
+        .data-table { display: block; overflow-x: auto; white-space: nowrap; }
+    }
     .page-controls {
         display: flex;
         gap: 15px;

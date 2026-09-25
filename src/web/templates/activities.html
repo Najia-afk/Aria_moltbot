@@ -3,6 +3,9 @@
 
 {% block extra_css %}
 <style>
+    @media (max-width: 768px) {
+        .data-table { display: block; overflow-x: auto; white-space: nowrap; }
+    }
     .page-controls { display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; align-items: center; }
     .search-box {
         flex: 1;

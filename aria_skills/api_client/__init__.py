@@ -532,8 +532,8 @@ class AriaAPIClient(BaseSkill):
             try:
                 from aria_skills.api_client.cache import get_shared_cache
                 get_shared_cache().invalidate(name)
-            except Exception:
-                pass
+            except Exception as e:
+                self.logger.debug(f"Cache invalidate skipped (create_entity): {e}")
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to create entity: {e}")
@@ -558,8 +558,8 @@ class AriaAPIClient(BaseSkill):
                 cache = get_shared_cache()
                 cache.invalidate(from_entity)
                 cache.invalidate(to_entity)
-            except Exception:
-                pass
+            except Exception as e:
+                self.logger.debug(f"Cache invalidate skipped (create_relation): {e}")
             return SkillResult.ok(resp.json())
         except Exception as e:
             return SkillResult.fail(f"Failed to create relation: {e}")
@@ -578,7 +578,8 @@ class AriaAPIClient(BaseSkill):
             cached = cache.get_traversal(start, max_depth, relation_type)
             if cached is not None:
                 return SkillResult.ok(cached)
-        except Exception:
+        except Exception as e:
+            self.logger.debug(f"Cache read skipped (graph_traverse): {e}")
             cache = None
         try:
             params = {"start": start, "max_depth": max_depth, "direction": direction}
@@ -606,7 +607,8 @@ class AriaAPIClient(BaseSkill):
             cached = cache._entities.get(cache_key)
             if cached is not None:
                 return SkillResult.ok(cached)
-        except Exception:
+        except Exception as e:
+            self.logger.debug(f"Cache read skipped (graph_search): {e}")
             cache = None
             cache_key = None
         try:
@@ -635,7 +637,8 @@ class AriaAPIClient(BaseSkill):
             cached = cache.get_traversal(start, max_depth, relation_type)
             if cached is not None:
                 return SkillResult.ok(cached)
-        except Exception:
+        except Exception as e:
+            self.logger.debug(f"Cache read skipped (kg_traverse): {e}")
             cache = None
         try:
             params: dict[str, Any] = {"start": start, "max_depth": max_depth, "direction": direction}
@@ -663,7 +666,8 @@ class AriaAPIClient(BaseSkill):
             cached = cache._entities.get(cache_key)
             if cached is not None:
                 return SkillResult.ok(cached)
-        except Exception:
+        except Exception as e:
+            self.logger.debug(f"Cache read skipped (kg_search): {e}")
             cache = None
             cache_key = None
         try:
@@ -687,7 +691,8 @@ class AriaAPIClient(BaseSkill):
             cached = cache._entities.get(cache_key)
             if cached is not None:
                 return SkillResult.ok(cached)
-        except Exception:
+        except Exception as e:
+            self.logger.debug(f"Cache read skipped (find_skill_for_task): {e}")
             cache = None
             cache_key = None
         try:

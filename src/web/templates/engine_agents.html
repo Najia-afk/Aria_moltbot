@@ -3,6 +3,9 @@
 
 {% block head %}
 <style>
+    @media (max-width: 768px) {
+        .table.table-sm { display: block; overflow-x: auto; white-space: nowrap; }
+    }
     .agent-tab { cursor: pointer; padding: 8px 16px; border-radius: 8px 8px 0 0; }
     .agent-tab.active { background: #fff; border: 1px solid #dee2e6; border-bottom: none; }
     .agent-tab .status-dot {

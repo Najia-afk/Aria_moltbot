@@ -33,9 +33,12 @@ from aria_models.loader import load_catalog, get_routing_config, normalize_model
 # litellm's streaming Message/StreamingChoices models emit a Pydantic
 # serializer warning on every tool-call chunk (known upstream quirk, not a
 # real data issue) — silence it instead of spamming this on every request.
+# NOTE: warnings.filterwarnings' message regex uses re.match without DOTALL,
+# so a leading ".*" can't cross the newline in this multi-line warning text —
+# anchor on the literal first line instead.
 warnings.filterwarnings(
     "ignore",
-    message=".*PydanticSerializationUnexpectedValue.*",
+    message="Pydantic serializer warnings:",
     category=UserWarning,
 )
 

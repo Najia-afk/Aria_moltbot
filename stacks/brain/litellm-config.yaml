@@ -1,6 +1,6 @@
 # AUTO-GENERATED from aria_models/models.yaml
-# Generated: 2026-09-25T21:29:24Z
-# Source SHA-256: 558535da0bd9dcc421744670a79289d153ae68df83653f99d44179eaf312aa89
+# Generated: 2026-09-25T21:39:01Z
+# Source SHA-256: 4d64ee13ee63f3682807ec77a142517076a2df241e56c860110b03360dac72e3
 # Do not hand-edit model_list — edit models.yaml and re-run:
 #   python scripts/generate_litellm_config.py
 
@@ -40,6 +40,15 @@ model_list:
       api_key: os.environ/OPEN_ROUTER_KEY
     model_info:
       max_tokens: 1000000
+      input_cost_per_token: 0
+      output_cost_per_token: 0
+
+  - model_name: trinity_backup
+    litellm_params:
+      model: "openrouter/inclusionai/ling-3.0-flash-sante:free"
+      api_key: os.environ/OPEN_ROUTER_KEY
+    model_info:
+      max_tokens: 262144
       input_cost_per_token: 0
       output_cost_per_token: 0
 

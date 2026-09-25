@@ -50,7 +50,7 @@
     </div>
 </div>
 
-<div style="display:grid;grid-template-columns:1fr 300px;gap:1.25rem;">
+<div class="embed-grid-sidebar">
     <div>
         <div class="card">
             <div class="card-header">
@@ -85,6 +85,11 @@
 </div>
 
 <style>
+.embed-grid-sidebar { display:grid; grid-template-columns:1fr 300px; gap:1.25rem; }
+@media (max-width: 768px) {
+    .embed-grid-sidebar { grid-template-columns: 1fr; }
+    .ctrl-select { font-size: 16px; }
+}
 .legend-item { display:flex; align-items:center; gap:0.5rem; margin-bottom:0.4rem; cursor:pointer; font-size:0.83rem; user-select:none; }
 .legend-dot { width:12px; height:12px; border-radius:50%; flex-shrink:0; }
 .legend-item.hidden { opacity:0.4; }

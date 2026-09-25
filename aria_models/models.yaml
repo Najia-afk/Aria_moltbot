@@ -190,6 +190,37 @@ models:
       planning: {temperature: 0.3, max_tokens: 1024}
       pevr: {temperature: 0.3, max_tokens: 2048}
 
+  # Second free fallback — trinity has no live fallback of its own (kimi is
+  # paid/excluded from auto-fallback, qwen3.5_mlx removed for RAM, sentiment_tiny
+  # can't fit agentic prompts). Verified live against OpenRouter across two
+  # separate calls before wiring in (2026-09-25).
+  trinity_backup:
+    provider: litellm
+    name: Ling 3.0 Flash (OpenRouter FREE, backup)
+    alias: Ling 3.0 Flash (OpenRouter FREE, backup)
+    tier: free
+    priority: 3
+    fallback_order: 3
+    tags: {default: 2}
+    reasoning: true
+    tool_calling: true
+    input: [text]
+    cost: {input: 0, output: 0, cacheRead: 0, cacheWrite: 0}
+    contextWindow: 262144
+    safe_prompt_tokens: 120000
+    maxTokens: 8192
+    routeSkill: litellm
+    litellm:
+      model: openrouter/inclusionai/ling-3.0-flash-sante:free
+      api_key: os.environ/OPEN_ROUTER_KEY
+    provider_label: openrouter
+    thinking_params:
+      extra_body:
+        reasoning: {enabled: false}
+    profiles:
+      routing: {temperature: 0.3, max_tokens: 512}
+      orchestrator: {temperature: 0.3, max_tokens: 512}
+
   # ─── PAID ────────────────────────────────────────────────────────────
   kimi:
     provider: litellm

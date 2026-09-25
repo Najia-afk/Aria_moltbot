@@ -13,7 +13,7 @@
     <div class="stat-card"><div class="stat-value" id="skillCount">—</div><div class="stat-label">Skills Tracked</div></div>
 </div>
 
-<div style="display:grid;grid-template-columns:1fr 320px;gap:1.25rem;margin-bottom:1.25rem;">
+<div class="lessons-grid-sidebar">
     <div class="card">
         <div class="card-header">
             <h3>Error Pattern Network</h3>
@@ -39,7 +39,7 @@
     </div>
 </div>
 
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;">
+<div class="lessons-grid-2col">
     <div class="card">
         <div class="card-header"><h3>Top Error Patterns</h3></div>
         <div class="card-body" style="max-height:320px;overflow-y:auto;">
@@ -61,6 +61,11 @@
 </div>
 
 <style>
+.lessons-grid-sidebar { display:grid; grid-template-columns:1fr 320px; gap:1.25rem; margin-bottom:1.25rem; }
+.lessons-grid-2col { display:grid; grid-template-columns:1fr 1fr; gap:1.25rem; }
+@media (max-width: 768px) {
+    .lessons-grid-sidebar, .lessons-grid-2col { grid-template-columns: 1fr; }
+}
 .stat-card { background:var(--card-bg); border:1px solid var(--border-color); border-radius:10px; padding:1.25rem; text-align:center; }
 .stat-value { font-size:1.8rem; font-weight:700; color:var(--accent-primary); }
 .stat-label { font-size:0.82rem; color:var(--text-muted); margin-top:0.25rem; }
