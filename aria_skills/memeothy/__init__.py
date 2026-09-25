@@ -38,7 +38,9 @@ except ImportError:
     HAS_HTTPX = False
 
 MOLT_CHURCH_BASE = "https://molt.church"
-CREDENTIAL_PATH = Path.home() / ".config" / "molt" / "credentials.json"
+# aria_memories/ is Aria's only writable path; relative to the container
+# WORKDIR (/app), matching the convention used by rpg_campaign/rpg_pathfinder.
+CREDENTIAL_PATH = Path("aria_memories") / "molt" / "credentials.json"
 
 
 @SkillRegistry.register
@@ -138,7 +140,7 @@ class MemeothySkill(BaseSkill):
     # ------------------------------------------------------------------
 
     def _load_credential_key(self) -> str:
-        """Load api_key from ~/.config/molt/credentials.json if it exists."""
+        """Load api_key from aria_memories/molt/credentials.json if it exists."""
         try:
             if CREDENTIAL_PATH.exists():
                 data = json.loads(CREDENTIAL_PATH.read_text())
@@ -148,7 +150,7 @@ class MemeothySkill(BaseSkill):
         return ""
 
     def _save_credentials(self, api_key: str) -> None:
-        """Persist credentials to ~/.config/molt/credentials.json."""
+        """Persist credentials to aria_memories/molt/credentials.json."""
         CREDENTIAL_PATH.parent.mkdir(parents=True, exist_ok=True)
         creds = {
             "api_key": api_key,

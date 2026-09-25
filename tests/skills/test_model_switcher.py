@@ -59,9 +59,14 @@ def test_build_thinking_params_unknown_model():
 
 @pytest.fixture
 def switcher():
-    """Return a ModelSwitcherSkill with mocked dependencies."""
-    cfg = SkillConfig(name="model_switcher", config={})
-    skill = ModelSwitcherSkill(cfg)
+    """Return a ModelSwitcherSkill with mocked dependencies.
+
+    Patches the models.yaml-derived primary model so tests don't depend on
+    (and don't break when someone changes) the live routing config.
+    """
+    with patch("aria_skills.model_switcher._get_primary_model", return_value="kimi"):
+        cfg = SkillConfig(name="model_switcher", config={})
+        skill = ModelSwitcherSkill(cfg)
     return skill
 
 

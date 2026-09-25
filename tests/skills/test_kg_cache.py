@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import time
 import pytest
-from aria_skills.knowledge_graph.cache import LRUCache, KGCacheManager
+from aria_skills.api_client.cache import LRUCache, KGCacheManager
 
 
 # ---------------------------------------------------------------------------

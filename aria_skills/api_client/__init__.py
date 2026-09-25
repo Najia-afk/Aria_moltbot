@@ -530,7 +530,7 @@ class AriaAPIClient(BaseSkill):
                 "properties": properties or {}
             })
             try:
-                from aria_skills.knowledge_graph.cache import get_shared_cache
+                from aria_skills.api_client.cache import get_shared_cache
                 get_shared_cache().invalidate(name)
             except Exception:
                 pass
@@ -554,7 +554,7 @@ class AriaAPIClient(BaseSkill):
                 "properties": properties or {}
             })
             try:
-                from aria_skills.knowledge_graph.cache import get_shared_cache
+                from aria_skills.api_client.cache import get_shared_cache
                 cache = get_shared_cache()
                 cache.invalidate(from_entity)
                 cache.invalidate(to_entity)
@@ -573,7 +573,7 @@ class AriaAPIClient(BaseSkill):
     ) -> SkillResult:
         """BFS traversal from a starting entity. Token-efficient graph exploration."""
         try:
-            from aria_skills.knowledge_graph.cache import get_shared_cache
+            from aria_skills.api_client.cache import get_shared_cache
             cache = get_shared_cache()
             cached = cache.get_traversal(start, max_depth, relation_type)
             if cached is not None:
@@ -600,7 +600,7 @@ class AriaAPIClient(BaseSkill):
     ) -> SkillResult:
         """ILIKE text search for entities matching a query string."""
         try:
-            from aria_skills.knowledge_graph.cache import get_shared_cache
+            from aria_skills.api_client.cache import get_shared_cache
             cache = get_shared_cache()
             cache_key = f"gsearch:{query}:{entity_type}:{limit}"
             cached = cache._entities.get(cache_key)
@@ -630,7 +630,7 @@ class AriaAPIClient(BaseSkill):
     ) -> SkillResult:
         """BFS traversal on the organic knowledge graph (not skill graph)."""
         try:
-            from aria_skills.knowledge_graph.cache import get_shared_cache
+            from aria_skills.api_client.cache import get_shared_cache
             cache = get_shared_cache()
             cached = cache.get_traversal(start, max_depth, relation_type)
             if cached is not None:
@@ -657,7 +657,7 @@ class AriaAPIClient(BaseSkill):
     ) -> SkillResult:
         """ILIKE text search on the organic knowledge graph."""
         try:
-            from aria_skills.knowledge_graph.cache import get_shared_cache
+            from aria_skills.api_client.cache import get_shared_cache
             cache = get_shared_cache()
             cache_key = f"search:{query}:{entity_type}:{limit}"
             cached = cache._entities.get(cache_key)
@@ -681,7 +681,7 @@ class AriaAPIClient(BaseSkill):
     async def find_skill_for_task(self, task: str, limit: int = 5) -> SkillResult:
         """Find the best skill for a given task description. ~100-200 tokens."""
         try:
-            from aria_skills.knowledge_graph.cache import get_shared_cache
+            from aria_skills.api_client.cache import get_shared_cache
             cache = get_shared_cache()
             cache_key = f"sft:{task[:120]}:{limit}"
             cached = cache._entities.get(cache_key)

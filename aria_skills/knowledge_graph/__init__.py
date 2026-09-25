@@ -11,10 +11,9 @@ from datetime import datetime, timezone
 from typing import Any
 
 from aria_skills.api_client import get_api_client
+from aria_skills.api_client.cache import get_shared_cache
 from aria_skills.base import BaseSkill, SkillConfig, SkillResult, SkillStatus
 from aria_skills.registry import SkillRegistry
-
-from .cache import get_shared_cache
 
 
 @SkillRegistry.register

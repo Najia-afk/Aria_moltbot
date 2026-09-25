@@ -9,7 +9,7 @@ Three-tier LRU + TTL cache sitting in front of every DB-bound memory query:
 Plus: embedding latency tracking, vector health monitoring,
 access-pattern analytics with per-tier time-series.
 
-Thread-safe, process-local. Modelled after aria_skills/knowledge_graph/cache.py.
+Thread-safe, process-local. Modelled after aria_skills/api_client/cache.py.
 """
 from __future__ import annotations
 

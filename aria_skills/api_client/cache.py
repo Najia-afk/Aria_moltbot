@@ -2,7 +2,9 @@
 Knowledge Graph Cache Layer
 
 LRU cache with TTL for entity lookups and traversal queries.
-Designed by Aria (kg_cache_design.md), integrated into the KG skill.
+Designed by Aria (kg_cache_design.md). Lives in api_client (L1) so both
+api_client and the knowledge_graph skill (L3) can share one cache without
+inverting the skill-layer dependency direction.
 
 Benchmarked: 73% avg speedup, 85% hit rate (kg_cache_experiment_report.md).
 """

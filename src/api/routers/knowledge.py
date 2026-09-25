@@ -365,7 +365,7 @@ async def create_knowledge_entity(body: EntityCreate, db: AsyncSession = Depends
         await db.rollback()
         raise HTTPException(status_code=409, detail=f"Entity creation failed: {exc}")
     try:
-        from aria_skills.knowledge_graph.cache import get_shared_cache
+        from aria_skills.api_client.cache import get_shared_cache
         get_shared_cache().invalidate(body.name)
     except Exception:
         pass
@@ -395,7 +395,7 @@ async def create_knowledge_relation(body: RelationCreate, db: AsyncSession = Dep
         await db.rollback()
         raise HTTPException(status_code=409, detail=f"Relation creation failed: {exc}")
     try:
-        from aria_skills.knowledge_graph.cache import get_shared_cache
+        from aria_skills.api_client.cache import get_shared_cache
         cache = get_shared_cache()
         cache.invalidate(body.from_entity)
         cache.invalidate(body.to_entity)
@@ -513,7 +513,7 @@ async def graph_search(
     """ILIKE text search for entities in the skill graph."""
     # ── Server-side cache check ──
     try:
-        from aria_skills.knowledge_graph.cache import get_shared_cache
+        from aria_skills.api_client.cache import get_shared_cache
         _gs_cache = get_shared_cache()
         _gs_key = f"gsearch:{q}:{entity_type}:{limit}"
         _gs_cached = _gs_cache._entities.get(_gs_key)
@@ -555,7 +555,7 @@ async def find_skill_for_task(
     """Find the best skill for a given task from the skill graph."""
     # ── Server-side cache check ──
     try:
-        from aria_skills.knowledge_graph.cache import get_shared_cache
+        from aria_skills.api_client.cache import get_shared_cache
         _sft_cache = get_shared_cache()
         _sft_key = f"sft:{task[:120]}:{limit}"
         _sft_cached = _sft_cache._entities.get(_sft_key)
@@ -641,7 +641,7 @@ async def find_skill_for_task(
     await _log_query(db, "skill_for_task", {"task": task}, len(candidates[:limit]), request=request)
     # ── Server-side cache store ──
     try:
-        from aria_skills.knowledge_graph.cache import get_shared_cache
+        from aria_skills.api_client.cache import get_shared_cache
         _sft_cache = get_shared_cache()
         _sft_key = f"sft:{task[:120]}:{limit}"
         _sft_cache._entities.put(_sft_key, result_data)
@@ -681,7 +681,7 @@ async def kg_traverse(
     """BFS traversal on the organic knowledge graph (knowledge_entities / knowledge_relations)."""
     # ── Server-side cache check ──
     try:
-        from aria_skills.knowledge_graph.cache import get_shared_cache
+        from aria_skills.api_client.cache import get_shared_cache
         _trav_cache = get_shared_cache()
         _cached_trav = _trav_cache.get_traversal(start, max_depth, relation_type)
         if _cached_trav is not None:
@@ -788,7 +788,7 @@ async def kg_traverse(
     }
     # ── Server-side cache store ──
     try:
-        from aria_skills.knowledge_graph.cache import get_shared_cache
+        from aria_skills.api_client.cache import get_shared_cache
         get_shared_cache().put_traversal(start, max_depth, response, relation_type)
     except Exception:
         pass
@@ -808,7 +808,7 @@ async def kg_search(
     """ILIKE text search for entities in the organic knowledge graph."""
     # ── Server-side cache check ──
     try:
-        from aria_skills.knowledge_graph.cache import get_shared_cache
+        from aria_skills.api_client.cache import get_shared_cache
         _cache = get_shared_cache()
         _cache_key = f"kgsearch:{q}:{entity_type}:{limit}"
         _cached = _cache._entities.get(_cache_key)
@@ -928,7 +928,7 @@ async def kg_cache_analytics(
     # ── 7. In-process cache stats (best effort) ─────────────────────────────
     cache_stats = None
     try:
-        from aria_skills.knowledge_graph.cache import get_shared_cache
+        from aria_skills.api_client.cache import get_shared_cache
         cache = get_shared_cache()
         cache_stats = cache.stats
     except Exception:
