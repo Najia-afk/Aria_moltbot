@@ -7,6 +7,7 @@
 
 ### Sprint Records
 - **[SPRINT_8_BOARD.md](SPRINT_8_BOARD.md)** — Sprint 8: Production Recovery & Mobile-Ready Chat (9/9 in-scope tickets done, 3 carried to next sprint)
+- **[SPRINT_9_BOARD.md](SPRINT_9_BOARD.md)** — Sprint 9: Swarm Architecture Audit & Production Verification (14/14 tickets done, 6 carried to Sprint 10)
 
 ### Aria's Files (copied for preservation)
 - **[aria_files/code/](aria_files/code/)** — Snapshot of modified files: `models.yaml`, `llm_gateway.py`, `pyproject.toml`, `engine_chat.html`
