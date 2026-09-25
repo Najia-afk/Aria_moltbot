@@ -64,4 +64,29 @@
     /* Typography */
     --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+    /* Z-index */
+    --z-tooltip: 1500;
+
+    /* ── Legacy token aliases ──────────────────────────────────────────
+       Older templates reference these pre-rebrand names. Alias them to the
+       canonical tokens above so every page renders the same palette instead
+       of silently falling back to stale hardcoded hex values. */
+    --primary: var(--accent-primary);
+    --accent: var(--accent-primary);
+    --accent-blue: var(--accent-primary);
+    --accent-purple: var(--accent-secondary);
+    --border: var(--border-default);
+    --border-color: var(--border-default);
+    --surface: var(--bg-secondary);
+    --surface-alt: var(--bg-tertiary);
+    --bg-card: var(--bg-elevated);
+    --card-bg: var(--bg-elevated);
+    --card-accent: var(--accent-primary);
+    --input-bg: var(--bg-primary);
+    --text: var(--text-primary);
+    --muted: var(--text-muted);
+    --text-tertiary: var(--text-dim);
+    --shadow: var(--shadow-md);
+    --shadow-xl: var(--shadow-lg);
 }
