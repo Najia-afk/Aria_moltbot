@@ -148,7 +148,10 @@
     }
 
     /* ── Mobile nav fix (inline to bypass CSS cache) ── */
-    @media (max-width: 1100px) {
+    /* Breakpoint matches base.css: raised from 1100px to 1650px because the
+       full desktop nav (~10 top-level items + status badge) needs ~1580px+
+       to fit without overflowing past the viewport edge. */
+    @media (max-width: 1650px) {
         /* backdrop-filter on header creates a containing block that traps
            position:fixed children. Use position:absolute on the nav-links
            and move it to body scope via JS instead. */

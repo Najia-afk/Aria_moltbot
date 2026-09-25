@@ -103,6 +103,13 @@ header .container {
     align-items: center;
     justify-content: space-between;
     height: 64px;
+    /* The nav row (logo + ~10 top-level items + status badge) needs more
+       horizontal room than the 1400px body-content container: at common
+       desktop widths (e.g. 1648px viewport) the badge was overflowing past
+       the container AND the viewport edge, getting visually clipped.
+       Widen just the header row; page content below keeps the narrower
+       1400px reading width. */
+    max-width: 1680px;
 }
 
 nav {
@@ -290,8 +297,11 @@ footer p {
     .grid-3 { grid-template-columns: repeat(2, 1fr); }
 }
 
-@media (max-width: 1100px) {
-    /* Tablet/mobile: hide nav by default, show hamburger */
+@media (max-width: 1650px) {
+    /* Tablet/mobile/narrower-desktop: hide nav by default, show hamburger.
+       Raised from 1100px -- with ~10 top-level nav items + status badge,
+       the full nav row needs ~1580px+ to render without overflowing past
+       the viewport edge (observed clipping the status badge at 1648px). */
     .nav-links {
         display: none;
         position: fixed;
