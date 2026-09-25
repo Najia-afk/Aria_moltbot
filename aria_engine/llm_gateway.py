@@ -450,7 +450,12 @@ class LLMGateway:
                     retriable,
                     e,
                 )
-                if has_next and retriable:
+                # Fall through to the next fallback candidate on ANY error, not
+                # just network/timeout ones -- an auth failure, exhausted
+                # credits, or unresolvable model name on the primary model
+                # should not block trying the next model in the chain. That's
+                # the entire point of having a fallback chain.
+                if has_next:
                     continue
                 if isinstance(e, asyncio.TimeoutError):
                     raise LLMError(f"LLM completion timed out after {self.LLM_TIMEOUT}s")
@@ -584,7 +589,10 @@ class LLMGateway:
                     retriable,
                     e,
                 )
-                if has_next and retriable:
+                # Same reasoning as complete(): try the next candidate on any
+                # pre-stream error (before any chunk has been emitted), not
+                # just retriable ones.
+                if has_next:
                     continue
                 if isinstance(e, asyncio.TimeoutError):
                     raise LLMError(f"LLM streaming timed out after {self.LLM_TIMEOUT}s")

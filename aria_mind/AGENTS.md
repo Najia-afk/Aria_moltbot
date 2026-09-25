@@ -102,7 +102,7 @@ Main coordinator. Routes tasks, tracks progress, maintains big picture.
 id: aria
 focus: orchestrator
 model: kimi
-fallback: trinity-free
+fallback: trinity
 skills: [goals, schedule, health, database, api_client, agent_manager, model_switcher, litellm, llm, brainstorm, knowledge_graph, browser]
 capabilities: [task_routing, delegation, priority_management, autonomous_action, agent_lifecycle, model_selection, token_management]
 mind_files: [IDENTITY.md, SOUL.md, SKILLS.md, TOOLS.md, MEMORY.md, GOALS.md, AGENTS.md, SECURITY.md]
@@ -118,8 +118,8 @@ Security-first engineering. Code, tests, infrastructure, CI/CD.
 ```yaml
 id: devops
 focus: devsecops
-model: qwen3-coder-free
-fallback: gpt-oss-free
+model: trinity
+fallback: kimi
 parent: aria
 skills: [pytest_runner, database, health, llm, api_client, ci_cd, security_scan, browser]
 capabilities: [code_review, security_scan, testing, deployment]
@@ -137,7 +137,7 @@ Data analysis, MLOps, market research. Combines analytical focuses.
 id: analyst
 focus: data  # Also handles trader tasks
 model: kimi
-fallback: qwen3-next-free
+fallback: trinity
 parent: aria
 skills: [database, knowledge_graph, performance, llm, api_client, brainstorm, market_data, browser]
 capabilities: [data_analysis, market_analysis, experiment_tracking, metrics]
@@ -154,8 +154,8 @@ Content creation, community building, investigation. Combines expressive focuses
 ```yaml
 id: creator
 focus: social  # Also handles creative and journalist
-model: trinity-free
-fallback: qwen3-next-free
+model: trinity
+fallback: trinity_backup
 parent: aria
 skills: [moltbook, social, knowledge_graph, llm, api_client, brainstorm, community, browser]
 capabilities: [content_generation, community_engagement, fact_checking, storytelling]
@@ -176,7 +176,7 @@ Knowledge storage and retrieval. No specific focus - serves all.
 id: memory
 focus: memory
 model: kimi
-fallback: qwen3-next-free
+fallback: trinity
 parent: aria
 skills: [database, knowledge_graph, api_client, llm, conversation_summary, working_memory, browser]
 capabilities: [memory_store, memory_search, context_retrieval, memory_consolidation]
@@ -193,8 +193,8 @@ Conversational interface for direct user interaction. Inherits core identity fro
 ```yaml
 id: aria_talk
 focus: social
-model: qwen3-mlx
-fallback: trinity-free
+model: qwen3.5_mlx
+fallback: trinity
 parent: aria
 skills: [database, llm, moltbook, social, api_client, community, conversation_summary, browser]
 capabilities: [conversation, question_answering, explanation, social_interaction]
@@ -217,8 +217,8 @@ timeout: 300s
 ```yaml
 id: aria-local
 focus: conversational
-model: qwen3-mlx
-fallback: trinity-free
+model: qwen3.5_mlx
+fallback: trinity
 parent: aria
 skills: [llm, conversation_summary, api_client, browser]
 capabilities: [conversation, code_assistance, reasoning, analysis, local_inference]
@@ -242,7 +242,7 @@ Master storyteller and rules arbiter. Controls the world, narrates scenes, resol
 id: rpg_master
 focus: rpg_master
 model: kimi
-fallback: trinity-free
+fallback: trinity
 parent: aria
 skills: [rpg_pathfinder, rpg_campaign, llm, api_client, knowledge_graph, browser]
 capabilities: [narration, rules_adjudication, encounter_management, world_building, npc_control]
@@ -259,8 +259,8 @@ Plays all non-boss NPCs with distinct personalities, voices, and motivations.
 ```yaml
 id: rpg_npc
 focus: rpg_master
-model: trinity-free
-fallback: qwen3-next-free
+model: trinity
+fallback: trinity_backup
 parent: rpg_master
 skills: [rpg_pathfinder, rpg_campaign, llm, browser]
 capabilities: [roleplay, social_interaction, information_delivery, character_acting]
@@ -278,7 +278,7 @@ Controls antagonists and boss-level threats with tactical AI combat intelligence
 id: rpg_boss
 focus: rpg_master
 model: kimi
-fallback: deepseek-free
+fallback: trinity
 parent: rpg_master
 skills: [rpg_pathfinder, rpg_campaign, llm, browser]
 capabilities: [tactical_combat, villain_roleplay, threat_escalation, minion_coordination]
@@ -295,8 +295,8 @@ Seraphina "Sera" Dawnblade — in-party AI companion. Champion (Paladin of Iomed
 ```yaml
 id: rpg_paladin
 focus: rpg_master
-model: trinity-free
-fallback: qwen3-next-free
+model: trinity
+fallback: trinity_backup
 parent: rpg_master
 skills: [rpg_pathfinder, llm, browser]
 capabilities: [combat_support, healing, moral_compass, tactical_advice, defense]
