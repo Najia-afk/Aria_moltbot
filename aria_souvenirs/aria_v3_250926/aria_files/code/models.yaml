@@ -1,0 +1,214 @@
+schema_version: 5
+notes: 'SINGLE SOURCE OF TRUTH. To add a model: add ONE block under models with
+  tier + tags. The loader derives tasks, aliases, criteria, profiles automatically.'
+model_priority_order: local → free → paid. Model order = tier list order.
+validation:
+  schema_version: 5
+  required_fields: [id, tier]
+providers:
+  litellm:
+    baseUrl: http://litellm:4000/v1
+    apiKey: ${LITELLM_MASTER_KEY}
+    api: openai-completions
+
+# Routing — fallbacks derived from per-model fallback_order
+# Primary is OpenRouter (trinity); only sentiment_tiny (~0.5GB) runs locally.
+routing:
+  primary: litellm/trinity
+  bypass: false
+  tier_order: [local, free, paid]
+  timeout: 300
+  retries: 2
+
+# ═══════════════════════════════════════════════════════════════════════
+# Models — curated active catalog.
+#
+# Keep one fully defined example per active provider path:
+#   - local chat via MLX
+#   - local embeddings via Ollama
+#   - OpenRouter free chat
+#   - Moonshot/Kimi paid long-context model
+#
+# Key fields the loader materializes from:
+#   tasks:          list     → builds the tasks map
+#   fallback_order: int      → builds routing.fallbacks (sorted asc)
+#   priority:       int      → builds criteria.priority (sorted asc)
+#   tags:           dict     → builds criteria.use_cases {tag: [models]}
+#   focus_for:      list     → builds criteria.focus_defaults
+#   aliases:        list     → compatibility model IDs accepted by loader/LiteLLM
+#   alias:          str      → builds agent_aliases
+#   profiles:       dict     → builds profiles section
+#   tier:           str      → builds criteria.tiers
+# ═══════════════════════════════════════════════════════════════════════
+models:
+
+  # Template — copy this block to add a new model, then fill in real values.
+  # my-model-id:
+  #   provider: litellm
+  #   name: My Model Name
+  #   alias: My Model Name
+  #   tier: free
+  #   tasks: [optional_task_name]
+  #   reasoning: false
+  #   input: [text]
+  #   cost: {input: 0, output: 0, cacheRead: 0, cacheWrite: 0}
+  #   contextWindow: 8192
+  #   maxTokens: 4096
+  #   routeSkill: litellm
+  #   litellm:
+  #     model: provider/full-model-name
+  #     api_base: https://provider.example/v1   # optional
+  #     api_key: os.environ/MY_PROVIDER_KEY     # optional
+  #   # Add tags/focus_for/profiles/thinking_params only if that model needs them.
+
+  # ─── LOCAL (disabled — host cannot run this model as a fallback) ──────
+  qwen3.5_mlx:
+    provider: litellm
+    name: Qwen3.5 4B Instruct (MLX Local)
+    alias: Qwen3.5 4B Instruct (MLX Local)
+    _note: 'Disabled: not in routing (no priority/fallback_order/tasks). Manual use only.'
+    tier: local
+    tasks: []
+    tags: {fast_simple: 1}
+    reasoning: true
+    vision: true
+    input: [text, image]
+    cost: {input: 0, output: 0, cacheRead: 0, cacheWrite: 0}
+    contextWindow: 131072
+    maxTokens: 8192
+    routeSkill: litellm
+    litellm:
+      model: openai/mlx-community/Qwen3.5-4B-MLX-4bit
+      api_base: http://host.docker.internal:8080/v1
+      api_key: not-needed
+    litellm_comments:
+      model: 'OLD 9B: openai/mlx-community/Qwen3.5-9B-MLX-4bit'
+    provider_label: local/mlx
+    thinking_params:
+      extra_body:
+        enable_thinking: true
+    profiles:
+      sentiment: {temperature: 0.2, max_tokens: 256}
+      devsecops: {temperature: 0.2, max_tokens: 4096}
+      focus_classify: {temperature: 0.1, max_tokens: 32}
+      reflection: {temperature: 0.7, max_tokens: 2048}
+      planning: {temperature: 0.3, max_tokens: 1024}
+      pevr: {temperature: 0.3, max_tokens: 2048}
+
+  # ─── LOCAL (active, ~0.5GB) ─────────────────────────────────────────
+  sentiment_tiny:
+    provider: litellm
+    name: Qwen2.5 0.5B Instruct (Ollama Local)
+    alias: Qwen2.5 0.5B (Sentiment)
+    _note: 'Only resident local chat model. Keeps RAM low on the 16GB host.'
+    tier: local
+    priority: 1
+    fallback_order: 1
+    tasks: [sentiment]
+    tags: {fast_simple: 1}
+    reasoning: false
+    input: [text]
+    cost: {input: 0, output: 0, cacheRead: 0, cacheWrite: 0}
+    contextWindow: 32768
+    maxTokens: 512
+    routeSkill: litellm
+    litellm:
+      model: ollama/qwen2.5:0.5b
+      api_base: http://host.docker.internal:11434
+    provider_label: local/ollama
+    thinking_params: {}
+    profiles:
+      sentiment: {temperature: 0.2, max_tokens: 256}
+
+  embedding:
+    provider: litellm
+    name: Nomic Embed Text (Ollama Local)
+    alias: Nomic Embed Text (Ollama Local)
+    tier: local
+    tasks: [embedding]
+    type: embedding
+    reasoning: false
+    input: [text]
+    cost: {input: 0, output: 0, cacheRead: 0, cacheWrite: 0}
+    dimensions: 768
+    contextWindow: 8192
+    maxTokens: 0
+    routeSkill: litellm
+    purpose: semantic memory search
+    use_for: [embedding]
+    litellm:
+      model: ollama/nomic-embed-text
+      api_base: http://host.docker.internal:11434
+    provider_label: local/ollama
+    thinking_params: {}
+    profiles:
+      embedding: {max_tokens: 0}
+
+  # ─── FREE ────────────────────────────────────────────────────────────
+  trinity:
+    provider: litellm
+    name: Nemotron 3.5 Lightning (OpenRouter FREE)
+    alias: Nemotron 3.5 Lightning (OpenRouter FREE)
+    _note: 'arcee-ai/trinity-large-preview:free was removed from OpenRouter (404); replaced 2026-09-25.'
+    tier: free
+    priority: 2
+    fallback_order: 2
+    tasks: [openrouter_default, primary, ollama_default, local_fast, focus_classify, reflection, planning, pevr]
+    tags: {default: 1, creative_writing: 1}
+    focus_for: [orchestrator, creative, social, journalist, devsecops]
+    reasoning: true
+    tool_calling: true
+    input: [text]
+    cost: {input: 0, output: 0, cacheRead: 0, cacheWrite: 0}
+    contextWindow: 1000000
+    maxTokens: 8192
+    routeSkill: litellm
+    litellm:
+      model: openrouter/nvidia/nemotron-3.5-lightning:free
+      api_key: os.environ/OPEN_ROUTER_KEY
+    provider_label: openrouter
+    thinking_params:
+      extra_body:
+        reasoning: {enabled: false}
+    profiles:
+      routing: {temperature: 0.3, max_tokens: 512}
+      orchestrator: {temperature: 0.3, max_tokens: 512}
+      analysis: {temperature: 0.7, max_tokens: 4096}
+      creative: {temperature: 0.9, max_tokens: 2048}
+      social: {temperature: 0.8, max_tokens: 1024}
+      journalist: {temperature: 0.5, max_tokens: 2048}
+      local_fast: {temperature: 0.3, max_tokens: 1024}
+      focus_classify: {temperature: 0.1, max_tokens: 32}
+      reflection: {temperature: 0.7, max_tokens: 2048}
+      planning: {temperature: 0.3, max_tokens: 1024}
+      pevr: {temperature: 0.3, max_tokens: 2048}
+
+  # ─── PAID ────────────────────────────────────────────────────────────
+  kimi:
+    provider: litellm
+    name: Kimi K2.5 (Moonshot Paid)
+    alias: Kimi K2.5 (Moonshot Paid)
+    tier: paid
+    priority: 4
+    tasks: [summarization, memory_compression, conversation_summary, token_counting, moonshot_default]
+    tags: {long_context: 1, complex_reasoning: 1}
+    focus_for: [data, trader]
+    reasoning: true
+    tool_calling: true
+    input: [text]
+    cost: {input: 0.56, output: 2.94, cacheRead: 0.098, cacheWrite: 0}
+    contextWindow: 256000
+    safe_prompt_tokens: 240000
+    maxTokens: 16384
+    routeSkill: litellm
+    litellm:
+      model: moonshot/kimi-k2.5
+      api_key: os.environ/MOONSHOT_KIMI_KEY
+      api_base: https://api.moonshot.ai/v1
+      temperature: 1
+    provider_label: moonshot
+    thinking_params: {}
+    profiles:
+      data: {temperature: 0.3, max_tokens: 4096}
+      trader: {temperature: 0.4, max_tokens: 4096}
+      research: {temperature: 0.2, max_tokens: 8192}

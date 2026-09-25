@@ -152,7 +152,7 @@ Configure in `.env`:
 3. Add to `.env`: `OPEN_ROUTER_KEY=sk-or-v1-...`
 
 Curated free models in this repo:
-- `trinity` — Trinity 400B MoE, general free chat fallback
+- `trinity` — free OpenRouter chat model (id kept stable; underlying model swapped when OpenRouter deprecates one, see models.yaml)
 
 ### Moonshot/Kimi (Paid fallback — last resort)
 1. Go to https://platform.moonshot.cn/

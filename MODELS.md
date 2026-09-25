@@ -28,7 +28,7 @@ This file defines every model id, provider, tier, context window, and pricing. N
 
 - `qwen3.5_mlx` — local MLX chat model for fast local work
 - `embedding` — local Ollama embedding model for semantic memory
-- `trinity` — main OpenRouter free chat model
+- `trinity` — main OpenRouter free chat model (currently nvidia/nemotron-3.5-lightning:free)
 - `kimi` — Moonshot K2.5 for long-context and summarization tasks
 
 ## How It Works

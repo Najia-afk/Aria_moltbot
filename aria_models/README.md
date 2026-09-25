@@ -15,7 +15,7 @@ The repo keeps a small curated set of active models:
 
 - `qwen3.5_mlx` — local MLX chat model
 - `embedding` — local Ollama embedding model
-- `trinity` — general free OpenRouter chat model
+- `trinity` — free OpenRouter chat model (rotates to whichever free model is live; see models.yaml)
 - `kimi` — paid Moonshot K2.5 long-context model
 
 ## Quick read (Python)
