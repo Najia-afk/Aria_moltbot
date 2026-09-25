@@ -1,60 +1,228 @@
 {% extends "base.html" %}
 {% block title %}Agents — Aria Engine{% endblock %}
 
-{% block head %}
+{% block extra_css %}
 <style>
+    .agents-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: var(--space-md);
+        margin-bottom: var(--space-lg);
+    }
+    .agents-toolbar h1 {
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin: 0 0 4px 0;
+    }
+    .agents-toolbar .meta {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+    }
+    .btn-sm {
+        padding: var(--space-xs) var(--space-md);
+        font-size: 0.8rem;
+    }
+
+    .agent-tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+    .agent-tab {
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: var(--space-sm) var(--space-md);
+        border-radius: var(--radius-md) var(--radius-md) 0 0;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-subtle);
+        border-bottom: none;
+        color: var(--text-secondary);
+        font-size: 0.85rem;
+    }
+    .agent-tab.active {
+        background: var(--bg-tertiary);
+        color: var(--text-primary);
+    }
+    .agent-tab .agent-model {
+        color: var(--text-dim);
+        font-size: 0.75rem;
+    }
+    .agent-loading-hint {
+        padding: var(--space-md);
+        color: var(--text-muted);
+        font-size: 0.85rem;
+    }
+
+    .status-dot {
+        display: inline-block;
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+    .status-idle { background: var(--success); }
+    .status-busy { background: var(--warning); animation: agent-pulse 1s infinite; }
+    .status-error { background: var(--danger); }
+    .status-disabled { background: var(--text-dim); }
+    @keyframes agent-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+    .agent-detail {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-subtle);
+        border-radius: 0 var(--radius-lg) var(--radius-lg) var(--radius-lg);
+        padding: var(--space-lg);
+    }
+    .agent-detail-empty {
+        text-align: center;
+        color: var(--text-muted);
+        padding: var(--space-xl) 0;
+    }
+    .agent-detail-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: var(--space-md);
+        margin-bottom: var(--space-lg);
+    }
+    .agent-detail-header h2 {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 1.15rem;
+        margin: 0 0 4px 0;
+        color: var(--text-primary);
+    }
+    .agent-detail-header .agent-id-tag {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        font-weight: 400;
+    }
+    .agent-detail-meta {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-sm);
+    }
+    .agent-detail-meta code {
+        background: var(--bg-tertiary);
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 0.8rem;
+    }
+    .agent-detail-side {
+        text-align: right;
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+    }
+    .agent-current-task {
+        margin-top: var(--space-sm);
+        font-size: 0.85rem;
+        color: var(--text-muted);
+    }
+
+    .metrics-row {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: var(--space-md);
+        margin-bottom: var(--space-lg);
+    }
     @media (max-width: 768px) {
-        .table.table-sm { display: block; overflow-x: auto; white-space: nowrap; }
+        .metrics-row { grid-template-columns: repeat(2, 1fr); }
     }
-    .agent-tab { cursor: pointer; padding: 8px 16px; border-radius: 8px 8px 0 0; }
-    .agent-tab.active { background: #fff; border: 1px solid #dee2e6; border-bottom: none; }
-    .agent-tab .status-dot {
-        display: inline-block; width: 10px; height: 10px;
-        border-radius: 50%; margin-right: 6px;
+    .metric-card {
+        background: var(--bg-tertiary);
+        border-radius: var(--radius-md);
+        padding: var(--space-md);
+        text-align: center;
     }
-    .status-idle { background: #28a745; }
-    .status-busy { background: #ffc107; animation: pulse 1s infinite; }
-    .status-error { background: #dc3545; }
-    .status-disabled { background: #6c757d; }
-    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
-    .agent-detail { background: #fff; border: 1px solid #dee2e6; border-radius: 0 8px 8px 8px; padding: 20px; }
-    .metric-card { background: #f8f9fa; border-radius: 8px; padding: 12px; text-align: center; }
-    .metric-card .value { font-size: 1.5rem; font-weight: bold; }
-    .metric-card .label { font-size: 0.8rem; color: #6c757d; }
-    .session-list { max-height: 300px; overflow-y: auto; }
-    .heartbeat-indicator { font-size: 0.85rem; }
-    .activity-feed { max-height: 200px; overflow-y: auto; font-size: 0.85rem; }
+    .metric-card .value {
+        font-size: 1.35rem;
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+    .metric-card .label {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-top: 2px;
+    }
+    .metric-bar {
+        height: 4px;
+        border-radius: 2px;
+        background: var(--border-subtle);
+        margin-top: var(--space-sm);
+        overflow: hidden;
+    }
+    .metric-bar-fill {
+        height: 100%;
+        border-radius: 2px;
+    }
+
+    .system-prompt-block {
+        margin-bottom: var(--space-lg);
+    }
+    .system-prompt-block h3,
+    .agent-sessions-block h3 {
+        font-size: 0.9rem;
+        color: var(--text-primary);
+        margin: 0 0 var(--space-sm) 0;
+    }
+    .system-prompt-block pre {
+        background: var(--bg-primary);
+        color: var(--text-secondary);
+        padding: var(--space-md);
+        border-radius: var(--radius-md);
+        font-size: 0.78rem;
+        max-height: 220px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+        border: 1px solid var(--border-subtle);
+    }
+
+    .session-list {
+        max-height: 320px;
+        overflow-y: auto;
+    }
+    @media (max-width: 768px) {
+        .session-list table { display: block; overflow-x: auto; white-space: nowrap; }
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid py-3">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <div>
-            <h4 class="mb-0">🤖 Agent Pool</h4>
-            <small class="text-muted">
-                <span id="agentCount">0</span> agents |
-                Pool status: <span id="poolStatus" class="badge bg-secondary">loading</span>
-            </small>
-        </div>
-        <div>
-            <button class="btn btn-sm btn-outline-primary" onclick="refreshAgents()">🔄 Refresh</button>
+<div class="agents-toolbar">
+    <div>
+        <h1>🤖 Agent Pool</h1>
+        <div class="meta">
+            <span id="agentCount">0</span> agents ·
+            Pool status: <span id="poolStatus" class="badge badge-info">loading</span>
         </div>
     </div>
+    <button class="btn btn-secondary btn-sm" onclick="refreshAgents()">🔄 Refresh</button>
+</div>
 
-    <!-- Agent Tabs -->
-    <div class="d-flex flex-wrap gap-1 mb-0" id="agentTabs">
-        <div class="text-muted p-2">Loading agents...</div>
-    </div>
+<!-- Agent Tabs -->
+<div class="agent-tabs" id="agentTabs">
+    <div class="agent-loading-hint">Loading agents…</div>
+</div>
 
-    <!-- Agent Detail Panel -->
-    <div class="agent-detail" id="agentDetail">
-        <p class="text-muted text-center">Select an agent tab above</p>
-    </div>
+<!-- Agent Detail Panel -->
+<div class="agent-detail" id="agentDetail">
+    <p class="agent-detail-empty">Select an agent tab above</p>
 </div>
 {% endblock %}
 
-{% block scripts %}
+{% block extra_js %}
 <script>
 const API_BASE = '/api/engine/agents';
 let agents = [];
@@ -62,6 +230,10 @@ let selectedAgent = null;
 
 function statusColor(status) {
     return { idle: 'status-idle', busy: 'status-busy', error: 'status-error', disabled: 'status-disabled' }[status] || 'status-disabled';
+}
+
+function statusBadgeClass(status) {
+    return { idle: 'badge-success', busy: 'badge-warning', error: 'badge-danger', disabled: 'badge-info' }[status] || 'badge-info';
 }
 
 function timeAgo(iso) {
@@ -83,10 +255,9 @@ async function refreshAgents() {
         document.getElementById('agentCount').textContent = data.total_agents;
         const statusCounts = data.status_counts || {};
         const running = (statusCounts.idle || 0) + (statusCounts.busy || 0);
-        document.getElementById('poolStatus').textContent =
-            `${running}/${data.total_agents} active`;
-        document.getElementById('poolStatus').className =
-            `badge ${running > 0 ? 'bg-success' : 'bg-warning'}`;
+        const poolStatusEl = document.getElementById('poolStatus');
+        poolStatusEl.textContent = `${running}/${data.total_agents} active`;
+        poolStatusEl.className = `badge ${running > 0 ? 'badge-success' : 'badge-warning'}`;
 
         renderTabs();
         if (selectedAgent) {
@@ -105,8 +276,8 @@ function renderTabs() {
         <div class="agent-tab ${selectedAgent === a.agent_id ? 'active' : ''}"
              data-agent-id="${escapeHtml(a.agent_id)}">
             <span class="status-dot ${statusColor(a.status)}"></span>
-            <strong>${a.display_name || a.agent_id}</strong>
-            <small class="text-muted ms-1">${a.model ? a.model.split('/').pop() : ''}</small>
+            <strong>${escapeHtml(a.display_name || a.agent_id)}</strong>
+            <span class="agent-model">${a.model ? escapeHtml(a.model.split('/').pop()) : ''}</span>
         </div>
     `).join('');
     // S-18: Event delegation instead of inline onclick
@@ -125,86 +296,71 @@ function renderDetail(agentId) {
     const agent = agents.find(a => a.agent_id === agentId);
     if (!agent) {
         document.getElementById('agentDetail').innerHTML =
-            '<p class="text-muted">Agent not found</p>';
+            '<p class="agent-detail-empty">Agent not found</p>';
         return;
     }
 
-    const pheromoneColor = agent.pheromone_score >= 0.7 ? '#28a745' :
-                           agent.pheromone_score >= 0.4 ? '#ffc107' : '#dc3545';
-    const pheromoneWidth = Math.round(agent.pheromone_score * 100);
+    const pheromoneColor = agent.pheromone_score >= 0.7 ? 'var(--success)' :
+                           agent.pheromone_score >= 0.4 ? 'var(--warning)' : 'var(--danger)';
+    const pheromoneWidth = Math.round((agent.pheromone_score || 0) * 100);
 
     document.getElementById('agentDetail').innerHTML = `
-        <div class="row mb-4">
-            <div class="col-md-8">
-                <h5>
+        <div class="agent-detail-header">
+            <div>
+                <h2>
                     <span class="status-dot ${statusColor(agent.status)}"></span>
-                    ${agent.display_name || agent.agent_id}
-                    <small class="text-muted">(${agent.agent_id})</small>
-                </h5>
-                <p class="mb-1">
-                    <strong>Model:</strong> <code>${agent.model || 'not set'}</code> |
-                    <strong>Focus:</strong> ${agent.focus_type || 'general'} |
-                    <strong>Status:</strong>
-                    <span class="badge bg-${agent.status === 'idle' ? 'success' : agent.status === 'busy' ? 'warning' : 'danger'}">
-                        ${agent.status}
-                    </span>
-                </p>
-                ${agent.current_task ? `<p class="mb-1 text-muted"><strong>Current task:</strong> ${agent.current_task}</p>` : ''}
-            </div>
-            <div class="col-md-4 text-end">
-                <div class="heartbeat-indicator">
-                    💓 Last active: <strong>${timeAgo(agent.last_active_at)}</strong>
+                    ${escapeHtml(agent.display_name || agent.agent_id)}
+                    <span class="agent-id-tag">(${escapeHtml(agent.agent_id)})</span>
+                </h2>
+                <div class="agent-detail-meta">
+                    <span><strong>Model:</strong> <code>${escapeHtml(agent.model || 'not set')}</code></span>
+                    <span><strong>Focus:</strong> ${escapeHtml(agent.focus_type || 'general')}</span>
+                    <span class="badge ${statusBadgeClass(agent.status)}">${escapeHtml(agent.status)}</span>
                 </div>
-                <div class="mt-1">
-                    Failures: <span class="badge ${agent.consecutive_failures > 0 ? 'bg-danger' : 'bg-success'}">
-                        ${agent.consecutive_failures}
-                    </span>
+                ${agent.current_task ? `<div class="agent-current-task"><strong>Current task:</strong> ${escapeHtml(agent.current_task)}</div>` : ''}
+            </div>
+            <div class="agent-detail-side">
+                <div>💓 Last active: <strong>${timeAgo(agent.last_active_at)}</strong></div>
+                <div style="margin-top:4px;">
+                    Failures: <span class="badge ${agent.consecutive_failures > 0 ? 'badge-danger' : 'badge-success'}">${agent.consecutive_failures}</span>
                 </div>
             </div>
         </div>
 
         <!-- Metrics Row -->
-        <div class="row g-3 mb-4">
-            <div class="col-md-3">
-                <div class="metric-card">
-                    <div class="value">${(agent.pheromone_score || 0.5).toFixed(3)}</div>
-                    <div class="label">Pheromone Score</div>
-                    <div class="progress mt-2" style="height: 4px;">
-                        <div class="progress-bar" style="width: ${pheromoneWidth}%; background: ${pheromoneColor}"></div>
-                    </div>
-                </div>
+        <div class="metrics-row">
+            <div class="metric-card">
+                <div class="value">${(agent.pheromone_score ?? 0.5).toFixed(3)}</div>
+                <div class="label">Pheromone Score</div>
+                <div class="metric-bar"><div class="metric-bar-fill" style="width:${pheromoneWidth}%;background:${pheromoneColor}"></div></div>
             </div>
-            <div class="col-md-3">
-                <div class="metric-card">
-                    <div class="value">${agent.context_length || 0}</div>
-                    <div class="label">Context Messages</div>
-                </div>
+            <div class="metric-card">
+                <div class="value">${agent.context_length || 0}</div>
+                <div class="label">Context Messages</div>
             </div>
-            <div class="col-md-3">
-                <div class="metric-card">
-                    <div class="value">${agent.current_session_id ? '✅' : '—'}</div>
-                    <div class="label">Active Session</div>
-                </div>
+            <div class="metric-card">
+                <div class="value">${agent.current_session_id ? '✅' : '—'}</div>
+                <div class="label">Active Session</div>
             </div>
-            <div class="col-md-3">
-                <div class="metric-card">
-                    <div class="value">${agent.status}</div>
-                    <div class="label">Runtime Status</div>
-                </div>
+            <div class="metric-card">
+                <div class="value">${escapeHtml(agent.status)}</div>
+                <div class="label">Runtime Status</div>
             </div>
         </div>
 
         <!-- System Prompt -->
         ${agent.system_prompt ? `
-        <div class="mb-3">
-            <h6>🧠 System Prompt</h6>
-            <pre style="background:var(--bs-dark,#1e1e1e);color:var(--bs-light,#f8f9fa);padding:0.75rem;border-radius:6px;font-size:0.78rem;max-height:220px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;">${agent.system_prompt.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre>
+        <div class="system-prompt-block">
+            <h3>🧠 System Prompt</h3>
+            <pre>${escapeHtml(agent.system_prompt)}</pre>
         </div>` : ''}
 
         <!-- Sessions for this agent -->
-        <h6>📂 Sessions</h6>
-        <div class="session-list mb-3" id="agentSessions-${agentId}">
-            <p class="text-muted">Loading sessions...</p>
+        <div class="agent-sessions-block">
+            <h3>📂 Sessions</h3>
+            <div class="session-list" id="agentSessions-${escapeHtml(agentId)}">
+                <p class="agent-loading-hint">Loading sessions…</p>
+            </div>
         </div>
     `;
 
@@ -214,26 +370,26 @@ function renderDetail(agentId) {
 
 async function loadAgentSessions(agentId) {
     try {
-        const resp = await fetch(`/api/engine/sessions?agent_id=${agentId}&limit=10`);
+        const resp = await fetch(`/api/engine/sessions?agent_id=${encodeURIComponent(agentId)}&limit=10`);
         const data = await resp.json();
         const container = document.getElementById(`agentSessions-${agentId}`);
 
         if (!data.sessions || data.sessions.length === 0) {
-            container.innerHTML = '<p class="text-muted">No sessions</p>';
+            container.innerHTML = '<p class="agent-loading-hint">No sessions</p>';
             return;
         }
 
         container.innerHTML = `
-            <table class="table table-sm">
+            <table>
                 <thead><tr><th>Title</th><th>Type</th><th>Messages</th><th>Status</th><th>Updated</th></tr></thead>
                 <tbody>
                     ${data.sessions.map(s => `
                         <tr>
-                            <td>${s.title || '<em>untitled</em>'}</td>
-                            <td><code>${s.session_type}</code></td>
+                            <td>${s.title ? escapeHtml(s.title) : '<em>untitled</em>'}</td>
+                            <td><code>${escapeHtml(s.session_type)}</code></td>
                             <td>${s.message_count || 0}</td>
-                            <td><span class="badge bg-${s.status === 'active' ? 'success' : 'secondary'}">${s.status}</span></td>
-                            <td><small>${timeAgo(s.updated_at)}</small></td>
+                            <td><span class="badge ${s.status === 'active' ? 'badge-success' : 'badge-info'}">${escapeHtml(s.status)}</span></td>
+                            <td>${timeAgo(s.updated_at)}</td>
                         </tr>
                     `).join('')}
                 </tbody>
