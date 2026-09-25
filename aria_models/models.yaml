@@ -12,8 +12,9 @@ providers:
     api: openai-completions
 
 # Routing — fallbacks derived from per-model fallback_order
+# Primary is OpenRouter (trinity); only sentiment_tiny (~0.5GB) runs locally.
 routing:
-  primary: litellm/qwen3.5_mlx
+  primary: litellm/trinity
   bypass: false
   tier_order: [local, free, paid]
   timeout: 300
@@ -60,18 +61,15 @@ models:
   #     api_key: os.environ/MY_PROVIDER_KEY     # optional
   #   # Add tags/focus_for/profiles/thinking_params only if that model needs them.
 
-  # ─── LOCAL ───────────────────────────────────────────────────────────
+  # ─── LOCAL (disabled — host cannot run this model as a fallback) ──────
   qwen3.5_mlx:
     provider: litellm
     name: Qwen3.5 4B Instruct (MLX Local)
     alias: Qwen3.5 4B Instruct (MLX Local)
-    _note: 'Active local chat model. Vision+text. Context: 128K.'
+    _note: 'Disabled: not in routing (no priority/fallback_order/tasks). Manual use only.'
     tier: local
-    priority: 1
-    fallback_order: 1
-    tasks: [primary, sentiment, ollama_default, local_fast, focus_classify, reflection, planning, pevr]
+    tasks: []
     tags: {fast_simple: 1}
-    focus_for: [devsecops]
     reasoning: true
     vision: true
     input: [text, image]
@@ -96,6 +94,31 @@ models:
       reflection: {temperature: 0.7, max_tokens: 2048}
       planning: {temperature: 0.3, max_tokens: 1024}
       pevr: {temperature: 0.3, max_tokens: 2048}
+
+  # ─── LOCAL (active, ~0.5GB) ─────────────────────────────────────────
+  sentiment_tiny:
+    provider: litellm
+    name: Qwen2.5 0.5B Instruct (Ollama Local)
+    alias: Qwen2.5 0.5B (Sentiment)
+    _note: 'Only resident local chat model. Keeps RAM low on the 16GB host.'
+    tier: local
+    priority: 1
+    fallback_order: 1
+    tasks: [sentiment]
+    tags: {fast_simple: 1}
+    reasoning: false
+    input: [text]
+    cost: {input: 0, output: 0, cacheRead: 0, cacheWrite: 0}
+    contextWindow: 32768
+    maxTokens: 512
+    routeSkill: litellm
+    litellm:
+      model: ollama/qwen2.5:0.5b
+      api_base: http://host.docker.internal:11434
+    provider_label: local/ollama
+    thinking_params: {}
+    profiles:
+      sentiment: {temperature: 0.2, max_tokens: 256}
 
   embedding:
     provider: litellm
@@ -124,26 +147,29 @@ models:
   # ─── FREE ────────────────────────────────────────────────────────────
   trinity:
     provider: litellm
-    name: Trinity 400B MoE (OpenRouter FREE)
-    alias: Trinity 400B (OpenRouter FREE)
+    name: Nemotron 3.5 Lightning (OpenRouter FREE)
+    alias: Nemotron 3.5 Lightning (OpenRouter FREE)
+    _note: 'arcee-ai/trinity-large-preview:free was removed from OpenRouter (404); replaced 2026-09-25.'
     tier: free
     priority: 2
     fallback_order: 2
-    tasks: [openrouter_default]
+    tasks: [openrouter_default, primary, ollama_default, local_fast, focus_classify, reflection, planning, pevr]
     tags: {default: 1, creative_writing: 1}
-    focus_for: [orchestrator, creative, social, journalist]
+    focus_for: [orchestrator, creative, social, journalist, devsecops]
     reasoning: true
     tool_calling: true
     input: [text]
     cost: {input: 0, output: 0, cacheRead: 0, cacheWrite: 0}
-    contextWindow: 131072
+    contextWindow: 1000000
     maxTokens: 8192
     routeSkill: litellm
     litellm:
-      model: openrouter/arcee-ai/trinity-large-preview:free
+      model: openrouter/nvidia/nemotron-3.5-lightning:free
       api_key: os.environ/OPEN_ROUTER_KEY
     provider_label: openrouter
-    thinking_params: {}
+    thinking_params:
+      extra_body:
+        reasoning: {enabled: false}
     profiles:
       routing: {temperature: 0.3, max_tokens: 512}
       orchestrator: {temperature: 0.3, max_tokens: 512}
@@ -151,6 +177,11 @@ models:
       creative: {temperature: 0.9, max_tokens: 2048}
       social: {temperature: 0.8, max_tokens: 1024}
       journalist: {temperature: 0.5, max_tokens: 2048}
+      local_fast: {temperature: 0.3, max_tokens: 1024}
+      focus_classify: {temperature: 0.1, max_tokens: 32}
+      reflection: {temperature: 0.7, max_tokens: 2048}
+      planning: {temperature: 0.3, max_tokens: 1024}
+      pevr: {temperature: 0.3, max_tokens: 2048}
 
   # ─── PAID ────────────────────────────────────────────────────────────
   kimi:

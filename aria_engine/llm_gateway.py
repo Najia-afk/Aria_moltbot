@@ -204,8 +204,17 @@ class LLMGateway:
         Moonshot/Kimi rejects assistant tool-call messages when thinking mode is
         enabled and ``reasoning_content`` is absent. We defensively ensure that
         field exists for every assistant tool-call message.
+
+        Some OpenAI-compatible backends (e.g. local mlx_lm.server) reject any
+        request containing more than one ``system`` message, or a ``system``
+        message that isn't first. Aria's context builder appends several
+        system-role messages (session prompt, memory recall, archive recall,
+        context-monitor warnings, delegation guidance, etc.) throughout the
+        message list, so we coalesce all of them into a single leading system
+        message here rather than at every call site.
         """
         normalized: list[dict[str, Any]] = []
+        system_parts: list[str] = []
         for message in messages:
             if not isinstance(message, dict):
                 normalized.append(message)
@@ -217,7 +226,16 @@ class LLMGateway:
                 if enable_thinking and "reasoning_content" not in entry:
                     entry["reasoning_content"] = entry.get("thinking") or "[reasoning_unavailable]"
 
+            if entry.get("role") == "system":
+                content = entry.get("content")
+                if content:
+                    system_parts.append(str(content))
+                continue
+
             normalized.append(entry)
+
+        if system_parts:
+            normalized.insert(0, {"role": "system", "content": "\n\n".join(system_parts)})
 
         return normalized
 
