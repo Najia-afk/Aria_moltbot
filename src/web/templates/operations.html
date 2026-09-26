@@ -485,8 +485,40 @@
             if (sub && overall.health_score != null) sub.textContent = `Health score: ${overall.health_score}/100`;
         }
 
+        await applyLlmQuotaStatus();
+
         const updated = document.getElementById('archUpdated');
         if (updated) updated.textContent = 'Updated ' + new Date().toLocaleTimeString();
+    }
+
+    // Surfaces the actual reason for cron/LLM failures instead of a bare red
+    // dot — recent OpenRouter free-tier exhaustion trips the LLM circuit
+    // breaker and cascades into every cron job that calls an LLM, which
+    // otherwise just looks like generic unexplained "down" everywhere.
+    async function applyLlmQuotaStatus() {
+        try {
+            const resp = await fetch(`${API}/heartbeat?limit=20`);
+            if (!resp.ok) return;
+            const data = await resp.json();
+            const entries = data.heartbeats || [];
+            const quotaExhausted = entries.some(h => {
+                const raw = JSON.stringify(h.details || '');
+                return raw.includes('daily limit') || raw.includes('RateLimitError');
+            });
+            const breakerOpen = entries.some(h => JSON.stringify(h.details || '').includes('Circuit breaker open'));
+
+            if (quotaExhausted || breakerOpen) {
+                setArchDot('llm', 'degraded');
+                const llmSub = document.querySelector('.arch-node[data-node="llm"] .arch-node-sub');
+                if (llmSub) {
+                    llmSub.textContent = quotaExhausted
+                        ? '⚠ Free daily quota exhausted (OpenRouter)'
+                        : '⚠ Circuit breaker open (recent LLM failures)';
+                }
+                const cronSub = document.getElementById('archCronSub');
+                if (cronSub) cronSub.textContent += ' — blocked by LLM quota';
+            }
+        } catch (e) { /* best-effort — don't block the rest of the diagram */ }
     }
 
     async function checkEngineHealth() {
