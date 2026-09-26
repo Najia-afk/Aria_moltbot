@@ -228,6 +228,14 @@ models:
     alias: Kimi K2.5 (Moonshot Paid)
     tier: paid
     priority: 4
+    # Last-resort auto-fallback (2026-09-26): trinity + trinity_backup are
+    # BOTH free OpenRouter models sharing one account-wide daily quota, so
+    # when that's exhausted every autonomous cron job (Work Cycle every
+    # 15min, Memory Bridge, Six Hour Review, etc.) went dark for hours with
+    # no fallback that could actually still respond. Gated by a daily spend
+    # cap in aria_engine/llm_gateway.py (LLM_DAILY_SPEND_CAP_USD, default
+    # $3.00) so this can't run away on unexpected repeated failures.
+    fallback_order: 4
     tasks: [summarization, memory_compression, conversation_summary, token_counting, moonshot_default]
     tags: {long_context: 1, complex_reasoning: 1}
     focus_for: [data, trader]

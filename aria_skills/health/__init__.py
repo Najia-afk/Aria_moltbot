@@ -91,6 +91,7 @@ class HealthMonitorSkill(BaseSkill):
         super().__init__(config)
         self._last_check: datetime | None = None
         self._check_results: dict[str, Any] = {}
+        self._api = None
     
     @property
     def name(self) -> str:
@@ -98,6 +99,8 @@ class HealthMonitorSkill(BaseSkill):
     
     async def initialize(self) -> bool:
         """Initialize health monitor."""
+        from aria_skills.api_client import get_api_client
+        self._api = await get_api_client()
         self._status = SkillStatus.AVAILABLE
         self.logger.info("Health monitor initialized")
         return True
@@ -230,6 +233,90 @@ class HealthMonitorSkill(BaseSkill):
         return SkillResult.ok({
             "timestamp": self._last_check.isoformat(),
             "checks": self._check_results,
+        })
+
+    @log_latency
+    @logged_method()
+    async def check_service(self, service: str = "", **kwargs) -> SkillResult:
+        """Check health of one specific external service via /api/status.
+
+        Note: this is intentionally a different method name than the
+        BaseSkill.health_check() abstract override (which reports this
+        skill's OWN status, not an arbitrary service) — the manifest tool
+        used to be misnamed the same as that override, so calling it with
+        service="litellm" silently ignored the argument and always
+        returned this skill's own status instead of actually checking
+        litellm.
+        """
+        if not service:
+            return SkillResult.fail("Missing 'service' parameter")
+        if not self._api:
+            return SkillResult.fail("api_client not initialized")
+
+        service_map = {"database": "postgres", "ollama": "ollama", "litellm": "litellm", "moltbook": "aria-web"}
+        probe_name = service_map.get(service, service)
+        result = await self._api.get("/status")
+        if not result:
+            return SkillResult.fail(f"Status probe failed: {getattr(result, 'error', 'unknown error')}")
+        info = (result.data or {}).get(probe_name, {})
+        is_up = info.get("status") == "up"
+        return SkillResult.ok({"service": service, "status": "healthy" if is_up else "unhealthy", "detail": info})
+
+    @log_latency
+    @logged_method()
+    async def get_full_status(self, **kwargs) -> SkillResult:
+        """Comprehensive live self-introspection — the same signals behind the
+        human-facing Architecture Overview dashboard (/operations), but as a
+        tool call Aria can make herself: service status, cron health, agent
+        pool status, skill health score, and whether the LLM circuit
+        breaker / a rate-limit quota is currently blocking calls.
+        """
+        if not self._api:
+            return SkillResult.fail("api_client not initialized")
+
+        import asyncio as _asyncio
+
+        async def _safe_get(path: str) -> dict[str, Any]:
+            try:
+                r = await self._api.get(path)
+                return r.data if r and isinstance(r.data, dict) else {}
+            except Exception as e:
+                return {"error": str(e)}
+
+        status, schedule, agents, skills, heartbeats = await _asyncio.gather(
+            _safe_get("/status"),
+            _safe_get("/schedule"),
+            _safe_get("/engine/agents"),
+            _safe_get("/skills/health/dashboard?hours=24"),
+            _safe_get("/heartbeat?limit=20"),
+        )
+
+        entries = heartbeats.get("heartbeats", []) if isinstance(heartbeats, dict) else []
+        raw_text = " ".join(str(h.get("details", "")) for h in entries)
+        quota_exhausted = "daily limit" in raw_text or "RateLimitError" in raw_text
+        breaker_open = "Circuit breaker open" in raw_text
+
+        overall = skills.get("overall", {}) if isinstance(skills, dict) else {}
+        jobs_total = schedule.get("jobs_total", 0) if isinstance(schedule, dict) else 0
+        jobs_failed = schedule.get("jobs_failed", 0) if isinstance(schedule, dict) else 0
+
+        return SkillResult.ok({
+            "services": status,
+            "cron": {
+                "jobs_total": jobs_total,
+                "jobs_failed": jobs_failed,
+                "jobs_healthy": max(jobs_total - jobs_failed, 0),
+            },
+            "agents": agents.get("status_counts", {}) if isinstance(agents, dict) else {},
+            "skill_health_score": overall.get("health_score"),
+            "skill_health_status": overall.get("status"),
+            "llm_quota_exhausted": quota_exhausted,
+            "llm_circuit_breaker_open": breaker_open,
+            "advice": (
+                "Free daily LLM quota appears exhausted or the circuit breaker is open — "
+                "skip non-critical LLM-dependent work this cycle rather than retrying immediately."
+                if (quota_exhausted or breaker_open) else "No LLM quota/circuit-breaker issue detected."
+            ),
         })
 
     # ─────────────────────────────────────────────────────────────────────────

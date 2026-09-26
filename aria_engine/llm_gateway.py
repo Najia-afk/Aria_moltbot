@@ -14,6 +14,7 @@ Features:
 import asyncio
 import json
 import logging
+import os
 import time
 import warnings
 from dataclasses import dataclass, field
@@ -110,6 +111,7 @@ class LLMGateway:
         self._models_config: dict[str, Any] | None = None
         self._cb = CircuitBreaker(name="llm", threshold=5, reset_after=30.0)
         self._latency_samples: list[float] = []
+        self._spend_cache: tuple[float, float] | None = None  # (monotonic_ts, spend_usd)
 
         # Configure litellm
         # Note: Do NOT set litellm.api_base globally — each model specifies
@@ -206,6 +208,70 @@ class LLMGateway:
             if fallback and fallback not in candidates:
                 candidates.append(fallback)
         return candidates
+
+    def _is_paid_model(self, candidate: str) -> bool:
+        """Look up a candidate's tier in the catalog (bare id, no 'litellm/' prefix)."""
+        bare = candidate.split("/", 1)[1] if "/" in candidate else candidate
+        models = self._load_models().get("models", {})
+        return isinstance(models, dict) and models.get(bare, {}).get("tier") == "paid"
+
+    async def _get_today_spend_usd(self) -> float:
+        """Total model_usage.cost_usd since UTC midnight, cached for 5 minutes.
+
+        Avoids a DB round-trip on every single LLM call while still giving
+        the daily spend cap a real, reasonably fresh number to check against.
+        """
+        now = time.monotonic()
+        cached = getattr(self, "_spend_cache", None)
+        if cached and (now - cached[0]) < 300:
+            return cached[1]
+        if self._db_engine is None:
+            return 0.0
+        try:
+            from sqlalchemy import text
+            async with self._db_engine.connect() as conn:
+                result = await conn.execute(text(
+                    "SELECT COALESCE(SUM(cost_usd), 0) FROM aria_data.model_usage "
+                    "WHERE created_at >= date_trunc('day', NOW())"
+                ))
+                spend = float(result.scalar() or 0.0)
+        except Exception as exc:
+            logger.debug("Daily spend lookup failed (non-fatal): %s", exc)
+            spend = 0.0
+        self._spend_cache = (now, spend)
+        return spend
+
+    async def _filter_candidates_by_budget(self, candidates: list[str]) -> list[str]:
+        """Drop paid-tier FALLBACK candidates once the daily spend cap is reached.
+
+        Safety rail for paid fallback models (e.g. kimi) added to the auto
+        fallback chain — without this, a sustained failure loop retrying a
+        paid model every few minutes for hours could run up real cost with
+        no ceiling. Disable via LLM_DAILY_SPEND_CAP_USD=0.
+
+        Only ever filters candidates[1:] (the automatic fallback chain) —
+        an explicitly requested primary model (candidates[0]) is always
+        honored even if it's paid-tier, since that's a deliberate choice,
+        not a runaway retry.
+        """
+        if len(candidates) < 2 or not any(self._is_paid_model(c) for c in candidates[1:]):
+            return candidates
+        try:
+            cap = float(os.environ.get("LLM_DAILY_SPEND_CAP_USD", "3.0"))
+        except ValueError:
+            cap = 3.0
+        if cap <= 0:
+            return candidates  # cap disabled
+        spend = await self._get_today_spend_usd()
+        if spend < cap:
+            return candidates
+        primary, rest = candidates[0], candidates[1:]
+        filtered_rest = [c for c in rest if not self._is_paid_model(c)]
+        logger.warning(
+            "Daily LLM spend cap reached ($%.2f >= $%.2f) — dropping paid fallback candidates: %s",
+            spend, cap, [c for c in rest if c not in filtered_rest],
+        )
+        return [primary, *filtered_rest]
 
     @staticmethod
     def _is_retriable_error(exc: Exception) -> bool:
@@ -338,7 +404,7 @@ class LLMGateway:
         if self._is_circuit_open():
             raise LLMError("Circuit breaker open — too many consecutive failures")
 
-        candidates = self._build_model_candidates(model)
+        candidates = await self._filter_candidates_by_budget(self._build_model_candidates(model))
         last_error: Exception | None = None
 
         for idx, candidate in enumerate(candidates):
@@ -482,7 +548,7 @@ class LLMGateway:
         if self._is_circuit_open():
             raise LLMError("Circuit breaker open — too many consecutive failures")
 
-        candidates = self._build_model_candidates(model)
+        candidates = await self._filter_candidates_by_budget(self._build_model_candidates(model))
         last_error: Exception | None = None
 
         for idx, candidate in enumerate(candidates):

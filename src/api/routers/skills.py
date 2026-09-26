@@ -1419,7 +1419,12 @@ def _health_score(total: int, failures: int, avg_duration_ms: float) -> float:
     # Activity bonus: skills with more usage get benefit of the doubt
     activity_bonus = min(total / 50, 1.0) * 20  # Full 20 pts at 50+ calls
 
-    return round(min(100.0, max(0.0, 100.0 - error_penalty - latency_penalty + activity_bonus)), 1)
+    score = 100.0 - error_penalty - latency_penalty + activity_bonus
+    # The activity bonus rewards well-exercised skills, but must never fully
+    # buy back a real error penalty — a high-volume skill with a genuine 10%+
+    # error rate should never read as "100/100" just because it's used a lot.
+    score = min(score, 100.0 - error_penalty)
+    return round(min(100.0, max(0.0, score)), 1)
 
 
 def _health_status(score: float) -> str:

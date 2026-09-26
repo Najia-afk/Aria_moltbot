@@ -349,21 +349,28 @@ async function loadGraph() {
 
 function drawKnowledgeGraph(entities, relations) {
     const container = document.getElementById('knowledge-network');
+    const RECENT_MS = 5 * 60 * 1000; // nodes added in the last 5 minutes get a "live" highlight
+    const now = Date.now();
 
-    const nodes = entities.map(e => ({
-        id: e.id,
-        label: e.name,
-        title: `${e.name}\nType: ${e.type}\n${e.properties?.description || ''}`,
-        color: {
-            background: TYPE_COLORS[e.type] || '#6b7280',
-            border: '#ffffff22',
-            highlight: { background: TYPE_COLORS[e.type] || '#6b7280', border: '#fff' },
-        },
-        font: { color: '#e0e0e0', size: 12 },
-        shape: TYPE_SHAPES[e.type] || 'dot',
-        size: TYPE_SIZES[e.type] || 18,
-        _entity: e,
-    }));
+    const nodes = entities.map(e => {
+        const isRecent = e.created_at && (now - new Date(e.created_at).getTime()) < RECENT_MS;
+        const baseColor = TYPE_COLORS[e.type] || '#6b7280';
+        return {
+            id: e.id,
+            label: e.name,
+            title: `${e.name}\nType: ${e.type}\n${e.properties?.description || ''}` + (isRecent ? '\n\u2728 Added in the last 5 min' : ''),
+            color: {
+                background: baseColor,
+                border: isRecent ? '#22c55e' : '#ffffff22',
+                highlight: { background: baseColor, border: '#fff' },
+            },
+            borderWidth: isRecent ? 3 : 1,
+            font: { color: '#e0e0e0', size: 12 },
+            shape: TYPE_SHAPES[e.type] || 'dot',
+            size: TYPE_SIZES[e.type] || 18,
+            _entity: e,
+        };
+    });
 
     const edges = relations.map((r, i) => ({
         id: `e-${i}`,
@@ -514,5 +521,9 @@ async function syncGraph() {
 }
 
 document.addEventListener('DOMContentLoaded', () => loadGraph());
+// See Aria's knowledge graph update live: silently reload every 30s so
+// entities/relations she creates while you're watching appear on their own
+// (new nodes get a bright green border for 5 min — see drawKnowledgeGraph).
+setInterval(() => loadGraph().catch(e => console.error('graph auto-refresh:', e)), 30000);
 </script>
 {% endblock %}

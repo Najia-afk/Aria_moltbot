@@ -163,3 +163,81 @@ async def test_get_last_check_after_run(health_skill):
     assert result.success is True
     assert "timestamp" in result.data
     assert "checks" in result.data
+
+
+# ---------------------------------------------------------------------------
+# check_service / get_full_status (real per-service check + self-introspection)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_check_service_missing_param():
+    cfg = SkillConfig(name="health", config={})
+    skill = HealthMonitorSkill(cfg)
+    skill._api = AsyncMock()
+    result = await skill.check_service()
+    assert not result.success
+
+
+@pytest.mark.asyncio
+async def test_check_service_maps_service_name_and_reports_up():
+    cfg = SkillConfig(name="health", config={})
+    skill = HealthMonitorSkill(cfg)
+    api = AsyncMock()
+    api.get = AsyncMock(return_value=MagicMock(
+        data={"litellm": {"status": "up", "code": 200}}, error=None,
+        __bool__=lambda self: True,
+    ))
+    skill._api = api
+    result = await skill.check_service(service="litellm")
+    assert result.success
+    assert result.data["status"] == "healthy"
+    api.get.assert_awaited_once_with("/status")
+
+
+@pytest.mark.asyncio
+async def test_check_service_reports_down():
+    cfg = SkillConfig(name="health", config={})
+    skill = HealthMonitorSkill(cfg)
+    api = AsyncMock()
+    api.get = AsyncMock(return_value=MagicMock(
+        data={"litellm": {"status": "down"}}, error=None,
+        __bool__=lambda self: True,
+    ))
+    skill._api = api
+    result = await skill.check_service(service="litellm")
+    assert result.success
+    assert result.data["status"] == "unhealthy"
+
+
+@pytest.mark.asyncio
+async def test_get_full_status_detects_quota_exhaustion():
+    cfg = SkillConfig(name="health", config={})
+    skill = HealthMonitorSkill(cfg)
+    api = AsyncMock()
+
+    async def _get(path):
+        if path == "/status":
+            return MagicMock(data={"litellm": {"status": "up"}}, __bool__=lambda self: True)
+        if path == "/schedule":
+            return MagicMock(data={"jobs_total": 18, "jobs_failed": 12}, __bool__=lambda self: True)
+        if path == "/engine/agents":
+            return MagicMock(data={"status_counts": {"idle": 11}}, __bool__=lambda self: True)
+        if path.startswith("/skills/health/dashboard"):
+            return MagicMock(data={"overall": {"health_score": 85.4, "status": "healthy"}}, __bool__=lambda self: True)
+        if path.startswith("/heartbeat"):
+            return MagicMock(
+                data={"heartbeats": [{"details": {"raw": "RateLimitError: daily limit exceeded"}}]},
+                __bool__=lambda self: True,
+            )
+        return MagicMock(data={}, __bool__=lambda self: True)
+
+    api.get = AsyncMock(side_effect=_get)
+    skill._api = api
+
+    result = await skill.get_full_status()
+    assert result.success
+    assert result.data["llm_quota_exhausted"] is True
+    assert result.data["cron"]["jobs_total"] == 18
+    assert result.data["cron"]["jobs_healthy"] == 6
+    assert result.data["skill_health_score"] == 85.4
+

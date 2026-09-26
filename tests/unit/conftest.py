@@ -13,8 +13,12 @@ from unittest.mock import MagicMock
 if "db" not in sys.modules:
     _db_stub = MagicMock()
     _db_stub.models = MagicMock()
+    _db_stub.session = MagicMock()
+    _db_stub.session.AsyncSessionLocal = MagicMock()
+    _db_stub.session.LiteLLMSessionLocal = MagicMock()
     sys.modules["db"] = _db_stub
     sys.modules["db.models"] = _db_stub.models
+    sys.modules["db.session"] = _db_stub.session
 
 # Stub sqlalchemy async components (used in session_protection constructor)
 if "sqlalchemy.ext.asyncio" not in sys.modules:

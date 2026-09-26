@@ -66,3 +66,63 @@ async def test_complete_raises_after_all_candidates_fail():
                 messages=[{"role": "user", "content": "hi"}],
                 model="ghost-model-not-in-catalog",
             )
+
+
+# ---------------------------------------------------------------------------
+# Daily spend cap for the paid (kimi) fallback candidate.
+#
+# kimi (Moonshot, paid) was added as a last-resort auto-fallback after
+# trinity/trinity_backup both proved to be free OpenRouter models sharing one
+# account-wide daily quota. This cap is the safety rail so a sustained
+# failure loop can't run up unbounded real cost retrying a paid model.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_budget_filter_keeps_paid_fallback_under_cap(monkeypatch):
+    monkeypatch.setenv("LLM_DAILY_SPEND_CAP_USD", "3.0")
+    gateway = LLMGateway(EngineConfig())
+    gateway._get_today_spend_usd = AsyncMock(return_value=0.50)
+
+    candidates = ["litellm/trinity", "litellm/trinity_backup", "litellm/kimi"]
+    result = await gateway._filter_candidates_by_budget(candidates)
+
+    assert result == candidates
+
+
+@pytest.mark.asyncio
+async def test_budget_filter_drops_paid_fallback_over_cap(monkeypatch):
+    monkeypatch.setenv("LLM_DAILY_SPEND_CAP_USD", "3.0")
+    gateway = LLMGateway(EngineConfig())
+    gateway._get_today_spend_usd = AsyncMock(return_value=5.00)
+
+    candidates = ["litellm/trinity", "litellm/trinity_backup", "litellm/kimi"]
+    result = await gateway._filter_candidates_by_budget(candidates)
+
+    assert result == ["litellm/trinity", "litellm/trinity_backup"]
+
+
+@pytest.mark.asyncio
+async def test_budget_filter_never_drops_explicit_paid_primary(monkeypatch):
+    """An explicitly requested paid primary model is always honored —
+    only the automatic fallback tail is subject to the spend cap."""
+    monkeypatch.setenv("LLM_DAILY_SPEND_CAP_USD", "3.0")
+    gateway = LLMGateway(EngineConfig())
+    gateway._get_today_spend_usd = AsyncMock(return_value=5.00)
+
+    candidates = ["litellm/kimi", "litellm/trinity"]
+    result = await gateway._filter_candidates_by_budget(candidates)
+
+    assert result == candidates
+
+
+@pytest.mark.asyncio
+async def test_budget_filter_disabled_via_zero_cap(monkeypatch):
+    monkeypatch.setenv("LLM_DAILY_SPEND_CAP_USD", "0")
+    gateway = LLMGateway(EngineConfig())
+    gateway._get_today_spend_usd = AsyncMock(return_value=999.0)
+
+    candidates = ["litellm/trinity", "litellm/kimi"]
+    result = await gateway._filter_candidates_by_budget(candidates)
+
+    assert result == candidates
+

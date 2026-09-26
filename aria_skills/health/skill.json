@@ -22,8 +22,8 @@
       }
     },
     {
-      "name": "health_check",
-      "description": "Check health of a specific service.",
+      "name": "check_service",
+      "description": "Check health of a specific external service (real check, not a self-status stub).",
       "parameters": {
         "type": "object",
         "properties": {
@@ -54,6 +54,14 @@
     {
       "name": "get_metrics",
       "description": "Get collected health metrics and statistics.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "get_full_status",
+      "description": "Comprehensive live self-introspection: service status (api/chat/litellm/postgres), cron job health, agent pool status, skill health score, and whether the LLM circuit breaker or a rate-limit/quota condition is currently blocking calls. This is the same data the human-facing Architecture Overview dashboard shows.",
       "parameters": {
         "type": "object",
         "properties": {}

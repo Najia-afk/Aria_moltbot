@@ -449,22 +449,26 @@ function applyFilter() {
 
 function drawGraph(nodes, edges) {
     const container = document.getElementById('memory-network');
+    const RECENT_MS = 5 * 60 * 1000; // nodes added in the last 5 minutes get a "live" highlight
+    const now = Date.now();
 
     const visNodes = nodes.map(n => {
         const color = TYPE_COLOR[n.type] || '#888';
         const sizeBase = TYPE_SIZE_BASE[n.type] || 12;
         const importance = n.importance || 0;
         const size = sizeBase + Math.round(importance * 6);  // scale by importance
+        const isRecent = n.created_at && (now - new Date(n.created_at).getTime()) < RECENT_MS;
         return {
             id: n.id,
             label: n.label || n.id,
-            title: buildTooltip(n),
+            title: buildTooltip(n) + (isRecent ? '\n\u2728 Added in the last 5 min' : ''),
             color: {
                 background: color,
-                border: color + 'cc',
+                border: isRecent ? '#22c55e' : color + 'cc',
                 highlight: { background: color, border: '#fff' },
                 hover:      { background: color + 'dd', border: '#fff' },
             },
+            borderWidth: isRecent ? 3 : 1,
             font: { color: '#e0e0e0', size: 11 },
             shape: TYPE_SHAPE[n.type] || 'dot',
             size: size,
@@ -632,5 +636,10 @@ function focusNode(nodeId) {
 }
 
 document.addEventListener('DOMContentLoaded', () => loadGraph());
+// See Aria's memory update live: silently reload periodically so new
+// memories appear on their own (recent nodes get a bright green border —
+// see drawGraph). The backing endpoint has a 60s cache TTL, so this polls
+// a bit faster than that to pick up changes promptly.
+setInterval(() => loadGraph().catch(e => console.error('graph auto-refresh:', e)), 30000);
 </script>
 {% endblock %}
