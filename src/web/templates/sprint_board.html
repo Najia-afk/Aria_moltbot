@@ -228,6 +228,16 @@ const API_BASE = API_BASE_URL;
 let currentSprint = 'current';
 let goalChart = null;
 
+function getChartThemeColors() {
+    const style = getComputedStyle(document.documentElement);
+    return {
+        text: style.getPropertyValue('--text-secondary').trim() || '#9e9e9e',
+        tick: style.getPropertyValue('--text-secondary').trim() || '#9e9e9e',
+        grid: style.getPropertyValue('--border-subtle').trim() || 'rgba(255,255,255,0.05)',
+    };
+}
+window.addEventListener('aria-theme-changed', () => loadGoalChart());
+
 // ── Board Loading ────────────────────────────────────────────────────
 async function loadBoard() {
     const sel = document.getElementById('sprintSelector');
@@ -375,6 +385,7 @@ async function loadGoalChart() {
 
         const ctx = document.getElementById('goalStatusChart').getContext('2d');
         if (goalChart) goalChart.destroy();
+        const theme = getChartThemeColors();
         goalChart = new Chart(ctx, {
             type: 'bar',
             data: { labels, datasets },
@@ -382,12 +393,12 @@ async function loadGoalChart() {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { position: 'bottom', labels: { color: '#e0e0e0' } },
-                    title: { display: true, text: 'Goal Activity by Day (completed = completion date)', color: '#e0e0e0' },
+                    legend: { position: 'bottom', labels: { color: theme.text } },
+                    title: { display: true, text: 'Goal Activity by Day (completed = completion date)', color: theme.text },
                 },
                 scales: {
-                    x: { stacked: true, ticks: { color: '#9e9e9e' }, grid: { color: 'rgba(255,255,255,0.05)' } },
-                    y: { stacked: true, ticks: { color: '#9e9e9e', stepSize: 1 }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                    x: { stacked: true, ticks: { color: theme.tick }, grid: { color: theme.grid } },
+                    y: { stacked: true, ticks: { color: theme.tick, stepSize: 1 }, grid: { color: theme.grid } },
                 },
             },
         });
@@ -455,6 +466,7 @@ function boardInit() {
     loadBoard().catch(e => console.error('board:', e));
     loadGoalChart().catch(e => console.error('chart:', e));
     loadArchive().catch(e => console.error('archive:', e));
+    setInterval(() => loadGoalChart().catch(e => console.error('chart refresh:', e)), 60000);
 }
 
 if (document.readyState === 'loading') {

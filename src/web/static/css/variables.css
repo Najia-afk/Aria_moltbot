@@ -1,5 +1,5 @@
 :root {
-    /* Dark theme - sleek cyberpunk aesthetic */
+    /* Dark theme (default) - sleek cyberpunk aesthetic */
     --bg-primary: #0d0d12;
     --bg-secondary: #14141c;
     --bg-tertiary: #1a1a26;
@@ -34,7 +34,30 @@
     --danger-bg: rgba(239, 68, 68, 0.1);
     --info: #3b82f6;
     --info-bg: rgba(59, 130, 246, 0.1);
-    
+
+    /* Shadows (dark theme needs stronger, more opaque shadows) */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.5);
+    --shadow-glow: 0 0 40px rgba(99, 102, 241, 0.15);
+
+    /* Sticky header (backdrop-blur) background — kept separate from
+       --bg-primary since it needs transparency for the blur to show through. */
+    --header-bg: rgba(20, 20, 28, 0.8);
+
+    /* Chart series palette — shared across both themes so data colors stay
+       consistent and legible regardless of light/dark background. Modeled
+       on the categorical palette used by financial dashboards (TokenLogic's
+       Aave Financials): distinct hues at consistent saturation/lightness. */
+    --chart-1: #3b82f6; /* blue */
+    --chart-2: #22c55e; /* green */
+    --chart-3: #f59e0b; /* orange */
+    --chart-4: #a855f7; /* purple */
+    --chart-5: #06b6d4; /* teal/cyan */
+    --chart-6: #ef4444; /* red */
+    --chart-7: #ec4899; /* pink */
+    --chart-8: #64748b; /* gray (catch-all / "other") */
+
     /* Spacing */
     --space-xs: 0.25rem;
     --space-sm: 0.5rem;
@@ -49,12 +72,6 @@
     --radius-lg: 16px;
     --radius-xl: 24px;
     --radius-full: 9999px;
-    
-    /* Shadows */
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
-    --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.5);
-    --shadow-glow: 0 0 40px rgba(99, 102, 241, 0.15);
     
     /* Transitions */
     --transition-fast: 150ms ease;
@@ -89,4 +106,40 @@
     --text-tertiary: var(--text-dim);
     --shadow: var(--shadow-md);
     --shadow-xl: var(--shadow-lg);
+}
+
+/* ── Light theme ───────────────────────────────────────────────────────
+   Applied via [data-theme="light"] on <html>, toggled by base.html's
+   theme-toggle button (persisted to localStorage, applied pre-paint via
+   an early inline script to avoid a flash of the wrong theme). Only the
+   tokens that actually differ between themes are redeclared here — accent
+   colors, chart palette, spacing/radius/typography/z-index stay the same
+   in both themes. */
+[data-theme="light"] {
+    --bg-primary: #f8fafc;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #f1f5f9;
+    --bg-elevated: #ffffff;
+    --bg-hover: #e2e8f0;
+
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #64748b;
+    --text-dim: #94a3b8;
+
+    --border-subtle: rgba(15, 23, 42, 0.06);
+    --border-default: rgba(15, 23, 42, 0.12);
+    --border-accent: rgba(99, 102, 241, 0.4);
+
+    --success-bg: rgba(16, 185, 129, 0.08);
+    --warning-bg: rgba(245, 158, 11, 0.08);
+    --danger-bg: rgba(239, 68, 68, 0.08);
+    --info-bg: rgba(59, 130, 246, 0.08);
+
+    --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+    --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+    --shadow-lg: 0 8px 30px rgba(15, 23, 42, 0.12);
+    --shadow-glow: 0 0 40px rgba(99, 102, 241, 0.1);
+
+    --header-bg: rgba(255, 255, 255, 0.8);
 }

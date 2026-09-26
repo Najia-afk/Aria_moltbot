@@ -430,6 +430,15 @@ let timelineChart = null;
 let spendModelChart = null;
 let costBreakdownChart = null;
 
+function chartTheme() {
+    const style = getComputedStyle(document.documentElement);
+    return {
+        text: style.getPropertyValue('--text-secondary').trim() || '#9ca3af',
+        grid: style.getPropertyValue('--border-subtle').trim() || 'rgba(255,255,255,0.05)',
+    };
+}
+window.addEventListener('aria-theme-changed', () => updateCharts().catch(e => console.error('chart theme refresh:', e)));
+
 // Pricing, calculateLogCost, formatNumber, formatMoney, getProvider, getProviderColor
 // are all provided by /static/js/pricing.js (loaded in base.html)
 
@@ -732,6 +741,7 @@ async function updateCharts() {
     const providerCtx = document.getElementById('tokens-by-provider-chart');
     if (providerCtx) {
         if (providerChart) providerChart.destroy();
+        const theme = chartTheme();
         
         if (providers.length === 0) {
             providerCtx.parentElement.innerHTML = `
@@ -756,7 +766,7 @@ async function updateCharts() {
                     plugins: {
                         legend: {
                             position: 'right',
-                            labels: { color: '#9ca3af', font: { size: 12 } }
+                            labels: { color: theme.text, font: { size: 12 } }
                         },
                         tooltip: {
                             callbacks: {
@@ -845,13 +855,13 @@ async function updateCharts() {
                 },
                 scales: {
                     x: { 
-                        grid: { color: 'rgba(255,255,255,0.05)' }, 
-                        ticks: { color: '#9ca3af', maxRotation: 45 } 
+                        grid: { color: chartTheme().grid }, 
+                        ticks: { color: chartTheme().text, maxRotation: 45 } 
                     },
                     y: { 
-                        grid: { color: 'rgba(255,255,255,0.05)' }, 
+                        grid: { color: chartTheme().grid }, 
                         ticks: { 
-                            color: '#9ca3af',
+                            color: chartTheme().text,
                             callback: (value) => formatNumber(value)
                         },
                         beginAtZero: true
@@ -905,13 +915,13 @@ async function updateCharts() {
                 },
                 scales: {
                     x: { 
-                        grid: { color: 'rgba(255,255,255,0.05)' }, 
+                        grid: { color: chartTheme().grid }, 
                         ticks: { 
-                            color: '#9ca3af',
+                            color: chartTheme().text,
                             callback: (value) => formatNumber(value)
                         }
                     },
-                    y: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 10 } } }
+                    y: { grid: { display: false }, ticks: { color: chartTheme().text, font: { size: 10 } } }
                 }
             }
         });
@@ -959,7 +969,7 @@ async function updateCharts() {
                     plugins: {
                         legend: {
                             position: 'bottom',
-                            labels: { color: '#9ca3af', font: { size: 12 } }
+                            labels: { color: chartTheme().text, font: { size: 12 } }
                         },
                         tooltip: {
                             callbacks: {
@@ -980,6 +990,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadGlobalSpend();  // must complete before charts use cached logs
     updateCharts();
     loadSpendLogs();
+
+    // Real-time refresh: wallet balances + charts + recent calls
+    setInterval(() => loadModelBalances(), 30000);
+    setInterval(async () => {
+        await loadGlobalSpend();
+        updateCharts();
+        loadSpendLogs();
+    }, 30000);
 });
 </script>
 {% endblock %}

@@ -89,7 +89,7 @@ main {
 
 /* Header */
 header {
-    background: rgba(20, 20, 28, 0.8);
+    background: var(--header-bg);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border-bottom: 1px solid var(--border-subtle);
@@ -222,6 +222,40 @@ nav {
 /* Menu Toggle (hamburger) - hidden on desktop */
 .menu-toggle {
     display: none;
+}
+
+/* Theme toggle (light/dark) */
+.theme-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-full);
+    color: var(--text-secondary);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.theme-toggle:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+}
+
+.theme-toggle .theme-icon-sun {
+    display: none;
+}
+
+[data-theme="light"] .theme-toggle .theme-icon-moon {
+    display: none;
+}
+
+[data-theme="light"] .theme-toggle .theme-icon-sun {
+    display: block;
 }
 
 .status-dot {

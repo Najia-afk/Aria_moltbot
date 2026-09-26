@@ -159,6 +159,82 @@
     .ops-cards { grid-template-columns: 1fr; }
     .quick-stats { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ── Architecture Flow Diagram ─────────────────────────────────
+   Static system-overview diagram (not live-data-driven — the charts
+   above already cover live metrics). Modeled on a "fee architecture"
+   style flow diagram: columns of icon-cards connected left-to-right. */
+.arch-diagram {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+    overflow-x: auto;
+    padding: 8px 4px 16px;
+}
+
+.arch-col {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 180px;
+    flex: 1;
+}
+
+.arch-col-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    text-align: center;
+    margin-bottom: 2px;
+}
+
+.arch-node {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: border-color var(--transition-fast);
+}
+
+.arch-node:hover {
+    border-color: var(--accent-primary);
+}
+
+.arch-node-icon {
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+
+.arch-node-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.arch-node-sub {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+}
+
+.arch-connector {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--border-accent);
+    font-size: 1rem;
+    align-self: center;
+    padding-top: 20px;
+}
+
+@media (max-width: 900px) {
+    .arch-diagram { flex-direction: column; }
+    .arch-connector { transform: rotate(90deg); padding: 0; }
+}
 </style>
 {% endblock %}
 
@@ -246,6 +322,44 @@
             <div class="quick-stat">
                 <div class="quick-stat-value" id="qsDbSize">—</div>
                 <div class="quick-stat-label">DB Size</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Architecture Overview -->
+    <div class="ops-section">
+        <h2>Architecture Overview</h2>
+        <div class="arch-diagram">
+            <div class="arch-col">
+                <div class="arch-col-label">Entry Points</div>
+                <div class="arch-node"><span class="arch-node-icon">💬</span><div><div class="arch-node-title">Chat</div><div class="arch-node-sub">Interactive sessions</div></div></div>
+                <div class="arch-node"><span class="arch-node-icon">⏰</span><div><div class="arch-node-title">Cron Jobs</div><div class="arch-node-sub">Autonomous work cycle</div></div></div>
+                <div class="arch-node"><span class="arch-node-icon">🔌</span><div><div class="arch-node-title">API</div><div class="arch-node-sub">External requests</div></div></div>
+            </div>
+            <div class="arch-connector">→</div>
+            <div class="arch-col">
+                <div class="arch-col-label">Orchestration</div>
+                <div class="arch-node"><span class="arch-node-icon">🤖</span><div><div class="arch-node-title">Agent Pool</div><div class="arch-node-sub">11 focus-specific agents</div></div></div>
+                <div class="arch-node"><span class="arch-node-icon">🧠</span><div><div class="arch-node-title">LLM Gateway</div><div class="arch-node-sub">Model routing + fallback chain</div></div></div>
+            </div>
+            <div class="arch-connector">→</div>
+            <div class="arch-col">
+                <div class="arch-col-label">Capabilities</div>
+                <div class="arch-node"><span class="arch-node-icon">🧩</span><div><div class="arch-node-title">Skills</div><div class="arch-node-sub">goals · sandbox · knowledge_graph…</div></div></div>
+                <div class="arch-node"><span class="arch-node-icon">🛡️</span><div><div class="arch-node-title">Security</div><div class="arch-node-sub">Input guard, consent gate</div></div></div>
+            </div>
+            <div class="arch-connector">→</div>
+            <div class="arch-col">
+                <div class="arch-col-label">Memory</div>
+                <div class="arch-node"><span class="arch-node-icon">⚡</span><div><div class="arch-node-title">Working Memory</div><div class="arch-node-sub">Live session context</div></div></div>
+                <div class="arch-node"><span class="arch-node-icon">🕸️</span><div><div class="arch-node-title">Semantic + Knowledge Graph</div><div class="arch-node-sub">pgvector embeddings</div></div></div>
+                <div class="arch-node"><span class="arch-node-icon">💾</span><div><div class="arch-node-title">Souvenirs</div><div class="arch-node-sub">Curated long-term memory</div></div></div>
+            </div>
+            <div class="arch-connector">→</div>
+            <div class="arch-col">
+                <div class="arch-col-label">Persistence</div>
+                <div class="arch-node"><span class="arch-node-icon">🐘</span><div><div class="arch-node-title">PostgreSQL</div><div class="arch-node-sub">+ pgvector</div></div></div>
+                <div class="arch-node"><span class="arch-node-icon">📦</span><div><div class="arch-node-title">NAS Backup</div><div class="arch-node-sub">Nightly, offsite</div></div></div>
             </div>
         </div>
     </div>
