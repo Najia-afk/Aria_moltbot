@@ -400,7 +400,7 @@ function drawKnowledgeGraph(entities, relations) {
 
 function getLayoutOptions() {
     const base = {
-        nodes: { borderWidth: 1.5, shadow: { enabled: true, size: 5 } },
+        nodes: { borderWidth: 1.5, shadow: false },
         edges: { width: 1.5, shadow: false },
         interaction: { hover: true, tooltipDelay: 150, zoomView: true, dragView: true },
     };
@@ -480,19 +480,21 @@ function onSearchInput(q) {
 
 async function doSearch(q) {
     try {
-        const query = String(q || '').toLowerCase();
-        const results = allEntities.filter((e) => {
-            const name = String(e.name || '').toLowerCase();
-            const desc = String(e.properties?.description || '').toLowerCase();
-            return name.includes(query) || desc.includes(query);
-        }).slice(0, 20);
+        // Server-side search (not a client-side filter of whatever happens to
+        // be loaded) — this is what actually scales: it searches every
+        // entity in the database, not just the ones currently rendered in
+        // the browser (which is capped well below the true entity count on
+        // a large graph).
+        const resp = await fetch(`${API_BASE}/knowledge-graph/kg-search?q=${encodeURIComponent(q)}&limit=20`);
+        const data = await resp.json();
+        const results = data.results || [];
         document.getElementById('search-count').textContent = results.length;
         if (results.length === 0) {
             document.getElementById('search-results').innerHTML = '<div style="padding: 0.5rem; color: var(--text-muted);">No results</div>';
             return;
         }
         document.getElementById('search-results').innerHTML = results.map(e => `
-            <div class="search-result-item" onclick="focusNode('${esc(e.id)}')">
+            <div class="search-result-item" onclick="focusOrTraverse('${esc(e.id)}', '${esc(e.name)}')">
                 <span class="type-badge type-${esc(e.type)}">${esc(e.type)}</span>
                 <strong>${esc(e.name)}</strong>
                 <div style="color: var(--text-muted); font-size: 0.7rem;">${esc(e.properties?.description?.substring(0, 60) || '')}</div>
@@ -500,6 +502,38 @@ async function doSearch(q) {
         `).join('');
     } catch (err) {
         console.error('Search failed:', err);
+    }
+}
+
+function focusOrTraverse(nodeId, name) {
+    // If the matched entity is already in the currently-rendered graph,
+    // just focus it. Otherwise (common once the graph is larger than what's
+    // loaded in the browser) fetch its neighborhood on demand instead of
+    // reloading everything.
+    if (nodesDataSet && nodesDataSet.get(nodeId)) {
+        focusNode(nodeId);
+    } else {
+        loadNeighborhood(name);
+    }
+}
+
+async function loadNeighborhood(entityName) {
+    try {
+        const resp = await fetch(`${API_BASE}/knowledge-graph/kg-traverse?start=${encodeURIComponent(entityName)}&max_depth=1&direction=both`);
+        const data = await resp.json();
+        if (data.error || !data.nodes?.length) return;
+        // Merge the traversed neighborhood into the current view rather than
+        // replacing it, so exploring one result doesn't lose the rest.
+        const existingIds = new Set(allEntities.map(e => e.id));
+        const newEntities = (data.nodes || []).filter(n => !existingIds.has(n.id));
+        allEntities = [...allEntities, ...newEntities];
+        const existingRelIds = new Set(allRelations.map(r => `${r.from_entity}-${r.to_entity}-${r.relation_type}`));
+        const newRelations = (data.edges || []).filter(e => !existingRelIds.has(`${e.from_entity}-${e.to_entity}-${e.relation_type}`));
+        allRelations = [...allRelations, ...newRelations];
+        drawKnowledgeGraph(allEntities, allRelations);
+        setTimeout(() => focusNode(newEntities[0]?.id), 300);
+    } catch (err) {
+        console.error('Neighborhood load failed:', err);
     }
 }
 
