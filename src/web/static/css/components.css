@@ -674,6 +674,71 @@ tr:hover td {
     color: var(--text-muted);
 }
 
+/* Shared filter-bar pattern: <div class="filters"><div class="search-box">
+   <svg>+<input class="input"></div><div class="filter-group">...</div></div>
+   Used by memories.html, memory_explorer.html, search.html, thoughts.html —
+   never defined anywhere (found via 2026-09-26 audit), so it rendered as
+   unstyled browser-default inputs clashing with the dark theme. */
+.filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-md);
+    margin-bottom: var(--space-lg);
+}
+
+.search-box {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    flex: 1;
+    min-width: 200px;
+    max-width: 400px;
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    color: var(--text-muted);
+}
+
+.search-box svg {
+    flex-shrink: 0;
+}
+
+.input {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    outline: none;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    font-family: inherit;
+    padding: var(--space-sm) var(--space-md);
+}
+
+.input::placeholder {
+    color: var(--text-muted);
+}
+
+.search-box .input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    padding: 0;
+}
+
+.filter-group {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.filter-label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
 /* ================================
    ACTIVITY LIST
    ================================ */

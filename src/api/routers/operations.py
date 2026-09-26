@@ -532,17 +532,11 @@ async def purge_pending_tasks(body: PurgeTasks, db: AsyncSession = Depends(get_d
 # Schedule
 # ──────────────────────────────────────────────────────────────────────────────
 
-@router.get("/schedule")
-async def get_schedule(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(ScheduleTick).where(ScheduleTick.id == 1))
-    tick = result.scalar_one_or_none()
-    return tick.to_dict() if tick else {"error": "No schedule found"}
+async def _compute_live_schedule_stats(db: AsyncSession) -> dict:
+    """Compute current scheduler/job stats live from EngineCronJob.
 
-
-@router.post("/schedule/tick")
-async def manual_tick(db: AsyncSession = Depends(get_db)):
-    """Manual heartbeat tick — updates schedule_tick from engine cron jobs."""
-    # Read stats from engine cron jobs (DB-backed, not legacy jobs.json)
+    Shared by GET /schedule (read-only) and POST /schedule/tick (persists).
+    """
     result = await db.execute(select(EngineCronJob))
     jobs = result.scalars().all()
 
@@ -578,6 +572,52 @@ async def manual_tick(db: AsyncSession = Depends(get_db)):
         if computed_next_run:
             if next_job_at is None or computed_next_run < next_job_at:
                 next_job_at = computed_next_run
+
+    return {
+        "jobs_total": jobs_total,
+        "jobs_successful": jobs_successful,
+        "jobs_failed": jobs_failed,
+        "last_job_name": last_job_name,
+        "last_job_status": last_job_status,
+        "next_job_at": next_job_at,
+    }
+
+
+@router.get("/schedule")
+async def get_schedule(db: AsyncSession = Depends(get_db)):
+    """Live scheduler status — computed fresh from EngineCronJob on every read.
+
+    Previously read a cached `schedule_tick` row that was only ever updated by
+    a manual POST to /schedule/tick, which nothing in the system calls
+    periodically — the heartbeat page showed a "last tick" frozen at whenever
+    that endpoint was last hit manually (found stale by ~186 days), alongside
+    jobs_failed/jobs_total counts from that same stale snapshot, even though
+    the real cron jobs were running fine the whole time.
+    """
+    stats = await _compute_live_schedule_stats(db)
+    result = await db.execute(select(ScheduleTick).where(ScheduleTick.id == 1))
+    tick = result.scalar_one_or_none()
+    return {
+        "last_tick": datetime.now(timezone.utc).isoformat(),
+        "tick_count": tick.tick_count if tick else 0,
+        "heartbeat_interval": tick.heartbeat_interval if tick else 3600,
+        "enabled": True,
+        **stats,
+        "next_job_at": stats["next_job_at"].isoformat() if stats["next_job_at"] else None,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.post("/schedule/tick")
+async def manual_tick(db: AsyncSession = Depends(get_db)):
+    """Manual heartbeat tick — updates schedule_tick from engine cron jobs."""
+    stats = await _compute_live_schedule_stats(db)
+    jobs_total = stats["jobs_total"]
+    jobs_successful = stats["jobs_successful"]
+    jobs_failed = stats["jobs_failed"]
+    last_job_name = stats["last_job_name"]
+    last_job_status = stats["last_job_status"]
+    next_job_at = stats["next_job_at"]
 
     now = datetime.now(timezone.utc)
     upsert_stmt = (
