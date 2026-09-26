@@ -6,31 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [Unreleased] — aria_v3_250926 Sprint 8 (2026-09-25)
+## [Unreleased] — aria_v3_250926 Sprint 8/9/10 wrap-up (2026-09-25)
 
-**Theme:** Production recovery, model routing repair, security/reliability hardening, mobile-ready UI.
+**Theme:** Full-day production recovery + hardening pass, closed out with a live UI/UX audit, model-routing resilience fix, and a curated-memory (souvenirs) semantic search feature.
 
 ### Fixed
-- Dead free OpenRouter model (`arcee-ai/trinity-large-preview:free` 404'd) replaced with `nvidia/nemotron-3.5-lightning:free`; local MLX fully removed from the routing/fallback chain (host RAM constrained).
-- `pyproject.toml` `apscheduler>=4.0.0,<5.0.0` pinned to a version that was never stably released, silently blocking every fresh `docker compose build --no-cache`; corrected to `>=3.10.0,<4.0.0` to match the existing 3.x compat shim.
-- `aria-api` self-referential health check deadlocked: a blocking `concurrent.futures.wait()` ran directly inside an `async def` endpoint, freezing the event loop that would have served the self-check request. Moved to `asyncio.to_thread()`.
-- Header status badge showed "Partial" permanently because optional/undeployed monitoring services (grafana/prometheus/pgadmin) were weighted equally against critical services; now tagged `optional` and excluded from the badge computation.
-- 21 CSS custom properties (`--border-color`, `--primary`, `--surface`, `--text`, etc.) referenced across ~45 templates were never defined in `variables.css`, causing stale/off-brand colors and, in a few cases, invalid/dropped border declarations sitewide. Fixed centrally via a legacy-token-alias block.
-- Timing-unsafe `!=` comparison on the admin token in `admin.py` replaced with `secrets.compare_digest()`.
-- Deprecated `asyncio.get_event_loop()` (breaks on Python 3.13+, and this repo now runs 3.14) replaced with `asyncio.get_running_loop()` in `tool_registry.py`.
-- Unprotected dict mutation in `memory_cache.py`'s `record_embedding_dims()` now guarded by the same lock its sibling method already used.
-- Removed a stale, unregistered duplicate `rpg_campaign/rpg_campaign/` skill implementation (older/less complete than the real one).
+- Live chat streaming displayed a raw `{"message": "...", "user_name": "..."} ` JSON envelope from free-tier models under heavy tool-calling context; the existing unwrap fix only covered the non-streaming `complete()` path. Wired into `streaming.py`'s post-loop accumulator (persisted + live self-corrected via a new `corrected_content` field), and backfilled the one historical message still affected.
+- Desktop nav (~10 items + status badge) overflowed past the viewport at common widths (e.g. 1648px), clipping the "All Systems Online" badge off-screen; widened the header's container and raised the collapse-to-hamburger breakpoint from 1100px to 1650px.
+- `/agents` (Agent Pool) page was completely non-functional — silently-dropped Jinja blocks (`{% block head %}`/`{% block scripts %}` don't exist in `base.html`) meant its entire CSS and JS never rendered; page was permanently stuck on "Loading agents...". Same bug found and fixed in `heartbeat.html` and `sprint_board.html` (missing page header/action buttons).
+- 12 CSS classes referenced across templates (`.section-card`, `.hero-compact`, `.btn-sm`, `.table-sm`, `.badge-secondary`, `.card-body`/`.card-footer`, `.stats-row`/`.stat-content`, `.subtitle`, and the site-wide footer's `.footer-*` classes) were never defined anywhere — added centrally to `components.css`.
+- **Model-routing resilience:** `LLMGateway.complete()`/`stream()`'s fallback chain only advanced to the next candidate for "retriable" (timeout/network) errors; an auth failure, exhausted credits, or unresolvable model name aborted the whole request even with untried fallbacks (trinity/trinity_backup) available. Now falls through on any error.
+- 6 of 11 agents in `AGENTS.md` referenced model IDs that no longer exist in `models.yaml` (`trinity-free`, `qwen3-mlx`, `qwen3-coder-free` — stale names from a prior schema version); corrected to real catalog IDs.
+- **NAS backup silently broken for over a month:** a single stale SMB mount point (from 2026-08-09, never cleaned up after a failed `umount`) blocked every subsequent daily NAS push with a cryptic "Operation not permitted" error, while local Postgres backups kept succeeding every night — masking the problem. `aria_backup.sh` now clears stale `/tmp/aria_nas_backup.*` mounts before attempting a new one, and logs unmount failures instead of silently swallowing them.
 
 ### Added
-- Mobile-safe chat UI: `100dvh` layout height, iOS safe-area padding on composer/sidebar, 16px input font-size (stops iOS Safari auto-zoom-on-focus), `viewport-fit=cover` + mobile-web-app meta tags.
-- `HSTS` and `X-Permitted-Cross-Domain-Policies` security headers.
-- Observability: the JSON-message-envelope guard in `llm_gateway.py` now logs when it actually fires, instead of silently patching.
-- `"status": "active"` field added to all skill.json manifests that were missing it (SKILL_STANDARD.md compliance).
+- **Curated memory search:** `aria_souvenirs/` (Aria's curated "keep this" archive — dated session snapshots + standalone reflective/creative pieces) is now embedded into the pgvector semantic-memory index (`aria_engine/memory_file_ingest.py`, `POST /api/memories/ingest-souvenirs`), making it searchable via `/memory-search` and pulled into chat context recall. Deliberately does NOT touch `aria_memories/` (Aria's raw working notes/logs/drafts, managed by her own memory-compression skills) — that boundary matters for preserving her own curation choices. Importance weighting: standalone identity/creative pieces are treated as evergreen (0.65); dated engineering-session snapshots decay gently with age (0.995/day, floor 0.2) so old sessions fade into the background instead of competing equally with recent work.
+- `tests/unit/test_llm_gateway_fallback.py` and `tests/unit/test_llm_gateway_envelope.py` — first-ever coverage for the fallback-chain and envelope-unwrap logic (previously 0%).
 
 ### Changed
 - `llm` skill's `focus_affinity` corrected from non-standard values to `["orchestrator"]`, matching other cross-cutting L2 utility skills.
 
 ---
+
 
 
 

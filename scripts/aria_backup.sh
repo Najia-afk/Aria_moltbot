@@ -187,6 +187,21 @@ echo "[$(date -Iseconds)] Backup complete. run=${RUN_DIR}, retained_runs=${REMAI
 # never reaches an Aria container). Failure here is non-fatal: the local
 # backup above has already succeeded regardless of NAS reachability.
 if [ "${NAS_BACKUP_ENABLED:-false}" = "true" ]; then
+    # Clean up any stale mount point left behind by a previous run whose
+    # umount failed (network blip, NAS reboot mid-transfer, etc). A single
+    # leftover mount to the same remote share silently blocks every future
+    # mount_smbfs call with a cryptic "Operation not permitted" on mkdir --
+    # this bit us for over a month (last clean run: 2026-08-09) before being
+    # found and fixed on 2026-09-25.
+    for stale in /tmp/aria_nas_backup.*; do
+        [ -d "${stale}" ] || continue
+        if mount | grep -q " ${stale} "; then
+            echo "[$(date -Iseconds)] Found stale NAS mount ${stale}, force-unmounting before proceeding."
+            diskutil unmount force "${stale}" >/dev/null 2>&1 || umount -f "${stale}" >/dev/null 2>&1 || true
+        fi
+        rmdir "${stale}" 2>/dev/null || true
+    done
+
     NAS_MOUNT_DIR=$(mktemp -d /tmp/aria_nas_backup.XXXXXX)
     NAS_PASS="${NAS_BACKUP_PASSWORD:-}"
 
@@ -194,7 +209,7 @@ if [ "${NAS_BACKUP_ENABLED:-false}" = "true" ]; then
         echo "[$(date -Iseconds)] WARNING: NAS_BACKUP_PASSWORD not set in .env; skipping NAS push."
     else
         NAS_PASS_ENC=$(python3 -c "import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=''))" "${NAS_PASS}")
-        if mount_smbfs "//${NAS_BACKUP_USER}:${NAS_PASS_ENC}@${NAS_BACKUP_HOST}/${NAS_BACKUP_SHARE}" "${NAS_MOUNT_DIR}" 2>/dev/null; then
+        if mount_smbfs "//${NAS_BACKUP_USER}:${NAS_PASS_ENC}@${NAS_BACKUP_HOST}/${NAS_BACKUP_SHARE}" "${NAS_MOUNT_DIR}" 2>&1; then
             if rsync -a "${RUN_DIR}/" "${NAS_MOUNT_DIR}/${TIMESTAMP}/"; then
                 echo "[$(date -Iseconds)] NAS push complete: ${NAS_BACKUP_HOST}/${NAS_BACKUP_SHARE}/${TIMESTAMP}"
                 # Prune old runs on the NAS too (same retention as local).
@@ -202,7 +217,9 @@ if [ "${NAS_BACKUP_ENABLED:-false}" = "true" ]; then
             else
                 echo "[$(date -Iseconds)] WARNING: NAS push (rsync) failed; local backup is still intact."
             fi
-            umount "${NAS_MOUNT_DIR}" 2>/dev/null || true
+            if ! umount "${NAS_MOUNT_DIR}" 2>&1; then
+                echo "[$(date -Iseconds)] WARNING: unmount of ${NAS_MOUNT_DIR} failed -- next run will clean it up."
+            fi
         else
             echo "[$(date -Iseconds)] WARNING: NAS SMB mount failed; local backup is still intact."
         fi

@@ -476,6 +476,26 @@ async def store_semantic_memory(
     return {"id": str(memory.id), "stored": True}
 
 
+@router.post("/memories/ingest-souvenirs")
+async def ingest_souvenir_memories():
+    """Embed aria_souvenirs/*.md (Aria's curated 'keep this' archive) into
+    semantic_memories so they show up in /memory-search and chat context
+    recall. Idempotent — safe to call repeatedly; only new/changed files are
+    re-embedded. Does NOT touch aria_memories/ (her working notes/logs/
+    drafts), which stays out of this index deliberately.
+    """
+    from aria_engine.memory_file_ingest import ingest_markdown_memories
+    from db.session import AsyncSessionLocal
+
+    stats = await ingest_markdown_memories(AsyncSessionLocal)
+    try:
+        from aria_engine.memory_cache import get_memory_cache
+        get_memory_cache().invalidate_semantic()
+    except Exception:
+        pass
+    return stats
+
+
 @router.get("/memories/search")
 async def search_memories(
     query: str,
