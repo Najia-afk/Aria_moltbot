@@ -195,3 +195,13 @@ async def test_query_by_type_fallback():
     result = await skill.query(entity_type="concept")
     assert result.success
     assert result.data["total_entities"] >= 1
+
+
+@pytest.mark.asyncio
+async def test_get_entities_alias():
+    """get_entities is a real, registered tool (alias for query()'s list mode)
+    so agents that hallucinate this plural name don't hard-fail."""
+    skill, api = await _make_skill()
+    result = await skill.get_entities(type="concept", limit=10)
+    assert result.success
+    assert "entities" in result.data

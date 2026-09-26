@@ -3,11 +3,12 @@ Goals + hourly goals endpoints.
 """
 
 import logging
+import re
 import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, select, update, delete
+from sqlalchemy import String, cast, func, or_, select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import Goal, HourlyGoal
@@ -333,13 +334,32 @@ async def goal_history(
 
 @router.get("/goals/{goal_id}")
 async def get_goal(goal_id: str, db: AsyncSession = Depends(get_db)):
-    """Fetch a single goal by UUID or goal_id string."""
+    """Fetch a single goal by UUID, goal_id string, or short hex prefix."""
+    goal = None
     try:
         uid = uuid.UUID(goal_id)
         result = await db.execute(select(Goal).where(Goal.id == uid))
+        goal = result.scalars().first()
     except ValueError:
         result = await db.execute(select(Goal).where(Goal.goal_id == goal_id))
-    goal = result.scalars().first()
+        goal = result.scalars().first()
+        if goal is None and re.fullmatch(r"[0-9a-fA-F]{6,32}", goal_id):
+            # Agents sometimes reference a goal by a bare hex prefix — e.g.
+            # the first 8 chars of the UUID `id`, without the "goal-"
+            # prefix used in the human-friendly `goal_id` string. Fall back
+            # to a prefix match on both identifiers as a last resort.
+            prefix = goal_id.lower()
+            result = await db.execute(
+                select(Goal).where(
+                    or_(
+                        cast(Goal.id, String).like(f"{prefix}%"),
+                        Goal.goal_id.like(f"goal-{prefix}%"),
+                    )
+                ).limit(2)
+            )
+            candidates = result.scalars().all()
+            if len(candidates) == 1:
+                goal = candidates[0]
     if not goal:
         raise HTTPException(status_code=404, detail=f"Goal {goal_id!r} not found")
     return goal.to_dict()

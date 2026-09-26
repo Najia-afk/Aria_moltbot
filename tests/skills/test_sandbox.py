@@ -119,6 +119,9 @@ async def test_run_code_success():
 
 @pytest.mark.asyncio
 async def test_run_code_failure():
+    """A non-zero exit code means the *code* had a bug, not that the sandbox
+    tool itself failed — result.success stays True (tool worked), while the
+    exit_code/stderr are still surfaced for the agent to act on."""
     skill = _make_skill()
     skill._client = AsyncMock()
     skill._client.post = AsyncMock(return_value=_mock_response(200, {
@@ -127,7 +130,9 @@ async def test_run_code_failure():
     skill._status = SkillStatus.AVAILABLE
 
     result = await skill.run_code(code="invalid(")
-    assert not result.success
+    assert result.success
+    assert result.data["exit_code"] == 1
+    assert result.error == "SyntaxError"
 
 
 @pytest.mark.asyncio

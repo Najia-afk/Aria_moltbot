@@ -115,7 +115,26 @@ class KnowledgeGraphSkill(BaseSkill):
             self.logger.warning(f"API add_relation failed, using fallback: {e}{detail}")
             self._relations.append(rel)
             return SkillResult.ok(rel)
-    
+
+    async def get_entities(
+        self,
+        type: str | None = None,
+        entity_type: str | None = None,
+        limit: int = 50,
+        **kwargs,
+    ) -> SkillResult:
+        """List/search multiple entities (alias for query()'s list mode).
+
+        Agents sometimes call this plural form instead of the registered
+        `get_entity`/`query` tools; kept as a real tool so that call doesn't
+        hard-fail with 'Unknown tool'.
+        """
+        result = await self.query(entity_type=entity_type or type)
+        if result.success and isinstance(result.data, dict):
+            entities = result.data.get("entities", [])[:limit]
+            result.data["entities"] = entities
+        return result
+
     async def get_entity(
         self,
         query: str | None = None,

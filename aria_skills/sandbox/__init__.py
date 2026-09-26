@@ -114,13 +114,21 @@ class SandboxSkill(BaseSkill):
             resp.raise_for_status()
             data = resp.json()
 
-            success = data.get("exit_code", -1) == 0
-            self._log_usage("run_code", success)
+            code_ok = data.get("exit_code", -1) == 0
+            # NOTE: "success" here means the sandbox *tool* worked (we got a
+            # valid response back), not that the executed code was bug-free.
+            # A non-zero exit code is a normal, expected outcome while an
+            # agent iterates on code — it must NOT count as a skill/tool
+            # failure, or it inflates health-dashboard error rates and trips
+            # the per-tool circuit breaker in chat_engine after just 3
+            # ordinary debugging attempts. The actual exit_code/stderr is
+            # still surfaced in `data`/`error` so the agent can react to it.
+            self._log_usage("run_code", True)
 
             return SkillResult(
-                success=success,
+                success=True,
                 data=data,
-                error=data.get("stderr") if not success else None,
+                error=data.get("stderr") if not code_ok else None,
             )
         except Exception as e:
             self._log_usage("run_code", False, error=str(e))

@@ -70,22 +70,46 @@
     },
     {
       "name": "query",
-      "description": "Find entities related to a given entity.",
+      "description": "Find entities related to a given entity (BFS traversal), OR, if entity_name is omitted, list/filter entities by type/relation.",
       "parameters": {
         "type": "object",
         "properties": {
           "entity_name": {
             "type": "string",
-            "description": "Entity name to find relations for"
+            "description": "Entity name to find relations for. Omit this to list entities instead (use entity_type/relation to filter)."
           },
           "depth": {
             "type": "integer",
             "description": "How many hops to traverse (default: 1)"
+          },
+          "entity_type": {
+            "type": "string",
+            "description": "Filter by entity type, e.g. when listing entities without entity_name"
+          },
+          "relation": {
+            "type": "string",
+            "description": "Filter by relation type"
           }
         },
-        "required": [
-          "entity_name"
-        ]
+        "required": []
+      }
+    },
+    {
+      "name": "get_entities",
+      "description": "List/search multiple entities, optionally filtered by type. Use this to list several entities at once (for a single entity by name/id, use get_entity).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Filter by entity type (person, place, concept, event, organization, skill, topic)"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Maximum number of entities to return (default: 50)"
+          }
+        },
+        "required": []
       }
     },
     {

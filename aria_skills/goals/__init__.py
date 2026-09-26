@@ -202,9 +202,18 @@ class GoalSchedulerSkill(BaseSkill):
             return SkillResult.ok(result.data)
         except Exception as e:
             self.logger.warning(f"API get_goal failed, using fallback: {e}")
-            if goal_id not in self._goals:
+            # Look up by dict key first, then by "id"/"goal_id" fields (the
+            # API may return a UUID or "goal-xxxxxxxx" string that differs
+            # from the local cache's internal counter-based key).
+            goal = self._goals.get(goal_id)
+            if goal is None:
+                for g in self._goals.values():
+                    if g.get("id") == goal_id or g.get("goal_id") == goal_id:
+                        goal = g
+                        break
+            if goal is None:
                 return SkillResult.fail(f"Goal not found: {goal_id}")
-            return SkillResult.ok(self._goals[goal_id])
+            return SkillResult.ok(goal)
     
     @logged_method()
     async def list_goals(
