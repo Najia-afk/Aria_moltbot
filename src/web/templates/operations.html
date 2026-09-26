@@ -163,7 +163,9 @@
 /* ── Architecture Flow Diagram ─────────────────────────────────
    Static system-overview diagram (not live-data-driven — the charts
    above already cover live metrics). Modeled on a "fee architecture"
-   style flow diagram: columns of icon-cards connected left-to-right. */
+   style flow diagram: columns of icon-cards connected left-to-right.
+   Each node's status dot is live-polled from existing health endpoints
+   (see loadArchitectureStatus() below) — no new backend surface needed. */
 .arch-diagram {
     display: flex;
     align-items: flex-start;
@@ -219,6 +221,54 @@
 .arch-node-sub {
     font-size: 0.68rem;
     color: var(--text-muted);
+}
+
+.arch-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    flex-shrink: 0;
+    margin-left: auto;
+    align-self: flex-start;
+    margin-top: 3px;
+}
+
+.arch-status-dot.up {
+    background: var(--success);
+    box-shadow: 0 0 6px var(--success);
+}
+
+.arch-status-dot.neutral {
+    background: var(--text-dim);
+}
+
+.arch-status-dot.degraded {
+    background: var(--warning);
+    box-shadow: 0 0 6px var(--warning);
+}
+
+.arch-status-dot.down {
+    background: var(--danger);
+    box-shadow: 0 0 6px var(--danger);
+    animation: pulse 1.5s infinite;
+}
+
+.arch-live-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-left: 10px;
+}
+
+.arch-live-badge .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--success);
+    animation: pulse 2s infinite;
 }
 
 .arch-connector {
@@ -328,38 +378,40 @@
 
     <!-- Architecture Overview -->
     <div class="ops-section">
-        <h2>Architecture Overview</h2>
+        <h2>Architecture Overview
+            <span class="arch-live-badge"><span class="dot"></span><span id="archUpdated">Loading…</span></span>
+        </h2>
         <div class="arch-diagram">
             <div class="arch-col">
                 <div class="arch-col-label">Entry Points</div>
-                <div class="arch-node"><span class="arch-node-icon">💬</span><div><div class="arch-node-title">Chat</div><div class="arch-node-sub">Interactive sessions</div></div></div>
-                <div class="arch-node"><span class="arch-node-icon">⏰</span><div><div class="arch-node-title">Cron Jobs</div><div class="arch-node-sub">Autonomous work cycle</div></div></div>
-                <div class="arch-node"><span class="arch-node-icon">🔌</span><div><div class="arch-node-title">API</div><div class="arch-node-sub">External requests</div></div></div>
+                <div class="arch-node" data-node="chat"><span class="arch-node-icon">💬</span><div><div class="arch-node-title">Chat</div><div class="arch-node-sub">Interactive sessions</div></div><span class="arch-status-dot"></span></div>
+                <div class="arch-node" data-node="cron"><span class="arch-node-icon">⏰</span><div><div class="arch-node-title">Cron Jobs</div><div class="arch-node-sub" id="archCronSub">Autonomous work cycle</div></div><span class="arch-status-dot"></span></div>
+                <div class="arch-node" data-node="api"><span class="arch-node-icon">🔌</span><div><div class="arch-node-title">API</div><div class="arch-node-sub">External requests</div></div><span class="arch-status-dot"></span></div>
             </div>
             <div class="arch-connector">→</div>
             <div class="arch-col">
                 <div class="arch-col-label">Orchestration</div>
-                <div class="arch-node"><span class="arch-node-icon">🤖</span><div><div class="arch-node-title">Agent Pool</div><div class="arch-node-sub">11 focus-specific agents</div></div></div>
-                <div class="arch-node"><span class="arch-node-icon">🧠</span><div><div class="arch-node-title">LLM Gateway</div><div class="arch-node-sub">Model routing + fallback chain</div></div></div>
+                <div class="arch-node" data-node="agents"><span class="arch-node-icon">🤖</span><div><div class="arch-node-title">Agent Pool</div><div class="arch-node-sub" id="archAgentsSub">11 focus-specific agents</div></div><span class="arch-status-dot"></span></div>
+                <div class="arch-node" data-node="llm"><span class="arch-node-icon">🧠</span><div><div class="arch-node-title">LLM Gateway</div><div class="arch-node-sub">Model routing + fallback chain</div></div><span class="arch-status-dot"></span></div>
             </div>
             <div class="arch-connector">→</div>
             <div class="arch-col">
                 <div class="arch-col-label">Capabilities</div>
-                <div class="arch-node"><span class="arch-node-icon">🧩</span><div><div class="arch-node-title">Skills</div><div class="arch-node-sub">goals · sandbox · knowledge_graph…</div></div></div>
-                <div class="arch-node"><span class="arch-node-icon">🛡️</span><div><div class="arch-node-title">Security</div><div class="arch-node-sub">Input guard, consent gate</div></div></div>
+                <div class="arch-node" data-node="skills"><span class="arch-node-icon">🧩</span><div><div class="arch-node-title">Skills</div><div class="arch-node-sub" id="archSkillsSub">goals · sandbox · knowledge_graph…</div></div><span class="arch-status-dot"></span></div>
+                <div class="arch-node" data-node="security"><span class="arch-node-icon">🛡️</span><div><div class="arch-node-title">Security</div><div class="arch-node-sub">Input guard, consent gate</div></div><span class="arch-status-dot"></span></div>
             </div>
             <div class="arch-connector">→</div>
             <div class="arch-col">
                 <div class="arch-col-label">Memory</div>
-                <div class="arch-node"><span class="arch-node-icon">⚡</span><div><div class="arch-node-title">Working Memory</div><div class="arch-node-sub">Live session context</div></div></div>
-                <div class="arch-node"><span class="arch-node-icon">🕸️</span><div><div class="arch-node-title">Semantic + Knowledge Graph</div><div class="arch-node-sub">pgvector embeddings</div></div></div>
-                <div class="arch-node"><span class="arch-node-icon">💾</span><div><div class="arch-node-title">Souvenirs</div><div class="arch-node-sub">Curated long-term memory</div></div></div>
+                <div class="arch-node" data-node="working-memory"><span class="arch-node-icon">⚡</span><div><div class="arch-node-title">Working Memory</div><div class="arch-node-sub">Live session context</div></div><span class="arch-status-dot"></span></div>
+                <div class="arch-node" data-node="semantic-kg"><span class="arch-node-icon">🕸️</span><div><div class="arch-node-title">Semantic + Knowledge Graph</div><div class="arch-node-sub">pgvector embeddings</div></div><span class="arch-status-dot"></span></div>
+                <div class="arch-node" data-node="souvenirs"><span class="arch-node-icon">💾</span><div><div class="arch-node-title">Souvenirs</div><div class="arch-node-sub">Curated long-term memory</div></div><span class="arch-status-dot"></span></div>
             </div>
             <div class="arch-connector">→</div>
             <div class="arch-col">
                 <div class="arch-col-label">Persistence</div>
-                <div class="arch-node"><span class="arch-node-icon">🐘</span><div><div class="arch-node-title">PostgreSQL</div><div class="arch-node-sub">+ pgvector</div></div></div>
-                <div class="arch-node"><span class="arch-node-icon">📦</span><div><div class="arch-node-title">NAS Backup</div><div class="arch-node-sub">Nightly, offsite</div></div></div>
+                <div class="arch-node" data-node="postgres"><span class="arch-node-icon">🐘</span><div><div class="arch-node-title">PostgreSQL</div><div class="arch-node-sub">+ pgvector</div></div><span class="arch-status-dot"></span></div>
+                <div class="arch-node" data-node="nas-backup"><span class="arch-node-icon">📦</span><div><div class="arch-node-title">NAS Backup</div><div class="arch-node-sub">Nightly, offsite</div></div></div>
             </div>
         </div>
     </div>
@@ -376,7 +428,66 @@
     document.addEventListener('DOMContentLoaded', () => {
         checkEngineHealth();
         loadQuickStats();
+        loadArchitectureStatus();
+        setInterval(loadArchitectureStatus, 30000);
     });
+
+    function setArchDot(node, status) {
+        const el = document.querySelector(`.arch-node[data-node="${node}"] .arch-status-dot`);
+        if (el) el.className = 'arch-status-dot ' + status;
+    }
+
+    async function loadArchitectureStatus() {
+        const [statusRes, scheduleRes, agentsRes, skillsRes] = await Promise.allSettled([
+            fetch(`${API}/status`).then(r => r.json()),
+            fetch(`${API}/schedule`).then(r => r.json()),
+            fetch(`${API}/engine/agents`).then(r => r.json()),
+            fetch(`${API}/skills/health/dashboard?hours=24`).then(r => r.json()),
+        ]);
+
+        if (statusRes.status === 'fulfilled') {
+            const s = statusRes.value;
+            const svc = (name) => (s[name] && s[name].status === 'up') ? 'up' : 'down';
+            setArchDot('api', svc('aria-api'));
+            setArchDot('chat', svc('aria-api'));
+            setArchDot('llm', svc('litellm'));
+            const dbStatus = svc('postgres');
+            setArchDot('postgres', dbStatus);
+            setArchDot('working-memory', dbStatus);
+            setArchDot('semantic-kg', dbStatus);
+            setArchDot('souvenirs', dbStatus);
+        }
+
+        if (scheduleRes.status === 'fulfilled') {
+            const d = scheduleRes.value;
+            const total = d.jobs_total || 0;
+            const failed = d.jobs_failed || 0;
+            const ratio = total > 0 ? failed / total : 0;
+            setArchDot('cron', total === 0 ? 'neutral' : ratio === 0 ? 'up' : ratio < 0.3 ? 'degraded' : 'down');
+            const sub = document.getElementById('archCronSub');
+            if (sub && total) sub.textContent = `${total - failed}/${total} jobs healthy`;
+        }
+
+        if (agentsRes.status === 'fulfilled') {
+            const d = agentsRes.value;
+            const counts = d.status_counts || {};
+            const errored = counts.error || 0;
+            setArchDot('agents', errored > 0 ? 'degraded' : 'up');
+            const sub = document.getElementById('archAgentsSub');
+            if (sub && d.total_agents) sub.textContent = `${d.total_agents} focus-specific agents`;
+        }
+
+        if (skillsRes.status === 'fulfilled') {
+            const overall = skillsRes.value.overall || {};
+            const status = overall.status === 'healthy' ? 'up' : overall.status === 'degraded' ? 'degraded' : 'down';
+            setArchDot('skills', status);
+            const sub = document.getElementById('archSkillsSub');
+            if (sub && overall.health_score != null) sub.textContent = `Health score: ${overall.health_score}/100`;
+        }
+
+        const updated = document.getElementById('archUpdated');
+        if (updated) updated.textContent = 'Updated ' + new Date().toLocaleTimeString();
+    }
 
     async function checkEngineHealth() {
         const dot = document.getElementById('statusDot');
