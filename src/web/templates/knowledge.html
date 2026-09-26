@@ -223,6 +223,7 @@
     </select>
     <button onclick="toggleLayout()" class="secondary">⚡ Toggle Layout</button>
     <button onclick="syncGraph()" class="sync-btn">🔄 Refresh</button>
+    <button onclick="loadFullOverview()" class="secondary" id="overview-btn">🗺️ Load Full Overview</button>
 </div>
 
 <div class="legend">
@@ -295,6 +296,13 @@ let network = null;
 let currentLayout = 'physics';
 let nodesDataSet = null;
 let edgesDataSet = null;
+let overviewLoaded = false;   // has the user explicitly loaded a full/large view?
+let activeRenderer = null;    // 'vis' | 'cytoscape'
+let cy = null;                // Cytoscape instance (only created for large graphs)
+// Above this many entities, vis-network's physics simulation stops being
+// interactive — switch to Cytoscape.js with a static (non-physics) layout
+// instead of trying to force-simulate a graph too big to render smoothly.
+const LARGE_GRAPH_THRESHOLD = 1500;
 
 function esc(str) {
     if (!str) return '';
@@ -341,14 +349,136 @@ async function loadGraph() {
         document.getElementById('entity-count').textContent = allEntities.length;
         document.getElementById('relation-count').textContent = allRelations.length;
 
+        activeRenderer = 'vis';
+        overviewLoaded = true;
         drawKnowledgeGraph(allEntities, allRelations);
     } catch (err) {
         console.error('Failed to load graph:', err);
     }
 }
 
+// ── Search-first default: don't render anything until asked to ──────────────
+// Loading and physics-simulating the whole graph on every page visit doesn't
+// scale — instead show real counts immediately (cheap COUNT(*) query) and
+// let the user search/traverse into what they actually want, with "Load Full
+// Overview" as an explicit opt-in for when you really do want to see it all.
+async function initEmptyState() {
+    const container = document.getElementById('knowledge-network');
+    container.innerHTML = `
+        <div class="empty-state" style="height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem;">
+            <div class="empty-state-icon">🔍</div>
+            <h3>Search to explore</h3>
+            <p style="color: var(--text-muted); max-width: 320px; text-align: center;">
+                Type in the search box, or click "Load Full Overview" to render everything.
+            </p>
+        </div>`;
+    try {
+        const resp = await fetch(`${API_BASE}/knowledge-graph/count`);
+        const data = await resp.json();
+        document.getElementById('entity-count').textContent = data.entity_count ?? '—';
+        document.getElementById('relation-count').textContent = data.relation_count ?? '—';
+        return data.entity_count || 0;
+    } catch (err) {
+        console.error('Failed to load counts:', err);
+        return 0;
+    }
+}
+
+async function loadFullOverview() {
+    const btn = document.getElementById('overview-btn');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Loading…'; }
+    try {
+        const countResp = await fetch(`${API_BASE}/knowledge-graph/count`);
+        const counts = await countResp.json();
+        const entityCount = counts.entity_count || 0;
+
+        if (entityCount > LARGE_GRAPH_THRESHOLD) {
+            await loadWithCytoscape();
+        } else {
+            await loadGraph();
+        }
+    } catch (err) {
+        console.error('Failed to load full overview:', err);
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '🗺️ Load Full Overview'; }
+    }
+}
+
+// ── Large-graph path: Cytoscape.js, static layout, no physics ───────────────
+// vis-network's continuous force simulation is the part that stops being
+// interactive at scale — Cytoscape with a one-shot layout (computed once,
+// not re-simulated every frame) stays usable for a lot more nodes.
+function loadCytoscapeScript() {
+    return new Promise((resolve, reject) => {
+        if (window.cytoscape) return resolve();
+        const s = document.createElement('script');
+        s.src = '/static/js/cytoscape.min.js';
+        s.onload = () => resolve();
+        s.onerror = () => reject(new Error('Failed to load cytoscape.min.js'));
+        document.head.appendChild(s);
+    });
+}
+
+async function loadWithCytoscape() {
+    await loadCytoscapeScript();
+    const resp = await fetch(`${API_BASE}/knowledge-graph?limit=2000`);
+    const data = await resp.json();
+    allEntities = data.entities || [];
+    allRelations = data.relations || [];
+
+    document.getElementById('entity-count').textContent = allEntities.length;
+    document.getElementById('relation-count').textContent = allRelations.length;
+
+    const container = document.getElementById('knowledge-network');
+    container.innerHTML = '';
+
+    if (network) { network.destroy(); network = null; }
+
+    const elements = [
+        ...allEntities.map(e => ({ data: { id: e.id, label: e.name, type: e.type } })),
+        ...allRelations
+            .filter(r => allEntities.some(e => e.id === r.from_entity) && allEntities.some(e => e.id === r.to_entity))
+            .map((r, i) => ({ data: { id: `e-${i}`, source: r.from_entity, target: r.to_entity, label: r.relation_type } })),
+    ];
+
+    cy = window.cytoscape({
+        container,
+        elements,
+        style: [
+            { selector: 'node', style: {
+                'background-color': (n) => TYPE_COLORS[n.data('type')] || '#6b7280',
+                'label': 'data(label)', 'font-size': 8, 'color': '#e0e0e0',
+                'width': 14, 'height': 14, 'text-valign': 'bottom', 'text-margin-y': 4,
+            } },
+            { selector: 'edge', style: {
+                'width': 1, 'line-color': '#555', 'curve-style': 'haystack', 'haystack-radius': 0.2,
+                'target-arrow-shape': 'triangle', 'target-arrow-color': '#555', 'arrow-scale': 0.6,
+            } },
+        ],
+        // 'cose' is a one-shot force layout — it runs once to settle
+        // positions, then stops, unlike vis-network's continuous simulation.
+        layout: { name: 'cose', animate: false, nodeRepulsion: 8000, idealEdgeLength: 60 },
+        wheelSensitivity: 0.2,
+    });
+
+    cy.on('tap', 'node', (evt) => onNodeClick({ nodes: [evt.target.id()] }));
+    cy.on('tap', (evt) => { if (evt.target === cy) onNodeClick({ nodes: [] }); });
+
+    activeRenderer = 'cytoscape';
+    overviewLoaded = true;
+}
+
 function drawKnowledgeGraph(entities, relations) {
     const container = document.getElementById('knowledge-network');
+    // If we're switching over from the Cytoscape large-graph view, its
+    // canvas is still attached to this container — tear it down first so
+    // vis-network doesn't end up layered underneath/inside it.
+    if (cy) {
+        cy.destroy();
+        cy = null;
+        container.innerHTML = '';
+        network = null;
+    }
     const RECENT_MS = 5 * 60 * 1000; // nodes added in the last 5 minutes get a "live" highlight
     const now = Date.now();
 
@@ -510,7 +640,10 @@ function focusOrTraverse(nodeId, name) {
     // just focus it. Otherwise (common once the graph is larger than what's
     // loaded in the browser) fetch its neighborhood on demand instead of
     // reloading everything.
-    if (nodesDataSet && nodesDataSet.get(nodeId)) {
+    if (activeRenderer === 'cytoscape' && cy && cy.getElementById(nodeId).length) {
+        cy.animate({ center: { eles: cy.getElementById(nodeId) }, zoom: 2 }, { duration: 400 });
+        onNodeClick({ nodes: [nodeId] });
+    } else if (activeRenderer === 'vis' && nodesDataSet && nodesDataSet.get(nodeId)) {
         focusNode(nodeId);
     } else {
         loadNeighborhood(name);
@@ -522,6 +655,18 @@ async function loadNeighborhood(entityName) {
         const resp = await fetch(`${API_BASE}/knowledge-graph/kg-traverse?start=${encodeURIComponent(entityName)}&max_depth=1&direction=both`);
         const data = await resp.json();
         if (data.error || !data.nodes?.length) return;
+
+        // Neighborhoods are always small — switch back to the interactive
+        // vis-network view even if a large-graph Cytoscape overview was
+        // showing (drawKnowledgeGraph tears down the Cytoscape canvas),
+        // rather than trying to fit a focused traversal into the static
+        // big-picture renderer.
+        if (activeRenderer === 'cytoscape') {
+            allEntities = [];
+            allRelations = [];
+        }
+        activeRenderer = 'vis';
+
         // Merge the traversed neighborhood into the current view rather than
         // replacing it, so exploring one result doesn't lose the rest.
         const existingIds = new Set(allEntities.map(e => e.id));
@@ -530,6 +675,8 @@ async function loadNeighborhood(entityName) {
         const existingRelIds = new Set(allRelations.map(r => `${r.from_entity}-${r.to_entity}-${r.relation_type}`));
         const newRelations = (data.edges || []).filter(e => !existingRelIds.has(`${e.from_entity}-${e.to_entity}-${e.relation_type}`));
         allRelations = [...allRelations, ...newRelations];
+        document.getElementById('entity-count').textContent = allEntities.length;
+        document.getElementById('relation-count').textContent = allRelations.length;
         drawKnowledgeGraph(allEntities, allRelations);
         setTimeout(() => focusNode(newEntities[0]?.id), 300);
     } catch (err) {
@@ -547,17 +694,30 @@ function focusNode(nodeId) {
 
 async function syncGraph() {
     try {
-        await loadGraph();
+        if (!overviewLoaded) {
+            await loadFullOverview();
+        } else if (activeRenderer === 'cytoscape') {
+            await loadWithCytoscape();
+        } else {
+            await loadGraph();
+        }
         alert(`Graph refreshed: ${allEntities.length} entities, ${allRelations.length} relations`);
     } catch (err) {
         alert('Refresh failed: ' + err.message);
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => loadGraph());
+document.addEventListener('DOMContentLoaded', () => initEmptyState());
 // See Aria's knowledge graph update live: silently reload every 30s so
 // entities/relations she creates while you're watching appear on their own
 // (new nodes get a bright green border for 5 min — see drawKnowledgeGraph).
-setInterval(() => loadGraph().catch(e => console.error('graph auto-refresh:', e)), 30000);
+// Only runs once the user has actually opted into a full/large view —
+// otherwise there's nothing rendered to refresh, and no point paying for
+// the query on every page visit.
+setInterval(() => {
+    if (!overviewLoaded) return;
+    const reload = activeRenderer === 'cytoscape' ? loadWithCytoscape : loadGraph;
+    reload().catch(e => console.error('graph auto-refresh:', e));
+}, 30000);
 </script>
 {% endblock %}

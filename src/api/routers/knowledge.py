@@ -256,6 +256,16 @@ async def sync_skills():
     return {"status": "ok", "stats": stats}
 
 
+@router.get("/knowledge-graph/count")
+async def get_knowledge_graph_count(db: AsyncSession = Depends(get_db)):
+    """Cheap entity/relation totals (COUNT(*) only) — lets the UI show real
+    numbers and decide whether a full overview load is sensible without
+    ever pulling row data across the wire."""
+    entity_count = (await db.execute(select(func.count()).select_from(KnowledgeEntity))).scalar() or 0
+    relation_count = (await db.execute(select(func.count()).select_from(KnowledgeRelation))).scalar() or 0
+    return {"entity_count": entity_count, "relation_count": relation_count}
+
+
 @router.get("/knowledge-graph")
 async def get_knowledge_graph(
     limit: int = Query(500, ge=1, le=2000),

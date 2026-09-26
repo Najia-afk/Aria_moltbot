@@ -224,6 +224,15 @@ async def ensure_schema() -> None:
             "CREATE INDEX IF NOT EXISTS idx_ecma_content_trgm "
             "ON aria_engine.chat_messages_archive USING gin (content gin_trgm_ops)",
         )
+        # GIN trigram index for knowledge-graph entity name search — kg-search
+        # does an ILIKE '%q%' scan, which a plain B-tree can't accelerate at
+        # all (leading wildcard); trigram is what keeps that fast as the
+        # graph grows well past what fits comfortably in a browser tab.
+        await _run_isolated(
+            conn, "gin_kg_entity_name_trgm",
+            "CREATE INDEX IF NOT EXISTS idx_kg_entity_name_trgm "
+            "ON aria_data.knowledge_entities USING gin (name gin_trgm_ops)",
+        )
 
         if failed:
             logger.warning("Schema bootstrap: %d tables created, %d failed: %s",
