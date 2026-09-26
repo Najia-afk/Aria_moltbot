@@ -3,8 +3,8 @@
 # Backs up all Aria data across all schemas and all databases.
 # Stored securely in ~/aria_vault/backups/ (NOT accessible by Aria).
 #
-# Usage:  ./scripts/aria_backup.sh
-# Cron:   0 3 * * * ~/aria/scripts/aria_backup.sh >> ~/aria_vault/backups/backup.log 2>&1
+# Usage:  bash ./scripts/aria_backup.sh
+# Schedule: com.aria.daily-backup LaunchAgent, daily at 03:15
 
 set -euo pipefail
 export PATH=/Applications/Docker.app/Contents/Resources/bin:/usr/local/bin:/usr/bin:$PATH
@@ -39,7 +39,7 @@ ARIA_DATA_SCHEMA_FILE="${RUN_DIR}/aria_data_schema.sql.gz"
 ARIA_ENGINE_SCHEMA_FILE="${RUN_DIR}/aria_engine_schema.sql.gz"
 LITELLM_SCHEMA_FILE="${RUN_DIR}/litellm_schema.sql.gz"
 JSON_EXPORT="${RUN_DIR}/aria_export.json"
-KEEP_DAYS=14
+LOCAL_KEEP_DAYS=7
 
 # Wait for aria-db to actually be up (e.g. this fired right after boot/wake,
 # before Docker Desktop finished starting the stack). Without this, the
@@ -175,10 +175,10 @@ echo "[$(date -Iseconds)] JSON export: ${JSON_EXPORT}"
 ln -sfn "${RUN_DIR}" "${BACKUP_ROOT}/latest"
 
 # Cleanup old backup runs (keep last N days)
-find "${BACKUP_ROOT}" -mindepth 1 -maxdepth 1 -type d -name "20*" -mtime +${KEEP_DAYS} -exec rm -rf {} + 2>/dev/null || true
+find "${BACKUP_ROOT}" -mindepth 1 -maxdepth 1 -type d -name "20*" -mtime +${LOCAL_KEEP_DAYS} -exec rm -rf {} + 2>/dev/null || true
 
 REMAINING_RUNS=$(find "${BACKUP_ROOT}" -mindepth 1 -maxdepth 1 -type d -name "20*" | wc -l | tr -d ' ')
-echo "[$(date -Iseconds)] Backup complete. run=${RUN_DIR}, retained_runs=${REMAINING_RUNS} (${KEEP_DAYS}-day retention)."
+echo "[$(date -Iseconds)] Backup complete. run=${RUN_DIR}, retained_runs=${REMAINING_RUNS} (local ${LOCAL_KEEP_DAYS}-day retention)."
 
 # ── Push this run to the NAS (SMB, dedicated non-admin user) ──────────
 # Aria's own containers never have these credentials — this is a Mac-side
@@ -187,6 +187,7 @@ echo "[$(date -Iseconds)] Backup complete. run=${RUN_DIR}, retained_runs=${REMAI
 # never reaches an Aria container). Failure here is non-fatal: the local
 # backup above has already succeeded regardless of NAS reachability.
 if [ "${NAS_BACKUP_ENABLED:-false}" = "true" ]; then
+    NAS_MOUNT_CLEANUP_FAILED=false
     # Clean up any stale mount point left behind by a previous run whose
     # umount failed (network blip, NAS reboot mid-transfer, etc). A single
     # leftover mount to the same remote share silently blocks every future
@@ -195,27 +196,43 @@ if [ "${NAS_BACKUP_ENABLED:-false}" = "true" ]; then
     # found and fixed on 2026-09-25.
     for stale in /tmp/aria_nas_backup.*; do
         [ -d "${stale}" ] || continue
-        if mount | grep -q " ${stale} "; then
+        stale_mount_name="${stale##*/}"
+        if mount | grep -Fq "${stale_mount_name}"; then
             echo "[$(date -Iseconds)] Found stale NAS mount ${stale}, force-unmounting before proceeding."
             diskutil unmount force "${stale}" >/dev/null 2>&1 || umount -f "${stale}" >/dev/null 2>&1 || true
+            if mount | grep -Fq "${stale_mount_name}"; then
+                echo "[$(date -Iseconds)] WARNING: stale NAS mount ${stale} is still busy; skipping NAS push."
+                NAS_MOUNT_CLEANUP_FAILED=true
+            fi
         fi
-        rmdir "${stale}" 2>/dev/null || true
+        if [ "${NAS_MOUNT_CLEANUP_FAILED}" != "true" ]; then
+            rmdir "${stale}" 2>/dev/null || true
+        fi
     done
 
-    NAS_MOUNT_DIR=$(mktemp -d /tmp/aria_nas_backup.XXXXXX)
+    NAS_MOUNT_DIR=""
     NAS_PASS="${NAS_BACKUP_PASSWORD:-}"
 
     if [ -z "${NAS_PASS}" ]; then
         echo "[$(date -Iseconds)] WARNING: NAS_BACKUP_PASSWORD not set in .env; skipping NAS push."
+    elif [ "${NAS_MOUNT_CLEANUP_FAILED}" = "true" ]; then
+        echo "[$(date -Iseconds)] NAS push skipped because a stale SMB mount could not be cleared."
     else
+        NAS_MOUNT_DIR=$(mktemp -d /tmp/aria_nas_backup.XXXXXX)
         NAS_PASS_ENC=$(python3 -c "import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=''))" "${NAS_PASS}")
         if mount_smbfs "//${NAS_BACKUP_USER}:${NAS_PASS_ENC}@${NAS_BACKUP_HOST}/${NAS_BACKUP_SHARE}" "${NAS_MOUNT_DIR}" 2>&1; then
-            if rsync -a "${RUN_DIR}/" "${NAS_MOUNT_DIR}/${TIMESTAMP}/"; then
-                echo "[$(date -Iseconds)] NAS push complete: ${NAS_BACKUP_HOST}/${NAS_BACKUP_SHARE}/${TIMESTAMP}"
-                # Prune old runs on the NAS too (same retention as local).
-                find "${NAS_MOUNT_DIR}" -mindepth 1 -maxdepth 1 -type d -name "20*" -mtime +${KEEP_DAYS} -exec rm -rf {} + 2>/dev/null || true
-            else
-                echo "[$(date -Iseconds)] WARNING: NAS push (rsync) failed; local backup is still intact."
+            NAS_SYNC_FAILED=false
+            while IFS= read -r local_run; do
+                run_timestamp="${local_run##*/}"
+                if rsync -a "${local_run}/" "${NAS_MOUNT_DIR}/${run_timestamp}/"; then
+                    echo "[$(date -Iseconds)] NAS push complete: ${NAS_BACKUP_HOST}/${NAS_BACKUP_SHARE}/${run_timestamp}"
+                else
+                    echo "[$(date -Iseconds)] WARNING: NAS push failed for ${run_timestamp}; local backup is still intact." >&2
+                    NAS_SYNC_FAILED=true
+                fi
+            done < <(find "${BACKUP_ROOT}" -mindepth 1 -maxdepth 1 -type d -name "20*" -print | sort)
+            if [ "${NAS_SYNC_FAILED}" = "true" ]; then
+                echo "[$(date -Iseconds)] WARNING: one or more local runs were not synchronized to NAS."
             fi
             if ! umount "${NAS_MOUNT_DIR}" 2>&1; then
                 echo "[$(date -Iseconds)] WARNING: unmount of ${NAS_MOUNT_DIR} failed -- next run will clean it up."
@@ -226,7 +243,9 @@ if [ "${NAS_BACKUP_ENABLED:-false}" = "true" ]; then
         NAS_PASS=""
         NAS_PASS_ENC=""
     fi
-    rmdir "${NAS_MOUNT_DIR}" 2>/dev/null || true
+    if [ -n "${NAS_MOUNT_DIR}" ]; then
+        rmdir "${NAS_MOUNT_DIR}" 2>/dev/null || true
+    fi
 else
     echo "[$(date -Iseconds)] NAS_BACKUP_ENABLED not true; skipping NAS push (local-only backup)."
 fi

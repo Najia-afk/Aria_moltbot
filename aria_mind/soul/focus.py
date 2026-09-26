@@ -416,7 +416,7 @@ class FocusManager:
 
         Uses a single cheap LLM call (local model, ~50 input tokens,
         max_tokens=64) to classify the task into a focus type.
-        Cost: $0 when using local qwen3.5_mlx or free-tier OpenRouter.
+        Cost: $0 when using the OpenRouter free router.
 
         Falls back to keyword matching if LLM is unavailable or fails.
 

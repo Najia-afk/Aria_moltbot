@@ -1,6 +1,6 @@
 # AUTO-GENERATED from aria_models/models.yaml
-# Generated: 2026-09-25T21:39:01Z
-# Source SHA-256: 4d64ee13ee63f3682807ec77a142517076a2df241e56c860110b03360dac72e3
+# Generated: 2026-09-26T13:53:58Z
+# Source SHA-256: 9736b83690a4171420ebf94962ac14ccd65c8cab4a69d6b9c4ae8f61d2c25965
 # Do not hand-edit model_list — edit models.yaml and re-run:
 #   python scripts/generate_litellm_config.py
 
@@ -36,16 +36,16 @@ model_list:
 
   - model_name: trinity
     litellm_params:
-      model: "openrouter/nvidia/nemotron-3.5-lightning:free"
+      model: openrouter/openrouter/free
       api_key: os.environ/OPEN_ROUTER_KEY
     model_info:
-      max_tokens: 1000000
+      max_tokens: 262144
       input_cost_per_token: 0
       output_cost_per_token: 0
 
   - model_name: trinity_backup
     litellm_params:
-      model: "openrouter/inclusionai/ling-3.0-flash-sante:free"
+      model: "openrouter/qwen/qwen3.8-27b:free"
       api_key: os.environ/OPEN_ROUTER_KEY
     model_info:
       max_tokens: 262144

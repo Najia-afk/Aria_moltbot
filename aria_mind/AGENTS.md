@@ -193,8 +193,8 @@ Conversational interface for direct user interaction. Inherits core identity fro
 ```yaml
 id: aria_talk
 focus: social
-model: qwen3.5_mlx
-fallback: trinity
+model: trinity
+fallback: trinity_backup
 parent: aria
 skills: [database, llm, moltbook, social, api_client, community, conversation_summary, browser]
 capabilities: [conversation, question_answering, explanation, social_interaction]
@@ -217,11 +217,11 @@ timeout: 300s
 ```yaml
 id: aria-local
 focus: conversational
-model: qwen3.5_mlx
-fallback: trinity
+model: trinity
+fallback: trinity_backup
 parent: aria
 skills: [llm, conversation_summary, api_client, browser]
-capabilities: [conversation, code_assistance, reasoning, analysis, local_inference]
+capabilities: [conversation, code_assistance, reasoning, analysis]
 mind_files: [IDENTITY.md, SOUL.md, SKILLS.md, TOOLS.md]
 context_window: 131072
 max_tokens: 8192

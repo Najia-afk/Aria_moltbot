@@ -274,22 +274,10 @@ class LLMGateway:
         return [primary, *filtered_rest]
 
     @staticmethod
-    def _is_retriable_error(exc: Exception) -> bool:
-        """Best-effort retriable classification for provider/network/transient failures."""
-        msg = str(exc).lower()
-        retriable_markers = (
-            "timeout",
-            "timed out",
-            "rate limit",
-            "429",
-            "503",
-            "502",
-            "connection",
-            "temporar",
-            "overloaded",
-            "service unavailable",
-        )
-        return any(marker in msg for marker in retriable_markers)
+    def _is_openrouter_free_quota_error(exc: Exception) -> bool:
+        """Whether OpenRouter rejected the request at its account-wide free limit."""
+        message = str(exc).lower()
+        return "openrouter_free_tier_daily" in message or "free-models-per-day" in message
 
     def _is_circuit_open(self) -> bool:
         """Check if circuit breaker is open."""
@@ -474,7 +462,7 @@ class LLMGateway:
                 usage = response.usage or {}
 
                 if idx > 0:
-                    logger.warning(
+                    logger.info(
                         "LLM completion fallback succeeded on candidate %s (attempt %d/%d)",
                         candidate,
                         idx + 1,
@@ -506,23 +494,28 @@ class LLMGateway:
                 self._cb.record_failure()
                 safe_fire_and_forget(self._cb_persist(), name="cb-persist-failure")
                 last_error = e
-                retriable = isinstance(e, asyncio.TimeoutError) or self._is_retriable_error(e)
                 has_next = idx < len(candidates) - 1
-                logger.error(
-                    "LLM completion failed on candidate %s (attempt %d/%d, retriable=%s): %s",
-                    candidate,
-                    idx + 1,
-                    len(candidates),
-                    retriable,
-                    e,
-                )
-                # Fall through to the next fallback candidate on ANY error, not
-                # just network/timeout ones -- an auth failure, exhausted
-                # credits, or unresolvable model name on the primary model
-                # should not block trying the next model in the chain. That's
-                # the entire point of having a fallback chain.
-                if has_next:
+                quota_exhausted = self._is_openrouter_free_quota_error(e)
+                # Candidate-specific errors can recover on another free model;
+                # an account-wide free quota cannot.
+                if has_next and not quota_exhausted:
+                    logger.info(
+                        "LLM candidate %s failed; rotating to fallback %s: %s",
+                        candidate,
+                        candidates[idx + 1],
+                        e,
+                    )
                     continue
+                if quota_exhausted:
+                    logger.info("OpenRouter free daily quota exhausted; skipping remaining free candidates")
+                else:
+                    logger.error(
+                        "LLM completion failed on candidate %s (attempt %d/%d): %s",
+                        candidate,
+                        idx + 1,
+                        len(candidates),
+                        e,
+                    )
                 if isinstance(e, asyncio.TimeoutError):
                     raise LLMError(f"LLM completion timed out after {self.LLM_TIMEOUT}s")
                 raise LLMError(f"LLM completion failed: {e}") from e
@@ -615,7 +608,7 @@ class LLMGateway:
                 self._cb.record_success()
                 safe_fire_and_forget(self._cb_persist(), name="cb-persist-stream-ok")
                 if idx > 0:
-                    logger.warning(
+                    logger.info(
                         "LLM streaming fallback succeeded on candidate %s (attempt %d/%d)",
                         candidate,
                         idx + 1,
@@ -637,7 +630,6 @@ class LLMGateway:
                 safe_fire_and_forget(self._cb_persist(), name="cb-persist-stream-fail")
                 last_error = e
 
-                retriable = isinstance(e, asyncio.TimeoutError) or self._is_retriable_error(e)
                 has_next = idx < len(candidates) - 1
 
                 # If we've already emitted any chunk, we cannot safely switch
@@ -647,19 +639,28 @@ class LLMGateway:
                         raise LLMError(f"LLM streaming timed out after {self.LLM_TIMEOUT}s")
                     raise LLMError(f"LLM streaming failed: {e}") from e
 
-                logger.error(
-                    "LLM streaming failed on candidate %s (attempt %d/%d, retriable=%s): %s",
-                    candidate,
-                    idx + 1,
-                    len(candidates),
-                    retriable,
-                    e,
-                )
+                quota_exhausted = self._is_openrouter_free_quota_error(e)
                 # Same reasoning as complete(): try the next candidate on any
                 # pre-stream error (before any chunk has been emitted), not
                 # just retriable ones.
-                if has_next:
+                if has_next and not quota_exhausted:
+                    logger.info(
+                        "LLM streaming candidate %s failed; rotating to fallback %s: %s",
+                        candidate,
+                        candidates[idx + 1],
+                        e,
+                    )
                     continue
+                if quota_exhausted:
+                    logger.info("OpenRouter free daily quota exhausted; skipping remaining free candidates")
+                else:
+                    logger.error(
+                        "LLM streaming failed on candidate %s (attempt %d/%d): %s",
+                        candidate,
+                        idx + 1,
+                        len(candidates),
+                        e,
+                    )
                 if isinstance(e, asyncio.TimeoutError):
                     raise LLMError(f"LLM streaming timed out after {self.LLM_TIMEOUT}s")
                 raise LLMError(f"LLM streaming failed: {e}") from e

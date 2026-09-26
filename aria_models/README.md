@@ -2,7 +2,7 @@
 
 Single source of truth for model definitions and routing.
 
-> Last updated: 2026-03-10  
+> Last updated: 2026-09-26
 > User-facing routing guide: [MODELS.md](../MODELS.md)
 
 - Catalog: `aria_models/models.yaml` (YAML, JSON-compatible)
@@ -13,10 +13,11 @@ Single source of truth for model definitions and routing.
 
 The repo keeps a small curated set of active models:
 
-- `qwen3.5_mlx` — local MLX chat model
+- `qwen3.5_mlx` — local MLX sentiment classifier only
 - `embedding` — local Ollama embedding model
-- `trinity` — free OpenRouter chat model (rotates to whichever free model is live; see models.yaml)
-- `kimi` — paid Moonshot K2.5 long-context model
+- `trinity` — OpenRouter Free Models Router, selects a compatible free model per request
+- `trinity_backup` — Qwen 3.8 27B free fallback
+- `kimi` — paid Moonshot K2.5 for explicit Moonshot skill calls only
 
 ## Quick read (Python)
 
@@ -36,9 +37,9 @@ routing:
 criteria:
   tiers:
     local: [qwen3.5_mlx, embedding]
-    free: [trinity]
+    free: [trinity, trinity_backup]
     paid: [kimi]
 tasks:
-  primary: kimi
+  primary: trinity
   embedding: embedding
 ```

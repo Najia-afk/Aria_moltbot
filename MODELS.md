@@ -2,7 +2,7 @@
 
 ## Strategy
 
-Aria uses a **local-first** LLM strategy: prefer on-device inference (Apple Silicon Metal GPU), fall back to free cloud models, use paid models only as a last resort.
+Aria uses a **free-first** strategy: MLX is reserved for sentiment classification; general work goes through OpenRouter's Free Models Router, with a static free-model fallback. Paid Moonshot calls are explicit only.
 
 All routing goes through [LiteLLM](https://github.com/BerriAI/litellm) with automatic failover and spend tracking.
 
@@ -12,9 +12,9 @@ All routing goes through [LiteLLM](https://github.com/BerriAI/litellm) with auto
 
 | Tier | Strategy | Cost |
 |------|----------|------|
-| **Local** | MLX chat + Ollama embeddings on Apple Silicon | Free |
-| **Free** | Curated OpenRouter free models | Free — rate-limited |
-| **Paid** | Moonshot/Kimi long-context fallback | Per-token billing |
+| **Local** | MLX sentiment + Ollama embeddings on Apple Silicon | Free |
+| **Free** | OpenRouter Free Models Router + Qwen 3.8 fallback | Free — rate-limited |
+| **Paid** | Explicit Moonshot/Kimi skill only | Per-token billing |
 
 The routing priority, fallback chain, and all model definitions are in a single source of truth:
 
@@ -26,10 +26,11 @@ This file defines every model id, provider, tier, context window, and pricing. N
 
 ## Active Models
 
-- `qwen3.5_mlx` — local MLX chat model for fast local work
+- `qwen3.5_mlx` — local MLX sentiment classifier only
 - `embedding` — local Ollama embedding model for semantic memory
-- `trinity` — main OpenRouter free chat model (currently nvidia/nemotron-3.5-lightning:free)
-- `kimi` — Moonshot K2.5 for long-context and summarization tasks
+- `trinity` — OpenRouter Free Models Router; selects an available compatible free model per request
+- `trinity_backup` — Qwen 3.8 27B free fallback
+- `kimi` — Moonshot K2.5, available only for explicit Moonshot calls
 
 ## How It Works
 
@@ -37,16 +38,17 @@ This file defines every model id, provider, tier, context window, and pricing. N
 Aria (or Agent)
      │
      ▼
-LiteLLM Router (:18793)
-     │
-     ├─► Local: MLX Server (host:8080, Metal GPU)
-     ├─► Free:  OpenRouter (Trinity)
-     └─► Paid:  Cloud APIs (fallback only)
+LiteLLM Router
+     ├─► Sentiment: MLX (host:8080)
+     └─► General: OpenRouter Free Models Router
+             └─► Qwen 3.8 free fallback
 ```
 
 - LiteLLM receives a model alias (e.g., `litellm/qwen3.5_mlx`)
 - Routes to the correct provider based on `models.yaml` configuration
-- Automatic failover follows the `routing.fallbacks` chain
+- OpenRouter chooses a currently available free model compatible with request features
+- Automatic fallback stays on free models; the daily account quota is not bypassed by model rotation
+- Kimi is not part of automatic routing
 - All usage is tracked for cost monitoring
 
 ---

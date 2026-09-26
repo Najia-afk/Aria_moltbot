@@ -324,7 +324,7 @@ All cron jobs are defined in `aria_mind/cron_jobs.yaml` and injected at containe
 - **none** â€” Maps to `--no-deliver`. Silent execution.
 
 ### Model Strategy
-- **Routine/lightweight** â†’ `main` agent (kimi primary, qwen3-mlx fallback)
-- **Deep analysis** â†’ delegated to `analyst` (trinity-free for synthesis-only; use tool-capable models for tool execution)
+- **Routine/lightweight** â†’ `main` agent (OpenRouter free router; Qwen 3.8 free fallback)
+- **Deep analysis** â†’ delegated to `analyst` (OpenRouter free router; MLX is sentiment-only)
 - **Social** â†’ delegated to `aria-talk`
 - **Memeothy** â†’ `aria-memeothy` agent (independent)

@@ -75,7 +75,8 @@ Aria's resilience is built in four phases across the Skills layer.
 
 ### Phase 3 — LLM Fallback Chain (S-45)
 - `aria_skills/llm/__init__.py` — `LLMSkill` — new skill.
-- `LLM_FALLBACK_CHAIN` priority list: `litellm/qwen3.5_mlx` (local) → `litellm/trinity` (free) → `litellm/kimi` (paid).
+- `LLM_FALLBACK_CHAIN` comes from `models.yaml`: OpenRouter Free Models Router → Qwen 3.8 free; no local or paid automatic fallback.
+- MLX is reserved for sentiment classification. When OpenRouter's account-wide daily free quota is exhausted, retries stop instead of cycling through other free model IDs.
 - `complete_with_fallback(messages)` iterates chain, skips open circuits, records success/failure per model.
 - `complete(messages, model=None)` pins to a specific model with auto-fallback on failure.
 - `get_circuit_status()` returns live per-model circuit state.

@@ -12,7 +12,7 @@ providers:
     api: openai-completions
 
 # Routing — fallbacks derived from per-model fallback_order
-# Primary is OpenRouter (trinity); only sentiment_tiny (~0.5GB) runs locally.
+# General requests use free OpenRouter models; MLX is reserved for sentiment.
 routing:
   primary: litellm/trinity
   bypass: false
@@ -61,16 +61,15 @@ models:
   #     api_key: os.environ/MY_PROVIDER_KEY     # optional
   #   # Add tags/focus_for/profiles/thinking_params only if that model needs them.
 
-  # ─── LOCAL (disabled — host cannot run this model as a fallback) ──────
+  # ─── LOCAL (sentiment only; excluded from general routing) ────────────
   qwen3.5_mlx:
     provider: litellm
     name: Qwen3.5 4B Instruct (MLX Local)
     alias: Qwen3.5 4B Instruct (MLX Local)
-    _note: 'Disabled: not in routing (no priority/fallback_order/tasks). Manual use only.'
+    _note: 'Dedicated to sentiment classification; excluded from general routing to preserve RAM for the harness.'
     tier: local
-    tasks: []
-    tags: {fast_simple: 1}
-    reasoning: true
+    tasks: [sentiment]
+    reasoning: false
     vision: true
     input: [text, image]
     cost: {input: 0, output: 0, cacheRead: 0, cacheWrite: 0}
@@ -86,27 +85,18 @@ models:
     provider_label: local/mlx
     thinking_params:
       extra_body:
-        enable_thinking: true
+        enable_thinking: false
     profiles:
       sentiment: {temperature: 0.2, max_tokens: 256}
-      devsecops: {temperature: 0.2, max_tokens: 4096}
-      focus_classify: {temperature: 0.1, max_tokens: 32}
-      reflection: {temperature: 0.7, max_tokens: 2048}
-      planning: {temperature: 0.3, max_tokens: 1024}
-      pevr: {temperature: 0.3, max_tokens: 2048}
 
-  # ─── LOCAL (active, ~0.5GB) ─────────────────────────────────────────
+  # ─── LOCAL COMPATIBILITY MODEL (not auto-routed) ─────────────────────
   sentiment_tiny:
     provider: litellm
     name: Qwen2.5 0.5B Instruct (Ollama Local)
     alias: Qwen2.5 0.5B (Sentiment)
-    _note: 'Only resident local chat model. Keeps RAM low on the 16GB host. Not
-      in the general fallback chain — 0.5B/32K-context is unsafe as a blind
-      catch-all for failed agentic/tool-calling completions; reachable only via
-      the sentiment task route.'
+    _note: 'Retained for explicit/manual Ollama use; sentiment routing uses MLX.'
     tier: local
-    tasks: [sentiment]
-    tags: {fast_simple: 1}
+    tasks: []
     reasoning: false
     input: [text]
     cost: {input: 0, output: 0, cacheRead: 0, cacheWrite: 0}
@@ -118,8 +108,6 @@ models:
       api_base: http://host.docker.internal:11434
     provider_label: local/ollama
     thinking_params: {}
-    profiles:
-      sentiment: {temperature: 0.2, max_tokens: 256}
 
   embedding:
     provider: litellm
@@ -148,30 +136,26 @@ models:
   # ─── FREE ────────────────────────────────────────────────────────────
   trinity:
     provider: litellm
-    name: Nemotron 3.5 Lightning (OpenRouter FREE)
-    alias: Nemotron 3.5 Lightning (OpenRouter FREE)
-    _note: 'arcee-ai/trinity-large-preview:free was removed from OpenRouter (404); replaced 2026-09-25.'
+    name: OpenRouter Free Models Router
+    alias: OpenRouter Free Models Router
+    _note: 'Selects an available free model compatible with each request.'
     tier: free
     priority: 2
     fallback_order: 2
-    tasks: [openrouter_default, primary, ollama_default, local_fast, focus_classify, reflection, planning, pevr]
+    tasks: [openrouter_default, primary, ollama_default, local_fast, focus_classify, reflection, planning, pevr, summarization, memory_compression, conversation_summary, token_counting]
     tags: {default: 1, creative_writing: 1}
-    focus_for: [orchestrator, creative, social, journalist, devsecops]
+    focus_for: [orchestrator, creative, social, journalist, devsecops, data, trader]
     reasoning: true
     tool_calling: true
     input: [text]
     cost: {input: 0, output: 0, cacheRead: 0, cacheWrite: 0}
-    contextWindow: 1000000
-    # aria_engine/chat_engine.py falls back to contextWindow for its hard
-    # token-budget limit when safe_prompt_tokens is unset. Without this,
-    # trinity's real 1M window let a cron session balloon to 395k input
-    # tokens / 175s latency before ever triggering compaction — set well
-    # below the raw window so budget enforcement actually engages.
+    contextWindow: 262144
+    # Keep dynamic routing within the smaller free models' context windows.
     safe_prompt_tokens: 120000
     maxTokens: 8192
     routeSkill: litellm
     litellm:
-      model: openrouter/nvidia/nemotron-3.5-lightning:free
+      model: openrouter/openrouter/free
       api_key: os.environ/OPEN_ROUTER_KEY
     provider_label: openrouter
     thinking_params:
@@ -189,15 +173,15 @@ models:
       reflection: {temperature: 0.7, max_tokens: 2048}
       planning: {temperature: 0.3, max_tokens: 1024}
       pevr: {temperature: 0.3, max_tokens: 2048}
+      data: {temperature: 0.3, max_tokens: 4096}
+      trader: {temperature: 0.4, max_tokens: 4096}
+      research: {temperature: 0.2, max_tokens: 8192}
 
-  # Second free fallback — trinity has no live fallback of its own (kimi is
-  # paid/excluded from auto-fallback, qwen3.5_mlx removed for RAM, sentiment_tiny
-  # can't fit agentic prompts). Verified live against OpenRouter across two
-  # separate calls before wiring in (2026-09-25).
+  # Static free fallback if the dynamic router request itself fails.
   trinity_backup:
     provider: litellm
-    name: Ling 3.0 Flash (OpenRouter FREE, backup)
-    alias: Ling 3.0 Flash (OpenRouter FREE, backup)
+    name: Qwen 3.8 27B (OpenRouter FREE, backup)
+    alias: Qwen 3.8 27B (OpenRouter FREE, backup)
     tier: free
     priority: 3
     fallback_order: 3
@@ -211,7 +195,7 @@ models:
     maxTokens: 8192
     routeSkill: litellm
     litellm:
-      model: openrouter/inclusionai/ling-3.0-flash-sante:free
+      model: openrouter/qwen/qwen3.8-27b:free
       api_key: os.environ/OPEN_ROUTER_KEY
     provider_label: openrouter
     thinking_params:
@@ -226,19 +210,9 @@ models:
     provider: litellm
     name: Kimi K2.5 (Moonshot Paid)
     alias: Kimi K2.5 (Moonshot Paid)
+    _note: 'Explicit Moonshot skill only; excluded from general routing and automatic fallbacks.'
     tier: paid
-    priority: 4
-    # Last-resort auto-fallback (2026-09-26): trinity + trinity_backup are
-    # BOTH free OpenRouter models sharing one account-wide daily quota, so
-    # when that's exhausted every autonomous cron job (Work Cycle every
-    # 15min, Memory Bridge, Six Hour Review, etc.) went dark for hours with
-    # no fallback that could actually still respond. Gated by a daily spend
-    # cap in aria_engine/llm_gateway.py (LLM_DAILY_SPEND_CAP_USD, default
-    # $3.00) so this can't run away on unexpected repeated failures.
-    fallback_order: 4
-    tasks: [summarization, memory_compression, conversation_summary, token_counting, moonshot_default]
-    tags: {long_context: 1, complex_reasoning: 1}
-    focus_for: [data, trader]
+    tasks: [moonshot_default]
     reasoning: true
     tool_calling: true
     input: [text]
@@ -254,7 +228,3 @@ models:
       temperature: 1
     provider_label: moonshot
     thinking_params: {}
-    profiles:
-      data: {temperature: 0.3, max_tokens: 4096}
-      trader: {temperature: 0.4, max_tokens: 4096}
-      research: {temperature: 0.2, max_tokens: 8192}

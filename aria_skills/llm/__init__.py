@@ -42,20 +42,10 @@ def _build_fallback_chain() -> list[dict]:
 
         # Build a tier map keyed by the routed alias used throughout the skill.
         models_map: dict[str, str] = {}
-        local_chat_models: list[str] = []
         for model_key, mval in catalog.get("models", {}).items():
             alias = f"litellm/{model_key}"
             tier = mval.get("tier", "paid")
             models_map[alias] = tier
-
-            if tier != "local":
-                continue
-            if mval.get("type") == "embedding":
-                continue
-            if mval.get("maxTokens", 0) <= 0:
-                continue
-
-            local_chat_models.append(alias)
 
         chain = []
         for i, model_id in enumerate(fallbacks):
@@ -69,11 +59,6 @@ def _build_fallback_chain() -> list[dict]:
                 else:
                     tier = "paid"
             chain.append({"model": model_id, "tier": tier, "priority": i + 1})
-
-        # Ensure chat-capable local models from models.yaml are prepended if not in fallbacks.
-        for local_id in reversed(local_chat_models):
-            if not any(entry["model"] == local_id for entry in chain):
-                chain.insert(0, {"model": local_id, "tier": "local", "priority": 0})
 
         return chain
     except Exception:
@@ -185,6 +170,19 @@ class LLMSkill(BaseSkill):
                 model, self._circuit_reset_seconds, count,
             )
 
+    @staticmethod
+    def _is_openrouter_free_quota_error(exc: Exception) -> bool:
+        message = str(exc).lower()
+        response = getattr(exc, "response", None)
+        if response is not None:
+            try:
+                error = response.json().get("error", {})
+                metadata = error.get("metadata", {})
+                message += f" {error.get('message', '')} {metadata.get('limit_source', '')}"
+            except Exception:
+                pass
+        return "openrouter_free_tier_daily" in message or "free-models-per-day" in message
+
     # ─────────────────────────────────────────────────────────────────────────
     # Core completion method
     # ─────────────────────────────────────────────────────────────────────────
@@ -227,6 +225,7 @@ class LLMSkill(BaseSkill):
         chain = chain or LLM_FALLBACK_CHAIN
         tried: list[str] = []
         last_error: Exception | None = None
+        quota_exhausted = False
 
         for model_cfg in sorted(chain, key=lambda m: m.get("priority", 99)):
             model = model_cfg["model"]
@@ -242,10 +241,17 @@ class LLMSkill(BaseSkill):
                 return SkillResult.ok(result)
             except Exception as exc:
                 last_error = exc
+                if self._is_openrouter_free_quota_error(exc):
+                    quota_exhausted = True
+                    self.logger.info("OpenRouter free daily quota exhausted; stopping fallback attempts")
+                    break
                 self._record_failure(model)
-                self.logger.warning(
+                self.logger.debug(
                     "LLM model %s failed (trying next): %s", model, exc
                 )
+
+        if quota_exhausted:
+            return SkillResult.fail("OpenRouter free-model daily quota exhausted")
 
         reason = (
             f"All LLM models in fallback chain unavailable. "

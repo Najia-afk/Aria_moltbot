@@ -21,6 +21,16 @@
         <string>0.0.0.0</string>
         <string>--port</string>
         <string>8080</string>
+        <string>--chat-template-args</string>
+        <string>{"enable_thinking":false}</string>
+        <string>--decode-concurrency</string>
+        <string>1</string>
+        <string>--prompt-concurrency</string>
+        <string>1</string>
+        <string>--prompt-cache-size</string>
+        <string>1</string>
+        <string>--prompt-cache-bytes</string>
+        <string>1073741824</string>
     </array>
     
     <key>RunAtLoad</key>

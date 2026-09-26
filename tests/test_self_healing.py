@@ -125,7 +125,7 @@ async def test_retry_with_exponential_backoff():
 @pytest.mark.asyncio
 async def test_llm_fallback_chain_skips_open_circuit():
     """
-    When primary model (qwen3.5_mlx) circuit is open, complete_with_fallback()
+    When primary model (OpenRouter free router) circuit is open, complete_with_fallback()
     skips it and succeeds via the next available model without any error.
     """
     skill, mock_http, fallback_chain = _make_llm_skill()
@@ -156,6 +156,31 @@ async def test_llm_fallback_chain_skips_open_circuit():
     assert primary not in result.data.get("_aria_fallback_tried", []), (
         "Primary (open circuit) should not appear in tried list"
     )
+
+
+def test_llm_fallback_chain_excludes_local_and_paid_models():
+    _, _, fallback_chain = _make_llm_skill()
+
+    assert [entry["model"] for entry in fallback_chain] == [
+        "litellm/trinity",
+        "litellm/trinity_backup",
+    ]
+    assert all(entry["tier"] == "free" for entry in fallback_chain)
+
+
+@pytest.mark.asyncio
+async def test_llm_skill_stops_after_openrouter_free_daily_quota():
+    skill, mock_http, _ = _make_llm_skill()
+    mock_http.post = AsyncMock(side_effect=Exception(
+        "RateLimitError: free-models-per-day-high-balance; "
+        "limit_source=openrouter_free_tier_daily"
+    ))
+
+    result = await skill.complete_with_fallback([{"role": "user", "content": "hello"}])
+
+    assert result.success is False
+    assert "daily quota exhausted" in result.error.lower()
+    assert mock_http.post.await_count == 1
 
 
 # ─────────────────────────────────────────────────────────────────────────────

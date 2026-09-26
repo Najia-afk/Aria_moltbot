@@ -68,6 +68,57 @@ async def test_complete_raises_after_all_candidates_fail():
             )
 
 
+@pytest.mark.asyncio
+async def test_complete_stops_retrying_on_openrouter_daily_free_quota(monkeypatch):
+    monkeypatch.setenv("LLM_DAILY_SPEND_CAP_USD", "3.0")
+    gateway = LLMGateway(EngineConfig())
+    calls = []
+
+    async def quota_exhausted(**kwargs):
+        calls.append(kwargs["model"])
+        raise Exception(
+            "RateLimitError: free-models-per-day-high-balance; "
+            "limit_source=openrouter_free_tier_daily"
+        )
+
+    from aria_engine.exceptions import LLMError
+
+    with patch("aria_engine.llm_gateway.acompletion", side_effect=quota_exhausted):
+        with pytest.raises(LLMError, match="free-models-per-day"):
+            await gateway.complete(
+                messages=[{"role": "user", "content": "hi"}],
+                model="trinity",
+            )
+
+    assert len(calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_stream_stops_retrying_on_openrouter_daily_free_quota(monkeypatch):
+    monkeypatch.setenv("LLM_DAILY_SPEND_CAP_USD", "3.0")
+    gateway = LLMGateway(EngineConfig())
+    calls = []
+
+    async def quota_exhausted(**kwargs):
+        calls.append(kwargs["model"])
+        raise Exception(
+            "RateLimitError: free-models-per-day-high-balance; "
+            "limit_source=openrouter_free_tier_daily"
+        )
+
+    from aria_engine.exceptions import LLMError
+
+    with patch("aria_engine.llm_gateway.acompletion", side_effect=quota_exhausted):
+        with pytest.raises(LLMError, match="free-models-per-day"):
+            async for _ in gateway.stream(
+                messages=[{"role": "user", "content": "hi"}],
+                model="trinity",
+            ):
+                pass
+
+    assert len(calls) == 1
+
+
 # ---------------------------------------------------------------------------
 # Daily spend cap for the paid (kimi) fallback candidate.
 #
