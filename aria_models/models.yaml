@@ -158,6 +158,10 @@ models:
       model: openrouter/openrouter/free
       api_key: os.environ/OPEN_ROUTER_KEY
     provider_label: openrouter
+    retry_policy:
+      quota_key: openrouter_free_tier_daily
+      quota_error_markers: [openrouter_free_tier_daily, free-models-per-day]
+      quota_cooldown_seconds: 21600
     thinking_params:
       extra_body:
         reasoning: {enabled: false}
@@ -198,6 +202,10 @@ models:
       model: openrouter/qwen/qwen3.8-27b:free
       api_key: os.environ/OPEN_ROUTER_KEY
     provider_label: openrouter
+    retry_policy:
+      quota_key: openrouter_free_tier_daily
+      quota_error_markers: [openrouter_free_tier_daily, free-models-per-day]
+      quota_cooldown_seconds: 21600
     thinking_params:
       extra_body:
         reasoning: {enabled: false}

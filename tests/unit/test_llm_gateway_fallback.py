@@ -119,6 +119,37 @@ async def test_stream_stops_retrying_on_openrouter_daily_free_quota(monkeypatch)
     assert len(calls) == 1
 
 
+@pytest.mark.asyncio
+async def test_catalog_quota_policy_uses_six_hour_cooldown():
+    gateway = LLMGateway(EngineConfig())
+    calls = []
+
+    async def quota_exhausted(**kwargs):
+        calls.append(kwargs["model"])
+        raise Exception(
+            "RateLimitError: free-models-per-day-high-balance; "
+            "limit_source=openrouter_free_tier_daily"
+        )
+
+    from aria_engine.exceptions import LLMError
+
+    with patch("aria_engine.llm_gateway.acompletion", side_effect=quota_exhausted):
+        with pytest.raises(LLMError, match="free-models-per-day"):
+            await gateway.complete(
+                messages=[{"role": "user", "content": "first"}],
+                model="trinity",
+            )
+
+        with pytest.raises(LLMError, match="quota cooldown"):
+            await gateway.complete(
+                messages=[{"role": "user", "content": "second"}],
+                model="trinity",
+            )
+
+    assert len(calls) == 1
+    assert gateway._quota_cooldown_remaining("trinity") >= (6 * 60 * 60) - 2
+
+
 # ---------------------------------------------------------------------------
 # Daily spend cap for the paid (kimi) fallback candidate.
 #

@@ -1,6 +1,6 @@
 # AUTO-GENERATED from aria_models/models.yaml
-# Generated: 2026-09-26T13:53:58Z
-# Source SHA-256: 9736b83690a4171420ebf94962ac14ccd65c8cab4a69d6b9c4ae8f61d2c25965
+# Generated: 2026-09-27T15:34:29Z
+# Source SHA-256: 05adaa520d048852a548084bd0a47ba5df044948c28a44f67ce852ba5262d485
 # Do not hand-edit model_list — edit models.yaml and re-run:
 #   python scripts/generate_litellm_config.py
 

@@ -112,6 +112,7 @@ class LLMGateway:
         self._cb = CircuitBreaker(name="llm", threshold=5, reset_after=30.0)
         self._latency_samples: list[float] = []
         self._spend_cache: tuple[float, float] | None = None  # (monotonic_ts, spend_usd)
+        self._quota_blocked_until: dict[str, float] = {}
 
         # Configure litellm
         # Note: Do NOT set litellm.api_base globally — each model specifies
@@ -273,11 +274,54 @@ class LLMGateway:
         )
         return [primary, *filtered_rest]
 
-    @staticmethod
-    def _is_openrouter_free_quota_error(exc: Exception) -> bool:
-        """Whether OpenRouter rejected the request at its account-wide free limit."""
+    def _get_retry_policy(self, candidate: str) -> dict[str, Any]:
+        """Return the candidate's declarative provider retry policy."""
+        model_id = normalize_model_id(candidate)
+        entry = self._load_models().get("models", {}).get(model_id, {})
+        policy = entry.get("retry_policy", {})
+        return policy if isinstance(policy, dict) else {}
+
+    def _quota_policy_key(self, candidate: str) -> str | None:
+        """Return the shared quota key for a candidate, if configured."""
+        value = self._get_retry_policy(candidate).get("quota_key")
+        return str(value) if value else None
+
+    def _is_quota_error(self, exc: Exception, candidate: str) -> bool:
+        """Match provider quota errors using the candidate's catalog policy."""
+        markers = self._get_retry_policy(candidate).get("quota_error_markers", [])
         message = str(exc).lower()
-        return "openrouter_free_tier_daily" in message or "free-models-per-day" in message
+        return bool(markers) and any(str(marker).lower() in message for marker in markers)
+
+    def _quota_cooldown_remaining(self, candidate: str) -> int:
+        """Return remaining cooldown seconds for the candidate's quota scope."""
+        key = self._quota_policy_key(candidate)
+        if not key:
+            return 0
+        return max(0, int(self._quota_blocked_until.get(key, 0.0) - time.monotonic()))
+
+    def _activate_quota_cooldown(self, candidate: str) -> None:
+        """Start the catalog-defined cooldown for a shared quota scope."""
+        policy = self._get_retry_policy(candidate)
+        key = self._quota_policy_key(candidate)
+        if not key:
+            return
+        try:
+            duration = max(0.0, float(policy.get("quota_cooldown_seconds", 0)))
+        except (TypeError, ValueError):
+            duration = 0.0
+        if duration:
+            self._quota_blocked_until[key] = time.monotonic() + duration
+
+    def _filter_quota_cooldown_candidates(self, candidates: list[str]) -> list[str]:
+        """Skip candidates whose configured shared quota is cooling down."""
+        available: list[str] = []
+        for candidate in candidates:
+            remaining = self._quota_cooldown_remaining(candidate)
+            if remaining:
+                logger.info("Skipping %s during quota cooldown (%ss remaining)", candidate, remaining)
+                continue
+            available.append(candidate)
+        return available
 
     def _is_circuit_open(self) -> bool:
         """Check if circuit breaker is open."""
@@ -393,6 +437,9 @@ class LLMGateway:
             raise LLMError("Circuit breaker open — too many consecutive failures")
 
         candidates = await self._filter_candidates_by_budget(self._build_model_candidates(model))
+        candidates = self._filter_quota_cooldown_candidates(candidates)
+        if not candidates:
+            raise LLMError("All configured LLM candidates are in quota cooldown")
         last_error: Exception | None = None
 
         for idx, candidate in enumerate(candidates):
@@ -491,11 +538,14 @@ class LLMGateway:
                 )
 
             except Exception as e:
-                self._cb.record_failure()
-                safe_fire_and_forget(self._cb_persist(), name="cb-persist-failure")
                 last_error = e
                 has_next = idx < len(candidates) - 1
-                quota_exhausted = self._is_openrouter_free_quota_error(e)
+                quota_exhausted = self._is_quota_error(e, candidate)
+                if quota_exhausted:
+                    self._activate_quota_cooldown(candidate)
+                else:
+                    self._cb.record_failure()
+                    safe_fire_and_forget(self._cb_persist(), name="cb-persist-failure")
                 # Candidate-specific errors can recover on another free model;
                 # an account-wide free quota cannot.
                 if has_next and not quota_exhausted:
@@ -507,7 +557,7 @@ class LLMGateway:
                     )
                     continue
                 if quota_exhausted:
-                    logger.info("OpenRouter free daily quota exhausted; skipping remaining free candidates")
+                    logger.info("Provider quota exhausted; skipping remaining candidates in that quota scope")
                 else:
                     logger.error(
                         "LLM completion failed on candidate %s (attempt %d/%d): %s",
@@ -542,6 +592,9 @@ class LLMGateway:
             raise LLMError("Circuit breaker open — too many consecutive failures")
 
         candidates = await self._filter_candidates_by_budget(self._build_model_candidates(model))
+        candidates = self._filter_quota_cooldown_candidates(candidates)
+        if not candidates:
+            raise LLMError("All configured LLM candidates are in quota cooldown")
         last_error: Exception | None = None
 
         for idx, candidate in enumerate(candidates):
@@ -626,8 +679,6 @@ class LLMGateway:
                 return
 
             except Exception as e:
-                self._cb.record_failure()
-                safe_fire_and_forget(self._cb_persist(), name="cb-persist-stream-fail")
                 last_error = e
 
                 has_next = idx < len(candidates) - 1
@@ -639,7 +690,12 @@ class LLMGateway:
                         raise LLMError(f"LLM streaming timed out after {self.LLM_TIMEOUT}s")
                     raise LLMError(f"LLM streaming failed: {e}") from e
 
-                quota_exhausted = self._is_openrouter_free_quota_error(e)
+                quota_exhausted = self._is_quota_error(e, candidate)
+                if quota_exhausted:
+                    self._activate_quota_cooldown(candidate)
+                else:
+                    self._cb.record_failure()
+                    safe_fire_and_forget(self._cb_persist(), name="cb-persist-stream-fail")
                 # Same reasoning as complete(): try the next candidate on any
                 # pre-stream error (before any chunk has been emitted), not
                 # just retriable ones.
@@ -652,7 +708,7 @@ class LLMGateway:
                     )
                     continue
                 if quota_exhausted:
-                    logger.info("OpenRouter free daily quota exhausted; skipping remaining free candidates")
+                    logger.info("Provider quota exhausted; skipping remaining candidates in that quota scope")
                 else:
                     logger.error(
                         "LLM streaming failed on candidate %s (attempt %d/%d): %s",
